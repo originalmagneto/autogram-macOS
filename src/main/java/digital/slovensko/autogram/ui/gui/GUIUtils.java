@@ -19,6 +19,7 @@ import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.util.ResourceBundle;
 
 public class GUIUtils {
     private static final Logger logger = LoggerFactory.getLogger(GUIUtils.class);
@@ -78,6 +79,8 @@ public class GUIUtils {
             var loader = new FXMLLoader();
             loader.setLocation(controller.getClass().getResource(fxml));
             loader.setController(controller);
+            var language = UserSettings.load().getLanguageOrDefault();
+            loader.setResources(ResourceBundle.getBundle("digital.slovensko.autogram.ui.gui.language.l10n", language.getLocale()));
             return loader.load();
         } catch (IOException e) {
             throw new RuntimeException(e);
