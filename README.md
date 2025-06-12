@@ -1,142 +1,100 @@
 # Autogram
 [🇸🇰 Slovenská verzia](README-SK.md)
 
-Autogram is a desktop app for signing and verifying documents (eIDAS compliant) on macOS, Windows, and Linux.
-It supports GUI workflows, CLI usage, and local HTTP API integration.
+Autogram is a multi-platform (Windows, MacOS, Linux) desktop JavaFX application for signing and verifying documents in accordance with the European eIDAS regulation. Users can sign files directly or easily integrate the application into their own (web) information system using HTTP API. Signing can also be initiated from the command line, which is suitable for batch signing large numbers of files at once.
+
+**Installation packages for Windows, MacOS, and Linux are available in the [Releases](https://github.com/slovensko-digital/autogram/releases) section.** If you want to use Autogram on existing Slovak government websites, you will need to install a [browser extension](https://github.com/slovensko-digital/autogram-extension#readme) as well.
 
 ![Screenshot](assets/autogram-screenshot-en.png?raw=true)
 
-## What You Get
-
-- Native desktop application (JavaFX)
-- Document signing and signature validation
-- Local HTTP API for integration with web/information systems
-- CLI mode for batch signing
-- PKCS#11 token support + selected native card integrations
-
-## Download and Install
-
-Use packages from [GitHub Releases](../../releases):
-
-- macOS: `.dmg` (recommended) or `.pkg`
-- Windows: `.msi`/`.exe`
-- Linux: `.deb`/`.rpm`
-
-### macOS quick start
-
-1. Download latest `.dmg` from [Releases](../../releases).
-2. Open the DMG and drag **Autogram.app** to **Applications**.
-3. Launch Autogram from Applications.
-
-### macOS (unsigned build) first run
-
-If a release is **not notarized/signed by Apple Developer ID**, macOS Gatekeeper may block first launch.
-
-Use one of these methods:
-
-1. Finder -> Applications -> right click **Autogram.app** -> **Open** -> confirm **Open**.
-2. System Settings -> Privacy & Security -> find blocked app message -> **Open Anyway**.
-
-If you still get launch issues, run:
-
-```bash
-xattr -dr com.apple.quarantine "/Applications/Autogram.app"
-codesign --force --deep --sign - --timestamp=none "/Applications/Autogram.app"
-open -a "/Applications/Autogram.app"
-```
-
-## Run Locally (Developers)
-
-### Prerequisites
-
-- JDK 24 with JavaFX (Liberica JDK with FX recommended)
-- Maven (or Maven Wrapper `./mvnw`)
-
-### Build
-
-```bash
-./mvnw -Psystem-jdk -DskipTests package
-```
-
-`./mvnw package` prepares artifacts in `target/` and runs `jpackage`.
-For unsigned macOS builds, keep `mac.sign=0` in
-`src/main/resources/digital/slovensko/autogram/build.properties`.
-
-macOS artifacts are produced in `target/` (typically `.dmg`, `.pkg`, and `app-image/Autogram.app`).
-
-### Run from classes
-
-```bash
-./mvnw -Psystem-jdk -DskipTests compile dependency:copy-dependencies
-java -cp "target/classes:target/dependency/*" digital.slovensko.autogram.Main
-```
-
-### macOS QA helper scripts
-
-```bash
-./scripts/macos-update-check.sh
-./scripts/macos-ui-smoke.sh
-```
 
 ## Integration
 
-- Local API docs after startup: `http://localhost:37200/docs`
-- OpenAPI file: `src/main/resources/digital/slovensko/autogram/server/server.yml`
-- URL handler protocol: `autogram://go`
+Swagger documentation for the HTTP API is [available on GitHub](https://generator3.swagger.io/index.html?url=https://raw.githubusercontent.com/slovensko-digital/autogram/main/src/main/resources/digital/slovensko/autogram/server/server.yml) or after starting the application at http://localhost:37200/docs.
 
-## Supported Signature Types
+You can trigger the application to run directly from a web browser by opening an address with the special protocol `autogram://`. For example, via `autogram://go`.
 
-- PAdES (PDF)
-- XAdES (XML)
-- CAdES (binary)
-- eForms
+## Console Mode
 
-## Supported Cards and Tokens
+Autogram can also be run from the command line (CLI mode). Detailed information about the switches is described in the help after running `autogram --help`, or `autogram-cli --help` on Windows.
 
-- Any PKCS#11-compatible card/token (with configured driver path)
-- Native support for selected cards (e.g., Slovak eID, Czech eObčanka, I.CA SecureStore, MONET+ ProID+Q, Gemalto IDPrime 940)
+### Styling
 
-### Windows Packaging Note (WiX)
+The application currently supports only one style - the state IDSK design. Additional styles are planned. However, styling already happens exclusively through cascading style sheets, see [idsk.css](https://github.com/slovensko-digital/autogram/blob/main/src/main/resources/digital/slovensko/autogram/ui/gui/idsk.css)
 
-If packaging on Windows fails with:
+## Supported Cards
 
+Currently, we support commonly used cards and their drivers:
+- Any PKCS#11 compatible card (by setting a path to driver)
+- Native support: Slovak ID card (eID client), I.CA SecureStore, MONET+ ProID+Q, Gemalto IDPrime 940
+
+Adding more cards is relatively easy as long as they use PKCS#11.
+
+## Development
+
+### Prerequisites
+
+- JDK 21 with JavaFX (see below)
+- Maven
+- Optional: Visual Studio Code as IDE or Intellij IDEA (community version is sufficient).
+
+We recommend using Liberica JDK, which includes JavaFX, making everything simpler. After calling `./mvnw initialize`, it should download to `target/jdkCache`.
+
+### Build
+
+Running `./mvnw package` prepares everything in `./target`:
+
+- `dependency-jars/`
+- `preparedJDK/` - JLink JDK (JRE) prepared for bundling with the application.
+- `autogram-*.jar` - JAR with the application
+
+Then using `jpackage`, it creates all executable packages (.msi/.exe, .dmg/.pkg, and .rpm/.deb).
+
+```sh
+./mvnw versions:set -DnewVersion=$(git describe --tags --abbrev=0 | sed -r 's/^v//g')
+./mvnw package
+```
+
+#### Debian/Ubuntu
+
+```sh
+sudo apt install openjdk-21-jdk maven binutils rpm fakeroot
+```
+
+#### Fedora
+
+```sh
+sudo dnf install java-21-openjdk maven rpm-build
+```
+
+#### Linux Docker compose
+
+There is a `docker-compose.yml` with 3 services to package 3 Linux distributables - `Ubuntu 22.04`, `Debian 11` and `Fedora 41`. Run:
+
+```
+docker compose up --build
+```
+
+And the resulting packages will appear in `packaging/output/`.
+
+#### WiX Tools
+In case of the following error:
 > Can not find WiX tools (light.exe, candle.exe)
+> Download WiX 3.0 or later from https://wixtoolset.org and add it to the PATH.
 
-install WiX v3 and add it to `PATH`:
-- [WiX website](https://wixtoolset.org)
-- [WiX v3 releases](https://github.com/wixtoolset/wix3/releases)
+Download it from https://github.com/wixtoolset/wix3/releases and add it to PATH (it is installed without prompt into `C:\Program Files (x86)\WiX Toolset v3.14`)
 
-## Releases for macOS Maintainers
 
-This repository includes a workflow that publishes releases with macOS `.dmg` and `.pkg`:
+## Authors and Sponsors
 
-- file: `.github/workflows/package.yaml`
-- triggers:
-1. push tag `v*.*.*`
-2. manual run via `workflow_dispatch`
-
-To publish:
-
-1. Push a tag, e.g. `v1.2.3`
-2. GitHub Actions builds on macOS and creates a GitHub Release with installers attached
-
-## Upstream Sync (Original Autogram)
-
-This fork can be updated from upstream, but expect non-trivial merge work because both upstream and this fork changed significantly.
-
-Current status snapshot:
-- local-only commits: 73
-- upstream-only commits: 78
-- changed files in divergence range: ~165
-
-Recommended approach:
-1. Sync from upstream tag-to-tag (for example `v2.5.x` -> `v2.6.x` -> `v2.7.x`), not as one huge merge.
-2. Keep your macOS UI/UX and packaging changes isolated in dedicated commits.
-3. Re-run UI smoke checks after each sync step.
+Jakub Ďuraš, Slovensko.Digital, CRYSTAL CONSULTING, s.r.o, Solver IT s.r.o. and other co-authors.
 
 ## License
 
-Licensed under **EUPL v1.2**.
+This software is licensed under EUPL v1.2, originally derived from the Octosign White Label project by Jakub Ďuraš, which is licensed under MIT license, and with the author's permission, this version is distributed under EUPL v1.2 license.
 
-Originally derived from Octosign White Label (MIT) with author permission for EUPL distribution.
-See [LICENSE](LICENSE) for the full text.
+In short, this means that you can freely use this software commercially and non-commercially, you can create your own versions, all provided that you also publish any of your changes and extensions under the same license and preserve the original copyright of the original authors. The software is provided "as is", without warranties.
+
+This project is built exclusively on open-source software, which also allows its use both commercially and non-commercially.
+
+Specifically, we mainly use [GPLv2+Classpath Exception license](https://openjdk.java.net/legal/gplv2+ce.html) and EU Digital Signature Service under the [LGPL-2.1](https://github.com/esig/dss/blob/master/LICENSE) license.
