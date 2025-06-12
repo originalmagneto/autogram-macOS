@@ -96,6 +96,16 @@ java -cp "target/classes:target/dependency/*" digital.slovensko.autogram.Main
 - Any PKCS#11-compatible card/token (with configured driver path)
 - Native support for selected cards (e.g., Slovak eID, Czech eObčanka, I.CA SecureStore, MONET+ ProID+Q, Gemalto IDPrime 940)
 
+### Windows Packaging Note (WiX)
+
+If packaging on Windows fails with:
+
+> Can not find WiX tools (light.exe, candle.exe)
+
+install WiX v3 and add it to `PATH`:
+- [WiX website](https://wixtoolset.org)
+- [WiX v3 releases](https://github.com/wixtoolset/wix3/releases)
+
 ## Releases for macOS Maintainers
 
 This repository includes a workflow that publishes releases with macOS `.dmg` and `.pkg`:
