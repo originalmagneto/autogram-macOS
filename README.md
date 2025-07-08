@@ -58,6 +58,10 @@ open -a "/Applications/Autogram.app"
 ./mvnw -Psystem-jdk -DskipTests package
 ```
 
+`./mvnw package` prepares artifacts in `target/` and runs `jpackage`.
+For unsigned macOS builds, keep `mac.sign=0` in
+`src/main/resources/digital/slovensko/autogram/build.properties`.
+
 macOS artifacts are produced in `target/` (typically `.dmg`, `.pkg`, and `app-image/Autogram.app`).
 
 ### Run from classes
