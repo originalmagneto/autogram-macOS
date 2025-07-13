@@ -5,7 +5,7 @@ import org.checkerframework.checker.nullness.qual.Nullable;
 import java.util.Locale;
 
 public enum SupportedLanguage {
-    SLOVAK(new Locale("sk", "SK")),
+    SLOVAK(new Locale.Builder().setLanguage("sk").setRegion("SK").build()),
     ENGLISH(Locale.ENGLISH);
 
     public static final SupportedLanguage DEFAULT = SLOVAK;
