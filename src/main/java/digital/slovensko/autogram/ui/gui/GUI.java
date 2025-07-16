@@ -555,7 +555,7 @@ public class GUI implements UI {
         var root = GUIUtils.loadFXML(controller, "ignorable-exception-dialog.fxml");
 
         var stage = new Stage();
-        stage.setTitle("Chyba pri zobrazovaní dokumentu");
+        stage.setTitle(controller.i18n("error.ignorable.title"));
         stage.setScene(new Scene(root));
         stage.setResizable(false);
         stage.initModality(Modality.WINDOW_MODAL);
