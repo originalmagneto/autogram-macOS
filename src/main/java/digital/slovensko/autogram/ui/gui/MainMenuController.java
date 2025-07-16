@@ -9,6 +9,7 @@ import digital.slovensko.autogram.core.errors.NoFilesSelectedException;
 import digital.slovensko.autogram.core.errors.UnrecognizedException;
 import digital.slovensko.autogram.ui.BatchGuiFileResponder;
 import digital.slovensko.autogram.ui.SaveFileResponder;
+import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.scene.Node;
 import javafx.scene.Scene;
@@ -41,8 +42,28 @@ public class MainMenuController implements SuppressedFocusController {
         if (menuBar != null) {
             menuBar.useSystemMenuBarProperty().set(true);
         }
+        
+        // Enhanced keyboard navigation
+        dropZone.setFocusTraversable(true);
+        dropZone.setOnKeyPressed(event -> {
+            if (event.getCode().toString().equals("SPACE") || event.getCode().toString().equals("ENTER")) {
+                onUploadButtonAction();
+                event.consume();
+            }
+        });
+        
         dropZone.setOnDragOver(event -> {
-            event.acceptTransferModes(TransferMode.ANY);
+            if (event.getDragboard().hasFiles()) {
+                event.acceptTransferModes(TransferMode.COPY);
+                if (!dropZone.getStyleClass().contains("autogram-dropzone-active")) {
+                    dropZone.getStyleClass().add("autogram-dropzone-active");
+                }
+            }
+            event.consume();
+        });
+        
+        dropZone.setOnDragExited(event -> {
+            dropZone.getStyleClass().remove("autogram-dropzone-active");
             event.consume();
         });
 
@@ -55,7 +76,26 @@ public class MainMenuController implements SuppressedFocusController {
         });
 
         dropZone.setOnDragDropped(event -> {
-            onFilesSelected(event.getDragboard().getFiles());
+            var dragboard = event.getDragboard();
+            boolean success = false;
+            
+            if (dragboard.hasFiles()) {
+                var files = dragboard.getFiles();
+                try {
+                    onFilesSelected(files);
+                    success = true;
+                } catch (Exception e) {
+                    // Handle file processing errors gracefully
+                    System.err.println("Error processing dropped files: " + e.getMessage());
+                    autogram.onSigningFailed(new UnrecognizedException(e));
+                }
+            }
+            
+            // Remove active styling
+            dropZone.getStyleClass().remove("autogram-dropzone-active");
+            
+            event.setDropCompleted(success);
+            event.consume();
         });
     }
 
@@ -150,6 +190,7 @@ public class MainMenuController implements SuppressedFocusController {
         autogram.onAboutInfo();
     }
 
+    @FXML
     public void onSettingButtonAction() {
         var controller = new SettingsDialogController(userSettings);
         var root = GUIUtils.loadFXML(controller, "settings-dialog.fxml");
@@ -160,6 +201,11 @@ public class MainMenuController implements SuppressedFocusController {
         stage.setResizable(false);
         stage.initModality(Modality.APPLICATION_MODAL);
         stage.show();
+    }
+
+    @FXML
+    public void onQuitButtonAction() {
+        Platform.exit();
     }
 
     @Override
