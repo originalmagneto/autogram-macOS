@@ -19,6 +19,8 @@
                         <MenuItem text="O Autograme" onAction="#onAboutButtonAction" accelerator="shortcut+I"/>
                         <MenuItem text="Nastavenia" onAction="#onSettingButtonAction" accelerator="shortcut+COMMA"/>
                         <SeparatorMenuItem/>
+                        <MenuItem text="Skontrolovať aktualizácie" onAction="#onCheckUpdateButtonAction"/>
+                        <SeparatorMenuItem/>
                         <MenuItem text="Ukončiť" onAction="#onQuitButtonAction" accelerator="shortcut+Q"/>
                     </items>
                 </Menu>
