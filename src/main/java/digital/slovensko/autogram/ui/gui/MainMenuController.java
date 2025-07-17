@@ -204,6 +204,11 @@ public class MainMenuController implements SuppressedFocusController {
     }
 
     @FXML
+    public void onCheckUpdateButtonAction() {
+        autogram.checkForUpdate();
+    }
+
+    @FXML
     public void onQuitButtonAction() {
         Platform.exit();
     }
