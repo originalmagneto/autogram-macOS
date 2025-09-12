@@ -26,16 +26,10 @@ public class AutogramServer {
     private final HttpServer server;
     private final Autogram autogram;
 
-    public AutogramServer(Autogram autogram, String hostname, int port, boolean isHttps, ExecutorService executorService) {
+    public AutogramServer(Autogram autogram, String hostname, int port, boolean isHttps, ExecutorService executorService, ResourceBundle languageResources) {
         this.autogram = autogram;
-        this.server = buildServer(hostname, port, isHttps);
+        this.server = buildServer(hostname, port, isHttps, languageResources);
         this.server.setExecutor(executorService);
-    }
-
-    // Compatibility bridge with upstream constructor that accepts language resources.
-    public AutogramServer(Autogram autogram, String hostname, int port, boolean isHttps, ExecutorService executorService,
-            ResourceBundle languageResources) {
-        this(autogram, hostname, port, isHttps, executorService);
     }
 
     public void start() {
@@ -66,8 +60,10 @@ public class AutogramServer {
         server.start();
     }
 
-    private HttpServer buildServer(String hostname, int port, boolean isHttps) {
+    private HttpServer buildServer(String hostname, int port, boolean isHttps, ResourceBundle languageResources) {
         try {
+            ErrorResponseBuilder.init(languageResources);
+
             if (!isHttps)
                 return HttpServer.create(new InetSocketAddress(hostname, port), 0);
 
