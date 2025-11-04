@@ -53,6 +53,7 @@ public class DefaultDriverDetector implements DriverDetector {
     private List<TokenDriver> getWindowsDrivers() {
         return List.of(
             new PKCS11TokenDriver("Občiansky preukaz (eID klient)", Path.of("C:\\Program Files (x86)\\eID_klient\\pkcs11_x64.dll"), TokenDriverShortnames.EID, HELPER_TEXT_EID),
+            new PKCS11TokenDriver("Občiansky preukaz (eID klient)", Path.of("C:\\Program Files\\eID_klient\\pkcs11_x64.dll"), TokenDriverShortnames.EID, HELPER_TEXT_EID),
             new PKCS11TokenDriver("eObčanka", Path.of("C:\\Windows\\System32\\eopproxyp11.dll"), TokenDriverShortnames.CZ_EID, HELPER_TEXT_CZ_EID),
             new PKCS11TokenDriver("I.CA SecureStore", Path.of("C:\\Windows\\System32\\SecureStorePkcs11.dll"), TokenDriverShortnames.SECURE_STORE, HELPER_TEXT_SECURE_STORE),
             new PKCS11TokenDriver("MONET+ ProID+Q", Path.of( "C:\\Windows\\system32\\proidqcm11.dll"), TokenDriverShortnames.MONET, HELPER_TEXT_MONET),
