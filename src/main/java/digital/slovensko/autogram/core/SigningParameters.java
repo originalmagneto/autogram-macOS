@@ -102,7 +102,6 @@ public class SigningParameters {
             // If the document is not an XML Datacontainer, ignore eForm attributes.
             if (!AutogramMimeType.isXDC(extractedDocumentMimeType) && eFormAttributes.transformation() != null)
                 throw new SigningParametersException(XSLT_NO_XDC);
-
             eFormAttributes = new EFormAttributes(null, null, null, null, null, null, false);
         }
 
