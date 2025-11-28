@@ -95,6 +95,8 @@ public class SigningParameters {
             if (packaging == null) packaging = SignaturePackaging.ENVELOPING;
             if (!AutogramMimeType.isXML(extractedDocumentMimeType) && !AutogramMimeType.isXDC(extractedDocumentMimeType))
                 throw new SigningParametersException(WRONG_MIME_TYPE);
+        } else {
+            eFormAttributes = new EFormAttributes(null, null, null, null, null, null, false);
         }
 
         var isXdcEform = eFormAttributes.containerXmlns() != null
