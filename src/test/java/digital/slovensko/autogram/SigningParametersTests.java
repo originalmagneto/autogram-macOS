@@ -473,7 +473,6 @@ public class SigningParametersTests {
 
         Assertions.assertNotNull(params);
     }
-
     @ParameterizedTest
     @MethodSource("digital.slovensko.autogram.TestMethodSources#embeddedOrsrDocumentsProvider")
     void testDoesNotThrowWithEmbeddedXdcWithoutAutoLoad(DSSDocument document) {
