@@ -10,8 +10,6 @@ import javax.xml.parsers.ParserConfigurationException;
 
 import digital.slovensko.autogram.core.*;
 import digital.slovensko.autogram.core.eforms.dto.EFormAttributes;
-import digital.slovensko.autogram.core.visualization.UnsupportedVisualization;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.xml.sax.SAXException;
 
@@ -44,11 +42,6 @@ public class TransformationTests {
                                 "crystal_test_data/PovolenieZdravotnictvo.html.xslt")
                         .readAllBytes());
 
-                var schema = new String(this.getClass()
-                        .getResourceAsStream(
-                                "crystal_test_data/rozhodnutie_X4564-2.xsd")
-                        .readAllBytes());
-
                 var document = new InMemoryDocument(
                         this.getClass().getResourceAsStream(
                                 "crystal_test_data/rozhodnutie_X4564-2.xml"),
@@ -66,7 +59,7 @@ public class TransformationTests {
                     new EFormAttributes(
                         "id1/asa",
                         transformation,
-                        schema,
+                        "<xsd/>",
                         "http://data.gov.sk/def/container/xmldatacontainer+xml/1.1",
                         null,
                         null,
@@ -127,11 +120,6 @@ public class TransformationTests {
                                 "crystal_test_data/PovolenieZdravotnictvo.sb.xslt")
                         .readAllBytes());
 
-                var schema = new String(this.getClass()
-                        .getResourceAsStream(
-                                "crystal_test_data/rozhodnutie_X4564-2.xsd")
-                        .readAllBytes());
-
                 var document = new InMemoryDocument(
                         this.getClass().getResourceAsStream(
                                 "crystal_test_data/rozhodnutie_X4564-2.xml"),
@@ -149,7 +137,7 @@ public class TransformationTests {
                     new EFormAttributes(
                         "id1/asa",
                         transformation,
-                        schema,
+                        "<xsd/>",
                         "http://data.gov.sk/def/container/xmldatacontainer+xml/1.1",
                         null,
                         null,
