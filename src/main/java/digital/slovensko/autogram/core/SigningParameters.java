@@ -95,24 +95,21 @@ public class SigningParameters {
             if (packaging == null) packaging = SignaturePackaging.ENVELOPING;
             if (!AutogramMimeType.isXML(extractedDocumentMimeType) && !AutogramMimeType.isXDC(extractedDocumentMimeType))
                 throw new SigningParametersException(WRONG_MIME_TYPE);
-        } else {
-            eFormAttributes = new EFormAttributes(null, null, null, null, null, null, false);
         }
 
         var isXdcEform = eFormAttributes.containerXmlns() != null
                 && eFormAttributes.containerXmlns().contains("xmldatacontainer");
 
-        if ((AutogramMimeType.isXDC(extractedDocumentMimeType) || AutogramMimeType.isXML(extractedDocumentMimeType)) && isXdcEform)
+        if ((AutogramMimeType.isXDC(extractedDocumentMimeType) || AutogramMimeType.isXML(extractedDocumentMimeType)) && isXdcEform) {
             XDCValidator.validateXml(
                     eFormAttributes.schema(), eFormAttributes.transformation(), extractedDocument,
                     propertiesCanonicalization, digestAlgorithm, eFormAttributes.embedUsedSchemas());
-        else {
-            // If the document is not an XML Datacontainer, ignore eForm attributes.
-            if (eFormAttributes.containerXmlns() == null || !eFormAttributes.containerXmlns().contains("xmldatacontainer")) {
-                if (eFormAttributes.transformation() != null)
-                    throw new SigningParametersException(XSLT_NO_XDC);
-                eFormAttributes = new EFormAttributes(null, null, null, null, null, null, false);
-            }
+        } else {
+            // if the document is not an XML resulting in XML Datacontainer, ignore all eForm attributes (mainly transformation)
+            if (eFormAttributes.transformation() != null)
+                throw new SigningParametersException(XSLT_NO_XDC);
+
+            eFormAttributes = new EFormAttributes(null, null, null, null, null, null, false);
         }
 
         if (!plainXmlEnabled && (AutogramMimeType.isXML(extractedDocumentMimeType) || AutogramMimeType.isXDC(extractedDocumentMimeType)) && (eFormAttributes.transformation() == null))
