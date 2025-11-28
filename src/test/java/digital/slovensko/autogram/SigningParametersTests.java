@@ -242,4 +242,17 @@ public class SigningParametersTests {
                         xdcXmlns, null, null, false), false, null, false, 800, document, tspSource, true));
     }
 
+    @Test
+    void testTransformationWithoutXdcXmlnsThrowsSigningParametersException() throws IOException {
+        var transformation = new String(this.getClass().getResourceAsStream("crystal_test_data/PovolenieZdravotnictvo.sb.xslt").readAllBytes());
+        var schema = new String(this.getClass().getResourceAsStream("crystal_test_data/rozhodnutie_X4564-2.xsd").readAllBytes());
+        var document = new InMemoryDocument(this.getClass().getResourceAsStream("crystal_test_data/rozhodnutie_X4564-2.xml"), "rozhodnutie_X4564-2.xml");
+
+        Assertions.assertThrows(SigningParametersException.class,
+                () -> SigningParameters.buildParameters(SignatureLevel.XAdES_BASELINE_B, null, asice, enveloping,
+                        false, inclusive, inclusive, inclusive,
+                        new EFormAttributes("id1/asa", transformation, schema, null, null, null, false),
+                        false, null, false, 800, document, null, true));
+    }
+
 }
