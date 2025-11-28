@@ -23,6 +23,7 @@ import eu.europa.esig.dss.pades.PAdESSignatureParameters;
 import eu.europa.esig.dss.spi.x509.tsp.TSPSource;
 import eu.europa.esig.dss.xades.XAdESSignatureParameters;
 
+import static digital.slovensko.autogram.core.errors.SigningParametersException.Error.WRONG_MIME_TYPE;
 import static digital.slovensko.autogram.core.errors.SigningParametersException.Error.XSLT_NO_XDC;
 
 public class SigningParameters {
@@ -97,19 +98,12 @@ public class SigningParameters {
                         eFormAttributes.schema(), eFormAttributes.transformation(), extractedDocument,
                         propertiesCanonicalization, digestAlgorithm, eFormAttributes.embedUsedSchemas());
             else
-                throw new SigningParametersException("Nesprávny typ dokumentu", "Zadaný dokument nemožno podpísať ako elektronický formulár v XML Datacontaineri");
+                throw new SigningParametersException(WRONG_MIME_TYPE);
         } else {
             // If the document is not an XML Datacontainer, ignore eForm attributes.
             if (!AutogramMimeType.isXDC(extractedDocumentMimeType) && eFormAttributes.transformation() != null)
                 throw new SigningParametersException(XSLT_NO_XDC);
             eFormAttributes = new EFormAttributes(null, null, null, null, null, null, false);
-        }
-
-        if (!AutogramMimeType.isXDC(extractedDocumentMimeType)) {
-            // If the document is not XDC and no valid xmldatacontainer namespace is requested,
-            // ignore eForm attributes (mainly transformation) to avoid applying arbitrary XSLT.
-            if (eFormAttributes.containerXmlns() == null || !eFormAttributes.containerXmlns().contains("xmldatacontainer"))
-                eFormAttributes = new EFormAttributes(null, null, null, null, null, null, false);
         }
 
         if (!plainXmlEnabled && (AutogramMimeType.isXML(extractedDocumentMimeType) || AutogramMimeType.isXDC(extractedDocumentMimeType)) && (eFormAttributes.transformation() == null))
