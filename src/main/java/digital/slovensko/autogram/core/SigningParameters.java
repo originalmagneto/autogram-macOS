@@ -102,6 +102,7 @@ public class SigningParameters {
                     eFormAttributes.schema(), eFormAttributes.transformation(), extractedDocument,
                     propertiesCanonicalization, digestAlgorithm, eFormAttributes.embedUsedSchemas());
         else {
+            // If the document is not an XML Datacontainer, ignore eForm attributes.
             if (eFormAttributes.containerXmlns() == null || !eFormAttributes.containerXmlns().contains("xmldatacontainer")) {
                 if (eFormAttributes.transformation() != null)
                     throw new SigningParametersException(XSLT_NO_XDC);
