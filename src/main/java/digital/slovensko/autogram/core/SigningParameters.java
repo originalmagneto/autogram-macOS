@@ -99,7 +99,7 @@ public class SigningParameters {
             else
                 throw new SigningParametersException("Nesprávny typ dokumentu", "Zadaný dokument nemožno podpísať ako elektronický formulár v XML Datacontaineri");
         } else {
-            // If the document is not an XML resulting in XML Datacontainer, ignore eForm attributes.
+            // If the document is not an XML Datacontainer, ignore eForm attributes.
             if (!AutogramMimeType.isXDC(extractedDocumentMimeType) && eFormAttributes.transformation() != null)
                 throw new SigningParametersException(XSLT_NO_XDC);
 
