@@ -94,9 +94,15 @@ public class SigningParameters {
                 XDCValidator.validateXml(
                         eFormAttributes.schema(), eFormAttributes.transformation(), extractedDocument,
                         propertiesCanonicalization, digestAlgorithm, eFormAttributes.embedUsedSchemas());
-
             else
                 throw new SigningParametersException("Nesprávny typ dokumentu", "Zadaný dokument nemožno podpísať ako elektronický formulár v XML Datacontaineri");
+        }
+
+        if (!AutogramMimeType.isXDC(extractedDocumentMimeType)) {
+            // If the document is not XDC and no valid xmldatacontainer namespace is requested,
+            // ignore eForm attributes (mainly transformation) to avoid applying arbitrary XSLT.
+            if (eFormAttributes.containerXmlns() == null || !eFormAttributes.containerXmlns().contains("xmldatacontainer"))
+                eFormAttributes = new EFormAttributes(null, null, null, null, null, null, false);
         }
 
         if (!plainXmlEnabled && (AutogramMimeType.isXML(extractedDocumentMimeType) || AutogramMimeType.isXDC(extractedDocumentMimeType)) && (eFormAttributes.transformation() == null))
