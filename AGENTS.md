@@ -32,8 +32,9 @@ export JAVA_HOME=$(dirname $(dirname $(readlink -f $(which java))))
 # Development build (compile only)
 ./mvnw compile -Psystem-jdk -DskipTests
 
-# Full build with dependencies
+# Full build with dependencies (Create macOS .app)
 ./mvnw package -Psystem-jdk -DskipTests
+# Note: On macOS, this generates target/app-image/Autogram.app
 
 # Build with tests
 ./mvnw test -Psystem-jdk

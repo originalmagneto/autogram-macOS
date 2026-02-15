@@ -250,29 +250,34 @@ if [[ "${platform}" == "mac" ]]; then
     cp "./Info.plist.template" "./Info.plist"
     sed -i.bak "s/PROTOCOL_NAME/${properties_protocol}/g" "./Info.plist" && rm "./Info.plist.bak"
 
-    arguments+=(
+    # Base arguments for app-image creation
+    appImageArguments=()
+    appImageArguments+=(
+        "--input" "${appDirectory}"
+        "--runtime-image" "${jdkDirectory}"
+        "--main-jar" "autogram.jar"
+        "--app-version" "${properties_version:-$version}"
+        "--copyright" "${properties_copyright}"
+        "--vendor" "${properties_vendor}"
+        "--resource-dir" "./"
+        "--description" "${properties_description}"
         "--name" "${properties_name}"
-        "--type" "pkg"
         "--icon" "./Autogram.icns"
         "--java-options" "${jvmOptions}"
         "--mac-app-category" "${properties_mac_appCategory:-business}"
-        # Building on mac requires modifying of image files
-        # So the temp files have to be on relative path
         "--temp" "./DTempFiles"
+        "--type" "app-image"
     )
 
     if [[ -n "${properties_mac_identifier}" ]]; then
-        arguments+=(
-            "--mac-package-identifier" "${properties_mac_identifier}"
-        )
+        appImageArguments+=("--mac-package-identifier" "${properties_mac_identifier}")
     fi
 
     if [[ -n "${properties_mac_name}" ]]; then
-        arguments+=(
-            "--mac-package-name" "${properties_mac_name}"
-        )
+        appImageArguments+=("--mac-package-name" "${properties_mac_name}")
     fi
 
+    signingArguments=()
     if [[ "${properties_mac_sign}" == "1" ]]; then
         export JPACKAGE_MAC_SIGN="1"
         if [[ -z "${APPLE_DEVELOPER_IDENTITY}" ]] || [[ -z "${APPLE_KEYCHAIN_PATH}" ]]; then
@@ -281,7 +286,7 @@ if [[ "${platform}" == "mac" ]]; then
         fi
 
         mac_signingKeyUserName=$(echo ${APPLE_DEVELOPER_IDENTITY} | sed -ne 's/Developer ID Application\:[[:space:]]\(.*\)[[:space:]]([0-9A-Z]*)/\1/p')
-        arguments+=(
+        signingArguments=(
             "--mac-sign"
             "--mac-signing-keychain" "${APPLE_KEYCHAIN_PATH}"
             "--mac-signing-key-user-name" "${mac_signingKeyUserName}"
@@ -289,11 +294,44 @@ if [[ "${platform}" == "mac" ]]; then
         )
     fi
 
-    # cwd je ./src/main/scripts/resources
-    $jpackage "${arguments[@]}"
+    # 1. Create App Image (.app)
+    appImageDir="${output}/app-image"
+    mkdir -p "${appImageDir}"
+    
+    echo "Creating app-image at: ${appImageDir}"
+    $jpackage "${appImageArguments[@]}" "${signingArguments[@]}" --dest "${appImageDir}"
     exitValue=$?
-    # See --temp argument above
     rm -rf ./DTempFiles
+    checkExitCode $exitValue
 
+    # 2. Create PKG from App Image
+    appName="${properties_name}.app"
+    pkgArguments=(
+        "--app-image" "${appImageDir}/${appName}"
+        "--name" "${properties_name}"
+        "--type" "pkg"
+        "--icon" "./Autogram.icns"
+        "--app-version" "${properties_version:-$version}"
+        "--resource-dir" "./"
+        "--dest" "${output}"
+        "--description" "${properties_description}"
+        "--mac-app-category" "${properties_mac_appCategory:-business}"
+    )
+
+    if [[ -n "${properties_mac_identifier}" ]]; then
+        pkgArguments+=("--mac-package-identifier" "${properties_mac_identifier}")
+    fi
+    
+    if [[ -n "${properties_mac_name}" ]]; then
+        pkgArguments+=("--mac-package-name" "${properties_mac_name}")
+    fi
+
+    if [[ "${properties_mac_sign}" == "1" ]]; then
+        pkgArguments+=("${signingArguments[@]}")
+    fi
+
+    echo "Creating pkg at: ${output}"
+    $jpackage "${pkgArguments[@]}"
+    exitValue=$?
     checkExitCode $exitValue
 fi
