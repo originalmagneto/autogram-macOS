@@ -10,6 +10,7 @@ import javafx.stage.Stage;
 public class ErrorController implements SuppressedFocusController {
     private final AutogramException exception;
     private final boolean errorDetailsDisabled;
+    private Runnable onClose;
 
     @FXML
     VBox mainBox;
@@ -30,6 +31,9 @@ public class ErrorController implements SuppressedFocusController {
         this.errorDetailsDisabled = errorDetailsDisabled;
     }
 
+    public void setOnClose(Runnable onClose) {
+        this.onClose = onClose;
+    }
 
     public void initialize() {
         errorSummaryComponentController.setException(exception);
@@ -39,7 +43,11 @@ public class ErrorController implements SuppressedFocusController {
     }
 
     public void onMainButtonAction() {
-        ((Stage) mainBox.getScene().getWindow()).close();
+        if (onClose != null) {
+            onClose.run();
+        } else {
+            ((Stage) mainBox.getScene().getWindow()).close();
+        }
     }
 
     @Override

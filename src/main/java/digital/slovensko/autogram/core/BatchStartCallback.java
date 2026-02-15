@@ -15,6 +15,14 @@ public class BatchStartCallback {
         this.responder = responder;
     }
 
+    public Batch getBatch() {
+        return batch;
+    }
+
+    public BatchResponder getResponder() {
+        return responder;
+    }
+
     public void accept(SigningKey key) {
         try {
             Logging.log("Starting batch");
@@ -30,7 +38,7 @@ public class BatchStartCallback {
             Logging.log("Cancelling batch");
             batch.end();
             responder.onBatchStartFailure(new BatchCanceledException());
-        }catch (ResponseNetworkErrorException ex){
+        } catch (ResponseNetworkErrorException ex) {
             Logging.log("ResponseNetworkErrorException: " + ex.getMessage());
         } catch (Exception e) {
             handleException(e);

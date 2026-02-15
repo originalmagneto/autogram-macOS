@@ -23,6 +23,7 @@ public class PickDriverDialogController {
     @FXML
     VBox mainBox;
     private ToggleGroup toggleGroup;
+    private Runnable onClose;
 
     public PickDriverDialogController(List<? extends TokenDriver> drivers, Consumer<TokenDriver> callback) {
         this.drivers = drivers;
@@ -39,13 +40,21 @@ public class PickDriverDialogController {
         }
     }
 
+    public void setOnClose(Runnable onClose) {
+        this.onClose = onClose;
+    }
+
     public void onPickDriverButtonAction() {
         if (toggleGroup.getSelectedToggle() == null) {
             error.setManaged(true);
+            error.setVisible(true);
             formGroup.getStyleClass().add("autogram-form-group--error");
-            formGroup.getScene().getWindow().sizeToScene();
         } else {
-            GUIUtils.closeWindow(mainBox);
+            if (onClose != null) {
+                onClose.run();
+            } else {
+                GUIUtils.closeWindow(mainBox);
+            }
             var driver = (TokenDriver) toggleGroup.getSelectedToggle().getUserData();
             callback.accept(driver);
         }

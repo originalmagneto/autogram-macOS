@@ -12,11 +12,11 @@
       prefWidth="768"
       fx:id="mainBox">
 
-    <TextFlow><Text styleClass="autogram-heading-m" text="Podpisy"/></TextFlow>
+    <TextFlow fx:id="signaturesHeader"><Text styleClass="autogram-heading-m" text="Podpisy"/></TextFlow>
 
-    <ScrollPane>
-        <VBox>
-            <VBox fx:id="signaturesBox" spacing="10" />
+    <ScrollPane fx:id="scrollPane" fitToWidth="true" VBox.vgrow="ALWAYS" style="-fx-background-color: transparent; -fx-padding: 0;">
+        <VBox style="-fx-padding: 16;">
+            <VBox fx:id="signaturesBox" spacing="16" />
         </VBox>
     </ScrollPane>
 

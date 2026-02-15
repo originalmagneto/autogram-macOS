@@ -11,6 +11,7 @@ import javafx.scene.text.Text;
 public class BatchSigningSuccessDialogController implements SuppressedFocusController {
     private final HostServices hostServices;
     private final BatchUiResult result;
+    private Runnable onClose;
 
     @FXML
     Hyperlink folderPathText;
@@ -20,8 +21,7 @@ public class BatchSigningSuccessDialogController implements SuppressedFocusContr
     @FXML
     Text successCount;
 
-
-    public BatchSigningSuccessDialogController(BatchUiResult result, HostServices hostServices)  {
+    public BatchSigningSuccessDialogController(BatchUiResult result, HostServices hostServices) {
 
         this.result = result;
         this.hostServices = hostServices;
@@ -40,7 +40,15 @@ public class BatchSigningSuccessDialogController implements SuppressedFocusContr
     }
 
     public void onCloseAction(ActionEvent ignored) {
-        GUIUtils.closeWindow(mainBox);
+        if (onClose != null) {
+            onClose.run();
+        } else {
+            GUIUtils.closeWindow(mainBox);
+        }
+    }
+
+    public void setOnClose(Runnable onClose) {
+        this.onClose = onClose;
     }
 
     public void onShowFiles(ActionEvent ignored) {

@@ -1,0 +1,1993 @@
+/*
+ * macOS Native Theme for Autogram
+ * ================================
+ * This file imports the upstream idsk.css and overrides all styles
+ * to match native macOS (Apple HIG) appearance.
+ *
+ * Architecture:
+ *   macos-native.css  (@import idsk.css, then override everything)
+ *   macos-native-dark.css  (@import macos-native.css, override colors)
+ *
+ * This approach keeps idsk.css merge-friendly with upstream.
+ */
+
+@import url("idsk.css");
+
+
+/* ============================================================
+   1. COLOR TOKENS — macOS Tahoe / Liquid Glass (Light Mode)
+   ============================================================ */
+
+.root {
+  /* Primary text — slightly warmer than pure black */
+  -autogram-text-colour: #1d1d1f;
+  -autogram-secondary-text-colour: #6e6e73;
+
+  /* Links — Apple Blue (Tahoe vibrant) */
+  -autogram-link-colour: #007aff;
+  -autogram-link-hover-colour: #0051d5;
+
+  /* Borders — softer, more translucent */
+  -autogram-border-colour: rgba(0, 0, 0, 0.12);
+  -autogram-input-border-colour: rgba(0, 0, 0, 0.15);
+  -autogram-input-background-color: rgba(255, 255, 255, 0.85);
+
+  /* Primary action */
+  -autogram-success-colour: #34c759;
+  -autogram-priamry-button-hover-colour: #0062cc;
+
+  /* Secondary */
+  -autogram-secondary-hover-colour: rgba(0, 0, 0, 0.04);
+
+  /* Destructive — Apple Red */
+  -autogram-warning-button-colour: #ff3b30;
+  -autorgam-warning-button-hover-colour: #d70015;
+
+  /* Backgrounds — warm white */
+  -autogram-background-colour: #fafafa;
+  -autogram-secondary-background-colour: #f2f2f7;
+
+  /* Accent — Apple Blue */
+  -autogram-focus-colour: #007aff;
+  -autogram-focus-text-colour: #ffffff;
+
+  /* Error — Apple Red */
+  -autogram-error-colour: #ff3b30;
+
+  /* Info — Apple Blue */
+  -autogram-partial-success-colour: #007aff;
+
+  /* Warning — Apple Orange (Tahoe) */
+  -autogram-warning-color: #ff9500;
+
+  /* Typography — macOS system font */
+  -fx-font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  -fx-font-size: 13px;
+  -fx-font-smoothing-type: gray;
+
+  /* Window background — warm off-white */
+  -fx-background-color: #fafafa;
+
+  /* Sidebar — Liquid Glass translucency */
+  -autogram-sidebar-bg: rgba(244, 244, 244, 0.55);
+  -autogram-window-bg: #fafafa;
+
+  /* Liquid Glass tokens */
+  -autogram-glass-surface: rgba(255, 255, 255, 0.4);
+  -autogram-glass-border: rgba(255, 255, 255, 0.6);
+  -autogram-glass-shadow: rgba(0, 0, 0, 0.08);
+  -autogram-glass-highlight: rgba(255, 255, 255, 0.9);
+}
+
+
+/* ============================================================
+   2. MAIN WINDOW & DIALOG CONTAINERS
+   ============================================================ */
+
+#mainBox {
+  -fx-border-width: 0;
+  -fx-border-color: transparent;
+  -fx-padding: 16px 20px;
+  -fx-spacing: 14px;
+  -fx-background-color: -autogram-background-colour;
+}
+
+/* Dialog window containers — consistent padding */
+.autogram-dialog {
+  -fx-padding: 0;
+  -fx-background-color: -autogram-background-colour;
+}
+
+.autogram-dialog-content {
+  -fx-padding: 24px;
+  -fx-spacing: 16px;
+}
+
+
+/* ============================================================
+   3. BUTTONS — Tahoe Liquid Glass style
+   ============================================================ */
+
+.autogram-button {
+  -fx-cursor: hand;
+  -fx-background-color: #007aff;
+  -fx-border-color: transparent;
+  -fx-border-width: 0;
+  -fx-text-fill: #ffffff;
+  -fx-padding: 8px 20px;
+  -fx-background-radius: 12px;
+  -fx-border-radius: 12px;
+  -fx-font-size: 13px;
+  -fx-font-weight: 500;
+  -fx-effect: dropshadow(gaussian, rgba(0, 122, 255, 0.2), 4, 0, 0, 1);
+}
+
+.autogram-button:hover {
+  -fx-background-color: #006ce6;
+  -fx-effect: dropshadow(gaussian, rgba(0, 122, 255, 0.3), 6, 0, 0, 2);
+}
+
+.autogram-button:focused,
+.autogram-button.autogram-button--secondary:focused,
+.autogram-button.autogram-button--warning:focused {
+  -fx-background-color: #007aff;
+  -fx-text-fill: #ffffff;
+  -fx-border-color: transparent;
+  -fx-effect: dropshadow(gaussian, rgba(0, 122, 255, 0.4), 0, 0, 0, 4);
+}
+
+.autogram-button:disabled {
+  -fx-opacity: 0.35;
+}
+
+.autogram-button.autogram-button--secondary {
+  -fx-text-fill: -autogram-text-colour;
+  -fx-background-color: rgba(0, 0, 0, 0.06);
+  -fx-border-color: rgba(0, 0, 0, 0.08);
+  -fx-border-width: 0.5px;
+  -fx-background-radius: 10px;
+  -fx-border-radius: 10px;
+  -fx-effect: none;
+}
+
+.autogram-button.autogram-button--secondary:hover {
+  -fx-background-color: rgba(0, 0, 0, 0.10);
+}
+
+.autogram-button.autogram-button--secondary:focused {
+  -fx-background-color: #e5e5ea;
+  -fx-text-fill: -autogram-text-colour;
+}
+
+.autogram-button.autogram-button--warning {
+  -fx-background-color: -autogram-error-colour;
+  -fx-border-color: transparent;
+}
+
+.autogram-button.autogram-button--warning:hover {
+  -fx-background-color: -autorgam-warning-button-hover-colour;
+}
+
+.autogram-button.autogram-button--warning:focused {
+  -fx-background-color: -autogram-error-colour;
+  -fx-text-fill: #ffffff;
+}
+
+
+/* ============================================================
+   4. LINKS — Apple blue, subtle
+   ============================================================ */
+
+.autogram-link {
+  -fx-background-insets: 0;
+  -fx-background-color: transparent;
+  -fx-border-width: 0;
+  -fx-text-fill: -autogram-link-colour;
+  -fx-underline: false;
+  -fx-font-size: 13px;
+}
+
+.autogram-link:hover {
+  -fx-cursor: hand;
+  -fx-background-color: transparent;
+  -fx-text-fill: -autogram-link-hover-colour;
+  -fx-underline: true;
+}
+
+.autogram-link:focused,
+.autogram-link:focused:hover {
+  -fx-text-fill: -autogram-link-colour;
+  -fx-background-color: transparent;
+  -fx-background-insets: 0;
+  -fx-underline: true;
+  -fx-effect: dropshadow(gaussian, rgba(0, 122, 255, 0.3), 0, 0, 0, 2);
+}
+
+
+/* ============================================================
+   5. TEXT STYLING — Tighter macOS typography scale
+   ============================================================ */
+
+.autogram-heading-l {
+  -fx-text-fill: -autogram-text-colour;
+  -fx-fill: -autogram-text-colour;
+  -fx-font-size: 20px;
+  -fx-font-weight: 600;
+  -fx-font-style: normal;
+}
+
+.autogram-heading-m {
+  -fx-text-fill: -autogram-text-colour;
+  -fx-fill: -autogram-text-colour;
+  -fx-font-size: 15px;
+  -fx-font-weight: 600;
+  -fx-font-style: normal;
+}
+
+.autogram-heading-s {
+  -fx-text-fill: -autogram-text-colour;
+  -fx-fill: -autogram-text-colour;
+  -fx-font-size: 14px;
+  -fx-font-weight: 600;
+}
+
+.autogram-body {
+  -fx-text-fill: -autogram-text-colour;
+  -fx-fill: -autogram-text-colour;
+  -fx-font-size: 13px;
+}
+
+.autogram-body-l {
+  -fx-text-fill: -autogram-text-colour;
+  -fx-fill: -autogram-text-colour;
+  -fx-font-size: 15px;
+}
+
+.autogram-body-s {
+  -fx-text-fill: -autogram-text-colour;
+  -fx-fill: -autogram-text-colour;
+  -fx-font-size: 11px;
+}
+
+TextFlow.autogram-heading-l,
+TextFlow.autogram-heading-m,
+TextFlow.autogram-heading-s {
+  -fx-padding: 0 0 8px 0;
+}
+
+.autogram-prose TextFlow.autogram-heading-l,
+.autogram-prose TextFlow.autogram-heading-m,
+.autogram-prose TextFlow.autogram-heading-s {
+  -fx-padding: 6px 0 8px 0;
+}
+
+TextFlow.autogram-body,
+TextFlow.autogram-body-s {
+  -fx-padding: 0 0 10px 0;
+}
+
+
+/* ============================================================
+   6. RADIO BUTTONS — macOS native size (16px)
+   ============================================================ */
+
+.radio-button {
+  -fx-cursor: hand;
+  -fx-label-padding: 0 0 0 6px;
+}
+
+.radio-button .text {
+  -fx-fill: -autogram-text-colour;
+  -fx-font-size: 13px;
+}
+
+.radio-button .radio {
+  -fx-background-color: -autogram-input-border-colour, -autogram-background-colour;
+  -fx-background-insets: 0, 1;
+  -fx-background-radius: 10px;
+  -fx-pref-height: 16px;
+  -fx-pref-width: 16px;
+  -fx-min-height: 16px;
+  -fx-min-width: 16px;
+}
+
+.radio-button:focused .radio {
+  -fx-background-color: -autogram-focus-colour, -autogram-input-border-colour, -autogram-background-colour;
+  -fx-background-insets: -2, 0, 1;
+  -fx-background-radius: 10px;
+}
+
+.radio-button .radio .dot {
+  -fx-background-color: transparent;
+  -fx-background-insets: 3;
+  -fx-background-radius: 10px;
+}
+
+.radio-button:selected .radio .dot {
+  -fx-background-color: -autogram-focus-colour;
+}
+
+.radio-button:selected .radio {
+  -fx-background-color: -autogram-focus-colour;
+  -fx-background-insets: 0;
+}
+
+.radio-button:selected .radio .dot {
+  -fx-background-color: #ffffff;
+  -fx-background-insets: 4;
+}
+
+/* Smaller radio variant */
+.autogram-smaller-radio-buttons {
+  -fx-spacing: 12px;
+}
+
+.autogram-smaller-radio-buttons .radio {
+  -fx-pref-height: 14px;
+  -fx-pref-width: 14px;
+  -fx-min-height: 14px;
+  -fx-min-width: 14px;
+  -fx-padding: 0;
+}
+
+.autogram-smaller-radio-buttons .radio-button:focused .radio {
+  -fx-background-color: -autogram-focus-colour, -autogram-input-border-colour, -autogram-background-colour;
+  -fx-background-insets: -2, 0, 1;
+  -fx-background-radius: 10px;
+}
+
+.autogram-smaller-radio-buttons .radio-button:focused:hover .radio {
+  -fx-background-color: -autogram-secondary-hover-colour, -autogram-focus-colour, -autogram-input-border-colour, -autogram-background-colour;
+  -fx-background-insets: -6, -2, 0, 1;
+  -fx-background-radius: 10px;
+}
+
+.autogram-smaller-radio-buttons .radio-button:selected .radio .dot {
+  -fx-background-color: #ffffff;
+  -fx-background-insets: 3;
+}
+
+.autogram-smaller-radio-buttons .radio-button:hover .radio {
+  -fx-background-color: -autogram-secondary-hover-colour, -autogram-input-border-colour, -autogram-background-colour;
+  -fx-background-insets: -6, 0, 1;
+  -fx-background-radius: 10px;
+}
+
+
+/* ============================================================
+   7. CHECKBOXES — macOS native size (18px)
+   ============================================================ */
+
+.check-box {
+  -fx-cursor: hand;
+  -fx-label-padding: 0 0 0 6px;
+  -fx-font-size: 13px;
+  -fx-padding: 0;
+}
+
+.check-box .box {
+  -fx-pref-height: 18px;
+  -fx-pref-width: 18px;
+  -fx-background-color: -autogram-background-colour;
+  -fx-border-color: -autogram-input-border-colour;
+  -fx-border-width: 1px;
+  -fx-border-radius: 4px;
+  -fx-background-radius: 4px;
+  -fx-border-insets: 0;
+  -fx-padding: 2px;
+}
+
+.check-box .mark {
+  -fx-shape: "M0,16 7,23 23,7 23,4 7,20 0,13";
+  -fx-pref-height: 10px;
+  -fx-pref-width: 10px;
+}
+
+.check-box:selected .mark {
+  -fx-background-color: #ffffff;
+}
+
+.check-box:selected .box {
+  -fx-background-color: -autogram-focus-colour;
+  -fx-border-color: -autogram-focus-colour;
+}
+
+.check-box:hover .box {
+  -fx-background-color: -autogram-secondary-hover-colour;
+  -fx-background-insets: 0;
+  -fx-border-color: #aeaeb2;
+}
+
+.check-box:selected:hover .box {
+  -fx-background-color: derive(-autogram-focus-colour, -10%);
+  -fx-border-color: derive(-autogram-focus-colour, -10%);
+  -fx-background-insets: 0;
+}
+
+.check-box:focused .box {
+  -fx-background-color: -autogram-background-colour;
+  -fx-border-color: -autogram-input-border-colour;
+  -fx-border-width: 1px;
+  -fx-background-insets: 0;
+  -fx-effect: dropshadow(gaussian, rgba(0, 122, 255, 0.4), 0, 0, 0, 3);
+}
+
+.check-box:focused:hover .box {
+  -fx-background-color: -autogram-secondary-hover-colour;
+  -fx-border-width: 1px;
+  -fx-background-insets: 0;
+  -fx-effect: dropshadow(gaussian, rgba(0, 122, 255, 0.4), 0, 0, 0, 3);
+}
+
+.check-box:selected:focused .box {
+  -fx-background-color: -autogram-focus-colour;
+  -fx-border-color: -autogram-focus-colour;
+}
+
+
+/* ============================================================
+   8. TEXT INPUTS — macOS native style
+   ============================================================ */
+
+.autogram-input {
+  -fx-text-fill: -autogram-text-colour;
+  -fx-padding: 6px 10px;
+  -fx-border-width: 0.5px;
+  -fx-border-color: rgba(0, 0, 0, 0.12);
+  -fx-border-radius: 8px;
+  -fx-background-radius: 8px;
+  -fx-background-color: rgba(255, 255, 255, 0.85);
+  -fx-font-size: 13px;
+}
+
+.autogram-input:hover {
+  -fx-cursor: text;
+  -fx-border-color: rgba(0, 0, 0, 0.2);
+}
+
+.autogram-input:focused {
+  -fx-background-color: -autogram-input-background-color;
+  -fx-background-insets: 0;
+  -fx-border-color: -autogram-focus-colour;
+  -fx-effect: dropshadow(gaussian, rgba(0, 122, 255, 0.3), 0, 0, 0, 3);
+}
+
+.autogram-input:disabled {
+  -fx-opacity: 0.4;
+}
+
+
+/* ============================================================
+   9. CHOICE BOXES / DROPDOWNS — macOS native
+   ============================================================ */
+
+.choice-box {
+  -fx-background-color: rgba(255, 255, 255, 0.85);
+  -fx-border-color: rgba(0, 0, 0, 0.12);
+  -fx-border-width: 0.5px;
+  -fx-border-radius: 8px;
+  -fx-background-radius: 8px;
+  -fx-padding: 5px 10px;
+  -fx-font-size: 13px;
+  -fx-cursor: hand;
+}
+
+.choice-box:hover {
+  -fx-border-color: rgba(0, 0, 0, 0.2);
+}
+
+.choice-box:focused {
+  -fx-border-color: -autogram-focus-colour;
+  -fx-effect: dropshadow(gaussian, rgba(0, 122, 255, 0.3), 0, 0, 0, 3);
+}
+
+.choice-box>.label {
+  -fx-text-fill: -autogram-text-colour;
+}
+
+.choice-box .arrow-button {
+  -fx-background-color: transparent;
+  -fx-background-radius: 0;
+}
+
+.choice-box .arrow {
+  -fx-background-color: -autogram-secondary-text-colour;
+  -fx-shape: "M10.925 0.624951L12 1.69995L6 7.69995L0 1.72495L1.075 0.649951L6 5.57495L10.925 0.624951Z";
+  -fx-padding: 3px 6px 3px 4px;
+  -fx-background-insets: 0;
+}
+
+
+/* ============================================================
+   10. CONTEXT MENU / POPUP — macOS native
+   ============================================================ */
+
+.context-menu {
+  -fx-background-color: rgba(250, 250, 250, 0.92);
+  -fx-pref-width: 19em;
+  -fx-padding: 4px 0;
+  -fx-background-insets: 0;
+  -fx-border-insets: 0;
+  -fx-border-style: solid;
+  -fx-border-color: rgba(0, 0, 0, 0.08);
+  -fx-border-width: 0.5px;
+  -fx-border-radius: 10px;
+  -fx-background-radius: 10px;
+  -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.12), 16, 0, 0, 6);
+}
+
+.menu-item:focused {
+  -fx-background-color: -autogram-focus-colour;
+  -fx-background-radius: 4px;
+  -fx-background-insets: 0 4px;
+}
+
+.menu-item>.label {
+  -fx-text-fill: -autogram-text-colour;
+  -fx-padding: 4px 8px;
+  -fx-font-size: 13px;
+}
+
+.menu-item:focused>.label {
+  -fx-text-fill: #ffffff;
+}
+
+
+/* ============================================================
+   11. TOOLTIP — macOS style
+   ============================================================ */
+
+.tooltip {
+  -fx-background-color: rgba(40, 40, 40, 0.95);
+  -fx-text-fill: #ffffff;
+  -fx-padding: 4px 8px;
+  -fx-background-radius: 4px;
+  -fx-font-size: 11px;
+  -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.2), 4, 0, 0, 2);
+}
+
+
+/* ============================================================
+   12. SCROLLBARS — Thin overlay, macOS style
+   ============================================================ */
+
+.scroll-bar:horizontal .track,
+.scroll-bar:vertical .track {
+  -fx-background-color: transparent;
+  -fx-border-color: transparent;
+  -fx-background-radius: 0;
+  -fx-border-radius: 0;
+}
+
+.scroll-bar:horizontal .increment-button,
+.scroll-bar:horizontal .decrement-button,
+.scroll-bar:vertical .increment-button,
+.scroll-bar:vertical .decrement-button {
+  -fx-background-color: transparent;
+  -fx-background-radius: 0;
+  -fx-padding: 0;
+}
+
+.scroll-bar .increment-arrow,
+.scroll-bar .decrement-arrow {
+  -fx-shape: " ";
+  -fx-padding: 0;
+}
+
+.scroll-bar:vertical .increment-arrow,
+.scroll-bar:vertical .decrement-arrow {
+  -fx-shape: " ";
+  -fx-padding: 0;
+}
+
+.scroll-bar:horizontal .thumb,
+.scroll-bar:vertical .thumb {
+  -fx-background-color: rgba(0, 0, 0, 0.25);
+  -fx-background-insets: 1;
+  -fx-background-radius: 4px;
+  -fx-min-width: 6px;
+  -fx-min-height: 6px;
+}
+
+.scroll-bar:horizontal .thumb:hover,
+.scroll-bar:vertical .thumb:hover {
+  -fx-background-color: rgba(0, 0, 0, 0.4);
+}
+
+.scroll-bar:horizontal .thumb:pressed,
+.scroll-bar:vertical .thumb:pressed {
+  -fx-background-color: rgba(0, 0, 0, 0.55);
+}
+
+.scroll-bar:vertical {
+  -fx-pref-width: 7px;
+  -fx-background-color: transparent;
+}
+
+.scroll-bar:horizontal {
+  -fx-pref-height: 7px;
+  -fx-background-color: transparent;
+}
+
+
+/* ============================================================
+   13. DROP ZONE — Clean, rounded, native
+   ============================================================ */
+
+.autogram-dropzone {
+  -fx-spacing: 14px;
+  -fx-border-color: #c7c7cc;
+  -fx-border-width: 1.5px;
+  -fx-border-style: dashed;
+  -fx-border-radius: 10px;
+  -fx-background-radius: 10px;
+  -fx-background-color: -autogram-secondary-background-colour;
+  -fx-padding: 30px;
+  -fx-alignment: center;
+}
+
+.autogram-dropzone--entered {
+  -fx-border-color: -autogram-focus-colour;
+  -fx-border-width: 2px;
+  -fx-border-style: solid;
+  -fx-background-color: derive(-autogram-focus-colour, 90%);
+  -fx-background-insets: 0;
+  -fx-background-radius: 10px;
+}
+
+
+/* ============================================================
+   14. FOOTER — Subtle, compact
+   ============================================================ */
+
+.autogram-footer {
+  -fx-border-width: 0.5px 0 0 0;
+  -fx-border-color: -autogram-border-colour;
+  -fx-background-color: -autogram-secondary-background-colour;
+  -fx-padding: 8px 16px;
+  -fx-spacing: 12px;
+}
+
+.autogram-footer .autogram-link {
+  -fx-text-fill: -autogram-secondary-text-colour;
+  -fx-font-size: 11px;
+}
+
+.autogram-footer .autogram-link:hover {
+  -fx-text-fill: -autogram-link-colour;
+  -fx-underline: true;
+  -fx-background-color: transparent;
+  -fx-background-insets: 0;
+}
+
+.autogram-footer .autogram-link:focused:hover {
+  -fx-text-fill: -autogram-link-colour;
+  -fx-background-color: transparent;
+  -fx-background-insets: 0;
+}
+
+
+/* ============================================================
+   15. ICONS — Thinner strokes
+   ============================================================ */
+
+.autogram-icon {
+  -fx-fill: transparent;
+  -fx-stroke: -autogram-secondary-text-colour;
+  -fx-stroke-width: 1.25;
+  -fx-stroke-line-cap: round;
+  -fx-stroke-line-join: round;
+}
+
+.autogram-icon--big {
+  -fx-scale-x: 1.5;
+  -fx-scale-y: 1.5;
+}
+
+.autogram-icon--warning {
+  -fx-stroke: -autogram-error-colour;
+}
+
+
+/* ============================================================
+   16. FORM ELEMENTS — Compact spacing
+   ============================================================ */
+
+.autogram-form-group {
+  -fx-spacing: 10px;
+}
+
+.autogram-form-group--error {
+  -fx-border-width: 0 0 0 3px;
+  -fx-border-insets: 4;
+  -fx-border-color: -autogram-error-colour;
+  -fx-border-style: solid inside;
+  -fx-padding: 0 0 0 10px;
+}
+
+.autogram-error-message {
+  -fx-font-size: 12px;
+  -fx-font-weight: 600;
+  -fx-fill: -autogram-error-colour;
+}
+
+.autogram-description {
+  -fx-text-fill: -autogram-secondary-text-colour;
+  -fx-fill: -autogram-secondary-text-colour;
+  -fx-font-size: 12px;
+}
+
+
+/* ============================================================
+   17. VISUALIZERS — Clean borders
+   ============================================================ */
+
+.autogram-visualizer-plaintext,
+.autogram-visualizer-html,
+.autogram-visualizer-pdf VBox>HBox,
+.autogram-visualizer-image {
+  -fx-border-color: -autogram-border-colour;
+  -fx-border-width: 1px;
+  -fx-border-style: solid;
+  -fx-border-radius: 8px;
+  -fx-background-radius: 8px;
+  -fx-wrap-text: true;
+}
+
+.autogram-visualizer-pdf VBox {
+  -fx-spacing: 8px;
+  -fx-padding: 4px;
+}
+
+.autogram-visualizer-plaintext {
+  -fx-padding: 10px;
+  -fx-font-family: "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, monospace;
+  -fx-font-size: 12px;
+  -fx-background-color: -autogram-input-background-color;
+}
+
+.autogram-visualizer-plaintext:focused {
+  -fx-border-color: -autogram-focus-colour;
+  -fx-effect: dropshadow(gaussian, rgba(0, 122, 255, 0.3), 0, 0, 0, 3);
+}
+
+.autogram-visualizer-image {
+  -fx-background-color: -autogram-background-colour;
+  -fx-padding: 16px;
+  -fx-alignment: center;
+}
+
+
+/* ============================================================
+   18. ERROR SUMMARY — macOS native alert style
+   ============================================================ */
+
+.autogram-error-summary {
+  -fx-padding: 16px;
+  -fx-border-width: 0;
+  -fx-border-color: transparent;
+  -fx-border-radius: 10px;
+  -fx-background-radius: 10px;
+  -fx-background-color: -autogram-background-colour;
+  -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.08), 6, 0, 0, 2);
+}
+
+.autogram-error-summary__title {
+  -fx-font-size: 15px;
+  -fx-font-weight: 600;
+  -fx-font-style: normal;
+  -fx-padding: 0 0 8px 0;
+  -fx-border-insets: 0;
+  -fx-background-insets: 0;
+}
+
+.autogram-error-summary__title>Text {
+  -fx-fill: -autogram-text-colour;
+}
+
+.autogram-error-summary__error {
+  -fx-font-size: 13px;
+  -fx-font-weight: normal;
+  -fx-padding: 0 0 6px 0;
+  -fx-border-insets: 0;
+  -fx-background-insets: 0;
+}
+
+
+/* ============================================================
+   19. WARNING SUMMARY — macOS native amber tint
+   ============================================================ */
+
+.autogram-warning-summary {
+  -fx-padding: 16px;
+  -fx-background-color: derive(#ff9500, 92%);
+  -fx-background-radius: 10px;
+  -fx-border-radius: 10px;
+  -fx-border-width: 0;
+}
+
+.autogram-warning-summary>VBox {
+  -fx-padding: 0 0 10px 0;
+}
+
+.autogram-warning-summary>HBox {
+  -fx-spacing: 10px;
+  -fx-alignment: center-left;
+}
+
+.autogram-warning-summary__description>Text {
+  -fx-text-fill: -autogram-text-colour;
+  -fx-fill: -autogram-text-colour;
+  -fx-font-size: 13px;
+}
+
+.autogram-warning-summary__title {
+  -fx-font-size: 15px;
+  -fx-font-weight: 600;
+  -fx-font-style: normal;
+  -fx-padding: 0 0 6px 0;
+  -fx-border-insets: 0;
+  -fx-background-insets: 0;
+}
+
+
+/* ============================================================
+   20. DETAILS / ACCORDION — Compact
+   ============================================================ */
+
+.autogram-details__text {
+  -fx-padding: 10px 10px 10px 14px;
+  -fx-border-color: -autogram-border-colour;
+  -fx-border-width: 0 0 0 3px;
+  -fx-border-radius: 0 4px 4px 0;
+  -fx-wrap-text: true;
+}
+
+.autogram-details .title .text {
+  -fx-font-size: 13px;
+  -fx-fill: -autogram-link-colour;
+  -fx-underline: false;
+}
+
+.autogram-details .title .text:hover {
+  -fx-fill: -autogram-link-hover-colour;
+  -fx-underline: true;
+}
+
+.autogram-details .title {
+  -fx-padding: 0 0 4px 0;
+  -fx-border-insets: 0 0 4px 0;
+  -fx-background-insets: 0 0 4px 0;
+}
+
+
+/* ============================================================
+   21. TABS — macOS segmented control style
+   ============================================================ */
+
+.tab-pane>.tab-header-area>.tab-header-background {
+  -fx-background-color: transparent;
+}
+
+.tab-pane>.tab-header-area {
+  -fx-padding: 0 0 -1px 0;
+}
+
+.tab .tab-label {
+  -fx-underline: false;
+  -fx-text-fill: -autogram-text-colour;
+  -fx-background-color: -autogram-secondary-background-colour;
+  -fx-border-color: -autogram-border-colour;
+  -fx-cursor: hand;
+  -fx-padding: 6px 16px;
+  -fx-background-insets: 0;
+  -fx-font-size: 12px;
+  -fx-font-weight: normal;
+  -fx-border-width: 1px;
+  -fx-border-radius: 0;
+  -fx-background-radius: 0;
+}
+
+/* First and last tab rounded corners */
+.tab:first-child .tab-label {
+  -fx-background-radius: 6px 0 0 0;
+  -fx-border-radius: 6px 0 0 0;
+}
+
+.tab:last-child .tab-label {
+  -fx-background-radius: 0 6px 0 0;
+  -fx-border-radius: 0 6px 0 0;
+}
+
+.tab:selected .tab-label {
+  -fx-underline: false;
+  -fx-background-color: -autogram-background-colour;
+  -fx-border-width: 1px 1px 0 1px;
+  -fx-border-color: -autogram-border-colour;
+  -fx-background-insets: 0;
+  -fx-border-insets: 0;
+  -fx-padding: 6px 16px;
+  -fx-font-weight: 600;
+}
+
+.tab:selected {
+  -fx-padding: 0;
+}
+
+
+/* ============================================================
+   22. SETTINGS — Compact layout
+   ============================================================ */
+
+.autogram-settings-tab-pane ScrollPane {
+  -fx-border-color: -autogram-border-colour;
+  -fx-border-width: 1px;
+  -fx-border-radius: 0 0 6px 6px;
+  -fx-background-radius: 0 0 6px 6px;
+  -fx-max-height: 480px;
+  -fx-hbar-policy: never;
+}
+
+.autogram-settings-tab-pane ScrollPane .container {
+  -fx-padding: 16px 0 16px 16px;
+  -fx-max-width: 44em;
+  -fx-min-width: 44em;
+}
+
+/* NOTE: .autogram-settings-row is defined in the Settings Redesign section below */
+
+.autogram-settings-tab-header-text {
+  -fx-padding: 4px 0;
+}
+
+
+/* ============================================================
+   23. TRUSTED COUNTRIES LIST
+   ============================================================ */
+
+.autogram-trusted-countries-list>HBox {
+  -fx-border-width: 0 0 0.5px 0;
+  -fx-border-color: -autogram-border-colour;
+  -fx-padding: 4px 0;
+}
+
+.autogram-trusted-countries-list>HBox>.left {
+  -fx-pref-width: 18em;
+  -fx-padding: 0 12px 0 0;
+}
+
+.autogram-trusted-countries-list>HBox>.left>TextFlow {
+  -fx-padding: 2px 0;
+  -fx-text-fill: -autogram-text-colour;
+  -fx-fill: -autogram-text-colour;
+  -fx-font-size: 13px;
+  -fx-font-weight: 600;
+}
+
+
+/* ============================================================
+   24. DROPDOWNS & CONTAINERS
+   ============================================================ */
+
+.autogram-dropdown {
+  -fx-cursor: hand;
+  -fx-alignment: center-left;
+}
+
+.autogram-dropdown>ChoiceBox {
+  -fx-pref-width: 16em;
+}
+
+.autogram-textfield-container>TextField {
+  -fx-pref-width: 16em;
+}
+
+
+/* ============================================================
+   25. TABLES — Lighter, more compact
+   ============================================================ */
+
+.autogram-table-text {
+  -fx-text-fill: -autogram-text-colour;
+  -fx-fill: -autogram-text-colour;
+  -fx-font-size: 13px;
+}
+
+.autogram-table__footer {
+  -fx-padding: 8px 0 0 0;
+}
+
+.autogram-table-cell {
+  -fx-border-style: hidden hidden solid hidden;
+  -fx-border-width: 0.5px;
+  -fx-border-color: -autogram-border-colour;
+  -fx-padding: 6px 0;
+}
+
+.autogram-table-cell>HBox {
+  -fx-padding: 2px 0;
+}
+
+.autogram-table-header {
+  -fx-border-style: hidden hidden solid hidden;
+  -fx-border-width: 0.5px;
+  -fx-border-color: -autogram-border-colour;
+  -fx-padding: 6px 0;
+}
+
+.autogram-table-header>TextFlow>Text {
+  -fx-text-fill: -autogram-text-colour;
+  -fx-fill: -autogram-text-colour;
+  -fx-font-size: 12px;
+  -fx-font-weight: 600;
+  -fx-padding: 0 0 8px 0;
+}
+
+.autogram-signatures-table>HBox {
+  -fx-border-style: hidden hidden solid hidden;
+  -fx-border-width: 0.5px;
+  -fx-border-color: -autogram-border-colour;
+  -fx-padding: 6px 0;
+  -fx-text-fill: -autogram-text-colour;
+  -fx-fill: -autogram-text-colour;
+  -fx-font-size: 13px;
+}
+
+.autogram-signatures-table>TextFlow {
+  -fx-border-style: hidden hidden solid hidden;
+  -fx-border-width: 0.5px;
+  -fx-border-color: -autogram-border-colour;
+  -fx-padding: 8px 0;
+  -fx-text-fill: -autogram-text-colour;
+  -fx-fill: -autogram-text-colour;
+  -fx-font-size: 13px;
+}
+
+
+/* ============================================================
+   26. TAGS — Pill-shaped, compact
+   ============================================================ */
+
+.autogram-tag {
+  -fx-padding: 2px 8px;
+  -fx-pref-height: 20px;
+  -fx-max-height: 20px;
+  -fx-background-radius: 10px;
+  -fx-border-radius: 10px;
+}
+
+.autogram-tag Text {
+  -fx-text-fill: -autogram-text-colour;
+  -fx-fill: -autogram-text-colour;
+  -fx-font-size: 11px;
+  -fx-font-weight: 600;
+}
+
+.autogram-tag-multiple-box {
+  -fx-hgap: 4px;
+  -fx-vgap: 4px;
+  -fx-padding: 0;
+}
+
+/* Tag color variants — softer macOS-style pastels */
+.autogram-tag-processing {
+  -fx-background-color: #dbeafe;
+  -fx-border-color: #dbeafe;
+}
+
+.autogram-tag-invalid {
+  -fx-background-color: #fecaca;
+  -fx-border-color: #fecaca;
+}
+
+.autogram-tag-valid {
+  -fx-background-color: #d1fae5;
+  -fx-border-color: #d1fae5;
+}
+
+.autogram-tag-custom-valid {
+  -fx-background-color: #dbeafe;
+  -fx-border-color: #dbeafe;
+}
+
+.autogram-tag-unknown {
+  -fx-background-color: #fef3c7;
+  -fx-border-color: #fef3c7;
+}
+
+.autogram-tag-warning {
+  -fx-background-color: #fef3c7;
+  -fx-border-color: #fef3c7;
+}
+
+.autogram-tag-info {
+  -fx-background-color: #f3f4f6;
+  -fx-border-color: #f3f4f6;
+}
+
+.autogram-tag-processing Text {
+  -fx-text-fill: #1e40af;
+  -fx-fill: #1e40af;
+}
+
+.autogram-tag-invalid Text {
+  -fx-text-fill: #991b1b;
+  -fx-fill: #991b1b;
+}
+
+.autogram-tag-valid Text {
+  -fx-text-fill: #065f46;
+  -fx-fill: #065f46;
+}
+
+.autogram-tag-custom-valid Text {
+  -fx-text-fill: #1e40af;
+  -fx-fill: #1e40af;
+}
+
+.autogram-tag-unknown Text {
+  -fx-text-fill: #92400e;
+  -fx-fill: #92400e;
+}
+
+.autogram-tag-warning Text {
+  -fx-text-fill: #92400e;
+  -fx-fill: #92400e;
+}
+
+.autogram-tag-info Text {
+  -fx-text-fill: #374151;
+  -fx-fill: #374151;
+}
+
+
+/* ============================================================
+   27. PROGRESS BAR — Thin Apple style
+   ============================================================ */
+
+.autogram-progress-bar {
+  -fx-border-color: transparent;
+  -fx-background-insets: 0;
+}
+
+.autogram-progress-bar>.track {
+  -fx-background-color: rgba(0, 0, 0, 0.08);
+  -fx-background-radius: 3px;
+  -fx-pref-height: 4px;
+}
+
+.autogram-progress-bar>.bar {
+  -fx-background-color: linear-gradient(to right, #007AFF, #5AC8FA);
+  -fx-background-radius: 3px;
+}
+
+/* Generic .progress-bar styling handled by .autogram-progress-bar above
+   and .autogram-batch-progress-bar in the batch section below */
+
+
+/* ============================================================
+   28. BATCH VISUALIZATION — Cleaner alert
+   ============================================================ */
+
+.autogram-batch-visualization {
+  -fx-border-width: 1px;
+  -fx-border-color: -autogram-error-colour;
+  -fx-border-radius: 8px;
+  -fx-background-radius: 8px;
+  -fx-spacing: 20px;
+  -fx-padding: 40px 30px 30px 30px;
+  -fx-alignment: center;
+  -fx-background-color: derive(-autogram-error-colour, 95%);
+}
+
+.autogram-batch-visualization VBox {
+  -fx-spacing: 12px;
+}
+
+
+/* ============================================================
+   29. CONFIRMATION — macOS native success/info banners
+   ============================================================ */
+
+.autogram-confirmation {
+  -fx-padding: 20px 16px;
+  -fx-background-insets: 8px 0;
+  -fx-background-radius: 10px;
+  -fx-text-fill: #ffffff;
+  -fx-text-alignment: center;
+}
+
+.autogram-confirmation--success {
+  -fx-background-color: -autogram-success-colour;
+}
+
+.autogram-confirmation--warning {
+  -fx-background-color: -autogram-partial-success-colour;
+}
+
+.autogram-confirmation .autogram-body {
+  -fx-text-fill: #ffffff;
+  -fx-fill: #ffffff;
+  -fx-font-size: 13px;
+  -fx-text-alignment: center;
+}
+
+.autogram-confirmation .autogram-heading-m {
+  -fx-text-fill: #ffffff;
+  -fx-fill: #ffffff;
+  -fx-font-size: 16px;
+  -fx-font-weight: 600;
+  -fx-text-alignment: center;
+}
+
+.autogram-confirmation Hyperlink {
+  -fx-font-size: 14px;
+  -fx-text-fill: rgba(255, 255, 255, 0.9);
+}
+
+
+/* ============================================================
+   30. UNSUPPORTED VISUALIZATION — Softer alert
+   ============================================================ */
+
+.autogram-unsupported-visualization {
+  -fx-background-color: derive(-autogram-background-colour, -2%);
+  -fx-border-color: -autogram-border-colour;
+  -fx-border-width: 1px;
+  -fx-border-radius: 8px;
+  -fx-background-radius: 8px;
+  -fx-padding: 30px 16px;
+  -fx-spacing: 16px;
+  -fx-alignment: center;
+}
+
+.autogram-unsupported-visualization VBox {
+  -fx-spacing: 8px;
+}
+
+
+/* ============================================================
+   31. LOADING — Centered, compact
+   ============================================================ */
+
+.autogram-loading {
+  -fx-padding: 30px;
+  -fx-alignment: center;
+}
+
+.autogram-loading__text {
+  -fx-padding: 8px;
+  -fx-alignment: center;
+  -fx-text-alignment: center;
+}
+
+
+/* ============================================================
+   32. CLAIM — subtle accent
+   ============================================================ */
+
+.autogram-claim {
+  -fx-background-color: transparent;
+  -fx-background-insets: 0;
+}
+
+
+/* ============================================================
+   33. ACTIONS — Right-aligned, toolbar-like
+   ============================================================ */
+
+.autogram-actions {
+  -fx-spacing: 12px;
+  -fx-alignment: center-right;
+  -fx-padding: 20px 0 0 0;
+}
+
+.autogram-radios {
+  -fx-spacing: 12px;
+}
+
+.autogram-radios HBox {
+  -fx-spacing: 8px;
+  -fx-alignment: center-left;
+}
+
+
+/* ============================================================
+   34. VISUALIZATION HEADER
+   ============================================================ */
+
+.autogram-visualization-header {
+  -fx-padding: 0 0 10px 0;
+}
+
+
+/* ============================================================
+   35. SIGNATURE BOX — Cleaner card
+   ============================================================ */
+
+.autogram-signature-box {
+  -fx-border-color: -autogram-border-colour;
+  -fx-border-width: 1px;
+  -fx-border-radius: 8px;
+  -fx-background-radius: 8px;
+  -fx-max-width: 688px;
+}
+
+.autogram-signature-box>HBox {
+  -fx-background-color: -autogram-secondary-background-colour;
+  -fx-background-radius: 8px 8px 0 0;
+}
+
+.autogram-signature-box>VBox {
+  -fx-padding: 8px 12px;
+}
+
+
+/* ============================================================
+   36. SUMMARY HEADER
+   ============================================================ */
+
+.autogram-summary-header {
+  -fx-background-color: -autogram-secondary-background-colour;
+  -fx-background-radius: 6px;
+}
+
+.autogram-summary-header__title {
+  -fx-padding: 10px 12px;
+}
+
+.autogram-summary-header__title>Text {
+  -fx-text-fill: -autogram-text-colour;
+  -fx-fill: -autogram-text-colour;
+  -fx-font-size: 13px;
+  -fx-font-weight: 600;
+  -fx-padding: 0;
+}
+
+
+/* ============================================================
+   37. TIMESTAMPS BOX
+   ============================================================ */
+
+.autogram-timestamps-box>VBox>VBox {
+  -fx-background-color: transparent;
+  -fx-background-insets: 0;
+  -fx-border-insets: 0;
+  -fx-border-width: 0;
+  -fx-font-size: 12px;
+  -fx-padding: 6px 0;
+  -fx-text-fill: -autogram-link-colour;
+  -fx-underline: false;
+}
+
+.autogram-timestamps-box>VBox>VBox>VBox {
+  -fx-border-color: -autogram-border-colour;
+  -fx-border-width: 0 0 0 3px;
+  -fx-border-radius: 0 4px 4px 0;
+  -fx-padding: 6px 10px;
+  -fx-spacing: 4px;
+}
+
+.autogram-timestamps-box>VBox>VBox>VBox>TextFlow>Text {
+  -fx-text-fill: -autogram-text-colour;
+  -fx-fill: -autogram-text-colour;
+  -fx-font-size: 12px;
+}
+
+
+/* ============================================================
+   38. LIST VIEW
+   ============================================================ */
+
+.autogram-listview {
+  -fx-max-height: 320px;
+  -fx-min-height: 30px;
+  -fx-pref-height: 180px;
+  -fx-padding: 0 0 12px 12px;
+}
+
+
+/* ============================================================
+   39. BODY DETAILS & MORE
+   ============================================================ */
+
+.autogram-body-details {
+  -fx-text-fill: -autogram-text-colour;
+  -fx-fill: -autogram-text-colour;
+  -fx-font-size: 12px;
+}
+
+.autogram-details__more {
+  -fx-padding: 6px 0;
+  -fx-border-insets: 0;
+  -fx-background-insets: 0;
+  -fx-font-size: 12px;
+}
+
+.autogram-details__more-icon {
+  -fx-fill: -autogram-link-colour;
+}
+
+.autogram-error-summary__more {
+  -fx-padding: 0 0 0 4px;
+  -fx-border-insets: 0;
+  -fx-background-insets: 0;
+  -fx-font-size: 11px;
+}
+
+
+/* ============================================================
+   40. WARNING TEXTFLOW
+   ============================================================ */
+
+.autogram-warning-textflow {
+  -fx-padding: 3px 10px;
+  -fx-background-color: derive(#ff9500, 85%);
+  -fx-background-radius: 5px;
+  -fx-font-size: 12px;
+  -fx-pref-height: 24px;
+  -fx-max-height: 24px;
+}
+
+.autogram-label {
+  -fx-font-size: 12px;
+}
+
+
+/* ============================================================
+   41. SCROLL PANE — Clean container
+   ============================================================ */
+
+.scroll-pane {
+  -fx-background-color: transparent;
+  -fx-border-color: transparent;
+  -fx-border-width: 0;
+  -fx-border-radius: 0;
+  -fx-background-radius: 0;
+  -fx-effect: none;
+}
+
+.scroll-pane .viewport {
+  -fx-background-color: -autogram-background-colour;
+}
+
+
+/* ============================================================
+   42. WEB VIEW — Native container
+   ============================================================ */
+
+.web-view {
+  -fx-background-color: -autogram-background-colour;
+  -fx-border-color: -autogram-border-colour;
+  -fx-border-width: 1px;
+  -fx-border-radius: 8px;
+  -fx-background-radius: 8px;
+}
+
+
+/* ============================================================
+   43. BORDER PANE — Transparent for unified look
+   ============================================================ */
+
+.border-pane {
+  -fx-background-color: -autogram-background-colour;
+  -fx-background-radius: 0;
+}
+
+
+/* ============================================================
+   44. ENHANCED TEXT STYLES
+   ============================================================ */
+
+.autogram-body-strong {
+  -fx-font-weight: 600;
+  -fx-font-size: 13px;
+  -fx-text-fill: -autogram-text-colour;
+}
+
+.autogram-body-small {
+  -fx-font-size: 11px;
+  -fx-text-fill: -autogram-secondary-text-colour;
+}
+
+
+/* ============================================================
+   45. RELEASE NOTES TEXT AREA
+   ============================================================ */
+
+.text-area.release-notes {
+  -fx-background-color: -autogram-input-background-color;
+  -fx-border-color: -autogram-input-border-colour;
+  -fx-border-width: 1px;
+  -fx-border-radius: 6px;
+  -fx-background-radius: 6px;
+  -fx-padding: 10px;
+  -fx-font-family: "SF Pro Text", -apple-system, "Helvetica Neue", Arial, sans-serif;
+  -fx-font-size: 12px;
+  -fx-text-fill: -autogram-text-colour;
+}
+
+.text-area.release-notes:focused {
+  -fx-border-color: -autogram-focus-colour;
+  -fx-effect: dropshadow(gaussian, rgba(0, 122, 255, 0.3), 0, 0, 0, 3);
+}
+
+
+/* ============================================================
+   46. SPLIT PANE — Single-window layout
+   ============================================================ */
+
+.autogram-split-pane {
+  -fx-background-color: transparent;
+  -fx-padding: 0;
+}
+
+.autogram-split-pane>.split-pane-divider {
+  -fx-background-color: -autogram-border-colour;
+  -fx-padding: 0 0.5 0 0;
+}
+
+
+/* ============================================================
+   47. SIDEBAR — Navigation panel
+   ============================================================ */
+
+.autogram-sidebar {
+  -fx-background-color: -autogram-sidebar-bg;
+  -fx-padding: 0;
+  -fx-spacing: 0;
+  -fx-border-width: 0 0.5px 0 0;
+  -fx-border-color: rgba(0, 0, 0, 0.06);
+}
+
+.autogram-sidebar-header {
+  -fx-padding: 32 20 20 24;
+  -fx-spacing: 4;
+}
+
+.autogram-claim {
+  -fx-font-size: 19px;
+  -fx-font-weight: 700;
+  -fx-text-fill: #1d1d1f;
+  -fx-padding: 0;
+}
+
+.autogram-sidebar-nav {
+  -fx-padding: 10 12;
+}
+
+.autogram-sidebar-item {
+  -fx-background-color: transparent;
+  -fx-background-radius: 10px;
+  -fx-padding: 8 12;
+  -fx-alignment: CENTER_LEFT;
+  -fx-graphic-text-gap: 10;
+  -fx-text-fill: #424245;
+  -fx-font-size: 13px;
+  -fx-font-weight: 400;
+  -fx-min-width: 180;
+  -fx-cursor: hand;
+}
+
+.autogram-sidebar-item:hover {
+  -fx-background-color: rgba(0, 0, 0, 0.04);
+}
+
+.autogram-sidebar-item--active {
+  -fx-background-color: rgba(0, 122, 255, 0.12);
+  -fx-text-fill: #007aff;
+  -fx-font-weight: 500;
+}
+
+.autogram-sidebar-item--active:hover {
+  -fx-background-color: rgba(0, 122, 255, 0.16);
+}
+
+.autogram-sidebar-icon {
+  -fx-fill: transparent;
+  -fx-stroke: #86868b;
+  -fx-stroke-width: 1.5;
+}
+
+.autogram-sidebar-item--active .autogram-sidebar-icon {
+  -fx-stroke: #007aff;
+}
+
+.autogram-sidebar-footer {
+  -fx-padding: 24 20;
+  -fx-border-color: rgba(0, 0, 0, 0.05) transparent transparent transparent;
+  -fx-border-width: 1 0 0 0;
+}
+
+.autogram-sidebar-status {
+  -fx-font-size: 11px;
+  -fx-text-fill: #86868b;
+}
+
+.autogram-content-area {
+  -fx-background-color: -autogram-window-bg;
+  -fx-padding: 0;
+}
+
+.autogram-content-panel {
+  -fx-padding: 40;
+  -fx-spacing: 24;
+}
+
+.autogram-sidebar-metadata {
+  -fx-padding: 24 20;
+  -fx-spacing: 12;
+  -fx-border-color: rgba(0, 0, 0, 0.05) transparent transparent transparent;
+  -fx-border-width: 1 0 0 0;
+}
+
+.autogram-sidebar-section-title {
+  -fx-font-size: 11px;
+  -fx-font-weight: 700;
+  -fx-text-fill: #86868b;
+  -fx-text-transform: uppercase;
+}
+
+.autogram-metadata-label {
+  -fx-font-family: "SF Pro Text", -apple-system, "Helvetica Neue", Arial, sans-serif;
+  -fx-font-size: 11px;
+  -fx-text-fill: -autogram-secondary-text-colour;
+  -fx-min-width: 60;
+}
+
+.autogram-metadata-value {
+  -fx-font-family: "SF Pro Text", -apple-system, "Helvetica Neue", Arial, sans-serif;
+  -fx-font-size: 11px;
+  -fx-text-fill: -autogram-text-colour;
+}
+
+/* --- Settings Redesign --- */
+
+.autogram-settings-window {
+  -fx-background-color: -autogram-window-bg;
+}
+
+/* ============================================================
+   20. RIGHT DRAWER — Slide-out details panel
+   ============================================================ */
+
+.autogram-right-drawer {
+  -fx-background-color: -autogram-sidebar-bg;
+  -fx-border-width: 0 0 0 0.5px;
+  -fx-border-color: rgba(0, 0, 0, 0.06);
+  -fx-padding: 0;
+}
+
+.autogram-right-drawer-header {
+  -fx-padding: 12px 16px;
+  -fx-border-width: 0 0 0.5px 0;
+  -fx-border-color: rgba(0, 0, 0, 0.06);
+  -fx-background-color: rgba(255, 255, 255, 0.35);
+}
+
+.autogram-right-drawer-scroll {
+  -fx-background-color: transparent;
+  -fx-padding: 16px;
+}
+
+.autogram-right-drawer-scroll .viewport {
+  -fx-background-color: transparent;
+}
+
+.autogram-button-icon {
+  -fx-background-color: transparent;
+  -fx-cursor: hand;
+  -fx-padding: 4px;
+  -fx-background-radius: 4px;
+}
+
+.autogram-button-icon:hover {
+  -fx-background-color: rgba(0, 0, 0, 0.05);
+}
+
+.autogram-settings-split-pane {
+  -fx-background-color: transparent;
+  -fx-background-insets: 0;
+  -fx-padding: 0;
+  -fx-border-width: 0;
+}
+
+.autogram-settings-split-pane>.split-pane-divider {
+  -fx-padding: 0 1 0 0;
+  -fx-background-color: rgba(0, 0, 0, 0.1);
+}
+
+.autogram-settings-sidebar {
+  -fx-background-color: rgba(0, 0, 0, 0.02);
+  -fx-padding: 16 0 16 0;
+}
+
+.autogram-settings-content-pane {
+  -fx-background-color: white;
+}
+
+.autogram-settings-scroll-pane {
+  -fx-background-color: transparent;
+  -fx-padding: 0;
+}
+
+.autogram-settings-scroll-pane .viewport {
+  -fx-background-color: transparent;
+}
+
+.autogram-settings-container {
+  -fx-padding: 24 40 40 40;
+  -fx-spacing: 12;
+}
+
+.autogram-settings-title {
+  -fx-font-family: "-apple-system", "SF Pro Display", sans-serif;
+  -fx-font-size: 20px;
+  -fx-font-weight: bold;
+  -fx-text-fill: #1d1d1f;
+}
+
+.autogram-settings-subtitle {
+  -fx-font-size: 13px;
+  -fx-text-fill: #86868b;
+  -fx-padding: 0 0 16 0;
+}
+
+.autogram-settings-section {
+  -fx-background-color: #f5f5f7;
+  -fx-background-radius: 12;
+  -fx-padding: 4 16 4 16;
+  -fx-spacing: 0;
+  -fx-border-color: rgba(0, 0, 0, 0.05);
+  -fx-border-radius: 12;
+}
+
+.autogram-settings-row {
+  -fx-padding: 12 0 12 0;
+  -fx-alignment: CENTER_LEFT;
+  -fx-spacing: 16;
+}
+
+.autogram-settings-row .left {
+  -fx-spacing: 2;
+}
+
+.autogram-settings-row .autogram-heading-s {
+  -fx-font-weight: bold;
+  -fx-font-size: 13px;
+  -fx-text-fill: #1d1d1f;
+}
+
+.autogram-settings-row .autogram-description {
+  -fx-font-size: 12px;
+  -fx-text-fill: #86868b;
+}
+
+.autogram-settings-section Separator {
+  -fx-opacity: 0.5;
+  -fx-padding: 0;
+}
+
+.autogram-toggle-group {
+  -fx-spacing: 4;
+}
+
+.autogram-toggle-group .radio-button {
+  -fx-padding: 4 8 4 8;
+  -fx-font-size: 11px;
+}
+
+.autogram-settings-footer {
+  -fx-padding: 16 24 16 24;
+  -fx-border-color: rgba(0, 0, 0, 0.1) transparent transparent transparent;
+  -fx-border-width: 1 0 0 0;
+  -fx-spacing: 12;
+  -fx-alignment: CENTER_RIGHT;
+  -fx-background-color: -autogram-window-bg;
+}
+
+/* Settings Tabs */
+.autogram-settings-tabs-container {
+  -fx-padding: 12 24 0 24;
+  -fx-background-color: -autogram-window-bg;
+}
+
+.autogram-settings-tabs {
+  -fx-background-color: rgba(0, 0, 0, 0.05);
+  -fx-background-radius: 8;
+  -fx-padding: 2;
+  -fx-min-width: 500px;
+  /* Prevent tabs from shrinking too much */
+}
+
+.autogram-tab-item {
+  -fx-background-color: transparent;
+  -fx-background-radius: 6;
+  -fx-padding: 6 16 6 16;
+  -fx-font-size: 13px;
+  -fx-text-fill: #3a3a3c;
+  -fx-cursor: hand;
+  -fx-spacing: 6;
+  -fx-min-width: -647535496;
+  /* Use system default min width but don't shrink */
+}
+
+.autogram-tab-item:hover {
+  -fx-background-color: rgba(255, 255, 255, 0.5);
+}
+
+.autogram-tab-item--active {
+  -fx-background-color: #ffffff;
+  -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.1), 4, 0, 0, 1);
+  -fx-text-fill: -autogram-accent;
+}
+
+.autogram-tab-icon {
+  -fx-background-color: #3a3a3c;
+  -fx-min-width: 14px;
+  -fx-min-height: 14px;
+  -fx-max-width: 14px;
+  -fx-max-height: 14px;
+}
+
+.autogram-tab-item--active .autogram-tab-icon {
+  -fx-background-color: -autogram-accent;
+}
+
+.autogram-settings-content-wrapper {
+  -fx-background-color: -autogram-window-bg;
+}
+
+/* ============================================================
+   22. BATCH SIGNING "PLAYLIST" UI
+   ============================================================ */
+
+.autogram-batch-queue {
+  -fx-background-color: -autogram-sidebar-bg;
+  -fx-pref-width: 320px;
+}
+
+.autogram-batch-queue-header {
+  -fx-padding: 20px;
+  -fx-spacing: 4px;
+  -fx-border-width: 0 0 0.5px 0;
+  -fx-border-color: -autogram-border-colour;
+}
+
+.autogram-batch-queue-scroll {
+  -fx-background-color: transparent;
+  -fx-padding: 0;
+}
+
+.autogram-batch-queue-scroll .viewport {
+  -fx-background-color: transparent;
+}
+
+.autogram-batch-queue-items {
+  -fx-padding: 10px;
+}
+
+.autogram-batch-item {
+  -fx-padding: 10px 12px;
+  -fx-background-radius: 10px;
+  -fx-cursor: hand;
+}
+
+.autogram-batch-item:hover {
+  -fx-background-color: rgba(0, 0, 0, 0.05);
+}
+
+.autogram-batch-item--active {
+  -fx-background-color: rgba(0, 122, 255, 0.1);
+  -fx-border-color: rgba(0, 122, 255, 0.2);
+  -fx-border-width: 0.5px;
+  -fx-border-radius: 10px;
+}
+
+.autogram-batch-item-icon-container {
+  -fx-min-width: 32px;
+  -fx-min-height: 32px;
+  -fx-background-color: #ffffff;
+  -fx-background-radius: 6px;
+  -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.05), 2, 0, 0, 1);
+  -fx-alignment: center;
+}
+
+.autogram-batch-item-name {
+  -fx-font-weight: 500;
+  -fx-text-fill: -autogram-text-colour;
+}
+
+.autogram-batch-item-status {
+  -fx-font-size: 11px;
+  -fx-text-fill: -autogram-secondary-text-colour;
+}
+
+.autogram-batch-queue-footer {
+  -fx-padding: 20px;
+  -fx-spacing: 15px;
+  -fx-border-width: 0.5px 0 0 0;
+  -fx-border-color: -autogram-border-colour;
+  -fx-background-color: rgba(255, 255, 255, 0.5);
+}
+
+.autogram-batch-item--success .autogram-batch-item-icon-container {
+  -fx-background-color: derive(-autogram-success-colour, 90%);
+}
+
+.autogram-batch-item--success .autogram-icon {
+  -fx-stroke: -autogram-success-colour;
+}
+
+.autogram-batch-item--success .autogram-batch-item-status {
+  -fx-text-fill: -autogram-success-colour;
+}
+
+.autogram-batch-item--error .autogram-batch-item-icon-container {
+  -fx-background-color: derive(-autogram-error-colour, 90%);
+}
+
+.autogram-batch-item--error .autogram-icon {
+  -fx-stroke: -autogram-error-colour;
+}
+
+.autogram-batch-item--error .autogram-batch-item-status {
+  -fx-text-fill: -autogram-error-colour;
+}
+
+/* Progress tracking */
+.autogram-batch-progress-box {
+  -fx-padding: 8px 20px;
+  -fx-spacing: 4px;
+}
+
+.autogram-batch-progress-text {
+  -fx-text-fill: -autogram-focus-colour;
+  -fx-font-weight: 500;
+}
+
+.autogram-batch-progress-bar {
+  -fx-pref-height: 4px;
+  -fx-max-height: 4px;
+  -fx-background-color: #e5e5ea;
+  -fx-background-radius: 2px;
+}
+
+.autogram-batch-progress-bar .bar {
+  -fx-background-color: -autogram-focus-colour;
+  -fx-background-radius: 2px;
+  -fx-background-insets: 0;
+}
+
+.autogram-batch-progress-bar .track {
+  -fx-background-color: #e5e5ea;
+  -fx-background-radius: 2px;
+  -fx-background-insets: 0;
+}
+
+
+/* ============================================================
+   UTILITY: Overlay & Transitions
+   ============================================================ */
+
+/* Modal overlay backdrop — semi-transparent dark scrim */
+.autogram-overlay-backdrop {
+  -fx-background-color: rgba(0, 0, 0, 0.35);
+}
+
+/* Overlay dialog card — elevated white card for inline modals */
+.autogram-overlay-card {
+  -fx-background-color: -autogram-background-colour;
+  -fx-background-radius: 14px;
+  -fx-border-radius: 14px;
+  -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.25), 20, 0, 0, 8);
+  -fx-padding: 24px;
+  -fx-max-width: 480px;
+  -fx-max-height: 600px;
+}
+
+/* Large overlay card for settings/about */
+.autogram-overlay-card--large {
+  -fx-max-width: 680px;
+  -fx-max-height: 720px;
+}

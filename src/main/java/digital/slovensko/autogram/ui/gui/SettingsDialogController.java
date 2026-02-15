@@ -10,6 +10,7 @@ import javafx.fxml.FXML;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.text.Text;
 import javafx.scene.text.TextFlow;
@@ -64,16 +65,39 @@ public class SettingsDialogController {
     private Button closeButton;
     @FXML
     private VBox driverSlot;
+    @FXML
+    private StackPane settingsContentArea;
+    @FXML
+    private ScrollPane signingSettingsContent;
+    @FXML
+    private ScrollPane validationSettingsContent;
+    @FXML
+    private ScrollPane securitySettingsContent;
+    @FXML
+    private ScrollPane otherSettingsContent;
+    @FXML
+    private Button signingNavButton;
+    @FXML
+    private Button validationNavButton;
+    @FXML
+    private Button securityNavButton;
+    @FXML
+    private Button otherNavButton;
+
+    private Runnable onSave;
 
     private final UserSettings userSettings;
     private final List<String> preDefinedTsaServers = List.of(
             "http://tsa.baltstamp.lt,http://ts.quovadisglobal.com/eu",
             "http://tsa.baltstamp.lt",
-            "http://ts.quovadisglobal.com/eu"
-    );
+            "http://ts.quovadisglobal.com/eu");
 
     public SettingsDialogController(UserSettings userSettings) {
         this.userSettings = userSettings;
+    }
+
+    public void setOnSave(Runnable onSave) {
+        this.onSave = onSave;
     }
 
     public void initialize() {
@@ -98,6 +122,8 @@ public class SettingsDialogController {
     }
 
     private void initializeSignatureLevelChoiceBox() {
+        if (signatureLevelChoiceBoxBox == null)
+            return;
         signatureLevelChoiceBoxBox.getItems().addAll(List.of(
                 SignatureLevel.XAdES_BASELINE_B,
                 SignatureLevel.PAdES_BASELINE_B,
@@ -111,6 +137,8 @@ public class SettingsDialogController {
     }
 
     private void initializeDriverChoiceBox() {
+        if (driverChoiceBox == null)
+            return;
         var driverDetector = new DefaultDriverDetector(userSettings);
         driverChoiceBox.setConverter(new TokenDriverStringConverter(driverDetector));
         driverChoiceBox.getItems().add(new FakeTokenDriver("Žiadne", null, "none", ""));
@@ -124,10 +152,14 @@ public class SettingsDialogController {
     }
 
     private void initializeTsaEnabled() {
+        if (tsaEnabledRadios == null)
+            return;
         initializeBooleanRadios(tsaEnabledRadios, t -> userSettings.setTsaEnabled(t), userSettings.getTsaEnabled());
     }
 
     private void initializeTsaServer() {
+        if (tsaChoiceBox == null || customTsaServerTextField == null)
+            return;
         final var USE_CUSTOM_TSA_LABEL = "Použiť vlastnú adresu TSA servera";
 
         customTsaServerTextField.setText(userSettings.getCustomTsaServer());
@@ -141,14 +173,14 @@ public class SettingsDialogController {
             tsaChoiceBox.getItems().add(server);
 
         tsaChoiceBox.getSelectionModel().selectedItemProperty().addListener((observable, oldValue, newValue) -> {
-           if (newValue.equals(USE_CUSTOM_TSA_LABEL)) {
-               userSettings.setTsaServer(customTsaServerTextField.getText());
-               customTsaServerTextField.setDisable(false);
-               return;
-           }
+            if (newValue.equals(USE_CUSTOM_TSA_LABEL)) {
+                userSettings.setTsaServer(customTsaServerTextField.getText());
+                customTsaServerTextField.setDisable(false);
+                return;
+            }
 
-           userSettings.setTsaServer(newValue);
-           customTsaServerTextField.setDisable(true);
+            userSettings.setTsaServer(newValue);
+            customTsaServerTextField.setDisable(true);
         });
 
         if (!preDefinedTsaServers.contains(userSettings.getTsaServer())) {
@@ -164,6 +196,8 @@ public class SettingsDialogController {
 
     private void initializeBooleanRadios(HBox parent, Consumer<Boolean> consumer, boolean defaultValue, String yesText,
             String noText) {
+        if (parent == null)
+            return;
         var toggleGroup = new ToggleGroup();
 
         var yes = new RadioButton(yesText);
@@ -197,7 +231,8 @@ public class SettingsDialogController {
     }
 
     private void initializePlainXmlEnabledCheckBox() {
-        initializeBooleanRadios(plainXmlEnabledRadios, t -> userSettings.setPlainXmlEnabled(t), userSettings.isPlainXmlEnabled());
+        initializeBooleanRadios(plainXmlEnabledRadios, t -> userSettings.setPlainXmlEnabled(t),
+                userSettings.isPlainXmlEnabled());
     }
 
     private void initializeCorrectDocumentDisplayCheckBox() {
@@ -226,6 +261,8 @@ public class SettingsDialogController {
     }
 
     private void initializeTrustedCountriesList() {
+        if (trustedCountriesList == null)
+            return;
         var europeanCountries = List.of(
                 new Country("Belgicko", "BE"),
                 new Country("Bulharsko", "BG"),
@@ -261,8 +298,10 @@ public class SettingsDialogController {
     }
 
     private HBox createCountryElement(Country country, boolean isCountryInTrustedList) {
-        var countryBox = new VBox(new TextFlow(new Text(country.getName())));
-        countryBox.getStyleClass().add("left");
+        var countryLabel = new Label(country.getName());
+        countryLabel.getStyleClass().add("autogram-body");
+        countryLabel.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(countryLabel, javafx.scene.layout.Priority.ALWAYS);
 
         var checkBox = new CheckBox(isCountryInTrustedList ? "Zapnuté" : "Vypnuté");
         checkBox.setSelected(isCountryInTrustedList);
@@ -276,18 +315,26 @@ public class SettingsDialogController {
             }
         });
 
-        return new HBox(countryBox, new VBox(checkBox));
+        var container = new HBox(countryLabel, checkBox);
+        container.setSpacing(10);
+        container.getStyleClass().add("autogram-settings-row");
+        container.setPadding(new javafx.geometry.Insets(4, 8, 4, 8));
+        return container;
     }
 
     private void initializePdfDpiSettings() {
+        if (pdfDpiChoiceBox == null)
+            return;
         pdfDpiChoiceBox.getItems().addAll("50 dpi", "70 dpi", "100 dpi", "150 dpi", "200 dpi", "300 dpi");
         pdfDpiChoiceBox.setValue(String.valueOf(userSettings.getPdfDpi()) + " dpi");
         pdfDpiChoiceBox.getSelectionModel().selectedItemProperty()
-                .addListener((observable, oldValue, newValue) ->
-                    userSettings.setPdfDpi(Integer.parseInt(newValue.replace(" dpi", ""))));
+                .addListener((observable, oldValue, newValue) -> userSettings
+                        .setPdfDpi(Integer.parseInt(newValue.replace(" dpi", ""))));
     }
 
     private void initializeCustomKeystoreSettings() {
+        if (customKeystorePathTextField == null)
+            return;
         customKeystorePathTextField.setText(userSettings.getCustomKeystorePath());
         customKeystorePathTextField.setOnKeyTyped((e) -> {
             userSettings.setCustomKeystorePath(customKeystorePathTextField.getText());
@@ -295,7 +342,10 @@ public class SettingsDialogController {
     }
 
     private void initializeTokenSessionTimeoutTextField() {
-        tokenSessionTimeoutTextField.setTextFormatter(new TextFormatter <> (change -> change.getControlNewText().matches("[0-9]*") ? change : null));
+        if (tokenSessionTimeoutTextField == null)
+            return;
+        tokenSessionTimeoutTextField.setTextFormatter(
+                new TextFormatter<>(change -> change.getControlNewText().matches("[0-9]*") ? change : null));
         tokenSessionTimeoutTextField.setText(String.valueOf(userSettings.getTokenSessionTimeout()));
         tokenSessionTimeoutTextField.setOnKeyTyped((e) -> {
             if (!tokenSessionTimeoutTextField.getText().isEmpty())
@@ -304,13 +354,17 @@ public class SettingsDialogController {
     }
 
     private void initializeCustomPKCS11DriverPathSettings() {
+        if (customPKCS11DriverPathTextField == null)
+            return;
         customPKCS11DriverPathTextField.setText(userSettings.getCustomPKCS11DriverPath());
         customPKCS11DriverPathTextField.setOnKeyTyped((e) -> {
             userSettings.setCustomPKCS11DriverPath(customPKCS11DriverPathTextField.getText());
         });
     }
 
-    private void initializeDriverSlot(){
+    private void initializeDriverSlot() {
+        if (driverSlot == null)
+            return;
         var driverDetector = new DefaultDriverDetector(userSettings);
         var drivers = driverDetector.getAvailableDrivers();
         if (drivers.isEmpty()) {
@@ -326,8 +380,10 @@ public class SettingsDialogController {
 
                 final var DEFAULT_LABEL = "Predvolený slot";
                 ChoiceBox<String> slotIndex = new ChoiceBox<>();
-                slotIndex.getItems().addAll(DEFAULT_LABEL, "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15");
-                slotIndex.setValue(userSettings.getDriverSlotIndex(tokenDriver.getShortname()) == -1 ? DEFAULT_LABEL : String.valueOf(userSettings.getDriverSlotIndex(tokenDriver.getShortname())));
+                slotIndex.getItems().addAll(DEFAULT_LABEL, "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11",
+                        "12", "13", "14", "15");
+                slotIndex.setValue(userSettings.getDriverSlotIndex(tokenDriver.getShortname()) == -1 ? DEFAULT_LABEL
+                        : String.valueOf(userSettings.getDriverSlotIndex(tokenDriver.getShortname())));
                 slotIndex.getSelectionModel().selectedItemProperty()
                         .addListener((observable, oldValue, newValue) -> {
                             if (newValue.equals(DEFAULT_LABEL))
@@ -341,11 +397,14 @@ public class SettingsDialogController {
     }
 
     public void onSaveButtonAction() {
-
         userSettings.save();
 
-        var stage = (Stage) saveButton.getScene().getWindow();
-        stage.close();
+        if (onSave != null) {
+            onSave.run();
+        } else {
+            var stage = (Stage) saveButton.getScene().getWindow();
+            stage.close();
+        }
     }
 
     public void onResetButtonAction() {
@@ -363,5 +422,41 @@ public class SettingsDialogController {
         stage.initModality(Modality.APPLICATION_MODAL);
         GUIUtils.suppressDefaultFocus(stage, controller);
         stage.show();
+    }
+
+    @FXML
+    private void showSigningSettings() {
+        showPanel(signingSettingsContent, signingNavButton);
+    }
+
+    @FXML
+    private void showValidationSettings() {
+        showPanel(validationSettingsContent, validationNavButton);
+    }
+
+    @FXML
+    private void showSecuritySettings() {
+        showPanel(securitySettingsContent, securityNavButton);
+    }
+
+    @FXML
+    private void showOtherSettings() {
+        showPanel(otherSettingsContent, otherNavButton);
+    }
+
+    private void showPanel(ScrollPane panel, Button navButton) {
+        signingSettingsContent.setVisible(false);
+        validationSettingsContent.setVisible(false);
+        securitySettingsContent.setVisible(false);
+        otherSettingsContent.setVisible(false);
+
+        panel.setVisible(true);
+
+        signingNavButton.getStyleClass().remove("autogram-tab-item--active");
+        validationNavButton.getStyleClass().remove("autogram-tab-item--active");
+        securityNavButton.getStyleClass().remove("autogram-tab-item--active");
+        otherNavButton.getStyleClass().remove("autogram-tab-item--active");
+
+        navButton.getStyleClass().add("autogram-tab-item--active");
     }
 }

@@ -30,7 +30,9 @@ public class BatchGuiFileResponder extends BatchResponder {
     private final TSPSource tspSource;
     private final boolean plainXmlEnabled;
 
-    public BatchGuiFileResponder(Autogram autogram, List<File> list, Path targetDirectory, boolean checkPDFACompliance, SignatureLevel pDFSignatureLevel, boolean signPDFAsPades, boolean isEn319132, TSPSource tspSource, boolean plainXmlEnabled) {
+    public BatchGuiFileResponder(Autogram autogram, List<File> list, Path targetDirectory, boolean checkPDFACompliance,
+            SignatureLevel pDFSignatureLevel, boolean signPDFAsPades, boolean isEn319132, TSPSource tspSource,
+            boolean plainXmlEnabled) {
         this.autogram = autogram;
         this.list = list;
         this.checkPDFACompliance = checkPDFACompliance;
@@ -39,6 +41,10 @@ public class BatchGuiFileResponder extends BatchResponder {
         this.targetPath = TargetPath.fromTargetDirectory(targetDirectory, signPDFAsPades);
         this.tspSource = tspSource;
         this.plainXmlEnabled = plainXmlEnabled;
+    }
+
+    public List<File> getList() {
+        return list;
     }
 
     @Override
@@ -54,17 +60,32 @@ public class BatchGuiFileResponder extends BatchResponder {
             try {
                 targetFiles.put(file, null);
                 errors.put(file, null);
-                var responder = new ResponderInBatch(new SaveFileFromBatchResponder(file, targetPath, (File targetFile) -> {
-                    targetFiles.put(file, targetFile);
-                    Logging.log(batch.getProcessedDocumentsCount() + " / " + batch.getTotalNumberOfDocuments() + " signed " + file.toString());
-                    onAllFilesSigned(batch);
-                }, (AutogramException error) -> {
-                    Logging.log("Signing failed " + file.toString() + " all:" + batch.isAllProcessed());
-                    errors.put(file, error);
-                    onAllFilesSigned(batch);
-                }), batch);
+                var responder = new ResponderInBatch(
+                        new SaveFileFromBatchResponder(file, targetPath, (File targetFile) -> {
+                            targetFiles.put(file, targetFile);
+                            Logging.log(batch.getProcessedDocumentsCount() + " / " + batch.getTotalNumberOfDocuments()
+                                    + " signed " + file.toString());
+                            if (autogram.getUI() instanceof digital.slovensko.autogram.ui.gui.GUI) {
+                                ((digital.slovensko.autogram.ui.gui.GUI) autogram.getUI()).updateBatchItemStatus(file,
+                                        "Podpísané ✓", "autogram-batch-item--success");
+                            }
+                            onAllFilesSigned(batch);
+                        }, (AutogramException error) -> {
+                            Logging.log("Signing failed " + file.toString() + " all:" + batch.isAllProcessed());
+                            errors.put(file, error);
+                            if (autogram.getUI() instanceof digital.slovensko.autogram.ui.gui.GUI) {
+                                ((digital.slovensko.autogram.ui.gui.GUI) autogram.getUI()).updateBatchItemStatus(file,
+                                        "Chyba ✗", "autogram-batch-item--error");
+                            }
+                            onAllFilesSigned(batch);
+                        }), batch);
 
-                var job = SigningJob.buildFromFile(file, responder, checkPDFACompliance, pDFSignatureLevel, isEn319132, tspSource, plainXmlEnabled);
+                if (autogram.getUI() instanceof digital.slovensko.autogram.ui.gui.GUI) {
+                    ((digital.slovensko.autogram.ui.gui.GUI) autogram.getUI()).updateBatchItemStatus(file,
+                            "Podpisujem...", null);
+                }
+                var job = SigningJob.buildFromFile(file, responder, checkPDFACompliance, pDFSignatureLevel, isEn319132,
+                        tspSource, plainXmlEnabled);
                 autogram.batchSign(job, batch.getBatchId());
             } catch (AutogramException e) {
                 autogram.onSigningFailed(e);

@@ -18,6 +18,7 @@ import javafx.scene.text.Text;
 public class BatchSigningFailureDialogController implements SuppressedFocusController {
     private final HostServices hostServices;
     private final BatchUiResult result;
+    private Runnable onClose;
 
     @FXML
     Hyperlink folderPathText;
@@ -60,7 +61,8 @@ public class BatchSigningFailureDialogController implements SuppressedFocusContr
         var errorFileNamesList = result.getFailedFilesList().map(file -> file.getName()).toList();
         errorList.setItems(FXCollections
                 .observableArrayList(errorFileNamesList));
-        errorList.prefHeightProperty().bind(Bindings.min(4, Bindings.size(errorList.getItems())).multiply(LIST_CELL_HEIGHT).add(2));
+        errorList.prefHeightProperty()
+                .bind(Bindings.min(4, Bindings.size(errorList.getItems())).multiply(LIST_CELL_HEIGHT).add(2));
         errorListHeading.setText("Nepodpísané dokumenty (" + errorFileNamesList.size() + ")");
         failureCount.setText(String.valueOf(errorFileNamesList.size()));
 
@@ -77,7 +79,15 @@ public class BatchSigningFailureDialogController implements SuppressedFocusContr
     }
 
     public void onCloseAction(ActionEvent ignored) {
-        GUIUtils.closeWindow(mainBox);
+        if (onClose != null) {
+            onClose.run();
+        } else {
+            GUIUtils.closeWindow(mainBox);
+        }
+    }
+
+    public void setOnClose(Runnable onClose) {
+        this.onClose = onClose;
     }
 
     public void onShowErrorDetailsButtonAction(ActionEvent ignored) {

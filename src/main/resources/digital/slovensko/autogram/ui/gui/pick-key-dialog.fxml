@@ -1,19 +1,20 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<?import javafx.scene.control.Button?>
-<?import javafx.scene.layout.VBox?>
-<?import javafx.scene.text.Text?>
-<?import javafx.scene.text.TextFlow?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.text.*?>
+
 <VBox xmlns="http://javafx.com/javafx"
       xmlns:fx="http://javafx.com/fxml"
-      prefHeight="200" prefWidth="600"
-      fx:id="mainBox">
+      fx:id="mainBox" styleClass="autogram-dialog-content">
 
-    <VBox fx:id="formGroup" styleClass="autogram-form-group">
-        <TextFlow><Text styleClass="autogram-heading-l">Ktorým certifikátom chcete podpisovať?</Text></TextFlow>
-        <TextFlow><Text fx:id="error" styleClass="autogram-error-message" managed="false">Vyberte certifikát, ktorým budete podpisovať</Text></TextFlow>
+    <VBox fx:id="formGroup" styleClass="autogram-form-group" VBox.vgrow="ALWAYS">
+        <TextFlow><Text styleClass="autogram-heading-m">Ktorým certifikátom chcete podpisovať?</Text></TextFlow>
+        <TextFlow><Text fx:id="error" styleClass="autogram-error-message" managed="false" visible="false">Vyberte certifikát, ktorým budete podpisovať</Text></TextFlow>
         <VBox fx:id="radios" styleClass="autogram-radios"/>
     </VBox>
 
-    <Button styleClass="autogram-button" fx:id="mainButton" text="Podpísať" onAction="#onPickCertificateButtonAction" />
+    <HBox styleClass="autogram-actions" alignment="CENTER_RIGHT">
+        <Button styleClass="autogram-button" fx:id="mainButton" text="Podpísať" onAction="#onPickCertificateButtonAction" />
+    </HBox>
 </VBox>

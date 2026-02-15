@@ -1,22 +1,29 @@
 package digital.slovensko.autogram.ui.gui;
 
 import java.io.File;
-import java.util.*;
+import java.io.IOException;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.WeakHashMap;
+import java.util.ArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 import java.util.function.Consumer;
 
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ScheduledExecutorService;
+
 import digital.slovensko.autogram.core.*;
 import digital.slovensko.autogram.core.errors.*;
-import javafx.event.ActionEvent;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import digital.slovensko.autogram.core.visualization.Visualization;
 import digital.slovensko.autogram.drivers.TokenDriver;
 import digital.slovensko.autogram.ui.BatchUiResult;
 import digital.slovensko.autogram.ui.UI;
+import digital.slovensko.autogram.util.PDFUtils;
 import digital.slovensko.autogram.util.macos.MacOSNotification;
+import eu.europa.esig.dss.model.DSSDocument;
 import eu.europa.esig.dss.token.DSSPrivateKeyEntry;
 import javafx.application.HostServices;
 import javafx.application.Platform;
@@ -31,17 +38,27 @@ import javafx.stage.Window;
 public class GUI implements UI {
     private final Map<SigningJob, SigningDialogController> jobControllers = new WeakHashMap<>();
     private SigningKey activeKey;
+    private char[] batchPin;
     private boolean driverWasAlreadySet = false;
     private final HostServices hostServices;
     private final UserSettings userSettings;
-    private BatchDialogController batchController;
-    private static final boolean DEBUG = false;
-    private static Logger logger = LoggerFactory.getLogger(GUI.class);
-    private int nWindows = 0;
+    private BatchQueueController batchQueueController;
+    private MainMenuController mainMenuController;
 
-    public GUI(HostServices hostServices, UserSettings userSettings) {
+    private int nWindows = 0;
+    public final ScheduledExecutorService scheduledExecutorService;
+    public final ExecutorService cachedExecutorService;
+
+    public GUI(HostServices hostServices, UserSettings userSettings, ScheduledExecutorService scheduledExecutorService,
+            ExecutorService cachedExecutorService) {
         this.hostServices = hostServices;
         this.userSettings = userSettings;
+        this.scheduledExecutorService = scheduledExecutorService;
+        this.cachedExecutorService = cachedExecutorService;
+    }
+
+    public void setMainMenuController(MainMenuController controller) {
+        this.mainMenuController = controller;
     }
 
     @Override
@@ -51,37 +68,37 @@ public class GUI implements UI {
 
     @Override
     public void startBatch(Batch batch, Autogram autogram, BatchStartCallback callback) {
-        batchController = new BatchDialogController(batch, callback, autogram, this);
-        var root = GUIUtils.loadFXML(batchController, "batch-dialog.fxml");
-
-        var stage = new Stage();
-        stage.setTitle("Hromadné podpisovanie");
-        stage.setScene(new Scene(root));
-        stage.setOnCloseRequest(e -> {
-            cancelBatch(batch);
+        if (mainMenuController != null) {
+            batchQueueController = new BatchQueueController();
+            var root = GUIUtils.loadFXML(batchQueueController, "batch-queue.fxml");
+            batchQueueController.initialize(mainMenuController, autogram, batch, callback);
+            mainMenuController.showRightDrawer(root);
+        } else {
+            // Fallback: no main menu yet — cancel since we can't display the batch UI
             callback.cancel();
-        });
-
-        stage.setResizable(false);
-        stage.sizeToScene();
-        GUIUtils.suppressDefaultFocus(stage, batchController);
-        GUIUtils.showOnTop(stage);
-        setUserFriendlyPositionAndLimits(stage);
+        }
     }
 
     @Override
     public void cancelBatch(Batch batch) {
-        batchController.close();
+        if (batchQueueController != null) {
+            batchQueueController.onBatchEnded();
+        }
         batch.end();
         refreshKeyOnAllJobs();
         enableSigningOnAllJobs();
     }
 
     public void updateBatch() {
-        if (batchController == null)
-            return;
+        if (batchQueueController != null) {
+            batchQueueController.update();
+        }
+    }
 
-        batchController.update();
+    public void updateBatchItemStatus(File file, String status, String styleClass) {
+        if (batchQueueController != null) {
+            batchQueueController.updateStatus(file, status, styleClass);
+        }
     }
 
     @Override
@@ -99,7 +116,8 @@ public class GUI implements UI {
             if (!driverWasAlreadySet && userSettings.getDefaultDriver() != null) {
                 try {
                     driverWasAlreadySet = true;
-                    var defaultDriver = drivers.stream().filter(d -> d.getName().equals(userSettings.getDefaultDriver()))
+                    var defaultDriver = drivers.stream()
+                            .filter(d -> d.getName().equals(userSettings.getDefaultDriver()))
                             .findFirst().get();
 
                     if (defaultDriver != null) {
@@ -130,7 +148,8 @@ public class GUI implements UI {
     }
 
     @Override
-    public void pickKeyAndThen(List<DSSPrivateKeyEntry> keys, TokenDriver driver, Consumer<DSSPrivateKeyEntry> callback) {
+    public void pickKeyAndThen(List<DSSPrivateKeyEntry> keys, TokenDriver driver,
+            Consumer<DSSPrivateKeyEntry> callback) {
         if (keys.isEmpty()) {
             showError(new NoKeysDetectedException(driver.getNoKeysHelperText()));
             refreshKeyOnAllJobs();
@@ -140,8 +159,9 @@ public class GUI implements UI {
         }
 
         var keysStream = keys.stream();
-//        TODO: NFC eID returns false for qualified certificate #367
-//        var keysStream = keys.stream().filter(k -> k.getCertificate().checkKeyUsage(KeyUsageBit.DIGITAL_SIGNATURE));
+        // TODO: NFC eID returns false for qualified certificate #367
+        // var keysStream = keys.stream().filter(k ->
+        // k.getCertificate().checkKeyUsage(KeyUsageBit.DIGITAL_SIGNATURE));
         if (!userSettings.isExpiredCertsEnabled()) {
             var now = new Date();
             keysStream = keysStream.filter(k -> k.getCertificate().isValidOn(now));
@@ -159,34 +179,41 @@ public class GUI implements UI {
         var controller = new PickKeyDialogController(keys, callback, userSettings.isExpiredCertsEnabled());
         var root = GUIUtils.loadFXML(controller, "pick-key-dialog.fxml");
 
-        var stage = new Stage();
-        stage.setTitle("Výber certifikátu");
-        stage.setScene(new Scene(root));
-        stage.setOnCloseRequest(e -> {
-            refreshKeyOnAllJobs();
-            enableSigningOnAllJobs();
-        });
-        stage.setResizable(false);
-        stage.initModality(Modality.APPLICATION_MODAL);
-        stage.show();
+        if (mainMenuController != null) {
+            controller.setOnClose(() -> mainMenuController.hideOverlayDialog());
+            mainMenuController.showOverlayDialog(root);
+        } else {
+            var stage = new Stage();
+            stage.setTitle("Výber certifikátu");
+            stage.setScene(new Scene(root));
+            stage.setOnCloseRequest(e -> {
+                refreshKeyOnAllJobs();
+                enableSigningOnAllJobs();
+            });
+            stage.setResizable(false);
+            stage.initModality(Modality.APPLICATION_MODAL);
+            stage.show();
+        }
     }
 
     public void refreshKeyOnAllJobs() {
         jobControllers.values().forEach(SigningDialogController::refreshSigningKey);
-        if (batchController != null) {
-            batchController.refreshSigningKey();
-        }
     }
 
     public void enableSigningOnAllJobs() {
         jobControllers.values().forEach(SigningDialogController::enableSigning);
-        if (batchController != null)
-            batchController.enableSigning();
     }
 
     @Override
     public void showError(AutogramException e) {
-        GUIUtils.showError(e, "Pokračovať", false);
+        if (mainMenuController != null) {
+            var controller = new ErrorController(e);
+            var root = GUIUtils.loadFXML(controller, "error-dialog.fxml");
+            controller.setOnClose(() -> mainMenuController.hideOverlayDialog());
+            mainMenuController.showOverlayDialog(root);
+        } else {
+            GUIUtils.showError(e, "Pokračovať", false);
+        }
     }
 
     public void showPkcsEidWindowsDllError(AutogramException e) {
@@ -207,8 +234,31 @@ public class GUI implements UI {
     }
 
     public char[] getKeystorePassword() {
+        if (mainMenuController != null) {
+            var latch = new java.util.concurrent.CountDownLatch(1);
+            var controller = new PasswordController("Aký je kód k úložisku klúčov?", "Zadajte kód k úložisku klúčov.",
+                    false, true);
+
+            Platform.runLater(() -> {
+                var root = GUIUtils.loadFXML(controller, "password-dialog.fxml");
+                controller.setOnClose(() -> {
+                    mainMenuController.hideOverlayDialog();
+                    latch.countDown();
+                });
+                mainMenuController.showOverlayDialog(root);
+            });
+
+            try {
+                latch.await();
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+            return controller.getPassword();
+        }
+
         var futurePassword = new FutureTask<>(() -> {
-            var controller = new PasswordController("Aký je kód k úložisku klúčov?", "Zadajte kód k úložisku klúčov.", false, true);
+            var controller = new PasswordController("Aký je kód k úložisku klúčov?", "Zadajte kód k úložisku klúčov.",
+                    false, true);
             var root = GUIUtils.loadFXML(controller, "password-dialog.fxml");
 
             var stage = new Stage();
@@ -234,10 +284,36 @@ public class GUI implements UI {
         }
     }
 
-
     public char[] getContextSpecificPassword() {
+        if (batchPin != null) {
+            return batchPin;
+        }
+
+        if (mainMenuController != null) {
+            var latch = new java.util.concurrent.CountDownLatch(1);
+            var controller = new PasswordController("Aký je podpisový PIN alebo heslo?",
+                    "Zadajte podpisový PIN alebo heslo ku klúču.", true, false);
+
+            Platform.runLater(() -> {
+                var root = GUIUtils.loadFXML(controller, "password-dialog.fxml");
+                controller.setOnClose(() -> {
+                    mainMenuController.hideOverlayDialog();
+                    latch.countDown();
+                });
+                mainMenuController.showOverlayDialog(root);
+            });
+
+            try {
+                latch.await();
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+            return controller.getPassword();
+        }
+
         var futurePassword = new FutureTask<>(() -> {
-            var controller = new PasswordController("Aký je podpisový PIN alebo heslo?", "Zadajte podpisový PIN alebo heslo ku klúču.", true, false);
+            var controller = new PasswordController("Aký je podpisový PIN alebo heslo?",
+                    "Zadajte podpisový PIN alebo heslo ku klúču.", true, false);
             var root = GUIUtils.loadFXML(controller, "password-dialog.fxml");
 
             var stage = new Stage();
@@ -293,17 +369,25 @@ public class GUI implements UI {
 
     @Override
     public void onPDFAComplianceCheckFailed(SigningJob job) {
-        var controller = new PDFAComplianceDialogController(job, this);
-        var root = GUIUtils.loadFXML(controller, "pdfa-compliance-dialog.fxml");
-
-        var stage = new Stage();
-        stage.setTitle("Dokument nie je vo formáte PDF/A");
-        stage.setScene(new Scene(root));
-        stage.setResizable(false);
-        stage.initModality(Modality.WINDOW_MODAL);
-        stage.initOwner(getJobWindow(job));
-        GUIUtils.suppressDefaultFocus(stage, controller);
-        stage.show();
+        if (mainMenuController != null) {
+            mainMenuController.updateFormatMetadata("PDF (nie PDF/A compliant)");
+            var controller = new PDFAComplianceDialogController(job, this);
+            var root = GUIUtils.loadFXML(controller, "pdfa-compliance-dialog.fxml");
+            controller.setOnClose(() -> mainMenuController.hideOverlayDialog());
+            mainMenuController.showOverlayDialog(root);
+        } else {
+            var controller = new PDFAComplianceDialogController(job, this);
+            var root = GUIUtils.loadFXML(controller, "pdfa-compliance-dialog.fxml");
+            var stage = new Stage();
+            GUIUtils.setAppIcon(stage);
+            stage.setTitle("Dokument nie je vo formáte PDF/A");
+            stage.setScene(new Scene(root));
+            stage.setResizable(false);
+            stage.initModality(Modality.WINDOW_MODAL);
+            stage.initOwner(getJobWindow(job));
+            GUIUtils.suppressDefaultFocus(stage, controller);
+            stage.show();
+        }
     }
 
     @Override
@@ -316,14 +400,31 @@ public class GUI implements UI {
     public void onSignatureCheckCompleted(ValidationReports reports) {
         var controller = jobControllers.get(reports.getSigningJob());
         controller.onSignatureCheckCompleted(reports.haveSignatures() ? reports.getReports() : null);
+
+        // Extract and show existing signatures in the sidebar
+        if (mainMenuController != null && reports.haveSignatures()) {
+            var reportsData = reports.getReports();
+            var simpleReport = reportsData.getSimpleReport();
+            var signatures = simpleReport.getSignatureIdList();
+            List<String> signerNames = new ArrayList<>();
+            for (String sigId : signatures) {
+                signerNames.add(simpleReport.getSignedBy(sigId));
+            }
+            mainMenuController.updateExistingSignatures(signerNames);
+        } else if (mainMenuController != null) {
+            mainMenuController.updateExistingSignatures(null);
+        }
     }
 
     public void showVisualization(Visualization visualization, Autogram autogram) {
         var title = "Dokument";
-        if (visualization.getJob().getDocument().getName() != null)
-            title = "Dokument " + visualization.getJob().getDocument().getName();
+        var doc = visualization.getJob().getDocument();
+        if (doc.getName() != null)
+            title = "Dokument " + doc.getName();
 
-        var controller = new SigningDialogController(visualization, autogram, this, title, userSettings.isSignaturesValidity());
+        var controller = new SigningDialogController(visualization, autogram, this, title,
+                userSettings.isSignaturesValidity());
+        controller.setMainMenuController(mainMenuController);
         jobControllers.put(visualization.getJob(), controller);
 
         Parent root;
@@ -336,20 +437,69 @@ public class GUI implements UI {
             showError(new UnrecognizedException(e));
             return;
         }
-        var stage = new Stage();
-        stage.setTitle(title);
-        stage.setScene(new Scene(root));
-        stage.setOnCloseRequest(e -> cancelJob(visualization.getJob()));
 
-        stage.sizeToScene();
+        // Embed signing visualization in the main window's content area
+        if (mainMenuController != null) {
+            // Update metadata
+            String filename = doc.getName() != null ? doc.getName() : "Neznámy";
+            String size = formatFileSize(doc);
+            String pages = formatPageCount(doc);
+            String format = doc.getMimeType().getMimeTypeString();
+            String cert = activeKey != null ? activeKey.toString() : "Nevybraný";
 
-        GUIUtils.suppressDefaultFocus(stage, controller);
-        GUIUtils.showOnTop(stage);
-        GUIUtils.hackToForceRelayout(stage);
-        setUserFriendlyPositionAndLimits(stage);
+            mainMenuController.updateMetadata(filename, size, pages, format, cert);
 
-        onWorkThreadDo(()
-                -> autogram.checkAndValidateSignatures(visualization.getJob()));
+            // Extract existing signatures if it's already a job we might know about
+            // Or it will be handled by onSignatureCheckCompleted soon
+
+            mainMenuController.showSigningContent(root);
+
+            // Auto-resize window if needed
+            Platform.runLater(() -> {
+                Window window = mainMenuController.splitPane.getScene().getWindow();
+                if (window instanceof Stage) {
+                    Stage stage = (Stage) window;
+                    double currentWidth = stage.getWidth();
+                    double neededWidth = 1000; // Optimal width for sidebar + document
+                    if (currentWidth < neededWidth) {
+                        stage.setWidth(neededWidth);
+                        stage.centerOnScreen();
+                    }
+                }
+            });
+        } else {
+            // Fallback: open in a separate stage
+            var stage = new Stage();
+            GUIUtils.setAppIcon(stage);
+            stage.setTitle(title);
+            stage.setScene(new Scene(root));
+            stage.setOnCloseRequest(e -> cancelJob(visualization.getJob()));
+            stage.sizeToScene();
+            GUIUtils.suppressDefaultFocus(stage, controller);
+            GUIUtils.showOnTop(stage);
+            GUIUtils.hackToForceRelayout(stage);
+            setUserFriendlyPositionAndLimits(stage);
+        }
+
+        onWorkThreadDo(() -> autogram.checkAndValidateSignatures(visualization.getJob()));
+    }
+
+    private String formatFileSize(DSSDocument doc) {
+        try {
+            long bytes = doc.openStream().available();
+            if (bytes < 1024)
+                return bytes + " B";
+            int exp = (int) (Math.log(bytes) / Math.log(1024));
+            char pre = "KMGTPE".charAt(exp - 1);
+            return String.format("%.1f %sB", bytes / Math.pow(1024, exp), pre);
+        } catch (IOException e) {
+            return "Neznáma";
+        }
+    }
+
+    private String formatPageCount(DSSDocument doc) {
+        int pages = PDFUtils.getPageCount(doc);
+        return pages > 0 ? String.valueOf(pages) : "N/A";
     }
 
     @Override
@@ -370,8 +520,6 @@ public class GUI implements UI {
 
     private void disableKeyPicking() {
         jobControllers.values().forEach(SigningDialogController::disableKeyPicking);
-        if (batchController != null)
-            batchController.disableKeyPicking();
     }
 
     @Override
@@ -387,7 +535,13 @@ public class GUI implements UI {
 
     @Override
     public void onSigningSuccess(SigningJob job) {
-        jobControllers.get(job).close();
+        var controller = jobControllers.get(job);
+        if (controller != null) {
+            // Don't close the window if we're in single-window mode
+            if (mainMenuController == null) {
+                controller.close();
+            }
+        }
         refreshKeyOnAllJobs();
         enableSigningOnAllJobs();
         updateBatch();
@@ -417,34 +571,60 @@ public class GUI implements UI {
         var controller = new SigningSuccessDialogController(targetFile, hostServices);
         var root = GUIUtils.loadFXML(controller, "signing-success-dialog.fxml");
 
-        var stage = new Stage();
-        stage.setTitle("Dokument bol úspešne podpísaný");
-        stage.setScene(new Scene(root));
-        stage.setResizable(false);
-        GUIUtils.suppressDefaultFocus(stage, controller);
-        stage.show();
+        // Show success inline in main window
+        if (mainMenuController != null) {
+            controller.setOnClose(() -> mainMenuController.showDropZone());
+            controller.setOnSignAnother(() -> mainMenuController.showDropZone());
+            mainMenuController.showSuccessContent(root);
+        } else {
+            var stage = new Stage();
+            GUIUtils.setAppIcon(stage);
+            stage.setTitle("Dokument bol úspešne podpísaný");
+            stage.setScene(new Scene(root));
+            stage.setResizable(false);
+            GUIUtils.suppressDefaultFocus(stage, controller);
+            stage.show();
+        }
         MacOSNotification.notify("Autogram", "Dokument " + targetFile.getName() + " bol podpísaný");
     }
 
     @Override
     public void onDocumentBatchSaved(BatchUiResult result) {
-        var stage = new Stage();
         SuppressedFocusController controller;
         Parent root;
+        String title;
         if (result.hasErrors()) {
-            controller = new BatchSigningFailureDialogController(result, hostServices);
+            var failureController = new BatchSigningFailureDialogController(result, hostServices);
+            controller = failureController;
             root = GUIUtils.loadFXML(controller, "batch-signing-failure-dialog.fxml");
-            stage.setTitle("Hromadné podpisovanie ukončené s chybami");
+            title = "Hromadné podpisovanie ukončené s chybami";
+            if (mainMenuController != null) {
+                failureController.setOnClose(() -> mainMenuController.hideOverlayDialog());
+            }
         } else {
-            controller = new BatchSigningSuccessDialogController(result, hostServices);
+            var successController = new BatchSigningSuccessDialogController(result, hostServices);
+            controller = successController;
             root = GUIUtils.loadFXML(controller, "batch-signing-success-dialog.fxml");
-            stage.setTitle("Hromadné podpisovanie úspešne ukončené");
+            title = "Hromadné podpisovanie úspešne ukončené";
+            if (mainMenuController != null) {
+                successController.setOnClose(() -> {
+                    mainMenuController.hideOverlayDialog();
+                    mainMenuController.showDropZone();
+                });
+            }
         }
-        stage.setScene(new Scene(root));
-        stage.setResizable(false);
-        stage.sizeToScene();
-        GUIUtils.suppressDefaultFocus(stage, controller);
-        stage.show();
+
+        if (mainMenuController != null) {
+            mainMenuController.showOverlayDialog(root);
+        } else {
+            var stage = new Stage();
+            stage.setTitle(title);
+            stage.setScene(new Scene(root));
+            stage.setResizable(false);
+            stage.sizeToScene();
+            GUIUtils.suppressDefaultFocus(stage, controller);
+            stage.show();
+        }
 
         enableSigningOnAllJobs();
     }
@@ -494,13 +674,11 @@ public class GUI implements UI {
 
     public void disableSigning() {
         jobControllers.values().forEach(SigningDialogController::disableSigning);
-        if (batchController != null)
-            batchController.disableSigning();
     }
 
     @Override
     public void resetSigningKey() {
-        onUIThreadDo(()->{
+        onUIThreadDo(() -> {
             setActiveSigningKeyAndThen(null, null);
             refreshKeyOnAllJobs();
         });
@@ -562,5 +740,13 @@ public class GUI implements UI {
         GUIUtils.suppressDefaultFocus(stage, controller);
 
         stage.show();
+    }
+
+    public void setBatchPin(char[] pin) {
+        this.batchPin = pin;
+    }
+
+    public void clearBatchPin() {
+        this.batchPin = null;
     }
 }

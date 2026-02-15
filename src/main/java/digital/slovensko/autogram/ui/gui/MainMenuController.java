@@ -9,23 +9,30 @@ import digital.slovensko.autogram.core.errors.NoFilesSelectedException;
 import digital.slovensko.autogram.core.errors.UnrecognizedException;
 import digital.slovensko.autogram.ui.BatchGuiFileResponder;
 import digital.slovensko.autogram.ui.SaveFileResponder;
+import digital.slovensko.autogram.util.macos.MacOSNotification;
+import javafx.animation.FadeTransition;
+import javafx.animation.Interpolator;
+import javafx.animation.TranslateTransition;
 import javafx.application.Platform;
+import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.scene.Node;
-import javafx.scene.Scene;
-import javafx.scene.input.TransferMode;
-import javafx.scene.control.MenuBar;
+import javafx.scene.Parent;
+import javafx.scene.control.*;
+import javafx.scene.effect.GaussianBlur;
+import javafx.scene.input.*;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
-import javafx.stage.Modality;
 import javafx.stage.Stage;
-
+import javafx.util.Duration;
 import java.io.File;
 import java.util.List;
 
 public class MainMenuController implements SuppressedFocusController {
     private final Autogram autogram;
     private final UserSettings userSettings;
+    private GUI gui;
 
     @FXML
     VBox dropZone;
@@ -33,16 +40,92 @@ public class MainMenuController implements SuppressedFocusController {
     @FXML
     MenuBar menuBar;
 
+    @FXML
+    SplitPane splitPane;
+
+    @FXML
+    VBox sidebar;
+
+    @FXML
+    StackPane contentArea;
+
+    @FXML
+    VBox dropZonePanel;
+
+    @FXML
+    VBox signingPanel;
+
+    @FXML
+    VBox successPanel;
+
+    @FXML
+    VBox settingsPanel;
+
+    @FXML
+    StackPane dialogOverlay;
+
+    @FXML
+    VBox dialogContentHost;
+
+    @FXML
+    Label statusLabel;
+
+    @FXML
+    Button navDropZone;
+
+    @FXML
+    Button navSettings;
+
+    @FXML
+    Button navAbout;
+
+    @FXML
+    VBox metadataPanel;
+
+    @FXML
+    Label metaFilename;
+
+    @FXML
+    Label metaSize;
+
+    @FXML
+    Label metaPages;
+
+    @FXML
+    Label metaFormat;
+
+    @FXML
+    Label metaCertificate;
+
+    @FXML
+    TitledPane existingSignaturesPane;
+
+    @FXML
+    VBox existingSignaturesList;
+
+    @FXML
+    VBox rightDrawer;
+    @FXML
+    StackPane rightDrawerContent;
+
     public MainMenuController(Autogram autogram, UserSettings userSettings) {
         this.autogram = autogram;
         this.userSettings = userSettings;
+    }
+
+    public void setGui(GUI gui) {
+        this.gui = gui;
+    }
+
+    public GUI getGui() {
+        return gui;
     }
 
     public void initialize() {
         if (menuBar != null) {
             menuBar.useSystemMenuBarProperty().set(true);
         }
-        
+
         // Enhanced keyboard navigation
         dropZone.setFocusTraversable(true);
         dropZone.setOnKeyPressed(event -> {
@@ -51,7 +134,10 @@ public class MainMenuController implements SuppressedFocusController {
                 event.consume();
             }
         });
-        
+
+        // Initialize SplitPane with right drawer hidden
+        hideRightDrawer();
+
         dropZone.setOnDragOver(event -> {
             if (event.getDragboard().hasFiles()) {
                 event.acceptTransferModes(TransferMode.COPY);
@@ -61,7 +147,7 @@ public class MainMenuController implements SuppressedFocusController {
             }
             event.consume();
         });
-        
+
         dropZone.setOnDragExited(event -> {
             dropZone.getStyleClass().remove("autogram-dropzone-active");
             event.consume();
@@ -78,7 +164,7 @@ public class MainMenuController implements SuppressedFocusController {
         dropZone.setOnDragDropped(event -> {
             var dragboard = event.getDragboard();
             boolean success = false;
-            
+
             if (dragboard.hasFiles()) {
                 var files = dragboard.getFiles();
                 try {
@@ -90,14 +176,396 @@ public class MainMenuController implements SuppressedFocusController {
                     autogram.onSigningFailed(new UnrecognizedException(e));
                 }
             }
-            
+
             // Remove active styling
             dropZone.getStyleClass().remove("autogram-dropzone-active");
-            
+
             event.setDropCompleted(success);
             event.consume();
         });
+
     }
+
+    public void onHideRightDrawer(ActionEvent event) {
+        hideRightDrawer();
+    }
+
+    public void showRightDrawer(Node content) {
+        Platform.runLater(() -> {
+            boolean alreadyVisible = rightDrawer.isVisible();
+            rightDrawerContent.getChildren().clear();
+            rightDrawerContent.getChildren().add(content);
+            rightDrawer.setManaged(true);
+            rightDrawer.setVisible(true);
+
+            // Calculate divider position based on SplitPane width
+            double splitPaneWidth = splitPane.getWidth();
+            double drawerWidth = 500.0;
+
+            if (!alreadyVisible) {
+                // Slide-in animation: start off-screen to the right
+                rightDrawer.setTranslateX(drawerWidth);
+                rightDrawer.setOpacity(0);
+
+                // Expand the window width
+                var stage = (Stage) splitPane.getScene().getWindow();
+                if (stage != null) {
+                    double currentStageWidth = stage.getWidth();
+                    rightDrawer.setManaged(true);
+                    rightDrawer.setVisible(true);
+                    stage.setWidth(currentStageWidth + drawerWidth);
+
+                    double newSplitPaneWidth = splitPaneWidth + drawerWidth;
+                    double targetRatio = splitPaneWidth / newSplitPaneWidth;
+                    if (targetRatio < 0.2)
+                        targetRatio = 0.2;
+                    splitPane.setDividerPosition(1, targetRatio);
+                }
+
+                // Animate slide-in from right
+                TranslateTransition slide = new TranslateTransition(Duration.millis(200), rightDrawer);
+                slide.setFromX(drawerWidth);
+                slide.setToX(0);
+                slide.setInterpolator(Interpolator.EASE_OUT);
+                slide.play();
+
+                FadeTransition fade = new FadeTransition(Duration.millis(200), rightDrawer);
+                fade.setFromValue(0);
+                fade.setToValue(1);
+                fade.play();
+            } else {
+                rightDrawer.setManaged(true);
+                rightDrawer.setVisible(true);
+            }
+        });
+    }
+
+    public void hideRightDrawer() {
+        Platform.runLater(() -> {
+            if (rightDrawer.isVisible()) {
+                double currentDrawerWidth = rightDrawer.getWidth();
+                if (currentDrawerWidth <= 0)
+                    currentDrawerWidth = 500.0;
+
+                var stage = (Stage) splitPane.getScene().getWindow();
+                if (stage != null) {
+                    stage.setWidth(stage.getWidth() - currentDrawerWidth);
+                }
+            }
+            rightDrawer.setVisible(false);
+            rightDrawer.setManaged(false);
+        });
+    }
+
+    // ========== Content Panel Management ==========
+
+    /**
+     * Show a specific content panel in the right area, hiding all others.
+     */
+    private void showPanel(VBox panel) {
+        // Hide all panels except the target
+        for (VBox p : new VBox[] { dropZonePanel, signingPanel, successPanel, settingsPanel }) {
+            if (p != panel) {
+                p.setVisible(false);
+                p.setManaged(false);
+            }
+        }
+
+        // Fade in the target panel
+        panel.setOpacity(0);
+        panel.setVisible(true);
+        panel.setManaged(true);
+        FadeTransition fadeIn = new FadeTransition(Duration.millis(150), panel);
+        fadeIn.setFromValue(0);
+        fadeIn.setToValue(1);
+        fadeIn.setInterpolator(Interpolator.EASE_BOTH);
+        fadeIn.play();
+
+        // Hide metadata if back to drop zone or in settings, show if in signing/success
+        if (panel == dropZonePanel || panel == settingsPanel) {
+            metadataPanel.setVisible(false);
+            metadataPanel.setManaged(false);
+
+            // Highlight nav items
+            if (panel == dropZonePanel) {
+                navDropZone.getStyleClass().add("autogram-sidebar-item--active");
+                navSettings.getStyleClass().remove("autogram-sidebar-item--active");
+                navAbout.getStyleClass().remove("autogram-sidebar-item--active");
+            } else if (panel == settingsPanel) {
+                navSettings.getStyleClass().add("autogram-sidebar-item--active");
+                navDropZone.getStyleClass().remove("autogram-sidebar-item--active");
+                navAbout.getStyleClass().remove("autogram-sidebar-item--active");
+            }
+        } else {
+            metadataPanel.setVisible(true);
+            metadataPanel.setManaged(true);
+        }
+    }
+
+    /**
+     * Update the metadata panel with document information.
+     */
+    public void updateMetadata(String filename, String size, String pages, String format, String certificate) {
+        Platform.runLater(() -> {
+            metaFilename.setText(filename);
+            metaSize.setText(size);
+            metaPages.setText(pages);
+            metaFormat.setText(format);
+            metaCertificate.setText(certificate);
+            metadataPanel.setVisible(true);
+            metadataPanel.setManaged(true);
+        });
+    }
+
+    /**
+     * Update only the certificate field in the metadata panel.
+     */
+    public void updateCertificateMetadata(String certificate) {
+        Platform.runLater(() -> {
+            metaCertificate.setText(certificate);
+        });
+    }
+
+    /**
+     * Update only the format field in the metadata panel.
+     */
+    /**
+     * Update only the format field in the metadata panel.
+     */
+    public void updateFormatMetadata(String format) {
+        Platform.runLater(() -> {
+            metaFormat.setText(format);
+        });
+    }
+
+    /**
+     * Update the list of existing signatures in the sidebar.
+     */
+    public void updateExistingSignatures(List<String> signatures) {
+        Platform.runLater(() -> {
+            existingSignaturesList.getChildren().clear();
+            if (signatures == null || signatures.isEmpty()) {
+                existingSignaturesPane.setVisible(false);
+                existingSignaturesPane.setManaged(false);
+            } else {
+                for (String sig : signatures) {
+                    Label label = new Label(sig);
+                    label.getStyleClass().add("autogram-metadata-value");
+                    label.setWrapText(true);
+                    existingSignaturesList.getChildren().add(label);
+                }
+                existingSignaturesPane.setVisible(true);
+                existingSignaturesPane.setManaged(true);
+            }
+        });
+    }
+
+    /**
+     * Show the drop zone (default view).
+     */
+    public void showDropZone() {
+        Platform.runLater(() -> {
+            showPanel(dropZonePanel);
+            setStatus("Pripravený");
+            updateNavActive(navDropZone);
+        });
+    }
+
+    /**
+     * Show signing visualization content in the right pane.
+     * 
+     * @param content The loaded FXML content from signing-dialog.fxml
+     */
+    public void showSigningContent(Parent content) {
+        Platform.runLater(() -> {
+            signingPanel.getChildren().clear();
+            signingPanel.getChildren().add(content);
+            VBox.setVgrow(content, javafx.scene.layout.Priority.ALWAYS);
+            showPanel(signingPanel);
+            setStatus("Podpisovanie...");
+        });
+    }
+
+    /**
+     * Show preview/visualization for a specific file without starting signing.
+     */
+    public void showFilePreview(File file) {
+        Platform.runLater(() -> {
+            try {
+                var job = SigningJob.buildFromFile(file, null, userSettings.isPdfaCompliance(),
+                        userSettings.getSignatureLevel(), userSettings.isEn319132(), null,
+                        userSettings.isPlainXmlEnabled());
+
+                var visualization = digital.slovensko.autogram.core.visualization.DocumentVisualizationBuilder.fromJob(
+                        job,
+                        userSettings);
+                var title = "Náhľad: " + file.getName();
+                var controller = new SigningDialogController(visualization, autogram, gui, title,
+                        userSettings.isSignaturesValidity());
+                controller.setMainMenuController(this);
+
+                var root = GUIUtils.loadFXML(controller, "signing-dialog.fxml");
+                signingPanel.getChildren().clear();
+                signingPanel.getChildren().add(root);
+                VBox.setVgrow(root, javafx.scene.layout.Priority.ALWAYS);
+                showPanel(signingPanel);
+
+                // Update metadata for this file
+                String filename = file.getName();
+                String size = formatFileSize(file);
+                String pages = formatPageCount(file);
+                String format = job.getDocument().getMimeType().getMimeTypeString();
+                String cert = gui.getActiveSigningKey() != null ? gui.getActiveSigningKey().toString() : "Nevybraný";
+                updateMetadata(filename, size, pages, format, cert);
+
+                // Trigger signature check
+                autogram.getUI().onWorkThreadDo(() -> autogram.checkAndValidateSignatures(job));
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        });
+    }
+
+    private String formatFileSize(File file) {
+        long bytes = file.length();
+        if (bytes < 1024)
+            return bytes + " B";
+        int exp = (int) (Math.log(bytes) / Math.log(1024));
+        char pre = "KMGTPE".charAt(exp - 1);
+        return String.format("%.1f %sB", bytes / Math.pow(1024, exp), pre);
+    }
+
+    private String formatPageCount(File file) {
+        // Simple heuristic or use PDFUtils if it's a PDF
+        if (file.getName().toLowerCase().endsWith(".pdf")) {
+            var doc = new eu.europa.esig.dss.model.FileDocument(file);
+            return String.valueOf(digital.slovensko.autogram.util.PDFUtils.getPageCount(doc));
+        }
+        return "N/A";
+    }
+
+    /**
+     * Show success content in the right pane.
+     * 
+     * @param content The loaded FXML content from signing-success-dialog.fxml
+     */
+    public void showSuccessContent(Parent content) {
+        Platform.runLater(() -> {
+            successPanel.getChildren().clear();
+            successPanel.getChildren().add(content);
+            showPanel(successPanel);
+            setStatus("Podpísané ✓");
+        });
+    }
+
+    /**
+     * Show a dialog integrated within the main window as an overlay.
+     */
+    @FXML
+    StackPane contentPanelContainer;
+
+    private FadeTransition activeOverlayTransition;
+
+    /**
+     * Show a dialog integrated within the main window as an overlay.
+     */
+    public void showOverlayDialog(Parent content) {
+        Platform.runLater(() -> {
+            // Cancel any active transition to prevent race conditions (e.g. hiding clearing
+            // content)
+            if (activeOverlayTransition != null) {
+                activeOverlayTransition.stop();
+            }
+
+            dialogContentHost.getChildren().clear();
+            dialogContentHost.getChildren().add(content);
+            dialogOverlay.setOpacity(0);
+            dialogOverlay.setVisible(true);
+            dialogOverlay.setManaged(true);
+            dialogOverlay.toFront();
+
+            // Apply subtle blur to background content only
+            if (contentPanelContainer != null) {
+                contentPanelContainer.setEffect(new GaussianBlur(3));
+            } else {
+                // Fallback if container is missing (shouldn't happen with updated FXML)
+                contentArea.setEffect(new GaussianBlur(3));
+            }
+
+            // Fade in the overlay
+            activeOverlayTransition = new FadeTransition(Duration.millis(150), dialogOverlay);
+            activeOverlayTransition.setFromValue(0);
+            activeOverlayTransition.setToValue(1);
+            activeOverlayTransition.setInterpolator(Interpolator.EASE_BOTH);
+            activeOverlayTransition.play();
+
+            // Set Vgrow for content
+            VBox.setVgrow(content, javafx.scene.layout.Priority.ALWAYS);
+        });
+    }
+
+    /**
+     * Hide the integrated dialog overlay.
+     */
+    public void hideOverlayDialog() {
+        Platform.runLater(() -> {
+            // Cancel any active transition
+            if (activeOverlayTransition != null) {
+                activeOverlayTransition.stop();
+            }
+
+            // Fade out the overlay
+            activeOverlayTransition = new FadeTransition(Duration.millis(120), dialogOverlay);
+            activeOverlayTransition.setFromValue(1);
+            activeOverlayTransition.setToValue(0);
+            activeOverlayTransition.setInterpolator(Interpolator.EASE_BOTH);
+            activeOverlayTransition.setOnFinished(e -> {
+                dialogOverlay.setVisible(false);
+                dialogOverlay.setManaged(false);
+                dialogContentHost.getChildren().clear();
+            });
+            activeOverlayTransition.play();
+
+            // Remove blur from background
+            if (contentPanelContainer != null) {
+                contentPanelContainer.setEffect(null);
+            } else {
+                contentArea.setEffect(null);
+            }
+        });
+    }
+
+    /**
+     * Set the status text in the sidebar footer.
+     */
+    public void setStatus(String text) {
+        Platform.runLater(() -> {
+            if (statusLabel != null) {
+                statusLabel.setText(text);
+            }
+        });
+    }
+
+    /**
+     * Update which sidebar nav item appears active.
+     */
+    private void updateNavActive(Button activeButton) {
+        navDropZone.getStyleClass().removeIf(s -> s.equals("autogram-sidebar-item--active"));
+        if (activeButton != null) {
+            if (!activeButton.getStyleClass().contains("autogram-sidebar-item--active")) {
+                activeButton.getStyleClass().add("autogram-sidebar-item--active");
+            }
+        }
+    }
+
+    // ========== Navigation Handlers ==========
+
+    @FXML
+    public void onNavDropZone() {
+        showDropZone();
+    }
+
+    // ========== File Handling ==========
 
     public void onUploadButtonAction() {
         var chooser = new FileChooser();
@@ -111,6 +579,7 @@ public class MainMenuController implements SuppressedFocusController {
     }
 
     public void onFilesSelected(List<File> list) {
+        hideRightDrawer();
         if (list == null)
             return;
 
@@ -159,12 +628,14 @@ public class MainMenuController implements SuppressedFocusController {
             var file = filesList.get(0);
             var job = SigningJob.buildFromFile(file,
                     new SaveFileResponder(file, autogram, userSettings.shouldSignPDFAsPades()),
-                    userSettings.isPdfaCompliance(), userSettings.getSignatureLevel(), userSettings.isEn319132(), tspSource, userSettings.isPlainXmlEnabled());
+                    userSettings.isPdfaCompliance(), userSettings.getSignatureLevel(), userSettings.isEn319132(),
+                    tspSource, userSettings.isPlainXmlEnabled());
             autogram.sign(job);
         } else {
             autogram.batchStart(filesList.size(), new BatchGuiFileResponder(autogram, filesList,
                     filesList.get(0).toPath().getParent().resolve("signed"), userSettings.isPdfaCompliance(),
-                    userSettings.getSignatureLevel(), userSettings.shouldSignPDFAsPades(), userSettings.isEn319132(), tspSource, userSettings.isPlainXmlEnabled()));
+                    userSettings.getSignatureLevel(), userSettings.shouldSignPDFAsPades(), userSettings.isEn319132(),
+                    tspSource, userSettings.isPlainXmlEnabled()));
         }
     }
 
@@ -193,14 +664,18 @@ public class MainMenuController implements SuppressedFocusController {
     @FXML
     public void onSettingButtonAction() {
         var controller = new SettingsDialogController(userSettings);
+        controller.setOnSave(() -> {
+            MacOSNotification.notify("Autogram", "Nastavenia boli uložené");
+            // If they changed the trusted list or validator settings, we might need to
+            // refresh
+            autogram.initializeSignatureValidator(gui.scheduledExecutorService, gui.cachedExecutorService,
+                    userSettings.getTrustedList());
+        });
         var root = GUIUtils.loadFXML(controller, "settings-dialog.fxml");
 
-        var stage = new Stage();
-        stage.setTitle("Nastavenia");
-        stage.setScene(new Scene(root));
-        stage.setResizable(false);
-        stage.initModality(Modality.APPLICATION_MODAL);
-        stage.show();
+        settingsPanel.getChildren().clear();
+        settingsPanel.getChildren().add(root);
+        showPanel(settingsPanel);
     }
 
     @FXML

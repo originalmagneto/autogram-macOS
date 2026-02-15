@@ -9,6 +9,7 @@ import digital.slovensko.autogram.server.AutogramServer;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.scene.Scene;
+import javafx.scene.image.Image;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 
@@ -39,20 +40,24 @@ public class GUIApp extends Application {
             }
 
             if (dark) {
-                setUserAgentStylesheet(getClass().getResource("idsk-dark.css").toExternalForm());
+                setUserAgentStylesheet(getClass().getResource("macos-native-dark.css").toExternalForm());
             } else {
-                setUserAgentStylesheet(getClass().getResource("idsk.css").toExternalForm());
+                setUserAgentStylesheet(getClass().getResource("macos-native.css").toExternalForm());
             }
             var titleString = "Autogram";
 
-            autogram = new Autogram(new GUI(getHostServices(), userSettings), userSettings);
+            var gui = new GUI(getHostServices(), userSettings, scheduledExecutorService, cachedExecutorService);
+            autogram = new Autogram(gui, userSettings);
             var finalAutogram = autogram;
             autogram.checkForUpdate();
-            autogram.initializeSignatureValidator(scheduledExecutorService, cachedExecutorService, userSettings.getTrustedList());
+            autogram.initializeSignatureValidator(scheduledExecutorService, cachedExecutorService,
+                    userSettings.getTrustedList());
 
             final var params = LaunchParameters.fromParameters(getParameters());
             final var controller = new MainMenuController(autogram, userSettings);
             this.mainMenuController = controller;
+            controller.setGui(gui);
+            gui.setMainMenuController(controller);
             if (osName.startsWith("Mac")) {
                 setupMacOpenHandler();
                 setupMacHandlers(autogram, userSettings);
@@ -63,7 +68,8 @@ public class GUIApp extends Application {
 
             if (userSettings.isServerEnabled()) {
                 try {
-                    server = new AutogramServer(autogram, params.getHost(), params.getPort(), params.isProtocolHttps(), cachedExecutorService);
+                    server = new AutogramServer(autogram, params.getHost(), params.getPort(), params.isProtocolHttps(),
+                            cachedExecutorService);
                     server.start();
 
                     var thread = new Thread(server::stop);
@@ -94,29 +100,35 @@ public class GUIApp extends Application {
 
             GUIUtils.suppressDefaultFocus(windowStage, controller);
             windowStage.setTitle(titleString);
-            
+
+            // Set dock icon programmatically (ensures it shows in dev mode too)
+            var appIcon = getClass().getResourceAsStream("Autogram.png");
+            if (appIcon != null) {
+                windowStage.getIcons().add(new Image(appIcon));
+            }
+
             var scene = new Scene(GUIUtils.loadFXML(controller, "main-menu.fxml"));
             windowStage.setScene(scene);
             windowStage.setResizable(true);
             windowStage.setMinWidth(600);
             windowStage.setMinHeight(400);
-            
+
             // macOS-specific window styling
             if (osName.startsWith("Mac")) {
                 // Enable unified title and toolbar look
                 windowStage.getScene().getRoot().setStyle("-fx-background-color: transparent;");
             }
-        
-        // Load and apply saved window state
-        loadWindowState(windowStage);
+
+            // Load and apply saved window state
+            loadWindowState(windowStage);
             windowStage.show();
 
         } catch (Exception e) {
-            //ak nastane chyba, zobrazíme chybové okno a ukončíme aplikáciu
-            var serverFinal = server; //pomocná premenná, do lambda výrazu nižšie musí vstupovať finalna premenná
+            // ak nastane chyba, zobrazíme chybové okno a ukončíme aplikáciu
+            var serverFinal = server; // pomocná premenná, do lambda výrazu nižšie musí vstupovať finalna premenná
             var finalAutogram = autogram;
             Platform.runLater(() -> {
-                GUIUtils.showError(new UnrecognizedException(e), "Ukončiť",true);
+                GUIUtils.showError(new UnrecognizedException(e), "Ukončiť", true);
                 if (serverFinal != null)
                     new Thread(serverFinal::stop).start();
 
@@ -137,7 +149,7 @@ public class GUIApp extends Application {
 
             Object aboutHandler = java.lang.reflect.Proxy.newProxyInstance(
                     aboutHandlerClass.getClassLoader(),
-                    new Class<?>[]{aboutHandlerClass},
+                    new Class<?>[] { aboutHandlerClass },
                     (proxy, method, args) -> {
                         Platform.runLater(autogram::onAboutInfo);
                         return null;
@@ -146,7 +158,7 @@ public class GUIApp extends Application {
 
             Object prefHandler = java.lang.reflect.Proxy.newProxyInstance(
                     preferencesHandlerClass.getClassLoader(),
-                    new Class<?>[]{preferencesHandlerClass},
+                    new Class<?>[] { preferencesHandlerClass },
                     (proxy, method, args) -> {
                         Platform.runLater(() -> showSettings(userSettings));
                         return null;
@@ -166,13 +178,14 @@ public class GUIApp extends Application {
 
             Object handler = java.lang.reflect.Proxy.newProxyInstance(
                     handlerClass.getClassLoader(),
-                    new Class<?>[]{handlerClass},
+                    new Class<?>[] { handlerClass },
                     (proxy, method, args) -> {
                         if ("openFiles".equals(method.getName()) && args != null && args.length > 0) {
                             Object event = args[0];
                             try {
                                 @SuppressWarnings("unchecked")
-                                var files = (java.util.List<java.io.File>) eventClass.getMethod("getFiles").invoke(event);
+                                var files = (java.util.List<java.io.File>) eventClass.getMethod("getFiles")
+                                        .invoke(event);
                                 if (mainMenuController != null && files != null) {
                                     Platform.runLater(() -> mainMenuController.onFilesSelected(files));
                                 }
@@ -207,7 +220,7 @@ public class GUIApp extends Application {
         double width = prefs.getDouble("window.width", 800);
         double height = prefs.getDouble("window.height", 600);
         boolean maximized = prefs.getBoolean("window.maximized", false);
-        
+
         if (x >= 0 && y >= 0) {
             stage.setX(x);
             stage.setY(y);
@@ -216,7 +229,7 @@ public class GUIApp extends Application {
         stage.setHeight(height);
         stage.setMaximized(maximized);
     }
-    
+
     private void saveWindowState(Stage stage) {
         Preferences prefs = Preferences.userNodeForPackage(GUIApp.class);
         if (!stage.isMaximized()) {
