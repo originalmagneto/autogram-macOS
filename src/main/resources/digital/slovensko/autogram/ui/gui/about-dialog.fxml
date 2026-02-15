@@ -69,11 +69,12 @@
         </VBox>
     </center>
     <bottom>
-        <HBox styleClass="autogram-footer">
-            <TextFlow>
+        <HBox styleClass="autogram-footer" spacing="16" alignment="CENTER_LEFT">
+            <TextFlow HBox.hgrow="ALWAYS">
                 <Text styleClass="autogram-body-s" text="Verzia: "/>
                 <Text styleClass="autogram-body-s" text="dev" fx:id="versionText"/>
             </TextFlow>
+            <Button styleClass="autogram-button,autogram-button--secondary" text="Zatvoriť" onAction="#onCloseButtonAction"/>
         </HBox>
     </bottom>
 </BorderPane>

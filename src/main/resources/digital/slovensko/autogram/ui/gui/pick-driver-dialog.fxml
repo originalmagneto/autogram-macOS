@@ -19,6 +19,8 @@
     </VBox>
 
     <HBox styleClass="autogram-actions" alignment="CENTER_RIGHT">
+        <Button styleClass="autogram-button,autogram-button--secondary" text="Zrušiť"
+                onAction="#onCancelButtonAction"/>
         <Button styleClass="autogram-button" fx:id="mainButton" text="Vybrať úložisko"
                 onAction="#onPickDriverButtonAction"/>
     </HBox>

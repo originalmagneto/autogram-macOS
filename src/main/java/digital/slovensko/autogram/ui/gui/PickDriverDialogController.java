@@ -44,6 +44,24 @@ public class PickDriverDialogController {
         this.onClose = onClose;
     }
 
+    private Runnable onCancel;
+
+    public void setOnCancel(Runnable onCancel) {
+        this.onCancel = onCancel;
+    }
+
+    public void onCancelButtonAction() {
+        if (onCancel != null) {
+            onCancel.run();
+        }
+
+        if (onClose != null) {
+            onClose.run();
+        } else {
+            GUIUtils.closeWindow(mainBox);
+        }
+    }
+
     public void onPickDriverButtonAction() {
         if (toggleGroup.getSelectedToggle() == null) {
             error.setManaged(true);
