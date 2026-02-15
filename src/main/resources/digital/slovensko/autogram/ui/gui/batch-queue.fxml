@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.text.*?>
+<?import javafx.scene.shape.SVGPath?>
+
+<VBox xmlns="http://javafx.com/javafx"
+    xmlns:fx="http://javafx.com/fxml"
+    fx:id="mainBox"
+    styleClass="autogram-batch-queue"
+    spacing="0">
+
+    <VBox styleClass="autogram-batch-queue-header">
+        <Label styleClass="autogram-heading-s" text="Hromadné podpisovanie" />
+        <Label fx:id="queueCountLabel" styleClass="autogram-body-s" text="Súbory v poradí" />
+        <Label fx:id="progressLabel" styleClass="autogram-body-s,autogram-batch-progress-text" text="" />
+    </VBox>
+
+    <ScrollPane fx:id="queueScrollPane" VBox.vgrow="ALWAYS" fitToWidth="true" styleClass="autogram-batch-queue-scroll">
+        <VBox fx:id="queueContainer" spacing="4" styleClass="autogram-batch-queue-items" />
+    </ScrollPane>
+
+    <VBox fx:id="progressBarBox" styleClass="autogram-batch-progress-box" spacing="4" managed="false" visible="false">
+        <ProgressBar fx:id="progressBar" maxWidth="Infinity" styleClass="autogram-batch-progress-bar" progress="0" />
+    </VBox>
+
+    <VBox styleClass="autogram-batch-queue-footer" spacing="15">
+        <VBox spacing="5">
+            <Label styleClass="autogram-label" text="PIN Podpisu" />
+            <PasswordField fx:id="pinField" promptText="Zadajte PIN" styleClass="autogram-input" />
+        </VBox>
+        
+        <HBox spacing="10">
+            <Button fx:id="signAllButton" styleClass="autogram-button" 
+                    text="Podpísať všetko" onAction="#onSignAllAction" HBox.hgrow="ALWAYS" maxWidth="Infinity" />
+        </HBox>
+        
+        <HBox spacing="10" alignment="CENTER">
+            <Button fx:id="cancelButton" styleClass="autogram-button,autogram-button--secondary" 
+                    text="Zrušiť" onAction="#onCancelAction" HBox.hgrow="ALWAYS" maxWidth="Infinity" />
+        </HBox>
+    </VBox>
+</VBox>

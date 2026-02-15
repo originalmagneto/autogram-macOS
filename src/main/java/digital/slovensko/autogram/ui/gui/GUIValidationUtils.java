@@ -37,7 +37,8 @@ public class GUIValidationUtils {
         return warningTextFlow;
     }
 
-    public static GridPane createSignatureTableRows(Reports reports, boolean isValidated, Consumer<String> callback, int maxRows) {
+    public static GridPane createSignatureTableRows(Reports reports, boolean isValidated, Consumer<String> callback,
+            int maxRows) {
         var table = new GridPane();
         table.getStyleClass().add("autogram-signatures-table");
 
@@ -66,7 +67,8 @@ public class GUIValidationUtils {
         }
 
         if (totalSignatures > maxRows) {
-            var label = new Text("Na dokumente " + createRemainingSignaturesCountString(totalSignatures - maxRows + 1) + ". ");
+            var label = new Text(
+                    "Na dokumente " + createRemainingSignaturesCountString(totalSignatures - maxRows + 1) + ". ");
 
             var button = new Button("Zobraziť všetky podpisy");
             button.getStyleClass().addAll("autogram-link");
@@ -101,7 +103,7 @@ public class GUIValidationUtils {
     }
 
     public static VBox createSignatureBox(Reports reports, boolean isValidated, String signatureId,
-                                          Consumer<String> callback, boolean areTLsLoaded) {
+            Consumer<String> callback, boolean areTLsLoaded) {
         var simple = reports.getSimpleReport();
         var diagnostic = reports.getDiagnosticData();
 
@@ -154,7 +156,8 @@ public class GUIValidationUtils {
                 createTableRow("Výsledok overenia",
                         isValidated
                                 ? validityToString(isValid, isFailed, areTLsLoaded, isRevocationValidated,
-                                        signatureQualification, signatureForm, isTimestampInvalid, isTimestampIndeterminate)
+                                        signatureQualification, signatureForm, isTimestampInvalid,
+                                        isTimestampIndeterminate)
                                 : "Prebieha overovanie"),
                 createTableRow("Certifikát", subject),
                 createTableRow("Vydavateľ", issuer),
@@ -207,33 +210,50 @@ public class GUIValidationUtils {
 
     public static HBox createTableRow(String label, Node valueNode, boolean isLast) {
         var labelNode = createTableCell(label, "autogram-heading-s", isLast, true);
+        labelNode.setMinWidth(120); // Give labels a fixed minimum width
+        labelNode.setPrefWidth(120);
+
         var cell = new TextFlow(valueNode);
         cell.getStyleClass().addAll(isLast ? "autogram-table-cell--last" : "autogram-table-cell");
         cell.getStyleClass().addAll("autogram-table-cell--right");
+        HBox.setHgrow(cell, javafx.scene.layout.Priority.ALWAYS);
 
-        return new HBox(labelNode, cell);
+        var row = new HBox(labelNode, cell);
+        row.setSpacing(10);
+        return row;
     }
 
     public static HBox createTableRow(String label, String value, boolean isLast) {
         var labelNode = createTableCell(label, "autogram-heading-s", isLast, true);
-        var valueNode = createTableCell(value, "autogram-body", isLast, false);
+        labelNode.setMinWidth(120);
+        labelNode.setPrefWidth(120);
 
-        return new HBox(labelNode, valueNode);
+        var valueNode = createTableCell(value, "autogram-body", isLast, false);
+        HBox.setHgrow(valueNode, javafx.scene.layout.Priority.ALWAYS);
+
+        var row = new HBox(labelNode, valueNode);
+        row.setSpacing(10);
+        return row;
     }
 
     public static TextFlow createTableCell(String value, String textStyle, boolean isLast, boolean isLeft) {
         var text = new Text(value);
         text.getStyleClass().add(textStyle);
+        // Ensure text wraps within its container
+        text.setWrappingWidth(0); // Let TextFlow handle wrapping based on its own width
 
         var cell = new TextFlow(text);
         cell.getStyleClass().addAll(isLast ? "autogram-table-cell--last" : "autogram-table-cell");
         cell.getStyleClass().addAll(isLeft ? "autogram-table-cell--left" : "autogram-table-cell--right");
 
+        // HBox.setHgrow doesn't work directly on TextFlow in this context because it's
+        // usually returned
+        // to be put into an HBox manually. We'll rely on the caller or CSS.
         return cell;
     }
 
     public static VBox createTimestampsBox(boolean isValidated, List<XmlTimestamp> timestamps, SimpleReport simple,
-                                           DiagnosticData diagnostic, Consumer<String> callback) {
+            DiagnosticData diagnostic, Consumer<String> callback) {
         var vBox = new VBox();
         vBox.getStyleClass().add("autogram-timestamps-box");
 

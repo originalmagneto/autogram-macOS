@@ -14,6 +14,8 @@ public class SigningSuccessDialogController implements SuppressedFocusController
     private final File targetFile;
     private final File targetDirectory;
     private final HostServices hostServices;
+    private Runnable onClose;
+    private Runnable onSignAnother;
     @FXML
     Text filenameText;
     @FXML
@@ -31,11 +33,18 @@ public class SigningSuccessDialogController implements SuppressedFocusController
         this.hostServices = hostServices;
     }
 
+    public void setOnClose(Runnable onClose) {
+        this.onClose = onClose;
+    }
+
+    public void setOnSignAnother(Runnable onSignAnother) {
+        this.onSignAnother = onSignAnother;
+    }
+
     public void initialize() {
         filenameText.setText(targetFile.getName());
         initHyperlink();
     }
-
 
     public void initHyperlink() {
         var path = targetFile.getParent().split("((?<=/|\\\\))");
@@ -54,7 +63,19 @@ public class SigningSuccessDialogController implements SuppressedFocusController
     }
 
     public void onCloseAction(ActionEvent ignored) {
-        GUIUtils.closeWindow(mainBox);
+        if (onClose != null) {
+            onClose.run();
+        } else {
+            GUIUtils.closeWindow(mainBox);
+        }
+    }
+
+    public void onSignAnotherAction(ActionEvent ignored) {
+        if (onSignAnother != null) {
+            onSignAnother.run();
+        } else if (onClose != null) {
+            onClose.run();
+        }
     }
 
     @Override

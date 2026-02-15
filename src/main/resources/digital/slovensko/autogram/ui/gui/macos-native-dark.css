@@ -1,0 +1,293 @@
+/*
+ * macOS Native Dark Theme for Autogram
+ * =====================================
+ * Imports the light macOS theme and overrides color tokens
+ * for macOS Dark Mode appearance.
+ */
+
+@import url("macos-native.css");
+
+.root {
+    /* Primary text — light on dark */
+    -autogram-text-colour: #f5f5f7;
+    -autogram-secondary-text-colour: #98989d;
+
+    /* Links — brighter blue for dark bg */
+    -autogram-link-colour: #0a84ff;
+    -autogram-link-hover-colour: #409cff;
+
+    /* Borders — translucent for glass effect */
+    -autogram-border-colour: rgba(255, 255, 255, 0.1);
+    -autogram-input-border-colour: rgba(255, 255, 255, 0.12);
+    -autogram-input-background-color: rgba(255, 255, 255, 0.06);
+
+    /* Primary action */
+    -autogram-success-colour: #30d158;
+    -autogram-priamry-button-hover-colour: #0060df;
+
+    /* Secondary */
+    -autogram-secondary-hover-colour: rgba(255, 255, 255, 0.06);
+
+    /* Destructive */
+    -autogram-warning-button-colour: #ff453a;
+    -autorgam-warning-button-hover-colour: #ff6961;
+
+    /* Backgrounds — deeper Tahoe dark */
+    -autogram-background-colour: #161617;
+    -autogram-secondary-background-colour: #232325;
+
+    /* Accent */
+    -autogram-focus-colour: #0a84ff;
+    -autogram-focus-text-colour: #ffffff;
+
+    /* Error */
+    -autogram-error-colour: #ff453a;
+
+    /* Info */
+    -autogram-partial-success-colour: #0a84ff;
+
+    /* Warning */
+    -autogram-warning-color: #ff9f0a;
+
+    /* Dark window background */
+    -fx-background-color: #161617;
+
+    /* Sidebar — dark glass */
+    -autogram-sidebar-bg: rgba(30, 30, 32, 0.65);
+    -autogram-window-bg: #161617;
+
+    /* Liquid Glass tokens — dark */
+    -autogram-glass-surface: rgba(255, 255, 255, 0.05);
+    -autogram-glass-border: rgba(255, 255, 255, 0.1);
+    -autogram-glass-shadow: rgba(0, 0, 0, 0.3);
+    -autogram-glass-highlight: rgba(255, 255, 255, 0.08);
+}
+
+
+/* ============================================================
+   Dark mode adjustments for specific components
+   ============================================================ */
+
+/* Buttons — slight adjustments for dark bg */
+.autogram-button {
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.2), 1, 0, 0, 0.5);
+}
+
+.autogram-button:hover {
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.3), 2, 0, 0, 1);
+}
+
+.autogram-button.autogram-button--secondary {
+    -fx-text-fill: -autogram-text-colour;
+    -fx-background-color: rgba(255, 255, 255, 0.08);
+    -fx-border-color: rgba(255, 255, 255, 0.1);
+}
+
+.autogram-button.autogram-button--secondary:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.12);
+}
+
+.autogram-button.autogram-button--secondary:focused {
+    -fx-background-color: #3a3a3c;
+    -fx-text-fill: -autogram-text-colour;
+}
+
+/* Drop zone dark */
+.autogram-dropzone {
+    -fx-border-color: rgba(255, 255, 255, 0.12);
+    -fx-background-color: rgba(255, 255, 255, 0.04);
+}
+
+.autogram-dropzone--entered {
+    -fx-border-color: -autogram-focus-colour;
+    -fx-background-color: derive(-autogram-focus-colour, -60%);
+}
+
+/* Context menu dark — dark glass */
+.context-menu {
+    -fx-background-color: rgba(40, 40, 42, 0.92);
+    -fx-border-color: rgba(255, 255, 255, 0.08);
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.5), 20, 0, 0, 8);
+}
+
+.menu-item>.label {
+    -fx-text-fill: -autogram-text-colour;
+}
+
+/* Tooltip dark */
+.tooltip {
+    -fx-background-color: rgba(80, 80, 80, 0.95);
+}
+
+/* Scrollbar dark */
+.scroll-bar:horizontal .thumb,
+.scroll-bar:vertical .thumb {
+    -fx-background-color: rgba(255, 255, 255, 0.2);
+}
+
+.scroll-bar:horizontal .thumb:hover,
+.scroll-bar:vertical .thumb:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.35);
+}
+
+.scroll-bar:horizontal .thumb:pressed,
+.scroll-bar:vertical .thumb:pressed {
+    -fx-background-color: rgba(255, 255, 255, 0.5);
+}
+
+/* Checkbox dark overrides */
+.check-box .box {
+    -fx-background-color: rgba(255, 255, 255, 0.06);
+    -fx-border-color: rgba(255, 255, 255, 0.15);
+}
+
+.check-box:hover .box {
+    -fx-background-color: rgba(255, 255, 255, 0.1);
+    -fx-border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Tags — dark mode pastels */
+.autogram-tag-processing {
+    -fx-background-color: #1e3a5f;
+    -fx-border-color: #1e3a5f;
+}
+
+.autogram-tag-invalid {
+    -fx-background-color: #5a1a1a;
+    -fx-border-color: #5a1a1a;
+}
+
+.autogram-tag-valid {
+    -fx-background-color: #1a3d2e;
+    -fx-border-color: #1a3d2e;
+}
+
+.autogram-tag-custom-valid {
+    -fx-background-color: #1e3a5f;
+    -fx-border-color: #1e3a5f;
+}
+
+.autogram-tag-unknown {
+    -fx-background-color: #4a3b10;
+    -fx-border-color: #4a3b10;
+}
+
+.autogram-tag-warning {
+    -fx-background-color: #4a3b10;
+    -fx-border-color: #4a3b10;
+}
+
+.autogram-tag-info {
+    -fx-background-color: #38383a;
+    -fx-border-color: #38383a;
+}
+
+.autogram-tag-processing Text {
+    -fx-text-fill: #64b5f6;
+    -fx-fill: #64b5f6;
+}
+
+.autogram-tag-invalid Text {
+    -fx-text-fill: #ef9a9a;
+    -fx-fill: #ef9a9a;
+}
+
+.autogram-tag-valid Text {
+    -fx-text-fill: #81c784;
+    -fx-fill: #81c784;
+}
+
+.autogram-tag-custom-valid Text {
+    -fx-text-fill: #64b5f6;
+    -fx-fill: #64b5f6;
+}
+
+.autogram-tag-unknown Text {
+    -fx-text-fill: #ffd54f;
+    -fx-fill: #ffd54f;
+}
+
+.autogram-tag-warning Text {
+    -fx-text-fill: #ffd54f;
+    -fx-fill: #ffd54f;
+}
+
+.autogram-tag-info Text {
+    -fx-text-fill: #bdbdbd;
+    -fx-fill: #bdbdbd;
+}
+
+/* Error summary dark */
+.autogram-error-summary {
+    -fx-background-color: -autogram-secondary-background-colour;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.2), 8, 0, 0, 2);
+}
+
+/* Warning summary dark */
+.autogram-warning-summary {
+    -fx-background-color: derive(#ff9f0a, -65%);
+}
+
+/* Batch visualization dark */
+.autogram-batch-visualization {
+    -fx-background-color: derive(-autogram-error-colour, -70%);
+}
+
+/* Progress bar dark */
+.autogram-progress-bar>.track {
+    -fx-background-color: rgba(255, 255, 255, 0.1);
+}
+
+.progress-bar {
+    -fx-background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Summary header dark */
+.autogram-summary-header {
+    -fx-background-color: #2c2c2e;
+}
+
+/* Unsupported visualization dark */
+.autogram-unsupported-visualization {
+    -fx-background-color: #2c2c2e;
+}
+
+/* Release notes dark */
+.text-area.release-notes {
+    -fx-background-color: #2c2c2e;
+    -fx-text-fill: -autogram-text-colour;
+}
+
+/* Sidebar dark — dark glass */
+.autogram-sidebar {
+    -fx-background-color: -autogram-sidebar-bg;
+    -fx-border-color: rgba(255, 255, 255, 0.06);
+}
+
+.autogram-sidebar-item:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.06);
+}
+
+.autogram-sidebar-item--active {
+    -fx-background-color: rgba(10, 132, 255, 0.2);
+    -fx-text-fill: #0a84ff;
+}
+
+.autogram-sidebar-item--active .autogram-sidebar-icon {
+    -fx-stroke: #0a84ff;
+}
+
+.autogram-sidebar-footer {
+    -fx-border-color: #38383a transparent transparent transparent;
+}
+
+/* Split pane dark */
+.autogram-split-pane>.split-pane-divider {
+    -fx-background-color: rgba(255, 255, 255, 0.08);
+}
+
+/* Sidebar metadata dark */
+.autogram-sidebar-metadata {
+    -fx-background-color: rgba(255, 255, 255, 0.03);
+    -fx-border-color: rgba(255, 255, 255, 0.06) transparent rgba(255, 255, 255, 0.06) transparent;
+}

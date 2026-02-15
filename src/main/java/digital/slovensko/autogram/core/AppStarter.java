@@ -5,32 +5,45 @@ import digital.slovensko.autogram.ui.gui.GUIApp;
 import javafx.application.Application;
 import org.apache.commons.cli.*;
 
+import org.slf4j.bridge.SLF4JBridgeHandler;
+
 import java.io.PrintWriter;
 
 public class AppStarter {
-    private static final Options options = new Options().
-        addOptionGroup(new OptionGroup().
-            addOption(new Option(null, "url", true, "Start in GUI mode with API server listening on given port and protocol (HTTP/HTTPS). Application starts minimised when is not empty.")).
-            addOption(new Option("c", "cli", false, "Run application in CLI mode."))
-        ).
-        addOption("h", "help", false, "Print this command line help.").
-        addOption("u", "usage", false, "Print usage examples.").
-        addOption("s", "source", true, "Source file or directory of files to sign.").
-        addOption("t", "target", true, "Target file or directory for signed files. Type (file/directory) must match the source.").
-        addOption("f", "force", false, "Overwrite existing file(s).").
-        addOption(null, "pdfa", false, "Check PDF/A compliance before signing.").
-        addOption(null, "parents", false, "Create all parent directories for target if needed.").
-        addOption("d", "driver", true, "PCKS driver name for signing. Supported values: eid, cz_eid, secure_store, monet, gemalto, keystore, custom_pkcs11 (requires valid path within pkcs11-driver-path option).").
-        addOption(null, "keystore", true, "Absolute path to a keystore file that can be used for signing.").
-        addOption(null, "slot-id", true, "Slot ID for PKCS11 driver. If not specified, first available slot is used.").
-        addOption(null, "pdf-level", true, "PDF signature level. Supported values: PAdES_BASELINE_B (default), XAdES_BASELINE_B, CAdES_BASELINE_B.").
-        addOption(null, "en319132", false, "Sign according to EN 319 132 or EN 319 122.").
-        addOption(null, "tsa-server", true, "Url of TimeStamp Authority server that should be used for timestamping in signature level BASELINE_T. If provided, BASELINE_T signatures are made.").
-        addOption(null, "plain-xml", false, "Enable signing plain (non-slovak-eform) XML files.").
-        addOption(null, "pkcs11-driver-path", true, "Absolute path to a file with custom PKCS11 driver.");
-
+    private static final Options options = new Options().addOptionGroup(new OptionGroup().addOption(new Option(null,
+            "url", true,
+            "Start in GUI mode with API server listening on given port and protocol (HTTP/HTTPS). Application starts minimised when is not empty."))
+            .addOption(new Option("c", "cli", false, "Run application in CLI mode.")))
+            .addOption("h", "help", false, "Print this command line help.")
+            .addOption("u", "usage", false, "Print usage examples.")
+            .addOption("s", "source", true, "Source file or directory of files to sign.")
+            .addOption("t", "target", true,
+                    "Target file or directory for signed files. Type (file/directory) must match the source.")
+            .addOption("f", "force", false, "Overwrite existing file(s).")
+            .addOption(null, "pdfa", false, "Check PDF/A compliance before signing.")
+            .addOption(null, "parents", false, "Create all parent directories for target if needed.")
+            .addOption("d", "driver", true,
+                    "PCKS driver name for signing. Supported values: eid, cz_eid, secure_store, monet, gemalto, keystore, custom_pkcs11 (requires valid path within pkcs11-driver-path option).")
+            .addOption(null, "keystore", true, "Absolute path to a keystore file that can be used for signing.")
+            .addOption(null, "slot-id", true,
+                    "Slot ID for PKCS11 driver. If not specified, first available slot is used.")
+            .addOption(null, "pdf-level", true,
+                    "PDF signature level. Supported values: PAdES_BASELINE_B (default), XAdES_BASELINE_B, CAdES_BASELINE_B.")
+            .addOption(null, "en319132", false, "Sign according to EN 319 132 or EN 319 122.")
+            .addOption(null, "tsa-server", true,
+                    "Url of TimeStamp Authority server that should be used for timestamping in signature level BASELINE_T. If provided, BASELINE_T signatures are made.")
+            .addOption(null, "plain-xml", false, "Enable signing plain (non-slovak-eform) XML files.")
+            .addOption(null, "pkcs11-driver-path", true, "Absolute path to a file with custom PKCS11 driver.");
 
     public static void start(String[] args) {
+        // macOS App Name Fix
+        System.setProperty("apple.awt.application.name", "Autogram");
+        System.setProperty("com.apple.mrj.application.apple.menu.about.name", "Autogram");
+
+        // Suppress VeraPDF logs (uses JUL) by bridging to SLF4J
+        SLF4JBridgeHandler.removeHandlersForRootLogger();
+        SLF4JBridgeHandler.install();
+
         try {
             CommandLine cmd = new DefaultParser().parse(options, args);
 

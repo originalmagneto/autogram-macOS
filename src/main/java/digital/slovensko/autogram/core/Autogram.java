@@ -35,9 +35,16 @@ public class Autogram {
         this.passwordManager = new PasswordManager(ui, this.settings);
     }
 
+    public UI getUI() {
+        return ui;
+    }
+
+    public UserSettings getUserSettings() {
+        return settings;
+    }
+
     public void sign(SigningJob job) {
-        ui.onUIThreadDo(()
-        -> ui.startSigning(job, this));
+        ui.onUIThreadDo(() -> ui.startSigning(job, this));
     }
 
     public void checkAndValidateSignatures(SigningJob job) {
@@ -71,7 +78,8 @@ public class Autogram {
         ui.onWorkThreadDo(() -> {
             if (PDFUtils.isPdfAndPasswordProtected(job.getDocument())) {
                 ui.onUIThreadDo(() -> {
-                    ui.showError(new AutogramException("Nastala chyba", "Dokument je chránený heslom", "Snažíte sa podpísať dokument chránený heslom, čo je funkcionalita, ktorá nie je podporovaná.\n\nOdstráňte ochranu heslom a potom budete môcť dokument podpísať."));
+                    ui.showError(new AutogramException("Nastala chyba", "Dokument je chránený heslom",
+                            "Snažíte sa podpísať dokument chránený heslom, čo je funkcionalita, ktorá nie je podporovaná.\n\nOdstráňte ochranu heslom a potom budete môcť dokument podpísať."));
                 });
                 return;
             }
@@ -86,7 +94,8 @@ public class Autogram {
 
                 if (settings.isCorrectDocumentDisplay()) {
                     ui.onUIThreadDo(
-                            () -> ui.showIgnorableExceptionDialog(new FailedVisualizationException(e, job, onContinue)));
+                            () -> ui.showIgnorableExceptionDialog(
+                                    new FailedVisualizationException(e, job, onContinue)));
                 } else {
                     ui.onUIThreadDo(onContinue);
                 }
@@ -158,7 +167,8 @@ public class Autogram {
      * @param batchId - current batch ID, used to authenticate the request
      */
     public void batchSign(SigningJob job, String batchId) {
-        if (batch == null) throw new BatchNotStartedException(); // TODO replace with checked exception
+        if (batch == null)
+            throw new BatchNotStartedException(); // TODO replace with checked exception
 
         batch.addJob(batchId);
 
@@ -200,7 +210,8 @@ public class Autogram {
     }
 
     public Batch getBatch(String batchId) {
-        if (batch == null) throw new BatchNotStartedException(); // TODO replace with checked exception
+        if (batch == null)
+            throw new BatchNotStartedException(); // TODO replace with checked exception
         batch.validate(batchId);
         return batch;
     }
@@ -213,8 +224,7 @@ public class Autogram {
                         fetchKeysAndThen(driver, callback);
                     });
                 },
-                null
-        );
+                null);
     }
 
     private void fetchKeysAndThen(TokenDriver driver, Consumer<SigningKey> callback) {
@@ -224,7 +234,8 @@ public class Autogram {
             resetTokenSessionTimer();
 
             ui.onUIThreadDo(
-                    () -> ui.pickKeyAndThen(keys, driver, (privateKey) -> callback.accept(new SigningKey(token, privateKey))));
+                    () -> ui.pickKeyAndThen(keys, driver,
+                            (privateKey) -> callback.accept(new SigningKey(token, privateKey))));
         } catch (DSSException e) {
             ui.onUIThreadDo(() -> ui.onPickSigningKeyFailed(AutogramException.createFromDSSException(e)));
         } catch (AutogramException e) {
@@ -262,7 +273,8 @@ public class Autogram {
         ui.onUIThreadDo(() -> ui.onSigningFailed(e));
     }
 
-    public void initializeSignatureValidator(ScheduledExecutorService scheduledExecutorService, ExecutorService cachedExecutorService, List<String> tlCountries) {
+    public void initializeSignatureValidator(ScheduledExecutorService scheduledExecutorService,
+            ExecutorService cachedExecutorService, List<String> tlCountries) {
         ui.onWorkThreadDo(() -> {
             SignatureValidator.getInstance().initialize(cachedExecutorService, tlCountries);
         });
@@ -313,7 +325,8 @@ public class Autogram {
     public void consentCertificateReadingAndThen(CertificatesResponder responder, List<String> drivers) {
         var availableDrivers = settings.getDriverDetector().getAvailableDrivers();
         if (drivers != null && !drivers.isEmpty())
-            availableDrivers = availableDrivers.stream().filter(driver -> drivers.contains(driver.getShortname())).toList();
+            availableDrivers = availableDrivers.stream().filter(driver -> drivers.contains(driver.getShortname()))
+                    .toList();
 
         if (availableDrivers.isEmpty()) {
             responder.onError(new NoDriversDetectedException());
@@ -323,52 +336,50 @@ public class Autogram {
         final var finalAvailableDrivers = availableDrivers;
 
         ui.onUIThreadDo(
-            () -> {
-                ui.consentCertificateReadingAndThen(
-                    (consentDialogCloseCallback) -> {
-                        ui.onWorkThreadDo(() -> {
-                                getCertificates(responder, finalAvailableDrivers, consentDialogCloseCallback);
-                            }
-                        );
-                    },
-                    () -> {
-                        responder.onError(new CertificatesReadingConsentRejectedException());
-                    }
-                );
-            }
-        );
+                () -> {
+                    ui.consentCertificateReadingAndThen(
+                            (consentDialogCloseCallback) -> {
+                                ui.onWorkThreadDo(() -> {
+                                    getCertificates(responder, finalAvailableDrivers, consentDialogCloseCallback);
+                                });
+                            },
+                            () -> {
+                                responder.onError(new CertificatesReadingConsentRejectedException());
+                            });
+                });
     }
 
-    public void getCertificates(CertificatesResponder responder, List<TokenDriver> drivers, Runnable consentDialogCloseCallback) {
+    public void getCertificates(CertificatesResponder responder, List<TokenDriver> drivers,
+            Runnable consentDialogCloseCallback) {
         final var availableDrivers = drivers;
         ui.onUIThreadDo(() -> {
             ui.pickTokenDriverAndThen(availableDrivers,
-                (driver) -> {
-                    ui.onWorkThreadDo(() -> {
-                        try (var token = driver.createToken(passwordManager, settings)) {
-                            var keys = token.getKeys();
-                            resetTokenSessionTimer();
-                            ui.onUIThreadDo(consentDialogCloseCallback);
-                            responder.onSuccess(keys.stream().map(key -> key.getCertificate().getCertificate()).toList());
-                        } catch (DSSException e) {
-                            var autogramException = AutogramException.createFromDSSException(e);
-                            ui.onUIThreadDo(() -> ui.onPickSigningKeyFailed(autogramException));
-                            ui.onUIThreadDo(consentDialogCloseCallback);
-                            responder.onError(autogramException);
-                        } catch (AutogramException e) {
-                            ui.onUIThreadDo(consentDialogCloseCallback);
-                            responder.onError(e);
-                        } catch (Exception e) {
-                            ui.onUIThreadDo(consentDialogCloseCallback);
-                            responder.onError(new UnrecognizedException(e));
-                        }
+                    (driver) -> {
+                        ui.onWorkThreadDo(() -> {
+                            try (var token = driver.createToken(passwordManager, settings)) {
+                                var keys = token.getKeys();
+                                resetTokenSessionTimer();
+                                ui.onUIThreadDo(consentDialogCloseCallback);
+                                responder.onSuccess(
+                                        keys.stream().map(key -> key.getCertificate().getCertificate()).toList());
+                            } catch (DSSException e) {
+                                var autogramException = AutogramException.createFromDSSException(e);
+                                ui.onUIThreadDo(() -> ui.onPickSigningKeyFailed(autogramException));
+                                ui.onUIThreadDo(consentDialogCloseCallback);
+                                responder.onError(autogramException);
+                            } catch (AutogramException e) {
+                                ui.onUIThreadDo(consentDialogCloseCallback);
+                                responder.onError(e);
+                            } catch (Exception e) {
+                                ui.onUIThreadDo(consentDialogCloseCallback);
+                                responder.onError(new UnrecognizedException(e));
+                            }
+                        });
+                    },
+                    () -> {
+                        consentDialogCloseCallback.run();
+                        responder.onError(new SigningCanceledByUserException());
                     });
-                },
-                () -> {
-                    consentDialogCloseCallback.run();
-                    responder.onError(new SigningCanceledByUserException());
-                }
-            );
         });
     }
 }

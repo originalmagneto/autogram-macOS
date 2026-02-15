@@ -13,6 +13,7 @@ public class PasswordController {
     private final String errorText;
     private final boolean isSigningStep;
     private final boolean allowEmpty;
+    private Runnable onClose;
 
     private char[] password;
 
@@ -31,17 +32,22 @@ public class PasswordController {
     @FXML
     VBox mainBox;
 
-    public PasswordController(String questionText, String blankPasswordErrorText, boolean isSigningStep, boolean allowEmpty) {
+    public PasswordController(String questionText, String blankPasswordErrorText, boolean isSigningStep,
+            boolean allowEmpty) {
         this.questionText = questionText;
         this.errorText = blankPasswordErrorText;
         this.isSigningStep = isSigningStep;
         this.allowEmpty = allowEmpty;
     }
 
+    public void setOnClose(Runnable onClose) {
+        this.onClose = onClose;
+    }
+
     public void initialize() {
         question.setText(questionText);
         error.setText(errorText);
-        if(isSigningStep) {
+        if (isSigningStep) {
             mainButton.setText("Podpísať");
             cancelButton.setManaged(true);
             cancelButton.setVisible(true);
@@ -59,14 +65,22 @@ public class PasswordController {
             passwordField.requestFocus();
         } else {
             this.password = passwordField.getText().toCharArray();
-            GUIUtils.closeWindow(mainBox);
+            if (onClose != null) {
+                onClose.run();
+            } else {
+                GUIUtils.closeWindow(mainBox);
+            }
         }
     }
 
     public void onCancelButtonPressed(ActionEvent event) {
-        var window = mainBox.getScene().getRoot().getScene().getWindow();
-        if (window instanceof Stage) {
-            ((Stage) window).close();
+        if (onClose != null) {
+            onClose.run();
+        } else {
+            var window = mainBox.getScene().getRoot().getScene().getWindow();
+            if (window instanceof Stage) {
+                ((Stage) window).close();
+            }
         }
     }
 

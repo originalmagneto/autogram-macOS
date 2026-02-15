@@ -2,7 +2,7 @@ package digital.slovensko.autogram.ui.gui;
 
 import digital.slovensko.autogram.core.Autogram;
 import digital.slovensko.autogram.core.SignatureValidator;
-import digital.slovensko.autogram.core.visualization.ImageVisualization;
+
 import digital.slovensko.autogram.core.visualization.Visualization;
 import digital.slovensko.autogram.ui.Visualizer;
 import digital.slovensko.autogram.util.DSSUtils;
@@ -14,6 +14,7 @@ import javafx.event.Event;
 import javafx.fxml.FXML;
 import javafx.scene.Cursor;
 import javafx.scene.Node;
+import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.ScrollPane;
@@ -27,10 +28,10 @@ import javafx.scene.text.Text;
 import javafx.scene.web.WebView;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
-import org.verapdf.xmp.impl.Base64;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+
 import java.util.ArrayList;
 
 import static digital.slovensko.autogram.ui.gui.GUIValidationUtils.*;
@@ -47,6 +48,7 @@ public class SigningDialogController implements SuppressedFocusController, Visua
     private Reports signatureValidationReports;
     private Reports signatureCheckReports;
     private final boolean shouldCheckValidityBeforeSigning;
+    private MainMenuController mainMenuController;
 
     @FXML
     VBox mainBox;
@@ -74,6 +76,10 @@ public class SigningDialogController implements SuppressedFocusController, Visua
     VBox signaturesTable;
     @FXML
     Text headerText;
+    @FXML
+    javafx.scene.control.ChoiceBox<eu.europa.esig.dss.enumerations.SignatureLevel> signatureFormatChoice;
+    @FXML
+    javafx.scene.control.CheckBox timestampCheckbox;
 
     public SigningDialogController(Visualization visualization, Autogram autogram, GUI gui, String title,
             boolean shouldCheckValidityBeforeSigning) {
@@ -91,6 +97,37 @@ public class SigningDialogController implements SuppressedFocusController, Visua
         refreshSigningKey();
         visualization.initialize(this);
         autogram.checkPDFACompliance(visualization.getJob());
+
+        // Initialize Signature Options
+        if (signatureFormatChoice != null) {
+            signatureFormatChoice.setConverter(new SignatureLevelStringConverter());
+            signatureFormatChoice.getItems().addAll(
+                    eu.europa.esig.dss.enumerations.SignatureLevel.PAdES_BASELINE_B,
+                    eu.europa.esig.dss.enumerations.SignatureLevel.XAdES_BASELINE_B,
+                    eu.europa.esig.dss.enumerations.SignatureLevel.CAdES_BASELINE_B);
+
+            var settings = autogram.getUserSettings();
+            signatureFormatChoice.setValue(settings.getSignatureLevel());
+            signatureFormatChoice.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
+                if (newVal != null) {
+                    settings.setSignatureLevel(newVal);
+                    settings.save();
+                }
+            });
+        }
+
+        if (timestampCheckbox != null) {
+            var settings = autogram.getUserSettings();
+            timestampCheckbox.setSelected(settings.getTsaEnabled());
+            timestampCheckbox.selectedProperty().addListener((obs, oldVal, newVal) -> {
+                settings.setTsaEnabled(newVal);
+                settings.save();
+            });
+        }
+    }
+
+    public void setMainMenuController(MainMenuController mainMenuController) {
+        this.mainMenuController = mainMenuController;
     }
 
     public void onMainButtonPressed(ActionEvent event) {
@@ -127,7 +164,8 @@ public class SigningDialogController implements SuppressedFocusController, Visua
         stage.sizeToScene();
         stage.initModality(Modality.WINDOW_MODAL);
         stage.initOwner(mainButton.getScene().getWindow());
-        stage.setOnCloseRequest(event -> signaturesInvalidDialogController.close());;
+        stage.setOnCloseRequest(event -> signaturesInvalidDialogController.close());
+        ;
 
         GUIUtils.suppressDefaultFocus(stage, signaturesInvalidDialogController);
 
@@ -186,20 +224,27 @@ public class SigningDialogController implements SuppressedFocusController, Visua
         if (signaturesController == null)
             signaturesController = new SignaturesController(signatureCheckReports, gui);
 
-        var root = GUIUtils.loadFXML(signaturesController, "present-signatures-dialog.fxml");
+        Node root = GUIUtils.loadFXML(signaturesController, "present-signatures-dialog.fxml");
+        signaturesController.setMainMenuController(mainMenuController);
 
-        var stage = new Stage();
-        stage.setTitle("Detailné informácie o podpisoch");
-        stage.setScene(new Scene(root));
-        stage.initModality(Modality.WINDOW_MODAL);
-        stage.initOwner(mainButton.getScene().getWindow());
-        GUIUtils.suppressDefaultFocus(stage, signaturesController);
-        stage.show();
-        stage.setResizable(false);
-        stage.show();
+        if (mainMenuController != null) {
+            mainMenuController.showRightDrawer(root);
+            if (signatureValidationCompleted)
+                signaturesController.onSignatureValidationCompleted(signatureValidationReports);
+        } else {
+            var stage = new Stage();
+            stage.setTitle("Detailné informácie o podpisoch");
+            stage.setScene(new Scene((Parent) root));
+            stage.initModality(Modality.WINDOW_MODAL);
+            stage.initOwner(mainButton.getScene().getWindow());
+            GUIUtils.suppressDefaultFocus(stage, signaturesController);
+            stage.show();
+            stage.setResizable(false);
+            stage.show();
 
-        if (signatureValidationCompleted)
-            signaturesController.onSignatureValidationCompleted(signatureValidationReports);
+            if (signatureValidationCompleted)
+                signaturesController.onSignatureValidationCompleted(signatureValidationReports);
+        }
     }
 
     public void onSignatureCheckCompleted(Reports reports) {

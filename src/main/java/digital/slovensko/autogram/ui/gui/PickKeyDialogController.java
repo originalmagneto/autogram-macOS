@@ -22,6 +22,7 @@ public class PickKeyDialogController {
     private final Consumer<DSSPrivateKeyEntry> callback;
     private final List<DSSPrivateKeyEntry> keys;
     private final boolean expiredCertsEnabled;
+    private Runnable onClose;
 
     @FXML
     VBox formGroup;
@@ -33,11 +34,15 @@ public class PickKeyDialogController {
     VBox radios;
     private ToggleGroup toggleGroup;
 
-
-    public PickKeyDialogController(List<DSSPrivateKeyEntry> keys, Consumer<DSSPrivateKeyEntry> callback, boolean expiredCertsEnabled) {
+    public PickKeyDialogController(List<DSSPrivateKeyEntry> keys, Consumer<DSSPrivateKeyEntry> callback,
+            boolean expiredCertsEnabled) {
         this.keys = keys;
         this.callback = callback;
         this.expiredCertsEnabled = expiredCertsEnabled;
+    }
+
+    public void setOnClose(Runnable onClose) {
+        this.onClose = onClose;
     }
 
     public void initialize() {
@@ -73,7 +78,11 @@ public class PickKeyDialogController {
             formGroup.getStyleClass().add("autogram-form-group--error");
             formGroup.getScene().getWindow().sizeToScene();
         } else {
-            GUIUtils.closeWindow(mainBox);
+            if (onClose != null) {
+                onClose.run();
+            } else {
+                GUIUtils.closeWindow(mainBox);
+            }
             var key = (DSSPrivateKeyEntry) toggleGroup.getSelectedToggle().getUserData();
             callback.accept(key);
         }

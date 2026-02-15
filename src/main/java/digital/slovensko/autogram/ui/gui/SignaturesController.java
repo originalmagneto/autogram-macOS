@@ -9,6 +9,7 @@ import javafx.scene.control.Button;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.scene.text.Text;
+import javafx.scene.text.TextFlow;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 
@@ -19,7 +20,10 @@ public class SignaturesController implements SuppressedFocusController {
     private Reports signatureCheckReports;
     private Reports signatureValidationReports;
     private String signatureValidationReportsHTML;
+    private MainMenuController mainMenuController;
 
+    @FXML
+    TextFlow signaturesHeader;
     @FXML
     Text signatureValidationMessage;
     @FXML
@@ -40,6 +44,14 @@ public class SignaturesController implements SuppressedFocusController {
 
     public void initialize() {
         renderSignatures();
+    }
+
+    public void setMainMenuController(MainMenuController mainMenuController) {
+        this.mainMenuController = mainMenuController;
+        if (mainMenuController != null && signaturesHeader != null) {
+            signaturesHeader.setVisible(false);
+            signaturesHeader.setManaged(false);
+        }
     }
 
     @Override
@@ -76,7 +88,11 @@ public class SignaturesController implements SuppressedFocusController {
     }
 
     public void onCloseButtonAction() {
-        GUIUtils.closeWindow(mainBox);
+        if (mainMenuController != null) {
+            mainMenuController.hideRightDrawer();
+        } else {
+            GUIUtils.closeWindow(mainBox);
+        }
     }
 
     public void renderSignatures() {

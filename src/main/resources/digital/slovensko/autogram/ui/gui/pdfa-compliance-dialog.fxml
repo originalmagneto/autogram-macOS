@@ -2,15 +2,12 @@
 
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
-
-<?import javafx.scene.text.Text?>
-<?import javafx.scene.text.TextFlow?>
+<?import javafx.scene.text.*?>
 <?import javafx.scene.shape.SVGPath?>
 
 <VBox xmlns="http://javafx.com/javafx"
       xmlns:fx="http://javafx.com/fxml"
-      prefWidth="600" minWidth="450"
-      fx:id="mainBox">
+      fx:id="mainBox" styleClass="autogram-dialog-content">
 
     <VBox styleClass="autogram-warning-summary">
         <HBox>

@@ -11,9 +11,9 @@
     prefWidth="450" minWidth="450"
     fx:id="mainBox">
 
-    <fx:include fx:id="errorSummaryComponent" source="error-summary-component.fxml" />
+    <fx:include fx:id="errorSummaryComponent" source="error-summary-component.fxml" VBox.vgrow="ALWAYS" />
 
-    <HBox styleClass="autogram-actions">
+    <HBox alignment="CENTER_RIGHT" spacing="12" styleClass="autogram-actions">
         <Button fx:id="mainButton" styleClass="autogram-button,autogram-button--secondary"
             text="Pokračovať" onAction="#onMainButtonAction" />
     </HBox>
