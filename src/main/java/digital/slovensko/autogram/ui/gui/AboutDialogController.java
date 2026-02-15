@@ -29,6 +29,26 @@ public class AboutDialogController implements SuppressedFocusController {
         hostServices.showDocument("https://github.com/slovensko-digital/autogram");
     }
 
+    private Runnable onClose;
+
+    public void setOnClose(Runnable onClose) {
+        this.onClose = onClose;
+    }
+
+    public void onCloseButtonAction(ActionEvent ignored) {
+        if (onClose != null) {
+            onClose.run();
+        } else {
+            // For now, About dialog implies it's in a stage if not in overlay, or handled
+            // by OS window controls
+            // But we added a close button, so we should try to close the window
+            var window = mainBox.getScene().getWindow();
+            if (window instanceof javafx.stage.Stage) {
+                ((javafx.stage.Stage) window).close();
+            }
+        }
+    }
+
     @Override
     public Node getNodeForLoosingFocus() {
         return mainBox;

@@ -69,15 +69,27 @@ open target/Autogram-1.0.0.pkg
 
 - `src/main/java/digital/slovensko/autogram/Main.java` - Entry point
 - `src/main/java/digital/slovensko/autogram/core/AppStarter.java` - CLI/GUI mode selection
+- `src/main/java/digital/slovensko/autogram/ui/gui/MainMenuController.java` - Main window orchestrator (overlays, panels)
 - `src/main/java/digital/slovensko/autogram/ui/gui/GUIApp.java` - JavaFX application
 - `pom.xml` - Maven configuration
 
 ## Architecture
 
 - **Core**: Document signing, validation, batch processing
-- **UI**: JavaFX-based GUI with multiple dialogs (signing, settings, etc.)
+- **UI**: JavaFX-based Single-Window GUI with inline overlays, using macOS 'Liquid Glass' design system (transparency, blurs)
 - **Server**: Embedded HTTP server for API integration
 - **Drivers**: PKCS#11, PKCS#12, and custom token driver support
+
+## Design System
+
+The application follows a **macOS-native "Liquid Glass"** aesthetic.
+
+- **Variables**: Defined in `macos-native.css` (root) and `macos-native-dark.css` (dark mode overrides).
+- **Glassmorphism**: Extensive use of translucency, blurs (`-fx-effect: dropshadow(...)`), and subtle borders (`rgba(0,0,0,0.1)`).
+- **Overlays**: Dialogs are rendered as inline overlays within the main window using `StackPane` and `MainMenuController.showOverlayDialog()`.
+    - Use `.autogram-overlay-card` for dialog containers.
+    - Use `.autogram-dialog-content` for inner padding.
+- **Typography**: System fonts (San Francisco) via `-fx-font-family: "System"`.
 
 ## Supported Signature Types
 

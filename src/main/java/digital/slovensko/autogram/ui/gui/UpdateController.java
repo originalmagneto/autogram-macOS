@@ -16,7 +16,7 @@ import java.util.concurrent.CompletableFuture;
 public class UpdateController implements SuppressedFocusController {
     private final HostServices hostServices;
     private Updater.UpdateInfo updateInfo;
-    
+
     @FXML
     Node mainBox;
     @FXML
@@ -38,7 +38,7 @@ public class UpdateController implements SuppressedFocusController {
         this.hostServices = hostServices;
         this.updateInfo = Updater.getUpdateInfo();
     }
-    
+
     @FXML
     public void initialize() {
         if (updateInfo != null) {
@@ -51,7 +51,7 @@ public class UpdateController implements SuppressedFocusController {
                 releaseNotesArea.setManaged(true);
             }
         }
-        
+
         if (progressBar != null) {
             progressBar.setVisible(false);
             progressBar.setManaged(false);
@@ -71,7 +71,7 @@ public class UpdateController implements SuppressedFocusController {
             hostServices.showDocument(Updater.getDownloadUrl());
         }
     }
-    
+
     private void startAutomaticDownload() {
         // Show progress UI
         if (progressBar != null) {
@@ -84,11 +84,11 @@ public class UpdateController implements SuppressedFocusController {
             progressText.setManaged(true);
             progressText.setText("Sťahovanie...");
         }
-        
+
         // Disable buttons during download
         mainButton.setDisable(true);
         mainButton.setText("Sťahuje sa...");
-        
+
         // Start download
         CompletableFuture<Path> downloadFuture = Updater.downloadUpdate(updateInfo, progress -> {
             Platform.runLater(() -> {
@@ -101,7 +101,7 @@ public class UpdateController implements SuppressedFocusController {
                 }
             });
         });
-        
+
         downloadFuture.whenComplete((path, throwable) -> {
             Platform.runLater(() -> {
                 if (throwable != null) {
@@ -115,24 +115,34 @@ public class UpdateController implements SuppressedFocusController {
                     }
                     mainButton.setText("Inštalovať");
                     mainButton.setDisable(false);
-                    
+
                     // Set up install action
                     mainButton.setOnAction(e -> installUpdate(path));
                 }
             });
         });
     }
-    
+
+    private Runnable onClose;
+
+    public void setOnClose(Runnable onClose) {
+        this.onClose = onClose;
+    }
+
     private void installUpdate(Path updateFile) {
         try {
             Updater.installUpdate(updateFile);
             // Close the dialog after opening the installer
-            GUIUtils.closeWindow(mainBox);
+            if (onClose != null) {
+                onClose.run();
+            } else {
+                GUIUtils.closeWindow(mainBox);
+            }
         } catch (Exception e) {
             showError("Chyba pri inštalácii: " + e.getMessage());
         }
     }
-    
+
     private void showError(String message) {
         Alert alert = new Alert(Alert.AlertType.ERROR);
         alert.setTitle("Chyba aktualizácie");
@@ -140,12 +150,12 @@ public class UpdateController implements SuppressedFocusController {
         alert.setContentText(message);
         alert.showAndWait();
     }
-    
+
     private void resetUI() {
         mainButton.setDisable(false);
         mainButton.setText("Stiahnuť novú verziu");
         mainButton.setOnAction(this::downloadAction);
-        
+
         if (progressBar != null) {
             progressBar.setVisible(false);
             progressBar.setManaged(false);
@@ -157,7 +167,11 @@ public class UpdateController implements SuppressedFocusController {
     }
 
     public void onCancelButtonPressed(ActionEvent ignored) {
-        GUIUtils.closeWindow(mainBox);
+        if (onClose != null) {
+            onClose.run();
+        } else {
+            GUIUtils.closeWindow(mainBox);
+        }
     }
 
     @Override

@@ -21,8 +21,18 @@ public class PkcsEidWindowsDllErrorController implements SuppressedFocusControll
         hostServices.showDocument("https://sluzby.slovensko.digital/autogram/vc-redist-redirect");
     }
 
+    private Runnable onClose;
+
+    public void setOnClose(Runnable onClose) {
+        this.onClose = onClose;
+    }
+
     public void onMainButtonAction() {
-        ((Stage) mainBox.getScene().getWindow()).close();
+        if (onClose != null) {
+            onClose.run();
+        } else {
+            ((Stage) mainBox.getScene().getWindow()).close();
+        }
     }
 
     @Override

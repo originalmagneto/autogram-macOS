@@ -131,19 +131,30 @@ public class GUI implements UI {
             PickDriverDialogController controller = new PickDriverDialogController(drivers, callback);
             var root = GUIUtils.loadFXML(controller, "pick-driver-dialog.fxml");
 
-            var stage = new Stage();
-            stage.setTitle("Výber úložiska certifikátu");
-            stage.setScene(new Scene(root));
-            stage.setOnCloseRequest(e -> {
-                refreshKeyOnAllJobs();
-                enableSigningOnAllJobs();
-                if (onCancel != null)
-                    onCancel.run();
-            });
-            stage.sizeToScene();
-            stage.setResizable(false);
-            stage.initModality(Modality.APPLICATION_MODAL);
-            stage.show();
+            if (mainMenuController != null) {
+                controller.setOnClose(() -> mainMenuController.hideOverlayDialog());
+                controller.setOnCancel(onCancel);
+                mainMenuController.showOverlayDialog(root);
+            } else {
+                var stage = new Stage();
+                stage.setTitle("Výber úložiska certifikátu");
+                stage.setScene(new Scene(root));
+
+                // Handle cancellation via controller (Cancel button)
+                controller.setOnCancel(onCancel);
+
+                // Handle cancellation via X button
+                stage.setOnCloseRequest(e -> {
+                    refreshKeyOnAllJobs();
+                    enableSigningOnAllJobs();
+                    if (onCancel != null)
+                        onCancel.run();
+                });
+                stage.sizeToScene();
+                stage.setResizable(false);
+                stage.initModality(Modality.APPLICATION_MODAL);
+                stage.show();
+            }
         }
     }
 
@@ -220,17 +231,22 @@ public class GUI implements UI {
         var controller = new PkcsEidWindowsDllErrorController(hostServices);
         var root = GUIUtils.loadFXML(controller, "pkcs-eid-windows-dll-error-dialog.fxml");
 
-        var stage = new Stage();
-        stage.setTitle(e.getSubheading());
-        stage.setScene(new Scene(root));
+        if (mainMenuController != null) {
+            controller.setOnClose(() -> mainMenuController.hideOverlayDialog());
+            mainMenuController.showOverlayDialog(root);
+        } else {
+            var stage = new Stage();
+            stage.setTitle(e.getSubheading());
+            stage.setScene(new Scene(root));
 
-        stage.sizeToScene();
-        stage.setResizable(false);
-        stage.initModality(Modality.APPLICATION_MODAL);
+            stage.sizeToScene();
+            stage.setResizable(false);
+            stage.initModality(Modality.APPLICATION_MODAL);
 
-        GUIUtils.suppressDefaultFocus(stage, controller);
+            GUIUtils.suppressDefaultFocus(stage, controller);
 
-        stage.show();
+            stage.show();
+        }
     }
 
     public char[] getKeystorePassword() {
@@ -344,13 +360,18 @@ public class GUI implements UI {
         var controller = new UpdateController(hostServices);
         var root = GUIUtils.loadFXML(controller, "update-dialog.fxml");
 
-        var stage = new Stage();
-        stage.setTitle("Dostupná aktualizácia");
-        stage.setScene(new Scene(root));
-        stage.setResizable(false);
-        stage.initModality(Modality.APPLICATION_MODAL);
-        GUIUtils.suppressDefaultFocus(stage, controller);
-        stage.show();
+        if (mainMenuController != null) {
+            controller.setOnClose(() -> mainMenuController.hideOverlayDialog());
+            mainMenuController.showOverlayDialog(root);
+        } else {
+            var stage = new Stage();
+            stage.setTitle("Dostupná aktualizácia");
+            stage.setScene(new Scene(root));
+            stage.setResizable(false);
+            stage.initModality(Modality.APPLICATION_MODAL);
+            GUIUtils.suppressDefaultFocus(stage, controller);
+            stage.show();
+        }
     }
 
     @Override
@@ -358,13 +379,18 @@ public class GUI implements UI {
         var controller = new AboutDialogController(hostServices);
         var root = GUIUtils.loadFXML(controller, "about-dialog.fxml");
 
-        var stage = new Stage();
-        stage.setTitle("O projekte Autogram");
-        stage.setScene(new Scene(root));
-        stage.setResizable(false);
-        stage.initModality(Modality.APPLICATION_MODAL);
-        GUIUtils.suppressDefaultFocus(stage, controller);
-        stage.show();
+        if (mainMenuController != null) {
+            controller.setOnClose(() -> mainMenuController.hideOverlayDialog());
+            mainMenuController.showOverlayDialog(root);
+        } else {
+            var stage = new Stage();
+            stage.setTitle("O projekte Autogram");
+            stage.setScene(new Scene(root));
+            stage.setResizable(false);
+            stage.initModality(Modality.APPLICATION_MODAL);
+            GUIUtils.suppressDefaultFocus(stage, controller);
+            stage.show();
+        }
     }
 
     @Override
