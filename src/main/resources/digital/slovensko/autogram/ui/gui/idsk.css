@@ -1,185 +1,58 @@
-/* Main styling - macOS native appearance */
+/* Main styling */
 
 .root {
-  -autogram-text-colour: #1d1d1f;
-  -autogram-secondary-text-colour: #6e6e73;
+  -autogram-text-colour: #0b0c0c;
+  -autogram-secondary-text-colour: #505a5f;
 
-  -autogram-link-colour: #007aff;
-  -autogram-link-hover-colour: #0051d5;
+  -autogram-link-colour: #1d70b8;
+  -autogram-link-hover-colour: #003078;
 
-  -autogram-border-colour: #d2d2d7;
-  -autogram-input-border-colour: #d2d2d7;
+  -autogram-border-colour: #b1b4b6;
+  -autogram-input-border-colour: #0b0c0c;
   -autogram-input-background-color: #ffffff;
 
-  -autogram-success-colour: #30d158;
-  -autogram-priamry-button-hover-colour: #28cd4f;
+  -autogram-success-colour: #00703c;
+  -autogram-priamry-button-hover-colour: #204e2e;
 
-  -autogram-secondary-hover-colour: #f2f2f7;
+  -autogram-secondary-hover-colour: #dee0e2;
 
-  -autogram-warning-button-colour: #ff3b30;
-  -autorgam-warning-button-hover-colour: #d70015;
+  -autogram-warning-button-colour: #d0190f;
+  -autorgam-warning-button-hover-colour: #9e1912;
 
   -autogram-background-colour: #ffffff;
-  -autogram-secondary-background-colour: #f2f2f7;
+  -autogram-secondary-background-colour: #f3f2f1;
 
-  -autogram-focus-colour: #007aff;
-  -autogram-focus-text-colour: #ffffff;
+  -autogram-focus-colour: #ffdd00;
+  -autogram-focus-text-colour: #0b0c0c;
 
-  -autogram-error-colour: #ff3b30;
+  -autogram-error-colour: #d4351c;
 
-  -autogram-partial-success-colour: #007aff;
 
-  /* macOS system font stack */
-  -fx-font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
-  -fx-font-size: 13px;
+  -autogram-partial-success-colour: #003078;
+
+  -fx-font-family: -apple-system, system-ui;
+  -fx-font-size: 16px;
 
   -fx-font-smoothing-type: gray;
 
-  -autogram-warning-color: #ff9500;
-  
-  /* macOS window background */
-  -fx-background-color: #ffffff;
-}
-
-/* macOS native window styling */
-.root {
-  -fx-background-color: -autogram-background-colour;
-  -fx-background-radius: 0;
-}
-
-/* Remove custom window decorations for native macOS look */
-.border-pane {
-  -fx-background-color: transparent;
-}
-
-/* macOS-style focus ring */
-.button:focused,
-.text-field:focused,
-.choice-box:focused {
-  -fx-effect: dropshadow(gaussian, rgba(0, 122, 255, 0.6), 0, 0, 0, 3);
-  -fx-background-insets: -3;
-}
-
-/* Hide title bar for native macOS integration */
-.menu-bar {
-  -fx-background-color: transparent;
-  -fx-border-width: 0;
-  -fx-padding: 0;
-}
-
-/* Enhanced drag and drop zone */
-.autogram-dropzone {
-  -fx-border-color: -autogram-border-colour;
-  -fx-border-width: 2px;
-  -fx-border-style: dashed;
-  -fx-border-radius: 8px;
-  -fx-background-color: derive(-autogram-background-colour, 5%);
-  -fx-padding: 2em;
-  -fx-spacing: 1em;
-  -fx-alignment: center;
-  -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 4, 0, 0, 1);
-}
-
-.autogram-dropzone:hover {
-  -fx-border-color: derive(-autogram-border-colour, -20%);
-  -fx-background-color: derive(-autogram-background-colour, 10%);
-}
-
-.autogram-dropzone--entered {
-  -fx-border-color: -autogram-link-colour !important;
-  -fx-background-color: derive(-autogram-link-colour, 90%) !important;
-  -fx-border-width: 3px !important;
-}
-
-.autogram-dropzone-active {
-  -fx-background-color: derive(-autogram-focus-colour, 85%) !important;
-  -fx-border-color: -autogram-focus-colour !important;
-  -fx-border-width: 2px !important;
-  -fx-effect: dropshadow(gaussian, derive(-autogram-focus-colour, 50%), 8, 0.3, 0, 0);
-}
-
-/* macOS-style dialogs */
-.autogram-dialog {
-  -fx-background-color: -autogram-background-colour;
-  -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.3), 10, 0, 0, 2);
-}
-
-.autogram-dialog-content {
-  -fx-background-color: -autogram-background-colour;
-  -fx-background-radius: 8px;
-  -fx-padding: 20px;
-}
-
-/* Improved button spacing for dialogs */
-.autogram-dialog .button-bar {
-  -fx-spacing: 10px;
-  -fx-padding: 20px 0 0 0;
-  -fx-alignment: center-right;
-}
-
-/* macOS-style tab pane */
-.autogram-settings-tab-pane {
-  -fx-background-color: -autogram-background-colour;
-}
-
-.autogram-settings-tab-pane .tab-header-area {
-  -fx-padding: 0;
-}
-
-.autogram-settings-tab-pane .tab {
-  -fx-background-color: derive(-autogram-background-colour, -5%);
-  -fx-background-radius: 8px 8px 0 0;
-  -fx-border-color: -autogram-border-colour;
-  -fx-border-width: 1px 1px 0 1px;
-  -fx-padding: 8px 16px;
-}
-
-.autogram-settings-tab-pane .tab:selected {
-  -fx-background-color: -autogram-background-colour;
-  -fx-border-color: -autogram-border-colour;
-}
-
-.autogram-settings-tab-pane .tab-content-area {
-  -fx-background-color: -autogram-background-colour;
-  -fx-border-color: -autogram-border-colour;
-  -fx-border-width: 1px;
-  -fx-border-radius: 0 0 8px 8px;
-}
-
-/* Accessibility improvements */
-.autogram-dropzone:focused {
-  -fx-border-color: -autogram-focus-colour !important;
-  -fx-border-width: 3px !important;
-  -fx-background-color: derive(-autogram-focus-colour, 90%) !important;
-}
-
-/* High contrast mode support */
-@media (prefers-contrast: high) {
-  .root {
-    -autogram-border-colour: #000000;
-    -autogram-text-colour: #000000;
-    -autogram-background-colour: #ffffff;
-  }
-  
-  .autogram-button {
-    -fx-border-width: 2px;
-    -fx-border-color: #000000;
-  }
-}
-
-/* Reduced motion support */
-@media (prefers-reduced-motion: reduce) {
-  * {
-    -fx-transition-duration: 0s;
-  }
+  -autogram-warning-color: #ffdf0f;
 }
 
 #mainBox {
-  /* Remove custom border styling for cleaner macOS look */
-  -fx-border-width: 0;
-  -fx-padding: 40px 40px 20px 40px;
-  -fx-spacing: 30px;
-  -fx-background-color: -autogram-background-colour;
+  -fx-border-width: 40px 0 0 0, 3px 0 0 0;
+  -fx-border-color: #003183,
+    linear-gradient(
+      from 0 0 to 150px 0,
+      repeat,
+      #ffffff 0%,
+      #ffffff 33.3%,
+      #003183 33.3%,
+      #003183 66.6%,
+      #d0190f 66.6%,
+      #d0190f 100%
+    );
+  -fx-padding: 2em;
+  -fx-spacing: 2em;
 }
 
 /* Radio buttons */
@@ -258,147 +131,124 @@
   -fx-background-radius: 25px;
 }
 
-/* macOS-style Buttons */
+/* Buttons */
 .autogram-button {
   -fx-cursor: hand;
   -fx-background-color: -autogram-success-colour;
-  -fx-border-color: transparent;
-  -fx-border-width: 0;
-  -fx-text-fill: #ffffff;
-  -fx-padding: 8px 16px;
-  -fx-background-radius: 6px;
-  -fx-font-size: 13px;
-  -fx-font-weight: 500;
-  -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.1), 1, 0, 0, 0.5);
+  -fx-border-color: -autogram-input-border-colour;
+  -fx-border-width: 0 0 2px 0;
+  -fx-text-fill: -autogram-background-colour;
+  -fx-padding: 7px 10px 7px 10px;
+
+  -fx-font-size: 1.1875em;
 }
 
 .autogram-button:hover {
   -fx-background-color: -autogram-priamry-button-hover-colour;
-  -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.15), 2, 0, 0, 1);
 }
 
-.autogram-button:pressed {
-  -fx-background-color: derive(-autogram-success-colour, -10%);
-  -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.2), 1, 0, 0, 0);
-  -fx-translate-y: 0.5px;
-}
+.autogram-button:focused,
+.autogram-button.autogram-button--secondary:focused,
+.autogram-button.autogram-button--warning:focused {
+  -fx-background-color: -autogram-focus-colour !important;
+  -fx-text-fill: -autogram-text-colour;
 
-.autogram-button:focused {
-  -fx-effect: dropshadow(gaussian, rgba(0, 122, 255, 0.6), 0, 0, 0, 3);
+  -fx-border-color: -autogram-input-border-colour;
 }
 
 .autogram-button:disabled {
   -fx-opacity: 0.5;
-  -fx-effect: none;
 }
 
 .autogram-link {
+  -fx-background-insets: 7px 0;
   -fx-background-color: transparent;
   -fx-border-width: 0;
   -fx-text-fill: -autogram-link-colour;
-  -fx-underline: false;
-  -fx-font-size: 13px;
-  -fx-font-weight: 400;
-  -fx-padding: 4px 8px;
-  -fx-background-radius: 4px;
+  -fx-underline: true;
+
+  -fx-font-size: 1.1875em;
 }
 
 .autogram-link:hover {
   -fx-cursor: hand;
-  -fx-background-color: rgba(0, 122, 255, 0.1);
+  -fx-background-color: transparent;
   -fx-text-fill: -autogram-link-hover-colour;
 }
 
-.autogram-link:focused {
-  -fx-background-color: -autogram-focus-colour;
+.autogram-link:focused,
+.autogram-link:focused:hover {
   -fx-text-fill: -autogram-focus-text-colour;
-  -fx-effect: dropshadow(gaussian, rgba(0, 122, 255, 0.6), 0, 0, 0, 3);
+  -fx-background-color: -autogram-focus-text-colour, -autogram-focus-colour,
+    transparent;
+  -fx-background-insets: 0 0 -4px 0, -4px 0 0 0, 0 0 0 0;
+  -fx-underline: false;
 }
 
 .autogram-button.autogram-button--secondary {
   -fx-text-fill: -autogram-text-colour;
   -fx-background-color: -autogram-secondary-background-colour;
   -fx-border-color: -autogram-border-colour;
-  -fx-border-width: 1px;
-  -fx-background-radius: 6px;
-  -fx-border-radius: 6px;
 }
 
 .autogram-button.autogram-button--secondary:hover {
   -fx-background-color: -autogram-secondary-hover-colour;
-  -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.1), 2, 0, 0, 1);
-}
-
-.autogram-button.autogram-button--secondary:pressed {
-  -fx-background-color: derive(-autogram-secondary-background-colour, -5%);
-  -fx-translate-y: 0.5px;
 }
 
 .autogram-button.autogram-button--warning {
   -fx-background-color: -autogram-error-colour;
-  -fx-border-color: transparent;
-  -fx-text-fill: #ffffff;
-  -fx-background-radius: 6px;
+  -fx-border-color: -autogram-warning-button-colour;
 }
 
 .autogram-button.autogram-button--warning:hover {
   -fx-background-color: -autorgam-warning-button-hover-colour;
-  -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.15), 2, 0, 0, 1);
 }
 
-.autogram-button.autogram-button--warning:pressed {
-  -fx-background-color: derive(-autogram-error-colour, -10%);
-  -fx-translate-y: 0.5px;
-}
-
-/* macOS Typography */
+/* Text styling */
 
 .autogram-heading-l {
   -fx-text-fill: -autogram-text-colour;
   -fx-fill: -autogram-text-colour;
-  -fx-font-size: 28px;
-  -fx-font-weight: 600;
-  -fx-font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+
+  -fx-font-size: 2.25em;
+  -fx-font-weight: bold;
 }
 
 .autogram-heading-m {
   -fx-text-fill: -autogram-text-colour;
   -fx-fill: -autogram-text-colour;
-  -fx-font-size: 20px;
-  -fx-font-weight: 600;
-  -fx-font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+
+  -fx-font-size: 1.5em;
+  -fx-font-weight: bold;
 }
 
 .autogram-heading-s {
   -fx-text-fill: -autogram-text-colour;
   -fx-fill: -autogram-text-colour;
-  -fx-font-size: 16px;
-  -fx-font-weight: 600;
-  -fx-font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+
+  -fx-font-size: 1.1875em;
+  -fx-font-weight: bold;
 }
 
 .autogram-body {
   -fx-text-fill: -autogram-text-colour;
   -fx-fill: -autogram-text-colour;
-  -fx-font-size: 13px;
-  -fx-font-weight: 400;
-  -fx-font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+
+  -fx-font-size: 1.1875em;
 }
 
 .autogram-body-l {
   -fx-text-fill: -autogram-text-colour;
   -fx-fill: -autogram-text-colour;
-  -fx-font-size: 15px;
-  -fx-font-weight: 400;
-  -fx-font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+
+  -fx-font-size: 1.5em;
 }
 
 .autogram-body-s {
-  -fx-text-fill: -autogram-secondary-text-colour;
-  -fx-fill: -autogram-secondary-text-colour;
-  -fx-font-size: 11px;
-  -fx-font-weight: 400;
-  -fx-font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+  -fx-text-fill: -autogram-text-colour;
+  -fx-fill: -autogram-text-colour;
+
+  -fx-font-size: 1em;
 }
 
 /* Tooltip */
@@ -409,37 +259,19 @@
   -fx-font-size: 1.1875em;
 }
 
-/* macOS Form styling */
+/* Form styling */
 
 .autogram-input {
   -fx-text-fill: -autogram-text-colour;
-  -fx-background-color: -autogram-input-background-color;
-  -fx-padding: 6px 8px;
-  -fx-border-width: 1px;
-  -fx-border-color: -autogram-input-border-colour;
-  -fx-border-radius: 6px;
-  -fx-background-radius: 6px;
-  -fx-font-size: 13px;
-  -fx-font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
-}
 
-.autogram-input:focused {
-  -fx-border-color: -autogram-focus-colour;
-  -fx-effect: dropshadow(gaussian, rgba(0, 122, 255, 0.3), 0, 0, 0, 2);
+  -fx-padding: 5px;
+  -fx-border-width: 2px;
+  -fx-border-color: -autogram-input-border-colour;
+  -fx-font-size: 1.1875em;
 }
 
 .autogram-input--width-3 {
-  -fx-max-width: 60px;
-}
-
-/* macOS Footer styling */
-.autogram-footer {
-  -fx-background-color: derive(-autogram-background-colour, -2%);
-  -fx-padding: 12px 20px;
-  -fx-spacing: 16px;
-  -fx-alignment: center;
-  -fx-border-color: -autogram-border-colour;
-  -fx-border-width: 1px 0 0 0;
+  -fx-max-width: 3.75em;
 }
 
 .autogram-input:hover {
@@ -1398,213 +1230,6 @@ TextFlow.autogram-body-s {
 
 .autogram-label {
   -fx-font-size: 1.125em;
-}
-
-/* Enhanced native macOS styling to reduce web-wrapper appearance */
-
-/* WebView styling to look more native */
-.web-view {
-  -fx-background-color: -autogram-background-colour;
-  -fx-border-color: -autogram-border-colour;
-  -fx-border-width: 1px;
-  -fx-border-radius: 8px;
-  -fx-background-radius: 8px;
-  -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.05), 2, 0, 0, 1);
-}
-
-/* Remove web-like scrollbars */
-.web-view .scroll-bar {
-  -fx-background-color: transparent;
-  -fx-pref-width: 8px;
-}
-
-.web-view .scroll-bar .track {
-  -fx-background-color: transparent;
-}
-
-.web-view .scroll-bar .thumb {
-  -fx-background-color: derive(-autogram-border-colour, -30%);
-  -fx-background-radius: 4px;
-  -fx-border-radius: 4px;
-  -fx-min-height: 20px;
-}
-
-.web-view .scroll-bar .thumb:hover {
-  -fx-background-color: derive(-autogram-border-colour, -50%);
-}
-
-/* Enhanced native-looking text areas */
-.autogram-visualizer-plaintext {
-  -fx-background-color: -autogram-input-background-color;
-  -fx-border-color: -autogram-input-border-colour;
-  -fx-border-width: 1px;
-  -fx-border-radius: 8px;
-  -fx-background-radius: 8px;
-  -fx-padding: 12px;
-  -fx-font-family: "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace;
-  -fx-font-size: 12px;
-  -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.05), 2, 0, 0, 1);
-}
-
-.autogram-visualizer-plaintext:focused {
-  -fx-border-color: -autogram-focus-colour;
-  -fx-effect: dropshadow(gaussian, rgba(0, 122, 255, 0.3), 0, 0, 0, 3);
-}
-
-/* Enhanced scroll panes for native look */
-.autogram-visualizer-pdf,
-.scroll-pane {
-  -fx-background-color: transparent;
-  -fx-border-color: -autogram-border-colour;
-  -fx-border-width: 1px;
-  -fx-border-radius: 8px;
-  -fx-background-radius: 8px;
-  -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.05), 2, 0, 0, 1);
-}
-
-.scroll-pane .viewport {
-  -fx-background-color: -autogram-background-colour;
-  -fx-background-radius: 7px;
-}
-
-.scroll-pane .scroll-bar {
-  -fx-background-color: transparent;
-  -fx-pref-width: 8px;
-  -fx-pref-height: 8px;
-}
-
-.scroll-pane .scroll-bar .track {
-  -fx-background-color: transparent;
-}
-
-.scroll-pane .scroll-bar .thumb {
-  -fx-background-color: derive(-autogram-border-colour, -20%);
-  -fx-background-radius: 4px;
-  -fx-border-radius: 4px;
-  -fx-min-height: 20px;
-  -fx-min-width: 6px;
-}
-
-.scroll-pane .scroll-bar .thumb:hover {
-  -fx-background-color: derive(-autogram-border-colour, -40%);
-}
-
-.scroll-pane .scroll-bar .thumb:pressed {
-  -fx-background-color: derive(-autogram-border-colour, -60%);
-}
-
-/* Image visualization improvements */
-.autogram-visualizer-image {
-  -fx-background-color: -autogram-background-colour;
-  -fx-padding: 20px;
-  -fx-alignment: center;
-}
-
-/* Enhanced dialog styling */
-.autogram-dialog-content {
-  -fx-background-color: -autogram-background-colour;
-  -fx-background-radius: 12px;
-  -fx-padding: 24px;
-  -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.15), 8, 0, 0, 2);
-}
-
-/* Improved visualization header */
-.autogram-visualization-header {
-  -fx-padding: 0 0 16px 0;
-  -fx-border-color: -autogram-border-colour;
-  -fx-border-width: 0 0 1px 0;
-}
-
-/* Enhanced unsupported visualization styling */
-.autogram-unsupported-visualization {
-  -fx-background-color: derive(-autogram-background-colour, 3%);
-  -fx-border-color: -autogram-border-colour;
-  -fx-border-width: 1px;
-  -fx-border-radius: 8px;
-  -fx-background-radius: 8px;
-  -fx-padding: 40px 20px;
-  -fx-spacing: 20px;
-  -fx-alignment: center;
-}
-
-/* Native window content styling */
-.border-pane {
-  -fx-background-color: -autogram-background-colour;
-  -fx-background-radius: 0;
-}
-
-/* Enhanced main content area */
-#mainBox {
-  -fx-background-color: -autogram-background-colour;
-  -fx-padding: 20px;
-  -fx-spacing: 16px;
-}
-
-/* Improved actions bar */
-.autogram-actions {
-  -fx-padding: 20px 0 0 0;
-  -fx-spacing: 12px;
-  -fx-alignment: center-right;
-  -fx-border-color: -autogram-border-colour;
-  -fx-border-width: 1px 0 0 0;
-}
-
-/* Progress bar styling for updates */
-.progress-bar {
-  -fx-background-color: derive(-autogram-background-colour, -5%);
-  -fx-border-color: -autogram-border-colour;
-  -fx-border-width: 1px;
-  -fx-border-radius: 8px;
-  -fx-background-radius: 8px;
-  -fx-pref-height: 8px;
-}
-
-.progress-bar .bar {
-  -fx-background-color: -autogram-focus-colour;
-  -fx-background-radius: 6px;
-  -fx-padding: 0;
-}
-
-.progress-bar.autogram-progress {
-  -fx-background-color: rgba(0, 0, 0, 0.1);
-  -fx-border-color: transparent;
-  -fx-pref-height: 6px;
-  -fx-background-radius: 3px;
-}
-
-.progress-bar.autogram-progress .bar {
-  -fx-background-color: linear-gradient(to right, #007AFF, #5AC8FA);
-  -fx-background-radius: 3px;
-}
-
-/* Release notes text area styling */
-.text-area.release-notes {
-  -fx-background-color: derive(-autogram-input-background-color, 5%);
-  -fx-border-color: -autogram-input-border-colour;
-  -fx-border-width: 1px;
-  -fx-border-radius: 8px;
-  -fx-background-radius: 8px;
-  -fx-padding: 12px;
-  -fx-font-family: "SF Pro Text", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "Roboto", "Helvetica Neue", "Arial", sans-serif;
-  -fx-font-size: 12px;
-  -fx-text-fill: derive(-autogram-text-colour, -10%);
-}
-
-.text-area.release-notes:focused {
-  -fx-border-color: -autogram-focus-colour;
-  -fx-effect: dropshadow(gaussian, rgba(0, 122, 255, 0.3), 0, 0, 0, 3);
-}
-
-/* Enhanced text styling for update dialog */
-.autogram-body-strong {
-  -fx-font-weight: 600;
-  -fx-font-size: 1.125em;
-  -fx-text-fill: -autogram-text-colour;
-}
-
-.autogram-body-small {
-  -fx-font-size: 0.875em;
-  -fx-text-fill: derive(-autogram-text-colour, -20%);
 }
 
 
