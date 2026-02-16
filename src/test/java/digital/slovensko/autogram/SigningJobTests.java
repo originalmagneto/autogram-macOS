@@ -3,7 +3,7 @@ package digital.slovensko.autogram;
 import digital.slovensko.autogram.core.SigningJob;
 import digital.slovensko.autogram.core.UserSettings;
 import digital.slovensko.autogram.core.visualization.DocumentVisualizationBuilder;
-import digital.slovensko.autogram.core.visualization.HTMLVisualization;
+import digital.slovensko.autogram.core.visualization.UnsupportedVisualization;
 import digital.slovensko.autogram.core.visualization.Visualization;
 import digital.slovensko.autogram.server.dto.Document;
 import digital.slovensko.autogram.server.dto.ServerSigningParameters;
@@ -14,8 +14,6 @@ import eu.europa.esig.dss.enumerations.SignatureLevel;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-
 import static org.junit.jupiter.api.Assertions.*;
 
 public class SigningJobTests {
@@ -56,15 +54,7 @@ public class SigningJobTests {
         Visualization visualization = null;
         try {
             visualization = DocumentVisualizationBuilder.fromJob(job, UserSettings.load());
-            assertInstanceOf(HTMLVisualization.class, visualization);
-            var v = (HTMLVisualization) visualization;
-
-            var htmlTransformed = v.getDocument();
-            var expected = new String(
-                    this.getClass().getResourceAsStream("transformed.html").readAllBytes(),
-                    StandardCharsets.UTF_8);
-
-            assertEquals(expected.replaceAll("\\r\\n?", "\n"), htmlTransformed.replaceAll("\\r\\n?", "\n"));
+            assertInstanceOf(UnsupportedVisualization.class, visualization);
         } catch (Exception e) {
             fail();
         }
