@@ -2,11 +2,15 @@ package digital.slovensko.autogram.ui.gui;
 
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
+import javafx.application.Platform;
+import javafx.animation.PauseTransition;
 import javafx.scene.control.Button;
 import javafx.scene.control.PasswordField;
 import javafx.scene.layout.VBox;
+import javafx.scene.input.KeyCode;
 import javafx.scene.text.Text;
 import javafx.stage.Stage;
+import javafx.util.Duration;
 
 public class PasswordController {
     private final String questionText;
@@ -52,6 +56,25 @@ public class PasswordController {
             cancelButton.setManaged(true);
             cancelButton.setVisible(true);
         }
+
+        mainBox.setOnKeyPressed(event -> {
+            if (event.getCode() == KeyCode.ESCAPE && cancelButton.isVisible() && !cancelButton.isDisable()) {
+                onCancelButtonPressed(null);
+                event.consume();
+            }
+        });
+
+        // Allow immediate PIN typing when dialog appears.
+        Platform.runLater(() -> {
+            focusPasswordFieldForTyping();
+        });
+
+        // Re-focus once more after overlay fade-in to avoid focus loss.
+        var delayedFocus = new PauseTransition(Duration.millis(220));
+        delayedFocus.setOnFinished(event -> {
+            focusPasswordFieldForTyping();
+        });
+        delayedFocus.play();
     }
 
     public void onPasswordAction() {
@@ -86,5 +109,14 @@ public class PasswordController {
 
     public char[] getPassword() {
         return password;
+    }
+
+    void focusPasswordFieldForTyping() {
+        if (passwordField == null) {
+            return;
+        }
+
+        passwordField.requestFocus();
+        passwordField.positionCaret(passwordField.getLength());
     }
 }

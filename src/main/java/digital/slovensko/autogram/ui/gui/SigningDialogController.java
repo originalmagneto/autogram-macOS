@@ -17,6 +17,7 @@ import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
+import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextArea;
 import javafx.scene.image.Image;
@@ -80,6 +81,12 @@ public class SigningDialogController implements SuppressedFocusController, Visua
     javafx.scene.control.ChoiceBox<eu.europa.esig.dss.enumerations.SignatureLevel> signatureFormatChoice;
     @FXML
     javafx.scene.control.CheckBox timestampCheckbox;
+    @FXML
+    Label stepPreviewLabel;
+    @FXML
+    Label stepSignaturesLabel;
+    @FXML
+    Label stepSigningLabel;
 
     public SigningDialogController(Visualization visualization, Autogram autogram, GUI gui, String title,
             boolean shouldCheckValidityBeforeSigning) {
@@ -92,6 +99,7 @@ public class SigningDialogController implements SuppressedFocusController, Visua
 
     public void initialize() throws IOException {
         headerText.setText(title);
+        setActiveStep(1);
         signaturesTable.setManaged(false);
         signaturesTable.setVisible(false);
         refreshSigningKey();
@@ -139,37 +147,52 @@ public class SigningDialogController implements SuppressedFocusController, Visua
             signaturesNotValidatedDialogController = new SignaturesNotValidatedDialogController(this);
 
         var root = GUIUtils.loadFXML(signaturesNotValidatedDialogController, "signatures-not-validated-dialog.fxml");
-        var stage = new Stage();
-        stage.setTitle("Upozornenie");
-        stage.setScene(new Scene(root));
+        if (mainMenuController != null) {
+            signaturesNotValidatedDialogController.setOnClose(mainMenuController::hideOverlayDialog);
+            mainMenuController.showOverlayDialog(root, OverlaySpec.wide()
+                    .withAutoFocus("#continueButton")
+                    .withCancelAction("#cancelButton")
+                    .withCloseOnEscape(true));
+        } else {
+            var stage = new Stage();
+            stage.setTitle("Upozornenie");
+            stage.setScene(new Scene(root));
 
-        stage.sizeToScene();
-        stage.initModality(Modality.WINDOW_MODAL);
-        stage.initOwner(mainButton.getScene().getWindow());
-        stage.setOnCloseRequest(event -> signaturesNotValidatedDialogController.close());
+            stage.sizeToScene();
+            stage.initModality(Modality.WINDOW_MODAL);
+            stage.initOwner(mainButton.getScene().getWindow());
+            stage.setOnCloseRequest(event -> signaturesNotValidatedDialogController.close());
 
-        GUIUtils.suppressDefaultFocus(stage, signaturesNotValidatedDialogController);
+            GUIUtils.suppressDefaultFocus(stage, signaturesNotValidatedDialogController);
 
-        stage.show();
+            stage.show();
+        }
     }
 
     private void showSignaturesInvalidDialog() {
         var signaturesInvalidDialogController = new SignaturesInvalidDialogController(this, signatureValidationReports);
 
         var root = GUIUtils.loadFXML(signaturesInvalidDialogController, "signatures-invalid-dialog.fxml");
-        var stage = new Stage();
-        stage.setTitle("Upozornenie");
-        stage.setScene(new Scene(root));
+        if (mainMenuController != null) {
+            signaturesInvalidDialogController.setOnClose(mainMenuController::hideOverlayDialog);
+            mainMenuController.showOverlayDialog(root, OverlaySpec.wide()
+                    .withAutoFocus("#continueButton")
+                    .withCancelAction("#cancelButton")
+                    .withCloseOnEscape(true));
+        } else {
+            var stage = new Stage();
+            stage.setTitle("Upozornenie");
+            stage.setScene(new Scene(root));
 
-        stage.sizeToScene();
-        stage.initModality(Modality.WINDOW_MODAL);
-        stage.initOwner(mainButton.getScene().getWindow());
-        stage.setOnCloseRequest(event -> signaturesInvalidDialogController.close());
-        ;
+            stage.sizeToScene();
+            stage.initModality(Modality.WINDOW_MODAL);
+            stage.initOwner(mainButton.getScene().getWindow());
+            stage.setOnCloseRequest(event -> signaturesInvalidDialogController.close());
 
-        GUIUtils.suppressDefaultFocus(stage, signaturesInvalidDialogController);
+            GUIUtils.suppressDefaultFocus(stage, signaturesInvalidDialogController);
 
-        stage.show();
+            stage.show();
+        }
     }
 
     private void checkExistingSignatureValidityAndSign() {
@@ -199,6 +222,7 @@ public class SigningDialogController implements SuppressedFocusController, Visua
     }
 
     public void sign() {
+        setActiveStep(3);
         var signingKey = gui.getActiveSigningKey();
         if (signingKey == null) {
             autogram.pickSigningKeyAndThen(key -> {
@@ -250,6 +274,7 @@ public class SigningDialogController implements SuppressedFocusController, Visua
     public void onSignatureCheckCompleted(Reports reports) {
         signatureCheckReports = reports;
         signatureCheckCompleted = true;
+        setActiveStep(2);
         renderSignatures(reports, false, true);
 
         if (signaturesNotValidatedDialogController != null)
@@ -259,6 +284,7 @@ public class SigningDialogController implements SuppressedFocusController, Visua
     public void onSignatureValidationCompleted(Reports reports) {
         signatureValidationCompleted = true;
         signatureValidationReports = reports;
+        setActiveStep(2);
         renderSignatures(reports, true, SignatureValidator.getInstance().areTLsLoaded());
         if (signaturesController != null)
             signaturesController.onSignatureValidationCompleted(reports);
@@ -282,14 +308,6 @@ public class SigningDialogController implements SuppressedFocusController, Visua
 
         signaturesTable.getChildren().add(
                 createSignatureTableRows(reports, isValidated, e -> onShowSignaturesButtonPressed(null), 3));
-
-        var stage = (Stage) mainButton.getScene().getWindow();
-        stage.sizeToScene();
-
-        // Magic code to make the window resize to the correct size
-        signaturesTable.setManaged(true);
-        signaturesTable.setVisible(true);
-        stage.sizeToScene();
     }
 
     public void refreshSigningKey() {
@@ -314,6 +332,11 @@ public class SigningDialogController implements SuppressedFocusController, Visua
     }
 
     public void close() {
+        if (mainMenuController != null) {
+            mainMenuController.showDropZone();
+            return;
+        }
+
         var window = mainButton.getScene().getRoot().getScene().getWindow();
         if (window instanceof Stage) {
             ((Stage) window).close();
@@ -327,9 +350,26 @@ public class SigningDialogController implements SuppressedFocusController, Visua
     }
 
     public void disableSigning() {
+        setActiveStep(3);
         mainButton.setText("Prebieha podpisovanie…");
         mainButton.setDisable(true);
         changeKeyButton.setDisable(true);
+    }
+
+    private void setActiveStep(int stepNumber) {
+        if (stepPreviewLabel == null || stepSignaturesLabel == null || stepSigningLabel == null) {
+            return;
+        }
+
+        var stepLabels = java.util.List.of(stepPreviewLabel, stepSignaturesLabel, stepSigningLabel);
+        stepLabels.forEach(label -> label.getStyleClass().remove("autogram-signing-step--active"));
+
+        if (stepNumber >= 1 && stepNumber <= stepLabels.size()) {
+            var activeLabel = stepLabels.get(stepNumber - 1);
+            if (!activeLabel.getStyleClass().contains("autogram-signing-step--active")) {
+                activeLabel.getStyleClass().add("autogram-signing-step--active");
+            }
+        }
     }
 
     public void showPlainTextVisualization(String text) {

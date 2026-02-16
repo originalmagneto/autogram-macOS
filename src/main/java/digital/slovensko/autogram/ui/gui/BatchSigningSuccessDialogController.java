@@ -52,7 +52,9 @@ public class BatchSigningSuccessDialogController implements SuppressedFocusContr
     }
 
     public void onShowFiles(ActionEvent ignored) {
-        mainBox.getScene().getWindow().sizeToScene();
+        if (mainBox.getParent() != null) {
+            mainBox.getParent().requestLayout();
+        }
     }
 
     @Override

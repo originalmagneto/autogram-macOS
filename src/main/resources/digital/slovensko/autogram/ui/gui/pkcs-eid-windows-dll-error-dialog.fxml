@@ -8,8 +8,8 @@
 
 <VBox xmlns="http://javafx.com/javafx"
       xmlns:fx="http://javafx.com/fxml"
-      prefWidth="450" minWidth="450"
-      fx:id="mainBox">
+      fx:id="mainBox"
+      styleClass="autogram-dialog-content,autogram-dialog-content--default">
 
     <VBox styleClass="autogram-error-summary">
         <TextFlow styleClass="autogram-error-summary__title">

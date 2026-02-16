@@ -13,15 +13,18 @@ import javafx.scene.image.Image;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 
+import java.io.IOException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.prefs.Preferences;
 
 public class GUIApp extends Application {
     private final ScheduledExecutorService scheduledExecutorService = Executors.newScheduledThreadPool(1);
     private final ExecutorService cachedExecutorService = Executors.newFixedThreadPool(8);
     private MainMenuController mainMenuController;
+    private volatile Boolean macDarkThemeActive;
 
     @Override
     public void start(Stage windowStage) throws Exception {
@@ -33,17 +36,7 @@ public class GUIApp extends Application {
             Platform.setImplicitExit(false);
 
             var osName = System.getProperty("os.name", "");
-            var dark = false;
-            if (osName.startsWith("Mac")) {
-                var interfaceStyle = System.getenv("AppleInterfaceStyle");
-                dark = interfaceStyle != null && interfaceStyle.equalsIgnoreCase("Dark");
-            }
-
-            if (dark) {
-                setUserAgentStylesheet(getClass().getResource("macos-native-dark.css").toExternalForm());
-            } else {
-                setUserAgentStylesheet(getClass().getResource("macos-native.css").toExternalForm());
-            }
+            applyMacThemeIfChanged();
             var titleString = "Autogram";
 
             var gui = new GUI(getHostServices(), userSettings, scheduledExecutorService, cachedExecutorService);
@@ -61,6 +54,7 @@ public class GUIApp extends Application {
             if (osName.startsWith("Mac")) {
                 setupMacOpenHandler();
                 setupMacHandlers(autogram, userSettings);
+                scheduledExecutorService.scheduleAtFixedRate(this::applyMacThemeIfChanged, 5, 5, TimeUnit.SECONDS);
             }
 
             if (!params.isStandaloneMode())
@@ -213,6 +207,52 @@ public class GUIApp extends Application {
         stage.show();
     }
 
+    private void applyMacThemeIfChanged() {
+        boolean dark = isMacDarkMode();
+        if (macDarkThemeActive != null && macDarkThemeActive == dark) {
+            return;
+        }
+        macDarkThemeActive = dark;
+
+        var stylesheet = dark ? "macos-native-dark.css" : "macos-native.css";
+        var stylesheetUrl = getClass().getResource(stylesheet).toExternalForm();
+        Platform.runLater(() -> setUserAgentStylesheet(stylesheetUrl));
+    }
+
+    private boolean isMacDarkMode() {
+        var osName = System.getProperty("os.name", "");
+        if (!osName.startsWith("Mac")) {
+            return false;
+        }
+
+        Process process = null;
+        try {
+            process = new ProcessBuilder("defaults", "read", "-g", "AppleInterfaceStyle")
+                    .redirectErrorStream(true)
+                    .start();
+            if (!process.waitFor(800, TimeUnit.MILLISECONDS)) {
+                process.destroyForcibly();
+                return false;
+            }
+
+            var style = new String(process.getInputStream().readAllBytes()).trim();
+            if (!style.isBlank()) {
+                return style.equalsIgnoreCase("Dark");
+            }
+        } catch (IOException | InterruptedException ignored) {
+            if (Thread.currentThread().isInterrupted()) {
+                Thread.currentThread().interrupt();
+            }
+        } finally {
+            if (process != null) {
+                process.destroy();
+            }
+        }
+
+        var interfaceStyle = System.getenv("AppleInterfaceStyle");
+        return interfaceStyle != null && interfaceStyle.equalsIgnoreCase("Dark");
+    }
+
     private void loadWindowState(Stage stage) {
         Preferences prefs = Preferences.userNodeForPackage(GUIApp.class);
         double x = prefs.getDouble("window.x", -1);
@@ -243,9 +283,11 @@ public class GUIApp extends Application {
 
     @Override
     public void stop() throws Exception {
+        scheduledExecutorService.shutdown();
         if (!scheduledExecutorService.awaitTermination(2, java.util.concurrent.TimeUnit.SECONDS))
             scheduledExecutorService.shutdownNow();
 
+        cachedExecutorService.shutdown();
         if (!cachedExecutorService.awaitTermination(2, java.util.concurrent.TimeUnit.SECONDS))
             cachedExecutorService.shutdownNow();
     }

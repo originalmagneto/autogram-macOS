@@ -30,7 +30,7 @@ public class GUIValidationUtils {
 
     public static Node createWarningText(String message) {
         var warningText = new Text(message);
-        warningText.getStyleClass().add("autogram-heading-s");
+        warningText.getStyleClass().addAll("autogram-heading-s", "autogram-body");
         var warningTextFlow = new TextFlow(warningText);
         warningTextFlow.getStyleClass().add("autogram-warning-textflow");
 
@@ -42,7 +42,9 @@ public class GUIValidationUtils {
         var table = new GridPane();
         table.getStyleClass().add("autogram-signatures-table");
 
-        var headerText = new TextFlow(new Text("Podpisy na dokumente"));
+        var headerLabel = new Text("Podpisy na dokumente");
+        headerLabel.getStyleClass().add("autogram-heading-s");
+        var headerText = new TextFlow(headerLabel);
         headerText.getStyleClass().addAll("autogram-heading-s", "autogram-signatures-table-cell--left");
         var headerLink = new TextFlow(createSignatureTableLink(callback));
         table.addRow(0, headerText, headerLink);
@@ -56,19 +58,25 @@ public class GUIValidationUtils {
         if (totalSignatures > maxRows)
             signatures = signatures.subList(0, maxRows - 1);
 
+        var currentRow = 1;
         for (var signatureId : signatures) {
-            var subject = new HBox(new TextFlow(new Text(reports.getSimpleReport().getSignedBy(signatureId))));
-            subject.getStyleClass().add("autogram-signatures-table-cell--left");
+            var subjectText = new Text(reports.getSimpleReport().getSignedBy(signatureId));
+            subjectText.getStyleClass().add("autogram-body");
+            var subject = new HBox(new TextFlow(subjectText));
+            subject.getStyleClass().addAll("autogram-signatures-table-cell--left", "autogram-signatures-table-row");
             var type = new HBox(
                     SignatureBadgeFactory.createCombinedBadgeFromQualification(
                             isValidated ? reports.getDetailedReport().getSignatureQualification(signatureId) : null,
                             reports, signatureId, 0));
-            table.addRow(table.getChildren().size(), subject, type);
+            type.getStyleClass().add("autogram-signatures-table-row");
+            table.addRow(currentRow, subject, type);
+            currentRow++;
         }
 
         if (totalSignatures > maxRows) {
             var label = new Text(
                     "Na dokumente " + createRemainingSignaturesCountString(totalSignatures - maxRows + 1) + ". ");
+            label.getStyleClass().add("autogram-body");
 
             var button = new Button("Zobraziť všetky podpisy");
             button.getStyleClass().addAll("autogram-link");
@@ -77,7 +85,8 @@ public class GUIValidationUtils {
 
             var flow = new TextFlow(label, button);
             flow.getStyleClass().addAll("autogram-body", "autogram-font-weight-bold");
-            table.add(flow, 0, maxRows * 2 - 1, 2, 1);
+            flow.getStyleClass().add("autogram-signatures-table-row");
+            table.add(flow, 0, currentRow, 2, 1);
         }
 
         return table;
@@ -120,7 +129,9 @@ public class GUIValidationUtils {
         var signatureForm = simple.getSignatureFormat(signatureId).getSignatureForm();
         var timestamps = simple.getSignatureTimestamps(signatureId);
 
-        var nameFlow = new TextFlow(new Text(name));
+        var nameText = new Text(name);
+        nameText.getStyleClass().add("autogram-body-strong");
+        var nameFlow = new TextFlow(nameText);
         nameFlow.getStyleClass().add("autogram-summary-header__title");
         var errors = reports.getSimpleReport().getAdESValidationErrors(signatureId);
         var isRevocationValidated = true;
@@ -259,8 +270,10 @@ public class GUIValidationUtils {
 
         for (var timestamp : timestamps) {
             var isFailed = timestamp.getIndication().equals(Indication.FAILED);
-            var subject = new TextFlow(new Text(getPrettyDN(
-                    diagnostic.getCertificateDN(diagnostic.getTimestampSigningCertificateId(timestamp.getId())))));
+            var subjectText = new Text(getPrettyDN(
+                    diagnostic.getCertificateDN(diagnostic.getTimestampSigningCertificateId(timestamp.getId()))));
+            subjectText.getStyleClass().add("autogram-body");
+            var subject = new TextFlow(subjectText);
             var timestampQualification = isValidated ? simple.getTimestampQualification(timestamp.getId()) : null;
             var qualificationBadge = new TextFlow(
                     SignatureBadgeFactory.createBadgeFromTSQualification(isFailed, timestampQualification));

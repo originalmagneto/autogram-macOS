@@ -2,263 +2,267 @@
 
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
-<?import javafx.scene.text.*?>
-<?import javafx.scene.shape.*?>
+<?import javafx.scene.shape.SVGPath?>
 
 <VBox xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml" fx:id="mainBox"
       styleClass="autogram-settings-window">
-    <!-- Top Navigation Tabs -->
-    <HBox styleClass="autogram-settings-tabs-container" alignment="CENTER" spacing="0" minWidth="600">
-        <HBox styleClass="autogram-settings-tabs" alignment="CENTER" minWidth="500">
-            <Button fx:id="signingNavButton" text="Podpisovanie" onAction="#showSigningSettings"
-                    styleClass="autogram-tab-item,autogram-tab-item--active" minWidth="-Infinity">
-                <graphic>
-                    <Region styleClass="autogram-tab-icon,icon-signature" />
-                </graphic>
-            </Button>
-            <Button fx:id="validationNavButton" text="Overovanie" onAction="#showValidationSettings"
-                    styleClass="autogram-tab-item" minWidth="-Infinity">
-                <graphic>
-                    <Region styleClass="autogram-tab-icon,icon-check-badge" />
-                </graphic>
-            </Button>
-            <Button fx:id="securityNavButton" text="Bezpečnosť" onAction="#showSecuritySettings"
-                    styleClass="autogram-tab-item" minWidth="-Infinity">
-                <graphic>
-                    <Region styleClass="autogram-tab-icon,icon-shield-check" />
-                </graphic>
-            </Button>
-            <Button fx:id="otherNavButton" text="Iné" onAction="#showOtherSettings"
-                    styleClass="autogram-tab-item" minWidth="-Infinity">
-                <graphic>
-                    <Region styleClass="autogram-tab-icon,icon-adjustments" />
-                </graphic>
-            </Button>
-        </HBox>
+
+    <HBox styleClass="autogram-settings-shell" VBox.vgrow="ALWAYS">
+        <VBox styleClass="autogram-settings-nav-pane" minWidth="220" maxWidth="260">
+            <VBox spacing="4" styleClass="autogram-settings-nav-header">
+                <Label text="Nastavenia" styleClass="autogram-heading-l" />
+                <Label text="Prispôsobte podpisovanie, overovanie a bezpečnosť." styleClass="autogram-body-s" wrapText="true" />
+            </VBox>
+
+            <VBox styleClass="autogram-settings-nav-list" spacing="6" VBox.vgrow="ALWAYS">
+                <Button fx:id="signingNavButton" text="Podpisovanie" onAction="#showSigningSettings"
+                        styleClass="autogram-settings-nav-item,autogram-tab-item--active">
+                    <graphic>
+                        <SVGPath styleClass="autogram-tab-icon-svg"
+                                 content="M3 13.5v3h3l7.2-7.2-3-3L3 13.5zm12.8-7.8a.8.8 0 000-1.1L14.4 3.2a.8.8 0 00-1.1 0l-1.2 1.2 3 3 1.7-1.7z" />
+                    </graphic>
+                </Button>
+                <Button fx:id="validationNavButton" text="Overovanie" onAction="#showValidationSettings"
+                        styleClass="autogram-settings-nav-item">
+                    <graphic>
+                        <SVGPath styleClass="autogram-tab-icon-svg"
+                                 content="M6.8 15.8L2.9 12l1.4-1.4 2.5 2.4 6-6L14.2 8l-7.4 7.8z" />
+                    </graphic>
+                </Button>
+                <Button fx:id="securityNavButton" text="Bezpečnosť" onAction="#showSecuritySettings"
+                        styleClass="autogram-settings-nav-item">
+                    <graphic>
+                        <SVGPath styleClass="autogram-tab-icon-svg"
+                                 content="M8 1l5 2v4.5c0 3.3-2.2 6-5 6.8-2.8-.8-5-3.5-5-6.8V3l5-2zM6.4 7.8l-.9.9 2 2 3.6-3.6-.9-.9-2.7 2.7-1.1-1.1z" />
+                    </graphic>
+                </Button>
+                <Button fx:id="otherNavButton" text="Iné" onAction="#showOtherSettings"
+                        styleClass="autogram-settings-nav-item">
+                    <graphic>
+                        <SVGPath styleClass="autogram-tab-icon-svg"
+                                 content="M2 4h12v1.5H2V4zm3 3.5h9V9H5V7.5zM2 11h12v1.5H2V11z" />
+                    </graphic>
+                </Button>
+            </VBox>
+        </VBox>
+
+        <StackPane fx:id="settingsContentArea" HBox.hgrow="ALWAYS" styleClass="autogram-settings-content-wrapper">
+            <!-- Podpisovanie -->
+            <ScrollPane fx:id="signingSettingsContent" fitToWidth="true" styleClass="autogram-settings-scroll-pane">
+                <VBox styleClass="autogram-settings-container" alignment="TOP_CENTER">
+                    <VBox maxWidth="860">
+                        <Label text="Podpisovanie" styleClass="autogram-settings-title" />
+                        <Label text="Predvolené nastavenia typu a spôsobu podpisovania Autogramu." styleClass="autogram-settings-subtitle" wrapText="true" />
+
+                        <VBox styleClass="autogram-settings-section">
+                            <HBox styleClass="autogram-settings-row">
+                                <VBox styleClass="left" HBox.hgrow="ALWAYS">
+                                    <Label text="Predvolené úložisko certifikátov" styleClass="autogram-heading-s" />
+                                    <Label text="Zvolené úložisko certifikátov sa automaticky použije." styleClass="autogram-description" wrapText="true" />
+                                </VBox>
+                                <ChoiceBox fx:id="driverChoiceBox" styleClass="autogram-choicebox" />
+                            </HBox>
+
+                            <Separator />
+
+                            <HBox styleClass="autogram-settings-row">
+                                <VBox styleClass="left" HBox.hgrow="ALWAYS">
+                                    <Label text="Typ podpisu pre PDF" styleClass="autogram-heading-s" />
+                                    <Label text="PAdES je všeobecne akceptovaný a najjednoduchší na používanie." styleClass="autogram-description" wrapText="true" />
+                                </VBox>
+                                <ChoiceBox fx:id="signatureLevelChoiceBoxBox" styleClass="autogram-choicebox" />
+                            </HBox>
+
+                            <Separator />
+
+                            <HBox styleClass="autogram-settings-row">
+                                <VBox styleClass="left" HBox.hgrow="ALWAYS">
+                                    <Label text="Pridávanie časových pečiatok" styleClass="autogram-heading-s" />
+                                    <Label text="Zvyšuje dôveryhodnosť podpisu." styleClass="autogram-description" wrapText="true" />
+                                </VBox>
+                                <HBox fx:id="tsaEnabledRadios" styleClass="autogram-toggle-group" />
+                            </HBox>
+
+                            <Separator />
+
+                            <HBox styleClass="autogram-settings-row">
+                                <VBox styleClass="left" HBox.hgrow="ALWAYS">
+                                    <Label text="Zdroje časových pečiatok" styleClass="autogram-heading-s" />
+                                    <Label text="Preddefinovaní alebo vlastní poskytovatelia." styleClass="autogram-description" wrapText="true" />
+                                </VBox>
+                                <ChoiceBox fx:id="tsaChoiceBox" styleClass="autogram-choicebox" />
+                            </HBox>
+
+                            <Separator />
+
+                            <HBox styleClass="autogram-settings-row">
+                                <VBox styleClass="left" HBox.hgrow="ALWAYS">
+                                    <Label text="Vlastné adresy TSP serverov" styleClass="autogram-heading-s" />
+                                    <Label text="URL adresy serverov, oddelené čiarkou." styleClass="autogram-description" wrapText="true" />
+                                </VBox>
+                                <TextField fx:id="customTsaServerTextField" styleClass="autogram-input" />
+                            </HBox>
+
+                            <Separator />
+
+                            <HBox styleClass="autogram-settings-row">
+                                <VBox styleClass="left" HBox.hgrow="ALWAYS">
+                                    <Label text="Hromadné podpisovanie" styleClass="autogram-heading-s" />
+                                    <Label text="Bez nutnosti opakovane zadávať PIN." styleClass="autogram-description" wrapText="true" />
+                                </VBox>
+                                <HBox fx:id="bulkEnabledRadios" styleClass="autogram-toggle-group" />
+                            </HBox>
+
+                            <Separator />
+
+                            <HBox styleClass="autogram-settings-row">
+                                <VBox styleClass="left" HBox.hgrow="ALWAYS">
+                                    <Label text="Štandard EN 319 132" styleClass="autogram-heading-s" />
+                                    <Label text="Použiť novšiu verziu štandardu pre XAdES/CAdES." styleClass="autogram-description" wrapText="true" />
+                                </VBox>
+                                <HBox fx:id="en319132Radios" styleClass="autogram-toggle-group" />
+                            </HBox>
+
+                            <Separator />
+
+                            <HBox styleClass="autogram-settings-row">
+                                <VBox styleClass="left" HBox.hgrow="ALWAYS">
+                                    <Label text="Čisté XML podpisy" styleClass="autogram-heading-s" />
+                                    <Label text="Vytvárať XAdES bez obalujúceho elementu ASiC." styleClass="autogram-description" wrapText="true" />
+                                </VBox>
+                                <HBox fx:id="plainXmlEnabledRadios" styleClass="autogram-toggle-group" />
+                            </HBox>
+                        </VBox>
+                    </VBox>
+                </VBox>
+            </ScrollPane>
+
+            <!-- Overovanie -->
+            <ScrollPane fx:id="validationSettingsContent" fitToWidth="true" visible="false" managed="false" styleClass="autogram-settings-scroll-pane">
+                <VBox styleClass="autogram-settings-container" alignment="TOP_CENTER">
+                    <VBox maxWidth="860">
+                        <Label text="Overovanie podpisov" styleClass="autogram-settings-title" />
+                        <Label text="Zoznam krajín, pre ktoré sa overuje platnosť podpisov." styleClass="autogram-settings-subtitle" wrapText="true" />
+
+                        <VBox styleClass="autogram-settings-section">
+                            <VBox fx:id="trustedCountriesList" styleClass="autogram-country-list" spacing="2" />
+                        </VBox>
+                    </VBox>
+                </VBox>
+            </ScrollPane>
+
+            <!-- Bezpečnosť -->
+            <ScrollPane fx:id="securitySettingsContent" fitToWidth="true" visible="false" managed="false" styleClass="autogram-settings-scroll-pane">
+                <VBox styleClass="autogram-settings-container" alignment="TOP_CENTER">
+                    <VBox maxWidth="860">
+                        <Label text="Bezpečnosť" styleClass="autogram-settings-title" />
+                        <Label text="Kontroly správnosti dokumentu a podpisov." styleClass="autogram-settings-subtitle" wrapText="true" />
+
+                        <VBox styleClass="autogram-settings-section">
+                            <HBox styleClass="autogram-settings-row">
+                                <VBox styleClass="left" HBox.hgrow="ALWAYS">
+                                    <Label text="Kontrola platnosti podpisov" styleClass="autogram-heading-s" />
+                                    <Label text="Upozornenie na neplatné podpisy na dokumente." styleClass="autogram-description" wrapText="true" />
+                                </VBox>
+                                <HBox fx:id="signatureValidationRadios" styleClass="autogram-toggle-group" />
+                            </HBox>
+
+                            <Separator />
+
+                            <HBox styleClass="autogram-settings-row">
+                                <VBox styleClass="left" HBox.hgrow="ALWAYS">
+                                    <Label text="Kontrola súladu s PDF/A" styleClass="autogram-heading-s" />
+                                    <Label text="Vyžadované niektorými úradmi." styleClass="autogram-description" wrapText="true" />
+                                </VBox>
+                                <HBox fx:id="checkPDFAComplianceRadios" styleClass="autogram-toggle-group" />
+                            </HBox>
+
+                            <Separator />
+
+                            <HBox styleClass="autogram-settings-row">
+                                <VBox styleClass="left" HBox.hgrow="ALWAYS">
+                                    <Label text="Exspirované certifikáty" styleClass="autogram-heading-s" />
+                                    <Label text="Povoliť podpisovanie exspirovanými certifikátmi." styleClass="autogram-description" wrapText="true" />
+                                </VBox>
+                                <HBox fx:id="expiredCertsRadios" styleClass="autogram-toggle-group" />
+                            </HBox>
+
+                            <Separator />
+
+                            <HBox styleClass="autogram-settings-row">
+                                <VBox styleClass="left" HBox.hgrow="ALWAYS">
+                                    <Label text="Kontrola zobrazenia dokumentu" styleClass="autogram-heading-s" />
+                                    <Label text="Overenie, či bol dokument správne zobrazený pred podpisom." styleClass="autogram-description" wrapText="true" />
+                                </VBox>
+                                <HBox fx:id="correctDocumentDisplayRadios" styleClass="autogram-toggle-group" />
+                            </HBox>
+
+                            <Separator />
+
+                            <HBox styleClass="autogram-settings-row">
+                                <VBox styleClass="left" HBox.hgrow="ALWAYS">
+                                    <Label text="Timeout sedenia tokenu (s)" styleClass="autogram-heading-s" />
+                                    <Label text="Ako dlho zostane token otvorený (v sekundách)." styleClass="autogram-description" wrapText="true" />
+                                </VBox>
+                                <TextField fx:id="tokenSessionTimeoutTextField" styleClass="autogram-input" />
+                            </HBox>
+                        </VBox>
+                    </VBox>
+                </VBox>
+            </ScrollPane>
+
+            <!-- Iné -->
+            <ScrollPane fx:id="otherSettingsContent" fitToWidth="true" visible="false" managed="false" styleClass="autogram-settings-scroll-pane">
+                <VBox styleClass="autogram-settings-container" alignment="TOP_CENTER">
+                    <VBox maxWidth="860">
+                        <Label text="Iné nastavenia" styleClass="autogram-settings-title" />
+                        <Label text="Ďalšie špeciálne nastavenia Autogramu." styleClass="autogram-settings-subtitle" wrapText="true" />
+
+                        <VBox styleClass="autogram-settings-section">
+                            <HBox styleClass="autogram-settings-row">
+                                <VBox styleClass="left" HBox.hgrow="ALWAYS">
+                                    <Label text="Autogram API" styleClass="autogram-heading-s" />
+                                    <Label text="Umožňuje podpisovanie z iných aplikácií." styleClass="autogram-description" wrapText="true" />
+                                </VBox>
+                                <HBox fx:id="localServerEnabledRadios" styleClass="autogram-toggle-group" />
+                            </HBox>
+
+                            <Separator />
+
+                            <HBox styleClass="autogram-settings-row">
+                                <VBox styleClass="left" HBox.hgrow="ALWAYS">
+                                    <Label text="Rozlíšenie náhľadu PDF" styleClass="autogram-heading-s" />
+                                    <Label text="Vyššie DPI spomaľuje zobrazenie." styleClass="autogram-description" wrapText="true" />
+                                </VBox>
+                                <ChoiceBox fx:id="pdfDpiChoiceBox" styleClass="autogram-choicebox" />
+                            </HBox>
+
+                            <Separator />
+
+                            <HBox styleClass="autogram-settings-row">
+                                <VBox styleClass="left" HBox.hgrow="ALWAYS">
+                                    <Label text="Cesta k PKCS11 ovládaču" styleClass="autogram-heading-s" />
+                                    <Label text="Externý ovládač pre kartu." styleClass="autogram-description" wrapText="true" />
+                                </VBox>
+                                <TextField fx:id="customPKCS11DriverPathTextField" styleClass="autogram-input" />
+                            </HBox>
+
+                            <Separator />
+
+                            <HBox styleClass="autogram-settings-row">
+                                <VBox styleClass="left" HBox.hgrow="ALWAYS">
+                                    <Label text="Vlastná cesta k úložisku (JKS)" styleClass="autogram-heading-s" />
+                                    <Label text="Cesta k súboru Java KeyStore (.jks)." styleClass="autogram-description" wrapText="true" />
+                                </VBox>
+                                <TextField fx:id="customKeystorePathTextField" styleClass="autogram-input" />
+                            </HBox>
+                        </VBox>
+                    </VBox>
+                </VBox>
+            </ScrollPane>
+        </StackPane>
     </HBox>
 
-    <Separator />
-
-    <!-- Content Area -->
-    <StackPane fx:id="settingsContentArea" VBox.vgrow="ALWAYS" styleClass="autogram-settings-content-wrapper">
-        <!-- Podpisovanie -->
-        <ScrollPane fx:id="signingSettingsContent" fitToWidth="true" styleClass="autogram-settings-scroll-pane">
-            <VBox styleClass="autogram-settings-container" alignment="TOP_CENTER">
-                <VBox maxWidth="600">
-                    <Label text="Podpisovanie" styleClass="autogram-settings-title" />
-                    <Label text="Predvolené nastavenia typu a spôsobu podpisovania Autogramu." styleClass="autogram-settings-subtitle" wrapText="true" />
-                    
-                    <VBox styleClass="autogram-settings-section">
-                        <HBox styleClass="autogram-settings-row">
-                            <VBox styleClass="left" HBox.hgrow="ALWAYS">
-                                <Label text="Predvolené úložisko certifikátov" styleClass="autogram-heading-s" />
-                                <Label text="Zvolené úložisko certifikátov sa automaticky použije." styleClass="autogram-description" wrapText="true" />
-                            </VBox>
-                            <ChoiceBox fx:id="driverChoiceBox" styleClass="autogram-choicebox" />
-                        </HBox>
-                        
-                        <Separator />
-                        
-                        <HBox styleClass="autogram-settings-row">
-                            <VBox styleClass="left" HBox.hgrow="ALWAYS">
-                                <Label text="Typ podpisu pre PDF" styleClass="autogram-heading-s" />
-                                <Label text="PAdES je všeobecne akceptovaný a najjednoduchší na používanie." styleClass="autogram-description" wrapText="true" />
-                            </VBox>
-                            <ChoiceBox fx:id="signatureLevelChoiceBoxBox" styleClass="autogram-choicebox" />
-                        </HBox>
-
-                        <Separator />
-
-                        <HBox styleClass="autogram-settings-row">
-                            <VBox styleClass="left" HBox.hgrow="ALWAYS">
-                                <Label text="Pridávanie časových pečiatok" styleClass="autogram-heading-s" />
-                                <Label text="Zvyšuje dôveryhodnosť podpisu." styleClass="autogram-description" wrapText="true" />
-                            </VBox>
-                            <HBox fx:id="tsaEnabledRadios" styleClass="autogram-toggle-group" />
-                        </HBox>
-
-                        <Separator />
-
-                        <HBox styleClass="autogram-settings-row">
-                            <VBox styleClass="left" HBox.hgrow="ALWAYS">
-                                <Label text="Zdroje časových pečiatok" styleClass="autogram-heading-s" />
-                                <Label text="Preddefinovaní alebo vlastní poskytovatelia." styleClass="autogram-description" wrapText="true" />
-                            </VBox>
-                            <ChoiceBox fx:id="tsaChoiceBox" styleClass="autogram-choicebox" />
-                        </HBox>
-
-                        <Separator />
-
-                        <HBox styleClass="autogram-settings-row">
-                            <VBox styleClass="left" HBox.hgrow="ALWAYS">
-                                <Label text="Vlastné adresy TSP serverov" styleClass="autogram-heading-s" />
-                                <Label text="URL adresy serverov, oddelené čiarkou." styleClass="autogram-description" wrapText="true" />
-                            </VBox>
-                            <TextField fx:id="customTsaServerTextField" styleClass="autogram-input" maxWidth="200" />
-                        </HBox>
-
-                        <Separator />
-
-                        <HBox styleClass="autogram-settings-row">
-                            <VBox styleClass="left" HBox.hgrow="ALWAYS">
-                                <Label text="Hromadné podpisovanie" styleClass="autogram-heading-s" />
-                                <Label text="Bez nutnosti opakovane zadávať PIN." styleClass="autogram-description" wrapText="true" />
-                            </VBox>
-                            <HBox fx:id="bulkEnabledRadios" styleClass="autogram-toggle-group" />
-                        </HBox>
-
-                        <Separator />
-
-                        <HBox styleClass="autogram-settings-row">
-                            <VBox styleClass="left" HBox.hgrow="ALWAYS">
-                                <Label text="Štandard EN 319 132" styleClass="autogram-heading-s" />
-                                <Label text="Použiť novšiu verziu štandardu pre XAdES/CAdES." styleClass="autogram-description" wrapText="true" />
-                            </VBox>
-                            <HBox fx:id="en319132Radios" styleClass="autogram-toggle-group" />
-                        </HBox>
-
-                        <Separator />
-
-                        <HBox styleClass="autogram-settings-row">
-                            <VBox styleClass="left" HBox.hgrow="ALWAYS">
-                                <Label text="Čisté XML podpisy" styleClass="autogram-heading-s" />
-                                <Label text="Vytvárať XAdES bez obalujúceho elementu ASiC." styleClass="autogram-description" wrapText="true" />
-                            </VBox>
-                            <HBox fx:id="plainXmlEnabledRadios" styleClass="autogram-toggle-group" />
-                        </HBox>
-                    </VBox>
-                </VBox>
-            </VBox>
-        </ScrollPane>
-
-        <!-- Overovanie -->
-        <ScrollPane fx:id="validationSettingsContent" fitToWidth="true" visible="false" styleClass="autogram-settings-scroll-pane">
-            <VBox styleClass="autogram-settings-container" alignment="TOP_CENTER">
-                <VBox maxWidth="600">
-                    <Label text="Overovanie podpisov" styleClass="autogram-settings-title" />
-                    <Label text="Zoznam krajín, pre ktoré sa overuje platnosť podpisov." styleClass="autogram-settings-subtitle" wrapText="true" />
-                    
-                    <VBox styleClass="autogram-settings-section">
-                        <VBox fx:id="trustedCountriesList" styleClass="autogram-country-list" spacing="2" />
-                    </VBox>
-                </VBox>
-            </VBox>
-        </ScrollPane>
-
-        <!-- Bezpečnosť -->
-        <ScrollPane fx:id="securitySettingsContent" fitToWidth="true" visible="false" styleClass="autogram-settings-scroll-pane">
-            <VBox styleClass="autogram-settings-container" alignment="TOP_CENTER">
-                <VBox maxWidth="600">
-                    <Label text="Bezpečnosť" styleClass="autogram-settings-title" />
-                    <Label text="Kontroly správnosti dokumentu a podpisov." styleClass="autogram-settings-subtitle" wrapText="true" />
-                    
-                    <VBox styleClass="autogram-settings-section">
-                        <HBox styleClass="autogram-settings-row">
-                            <VBox styleClass="left" HBox.hgrow="ALWAYS">
-                                <Label text="Kontrola platnosti podpisov" styleClass="autogram-heading-s" />
-                                <Label text="Upozornenie na neplatné podpisy na dokumente." styleClass="autogram-description" wrapText="true" />
-                            </VBox>
-                            <HBox fx:id="signatureValidationRadios" styleClass="autogram-toggle-group" />
-                        </HBox>
-
-                        <Separator />
-
-                        <HBox styleClass="autogram-settings-row">
-                            <VBox styleClass="left" HBox.hgrow="ALWAYS">
-                                <Label text="Kontrola súladu s PDF/A" styleClass="autogram-heading-s" />
-                                <Label text="Vyžadované niektorými úradmi." styleClass="autogram-description" wrapText="true" />
-                            </VBox>
-                            <HBox fx:id="checkPDFAComplianceRadios" styleClass="autogram-toggle-group" />
-                        </HBox>
-
-                        <Separator />
-
-                        <HBox styleClass="autogram-settings-row">
-                            <VBox styleClass="left" HBox.hgrow="ALWAYS">
-                                <Label text="Exspirované certifikáty" styleClass="autogram-heading-s" />
-                                <Label text="Povoliť podpisovanie exspirovanými certifikátmi." styleClass="autogram-description" wrapText="true" />
-                            </VBox>
-                            <HBox fx:id="expiredCertsRadios" styleClass="autogram-toggle-group" />
-                        </HBox>
-
-                        <Separator />
-
-                        <HBox styleClass="autogram-settings-row">
-                            <VBox styleClass="left" HBox.hgrow="ALWAYS">
-                                <Label text="Kontrola zobrazenia dokumentu" styleClass="autogram-heading-s" />
-                                <Label text="Overenie, či bol dokument správne zobrazený pred podpisom." styleClass="autogram-description" wrapText="true" />
-                            </VBox>
-                            <HBox fx:id="correctDocumentDisplayRadios" styleClass="autogram-toggle-group" />
-                        </HBox>
-
-                        <Separator />
-
-                        <HBox styleClass="autogram-settings-row">
-                            <VBox styleClass="left" HBox.hgrow="ALWAYS">
-                                <Label text="Timeout sedenia tokenu (s)" styleClass="autogram-heading-s" />
-                                <Label text="Ako dlho zostane token otvorený (v sekundách)." styleClass="autogram-description" wrapText="true" />
-                            </VBox>
-                            <TextField fx:id="tokenSessionTimeoutTextField" styleClass="autogram-input" maxWidth="100" />
-                        </HBox>
-                    </VBox>
-                </VBox>
-            </VBox>
-        </ScrollPane>
-
-        <!-- Iné -->
-        <ScrollPane fx:id="otherSettingsContent" fitToWidth="true" visible="false" styleClass="autogram-settings-scroll-pane">
-            <VBox styleClass="autogram-settings-container" alignment="TOP_CENTER">
-                <VBox maxWidth="600">
-                    <Label text="Iné nastavenia" styleClass="autogram-settings-title" />
-                    <Label text="Ďalšie špeciálne nastavenia Autogramu." styleClass="autogram-settings-subtitle" wrapText="true" />
-                    
-                    <VBox styleClass="autogram-settings-section">
-                        <HBox styleClass="autogram-settings-row">
-                            <VBox styleClass="left" HBox.hgrow="ALWAYS">
-                                <Label text="Autogram API" styleClass="autogram-heading-s" />
-                                <Label text="Umožňuje podpisovanie z iných aplikácií." styleClass="autogram-description" wrapText="true" />
-                            </VBox>
-                            <HBox fx:id="localServerEnabledRadios" styleClass="autogram-toggle-group" />
-                        </HBox>
-
-                        <Separator />
-
-                        <HBox styleClass="autogram-settings-row">
-                            <VBox styleClass="left" HBox.hgrow="ALWAYS">
-                                <Label text="Rozlíšenie náhľadu PDF" styleClass="autogram-heading-s" />
-                                <Label text="Vyššie DPI spomaľuje zobrazenie." styleClass="autogram-description" wrapText="true" />
-                            </VBox>
-                            <ChoiceBox fx:id="pdfDpiChoiceBox" styleClass="autogram-choicebox" />
-                        </HBox>
-
-                        <Separator />
-
-                        <HBox styleClass="autogram-settings-row">
-                            <VBox styleClass="left" HBox.hgrow="ALWAYS">
-                                <Label text="Cesta k PKCS11 ovládaču" styleClass="autogram-heading-s" />
-                                <Label text="Externý ovládač pre kartu." styleClass="autogram-description" wrapText="true" />
-                            </VBox>
-                            <TextField fx:id="customPKCS11DriverPathTextField" styleClass="autogram-input" maxWidth="400" />
-                        </HBox>
-
-                        <Separator />
-
-                        <HBox styleClass="autogram-settings-row">
-                            <VBox styleClass="left" HBox.hgrow="ALWAYS">
-                                <Label text="Vlastná cesta k úložisku (JKS)" styleClass="autogram-heading-s" />
-                                <Label text="Cesta k súboru Java KeyStore (.jks)." styleClass="autogram-description" wrapText="true" />
-                            </VBox>
-                            <TextField fx:id="customKeystorePathTextField" styleClass="autogram-input" maxWidth="400" />
-                        </HBox>
-                    </VBox>
-                </VBox>
-            </VBox>
-        </ScrollPane>
-    </StackPane>
-
-    <Separator />
-
-    <!-- Footer Actions -->
     <HBox styleClass="autogram-settings-footer" alignment="CENTER_RIGHT" spacing="12">
         <Button fx:id="resetButton" text="Resetovať" onAction="#onResetButtonAction"
                 styleClass="autogram-button,autogram-button--secondary" />

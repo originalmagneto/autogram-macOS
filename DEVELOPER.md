@@ -1,5 +1,63 @@
 # Info for developers
 
+## macOS update workflow (build + test + run)
+
+Po každej väčšej zmene na macOS použi jeden konzistentný krok:
+
+```bash
+./scripts/macos-update-check.sh
+```
+
+Skript urobí:
+- `mvn test -Psystem-jdk`
+- `mvn compile dependency:copy-dependencies -Psystem-jdk`
+- spustí desktop appku s potrebnými JVM flagmi pre macOS
+
+Ak zlyhá test alebo build, appka sa nespustí.
+
+## macOS UI smoke workflow
+
+Rýchly vizuálny smoke test po frontend zmenách:
+
+```bash
+./scripts/macos-ui-smoke.sh
+```
+
+Skript:
+- skompiluje appku (`compile + dependency:copy-dependencies`)
+- spustí targeted smoke testy (`VersionTests`, `SigningJobTests`, `FXMLSanityTests`, `MainMenuControllerOverlayFocusTests`, `PasswordControllerTests`)
+- vypíše checklist a spustí appku
+
+### Manual verification protocol (must-pass)
+
+1. Dark mode čitateľnosť:
+- v Nastaveniach sú texty v dropdownoch čitateľné v zatvorenom aj otvorenom stave
+- labely a pomocné texty nemajú čiernu farbu na tmavom pozadí
+
+2. Settings panel:
+- taby nemajú žiadne „štvorce“ pred textom
+- ikony tabov sú zobrazené a zarovnané
+- riadky sú kompaktne rozložené, bez zbytočného prázdneho priestoru
+
+3. Signing panel:
+- texty v sekcii „Podpisy na dokumente“ sú čitateľné
+- „Formát“ a „Časová pečiatka“ sú čitateľné v dark mode
+
+4. Modal sizing + alignment:
+- výber certifikátu nie je zbytočne veľký
+- PIN dialog je kompaktne centrovaný
+
+5. Keyboard workflow:
+- pri PIN dialógu je kurzor hneď v inpute
+- čísla sa dajú písať bez kliknutia myšou
+- `Esc` funguje ako cancel/close tam, kde je to bezpečné
+- `Tab` cyklí fokus v rámci aktívneho modálu
+
+6. Signing workflow layout:
+- po načítaní A4 PDF sa hlavné okno nesmie automaticky zväčšiť tak, že spodný action bar zmizne mimo obrazovky
+- warning modály (PDF/A, neoverené/neplatné podpisy) nesmú mať useknutý text ani nadbytočný prázdny priestor
+- krokový indikátor 1/2/3 v signing view sa má prepínať podľa stavu workflow
+
 # How to use FakeTokenDriver
 
 create empty file `fakeTokenDriver` in cwd - so in project root when developing, to enable "Fake token driver"

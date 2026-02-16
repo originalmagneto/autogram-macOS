@@ -6,15 +6,17 @@
 
 <VBox xmlns="http://javafx.com/javafx"
       xmlns:fx="http://javafx.com/fxml"
-      fx:id="mainBox" styleClass="autogram-dialog-content">
+      fx:id="mainBox" styleClass="autogram-dialog-content,autogram-dialog-content--compact" spacing="10">
 
-    <VBox fx:id="formGroup" styleClass="autogram-form-group" VBox.vgrow="ALWAYS">
+    <VBox fx:id="formGroup" styleClass="autogram-form-group" spacing="8">
         <TextFlow><Text styleClass="autogram-heading-m">Ktorým certifikátom chcete podpisovať?</Text></TextFlow>
         <TextFlow><Text fx:id="error" styleClass="autogram-error-message" managed="false" visible="false">Vyberte certifikát, ktorým budete podpisovať</Text></TextFlow>
         <VBox fx:id="radios" styleClass="autogram-radios"/>
     </VBox>
 
     <HBox styleClass="autogram-actions" alignment="CENTER_RIGHT">
+        <Button fx:id="cancelButton" styleClass="autogram-button,autogram-button--secondary" text="Zrušiť"
+                onAction="#onCancelButtonAction" />
         <Button styleClass="autogram-button" fx:id="mainButton" text="Podpísať" onAction="#onPickCertificateButtonAction" />
     </HBox>
 </VBox>

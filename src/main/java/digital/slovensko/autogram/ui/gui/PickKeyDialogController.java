@@ -23,6 +23,7 @@ public class PickKeyDialogController {
     private final List<DSSPrivateKeyEntry> keys;
     private final boolean expiredCertsEnabled;
     private Runnable onClose;
+    private Runnable onCancel;
 
     @FXML
     VBox formGroup;
@@ -43,6 +44,10 @@ public class PickKeyDialogController {
 
     public void setOnClose(Runnable onClose) {
         this.onClose = onClose;
+    }
+
+    public void setOnCancel(Runnable onCancel) {
+        this.onCancel = onCancel;
     }
 
     public void initialize() {
@@ -85,6 +90,18 @@ public class PickKeyDialogController {
             }
             var key = (DSSPrivateKeyEntry) toggleGroup.getSelectedToggle().getUserData();
             callback.accept(key);
+        }
+    }
+
+    public void onCancelButtonAction(ActionEvent actionEvent) {
+        if (onCancel != null) {
+            onCancel.run();
+        }
+
+        if (onClose != null) {
+            onClose.run();
+        } else {
+            GUIUtils.closeWindow(mainBox);
         }
     }
 }

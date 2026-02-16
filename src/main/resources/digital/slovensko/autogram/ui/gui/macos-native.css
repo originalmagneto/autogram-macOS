@@ -46,10 +46,21 @@
   /* Backgrounds — warm white */
   -autogram-background-colour: #fafafa;
   -autogram-secondary-background-colour: #f2f2f7;
+  -autogram-surface-0: #fafafa;
+  -autogram-surface-1: #f2f2f7;
+  -autogram-surface-2: #ececf2;
 
   /* Accent — Apple Blue */
   -autogram-focus-colour: #007aff;
   -autogram-focus-text-colour: #ffffff;
+  -autogram-accent: -autogram-focus-colour;
+  -autogram-text-primary: -autogram-text-colour;
+  -autogram-text-secondary: -autogram-secondary-text-colour;
+  -autogram-text-muted: #8e8e93;
+  -autogram-interactive-normal: rgba(0, 0, 0, 0.04);
+  -autogram-interactive-hover: rgba(0, 0, 0, 0.08);
+  -autogram-interactive-active: rgba(0, 122, 255, 0.14);
+  -autogram-interactive-disabled: rgba(0, 0, 0, 0.25);
 
   /* Error — Apple Red */
   -autogram-error-colour: #ff3b30;
@@ -99,8 +110,23 @@
 }
 
 .autogram-dialog-content {
-  -fx-padding: 24px;
-  -fx-spacing: 16px;
+  -fx-padding: 20px;
+  -fx-spacing: 14px;
+}
+
+.autogram-dialog-content--compact {
+  -fx-padding: 16px;
+  -fx-spacing: 10px;
+  -fx-max-width: 360px;
+}
+
+.autogram-dialog-content--wide {
+  -fx-max-width: 620px;
+}
+
+.autogram-dialog-host {
+  -fx-padding: 0;
+  -fx-spacing: 0;
 }
 
 
@@ -365,6 +391,11 @@ TextFlow.autogram-body-s {
   -fx-padding: 0;
 }
 
+.check-box .text {
+  -fx-fill: -autogram-text-colour;
+  -fx-text-fill: -autogram-text-colour;
+}
+
 .check-box .box {
   -fx-pref-height: 18px;
   -fx-pref-width: 18px;
@@ -482,6 +513,14 @@ TextFlow.autogram-body-s {
 }
 
 .choice-box>.label {
+  -fx-text-fill: -autogram-text-colour;
+}
+
+.choice-box .context-menu .menu-item>.label {
+  -fx-text-fill: -autogram-text-colour;
+}
+
+.choice-box-popup-menu .menu-item > .label {
   -fx-text-fill: -autogram-text-colour;
 }
 
@@ -804,6 +843,8 @@ TextFlow.autogram-body-s {
   -fx-background-radius: 10px;
   -fx-border-radius: 10px;
   -fx-border-width: 0;
+  -fx-spacing: 10px;
+  -fx-max-width: 620px;
 }
 
 .autogram-warning-summary>VBox {
@@ -812,13 +853,19 @@ TextFlow.autogram-body-s {
 
 .autogram-warning-summary>HBox {
   -fx-spacing: 10px;
-  -fx-alignment: center-left;
+  -fx-alignment: top-left;
 }
 
 .autogram-warning-summary__description>Text {
   -fx-text-fill: -autogram-text-colour;
   -fx-fill: -autogram-text-colour;
   -fx-font-size: 13px;
+}
+
+.autogram-warning-summary__description,
+.autogram-warning-summary__title {
+  -fx-pref-width: 560px;
+  -fx-max-width: 560px;
 }
 
 .autogram-warning-summary__title {
@@ -1282,8 +1329,16 @@ TextFlow.autogram-body-s {
   -fx-padding: 20px 0 0 0;
 }
 
+.autogram-dialog-content--compact .autogram-actions {
+  -fx-padding: 10px 0 0 0;
+}
+
 .autogram-radios {
   -fx-spacing: 12px;
+}
+
+.autogram-dialog-content--compact .autogram-radios {
+  -fx-spacing: 8px;
 }
 
 .autogram-radios HBox {
@@ -1430,7 +1485,92 @@ TextFlow.autogram-body-s {
 }
 
 .autogram-label {
-  -fx-font-size: 12px;
+  -fx-font-size: 13px;
+  -fx-text-fill: -autogram-text-primary;
+  -fx-font-weight: 500;
+}
+
+.autogram-options-row .label {
+  -fx-text-fill: -autogram-text-primary;
+}
+
+.autogram-signatures-table Text {
+  -fx-fill: -autogram-text-primary;
+}
+
+.autogram-signatures-table .text {
+  -fx-fill: -autogram-text-primary;
+}
+
+.autogram-signatures-summary-card .label,
+.autogram-signatures-summary-card .text,
+.autogram-signatures-summary-card Text {
+  -fx-text-fill: -autogram-text-primary;
+  -fx-fill: -autogram-text-primary;
+}
+
+.autogram-signing-shell {
+  -fx-spacing: 14;
+  -fx-padding: 0;
+}
+
+.autogram-signing-head {
+  -fx-spacing: 8;
+}
+
+.autogram-signing-stepper {
+  -fx-padding: 2 0 4 0;
+}
+
+.autogram-signing-step {
+  -fx-font-size: 11px;
+  -fx-text-fill: -autogram-text-secondary;
+  -fx-background-color: -autogram-surface-1;
+  -fx-padding: 4 10;
+  -fx-background-radius: 999;
+}
+
+.autogram-signing-step--active {
+  -fx-text-fill: -autogram-accent;
+  -fx-background-color: rgba(0, 122, 255, 0.12);
+  -fx-font-weight: 600;
+}
+
+.autogram-signing-preview-card {
+  -fx-background-color: -autogram-surface-0;
+  -fx-border-color: -autogram-border-colour;
+  -fx-border-width: 1px;
+  -fx-border-radius: 14;
+  -fx-background-radius: 14;
+  -fx-padding: 12;
+}
+
+.autogram-signatures-summary-card {
+  -fx-background-color: -autogram-surface-1;
+  -fx-border-color: -autogram-border-colour;
+  -fx-border-width: 1px;
+  -fx-border-radius: 12;
+  -fx-background-radius: 12;
+  -fx-padding: 10 12;
+}
+
+.autogram-signing-control-bar {
+  -fx-spacing: 12;
+  -fx-padding: 8 0 0 0;
+  -fx-alignment: CENTER_LEFT;
+}
+
+.autogram-signing-control-bar .autogram-choicebox {
+  -fx-pref-width: 220;
+}
+
+.autogram-signing-control-bar .check-box .text {
+  -fx-fill: -autogram-text-primary;
+  -fx-text-fill: -autogram-text-primary;
+}
+
+.autogram-signing-control-bar .label {
+  -fx-text-fill: -autogram-text-primary;
 }
 
 
@@ -1647,6 +1787,55 @@ TextFlow.autogram-body-s {
   -fx-background-color: -autogram-window-bg;
 }
 
+.autogram-settings-shell {
+  -fx-background-color: -autogram-window-bg;
+}
+
+.autogram-settings-nav-pane {
+  -fx-background-color: rgba(0, 0, 0, 0.015);
+  -fx-border-color: rgba(0, 0, 0, 0.08);
+  -fx-border-width: 0 0.5px 0 0;
+  -fx-padding: 18 14 14 14;
+  -fx-spacing: 16;
+}
+
+.autogram-settings-nav-header .autogram-body-s {
+  -fx-text-fill: -autogram-text-secondary;
+}
+
+.autogram-settings-nav-list {
+  -fx-padding: 4 0;
+}
+
+.autogram-settings-nav-item {
+  -fx-background-color: transparent;
+  -fx-background-radius: 10;
+  -fx-padding: 9 12;
+  -fx-font-size: 13px;
+  -fx-text-fill: -autogram-text-secondary;
+  -fx-cursor: hand;
+  -fx-alignment: CENTER_LEFT;
+  -fx-graphic-text-gap: 8;
+}
+
+.autogram-settings-nav-item:hover {
+  -fx-background-color: -autogram-interactive-normal;
+}
+
+.autogram-settings-nav-item.autogram-tab-item--active {
+  -fx-background-color: rgba(0, 122, 255, 0.14);
+  -fx-text-fill: -autogram-accent;
+  -fx-font-weight: 600;
+}
+
+.autogram-settings-nav-item .autogram-tab-icon-svg {
+  -fx-fill: -autogram-text-secondary;
+}
+
+.autogram-settings-nav-item.autogram-tab-item--active .autogram-tab-icon-svg {
+  -fx-fill: -autogram-accent;
+}
+
 /* ============================================================
    20. RIGHT DRAWER — Slide-out details panel
    ============================================================ */
@@ -1716,51 +1905,59 @@ TextFlow.autogram-body-s {
 }
 
 .autogram-settings-container {
-  -fx-padding: 24 40 40 40;
-  -fx-spacing: 12;
+  -fx-padding: 20 28 28 28;
+  -fx-spacing: 10;
 }
 
 .autogram-settings-title {
   -fx-font-family: "-apple-system", "SF Pro Display", sans-serif;
   -fx-font-size: 20px;
   -fx-font-weight: bold;
-  -fx-text-fill: #1d1d1f;
+  -fx-text-fill: -autogram-text-colour;
 }
 
 .autogram-settings-subtitle {
   -fx-font-size: 13px;
-  -fx-text-fill: #86868b;
-  -fx-padding: 0 0 16 0;
+  -fx-text-fill: -autogram-secondary-text-colour;
+  -fx-padding: 0 0 12 0;
 }
 
 .autogram-settings-section {
-  -fx-background-color: #f5f5f7;
+  -fx-background-color: -autogram-secondary-background-colour;
   -fx-background-radius: 12;
-  -fx-padding: 4 16 4 16;
+  -fx-padding: 2 14 2 14;
   -fx-spacing: 0;
-  -fx-border-color: rgba(0, 0, 0, 0.05);
+  -fx-border-color: -autogram-border-colour;
   -fx-border-radius: 12;
 }
 
 .autogram-settings-row {
-  -fx-padding: 12 0 12 0;
+  -fx-padding: 10 0 10 0;
   -fx-alignment: CENTER_LEFT;
-  -fx-spacing: 16;
+  -fx-spacing: 14;
 }
 
 .autogram-settings-row .left {
   -fx-spacing: 2;
+  -fx-min-width: 320;
+  -fx-max-width: 420;
 }
 
 .autogram-settings-row .autogram-heading-s {
   -fx-font-weight: bold;
   -fx-font-size: 13px;
-  -fx-text-fill: #1d1d1f;
+  -fx-text-fill: -autogram-text-colour;
 }
 
 .autogram-settings-row .autogram-description {
   -fx-font-size: 12px;
-  -fx-text-fill: #86868b;
+  -fx-text-fill: -autogram-secondary-text-colour;
+}
+
+.autogram-settings-row .choice-box,
+.autogram-settings-row .autogram-input {
+  -fx-pref-width: 240;
+  -fx-max-width: 320;
 }
 
 .autogram-settings-section Separator {
@@ -1769,16 +1966,16 @@ TextFlow.autogram-body-s {
 }
 
 .autogram-toggle-group {
-  -fx-spacing: 4;
+  -fx-spacing: 8;
 }
 
 .autogram-toggle-group .radio-button {
-  -fx-padding: 4 8 4 8;
-  -fx-font-size: 11px;
+  -fx-padding: 4 10 4 8;
+  -fx-font-size: 12px;
 }
 
 .autogram-settings-footer {
-  -fx-padding: 16 24 16 24;
+  -fx-padding: 14 22 14 22;
   -fx-border-color: rgba(0, 0, 0, 0.1) transparent transparent transparent;
   -fx-border-width: 1 0 0 0;
   -fx-spacing: 12;
@@ -1787,55 +1984,55 @@ TextFlow.autogram-body-s {
 }
 
 /* Settings Tabs */
-.autogram-settings-tabs-container {
-  -fx-padding: 12 24 0 24;
-  -fx-background-color: -autogram-window-bg;
-}
-
-.autogram-settings-tabs {
-  -fx-background-color: rgba(0, 0, 0, 0.05);
-  -fx-background-radius: 8;
-  -fx-padding: 2;
-  -fx-min-width: 500px;
-  /* Prevent tabs from shrinking too much */
-}
-
 .autogram-tab-item {
   -fx-background-color: transparent;
-  -fx-background-radius: 6;
-  -fx-padding: 6 16 6 16;
+  -fx-background-radius: 8;
+  -fx-padding: 7 14 7 14;
   -fx-font-size: 13px;
-  -fx-text-fill: #3a3a3c;
+  -fx-text-fill: -autogram-text-secondary;
   -fx-cursor: hand;
-  -fx-spacing: 6;
-  -fx-min-width: -647535496;
-  /* Use system default min width but don't shrink */
+  -fx-spacing: 7;
+  -fx-min-width: 120;
+  -fx-alignment: CENTER_LEFT;
 }
 
 .autogram-tab-item:hover {
-  -fx-background-color: rgba(255, 255, 255, 0.5);
+  -fx-background-color: -autogram-interactive-normal;
 }
 
 .autogram-tab-item--active {
-  -fx-background-color: #ffffff;
-  -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.1), 4, 0, 0, 1);
+  -fx-background-color: -autogram-surface-0;
+  -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.12), 4, 0, 0, 1);
   -fx-text-fill: -autogram-accent;
+  -fx-font-weight: 600;
 }
 
-.autogram-tab-icon {
-  -fx-background-color: #3a3a3c;
-  -fx-min-width: 14px;
-  -fx-min-height: 14px;
-  -fx-max-width: 14px;
-  -fx-max-height: 14px;
+.autogram-tab-icon-svg {
+  -fx-fill: -autogram-text-secondary;
+  -fx-scale-x: 0.82;
+  -fx-scale-y: 0.82;
 }
 
-.autogram-tab-item--active .autogram-tab-icon {
-  -fx-background-color: -autogram-accent;
+.autogram-tab-item--active .autogram-tab-icon-svg {
+  -fx-fill: -autogram-accent;
 }
 
 .autogram-settings-content-wrapper {
   -fx-background-color: -autogram-window-bg;
+}
+
+.autogram-country-list {
+  -fx-spacing: 6;
+}
+
+.autogram-country-row {
+  -fx-padding: 6 8 6 8;
+  -fx-alignment: CENTER_LEFT;
+  -fx-background-radius: 8;
+}
+
+.autogram-country-row:hover {
+  -fx-background-color: rgba(0, 0, 0, 0.03);
 }
 
 /* ============================================================
@@ -1978,16 +2175,28 @@ TextFlow.autogram-body-s {
 /* Overlay dialog card — elevated white card for inline modals */
 .autogram-overlay-card {
   -fx-background-color: -autogram-background-colour;
-  -fx-background-radius: 14px;
-  -fx-border-radius: 14px;
+  -fx-background-radius: 16px;
+  -fx-border-radius: 16px;
   -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.25), 20, 0, 0, 8);
-  -fx-padding: 24px;
-  -fx-max-width: 480px;
-  -fx-max-height: 600px;
+  -fx-padding: 18px;
+}
+
+.autogram-overlay-card--compact {
+  -fx-max-width: 420px;
+  -fx-padding: 14px;
+}
+
+.autogram-overlay-card--default {
+  -fx-max-width: 580px;
+}
+
+.autogram-overlay-card--wide {
+  -fx-max-width: 760px;
+  -fx-max-height: 780px;
 }
 
 /* Large overlay card for settings/about */
 .autogram-overlay-card--large {
-  -fx-max-width: 680px;
-  -fx-max-height: 720px;
+  -fx-max-width: 720px;
+  -fx-max-height: 760px;
 }

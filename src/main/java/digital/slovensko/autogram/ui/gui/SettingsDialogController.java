@@ -119,6 +119,7 @@ public class SettingsDialogController {
         initializeCustomKeystoreSettings();
         initializeCustomPKCS11DriverPathSettings();
         initializeDriverSlot();
+        showSigningSettings();
     }
 
     private void initializeSignatureLevelChoiceBox() {
@@ -317,7 +318,7 @@ public class SettingsDialogController {
 
         var container = new HBox(countryLabel, checkBox);
         container.setSpacing(10);
-        container.getStyleClass().add("autogram-settings-row");
+        container.getStyleClass().addAll("autogram-settings-row", "autogram-country-row");
         container.setPadding(new javafx.geometry.Insets(4, 8, 4, 8));
         return container;
     }
@@ -446,11 +447,16 @@ public class SettingsDialogController {
 
     private void showPanel(ScrollPane panel, Button navButton) {
         signingSettingsContent.setVisible(false);
+        signingSettingsContent.setManaged(false);
         validationSettingsContent.setVisible(false);
+        validationSettingsContent.setManaged(false);
         securitySettingsContent.setVisible(false);
+        securitySettingsContent.setManaged(false);
         otherSettingsContent.setVisible(false);
+        otherSettingsContent.setManaged(false);
 
         panel.setVisible(true);
+        panel.setManaged(true);
 
         signingNavButton.getStyleClass().remove("autogram-tab-item--active");
         validationNavButton.getStyleClass().remove("autogram-tab-item--active");

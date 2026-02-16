@@ -66,6 +66,6 @@ public class ErrorSummaryComponentController {
             showErrorDetailsButton.getStyleClass().add("autogram-error-summary__more-open");
             showErrorDetailsButton.setText("Schovať detail chyby");
         }
-        errorDetails.getScene().getWindow().sizeToScene();
+        errorDetails.requestLayout();
     }
 }

@@ -46,7 +46,7 @@ public class Batch {
         resetExpirationDate();
 
         if (this.totalNumberOfDocuments <= this.addedDocumentsCount)
-            throw new IllegalAccessError("Sent more sign requests than declared at start");
+            throw new IllegalStateException("Sent more sign requests than declared at start");
 
         addedDocumentsCount++;
     }

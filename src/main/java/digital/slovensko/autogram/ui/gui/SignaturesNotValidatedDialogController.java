@@ -7,6 +7,7 @@ import javafx.stage.Stage;
 
 public class SignaturesNotValidatedDialogController implements SuppressedFocusController {
     private final SigningDialogController signigDialogController;
+    private Runnable onClose;
 
     @FXML
     Button cancelButton;
@@ -19,10 +20,18 @@ public class SignaturesNotValidatedDialogController implements SuppressedFocusCo
         this.signigDialogController = signigDialogController;
     }
 
+    public void setOnClose(Runnable onClose) {
+        this.onClose = onClose;
+    }
+
     public void close() {
-        var window = mainBox.getScene().getRoot().getScene().getWindow();
-        if (window instanceof Stage)
-            ((Stage) window).close();
+        if (onClose != null) {
+            onClose.run();
+        } else {
+            var window = mainBox.getScene().getRoot().getScene().getWindow();
+            if (window instanceof Stage)
+                ((Stage) window).close();
+        }
 
         signigDialogController.enableSigningOnAllJobs();
     }
@@ -33,9 +42,13 @@ public class SignaturesNotValidatedDialogController implements SuppressedFocusCo
     }
 
     public void onContinueAction() {
-        var window = mainBox.getScene().getRoot().getScene().getWindow();
-        if (window instanceof Stage)
-            ((Stage) window).close();
+        if (onClose != null) {
+            onClose.run();
+        } else {
+            var window = mainBox.getScene().getRoot().getScene().getWindow();
+            if (window instanceof Stage)
+                ((Stage) window).close();
+        }
         signigDialogController.sign();
     }
 

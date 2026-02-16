@@ -35,10 +35,21 @@
     /* Backgrounds — deeper Tahoe dark */
     -autogram-background-colour: #161617;
     -autogram-secondary-background-colour: #232325;
+    -autogram-surface-0: #161617;
+    -autogram-surface-1: #202126;
+    -autogram-surface-2: #2a2c33;
 
     /* Accent */
     -autogram-focus-colour: #0a84ff;
     -autogram-focus-text-colour: #ffffff;
+    -autogram-accent: -autogram-focus-colour;
+    -autogram-text-primary: #f5f5f7;
+    -autogram-text-secondary: #adb1bc;
+    -autogram-text-muted: #8a8f9c;
+    -autogram-interactive-normal: rgba(255, 255, 255, 0.08);
+    -autogram-interactive-hover: rgba(255, 255, 255, 0.14);
+    -autogram-interactive-active: rgba(10, 132, 255, 0.34);
+    -autogram-interactive-disabled: rgba(255, 255, 255, 0.35);
 
     /* Error */
     -autogram-error-colour: #ff453a;
@@ -92,15 +103,84 @@
     -fx-text-fill: -autogram-text-colour;
 }
 
+.choice-box {
+    -fx-background-color: rgba(255, 255, 255, 0.14);
+    -fx-border-color: rgba(255, 255, 255, 0.18);
+}
+
+.choice-box:hover {
+    -fx-border-color: rgba(255, 255, 255, 0.28);
+}
+
+.choice-box > .label {
+    -fx-text-fill: #f2f4f8;
+}
+
+.choice-box .context-menu,
+.choice-box .context-menu .menu-item {
+    -fx-background-color: rgba(35, 36, 41, 0.96);
+}
+
+.choice-box .context-menu .menu-item > .label {
+    -fx-text-fill: #f2f4f8;
+}
+
+.choice-box-popup-menu {
+    -fx-background-color: rgba(35, 36, 41, 0.96);
+    -fx-border-color: rgba(255, 255, 255, 0.12);
+}
+
+.choice-box-popup-menu .menu-item {
+    -fx-background-color: transparent;
+}
+
+.choice-box-popup-menu .menu-item > .label {
+    -fx-text-fill: #f2f4f8;
+}
+
+.choice-box-popup-menu .menu-item:focused {
+    -fx-background-color: rgba(10, 132, 255, 0.42);
+}
+
+.choice-box-popup-menu .menu-item:focused > .label {
+    -fx-text-fill: #ffffff;
+}
+
+.choice-box:disabled {
+    -fx-opacity: 1;
+    -fx-background-color: rgba(255, 255, 255, 0.10);
+}
+
+.choice-box:disabled > .label {
+    -fx-text-fill: rgba(242, 244, 248, 0.86);
+}
+
+.choice-box .arrow {
+    -fx-background-color: #b8becc;
+}
+
 /* Drop zone dark */
 .autogram-dropzone {
-    -fx-border-color: rgba(255, 255, 255, 0.12);
-    -fx-background-color: rgba(255, 255, 255, 0.04);
+    -fx-border-color: rgba(255, 255, 255, 0.18);
+    -fx-background-color: rgba(255, 255, 255, 0.07);
 }
 
 .autogram-dropzone--entered {
     -fx-border-color: -autogram-focus-colour;
     -fx-background-color: derive(-autogram-focus-colour, -60%);
+}
+
+.autogram-overlay-backdrop {
+    -fx-background-color: rgba(0, 0, 0, 0.45);
+}
+
+.autogram-overlay-card {
+    -fx-border-color: rgba(255, 255, 255, 0.08);
+    -fx-border-width: 1px;
+}
+
+.autogram-content-area {
+    -fx-background-color: #1b1c20;
 }
 
 /* Context menu dark — dark glass */
@@ -112,6 +192,14 @@
 
 .menu-item>.label {
     -fx-text-fill: -autogram-text-colour;
+}
+
+.radio-button .text,
+.check-box .text,
+.label,
+.text {
+    -fx-text-fill: -autogram-text-primary;
+    -fx-fill: -autogram-text-primary;
 }
 
 /* Tooltip dark */
@@ -144,6 +232,44 @@
 .check-box:hover .box {
     -fx-background-color: rgba(255, 255, 255, 0.1);
     -fx-border-color: rgba(255, 255, 255, 0.2);
+}
+
+.autogram-label,
+.autogram-options-row .label,
+.autogram-signatures-table Text,
+.autogram-signatures-table .text,
+.autogram-signing-control-bar .check-box .text {
+    -fx-text-fill: #f1f4fb;
+    -fx-fill: #f1f4fb;
+}
+
+.autogram-signing-step {
+    -fx-background-color: rgba(255, 255, 255, 0.08);
+    -fx-text-fill: #b8bfcc;
+}
+
+.autogram-signing-step--active {
+    -fx-background-color: rgba(10, 132, 255, 0.28);
+    -fx-text-fill: #e6f1ff;
+}
+
+.autogram-signing-preview-card {
+    -fx-background-color: #101217;
+    -fx-border-color: rgba(255, 255, 255, 0.10);
+}
+
+.autogram-signatures-summary-card {
+    -fx-background-color: rgba(255, 255, 255, 0.06);
+    -fx-border-color: rgba(255, 255, 255, 0.10);
+}
+
+.autogram-signatures-summary-card .label,
+.autogram-signatures-summary-card .text,
+.autogram-signatures-summary-card Text,
+.autogram-signing-shell .label,
+.autogram-signing-shell .text {
+    -fx-text-fill: #f1f4fb;
+    -fx-fill: #f1f4fb;
 }
 
 /* Tags — dark mode pastels */
@@ -260,25 +386,41 @@
 
 /* Sidebar dark — dark glass */
 .autogram-sidebar {
-    -fx-background-color: -autogram-sidebar-bg;
+    -fx-background-color: rgba(33, 34, 39, 0.92);
     -fx-border-color: rgba(255, 255, 255, 0.06);
 }
 
+.autogram-claim {
+    -fx-text-fill: #f5f5f7;
+}
+
 .autogram-sidebar-item:hover {
-    -fx-background-color: rgba(255, 255, 255, 0.06);
+    -fx-background-color: rgba(255, 255, 255, 0.10);
+}
+
+.autogram-sidebar-item {
+    -fx-text-fill: #d7d8dd;
 }
 
 .autogram-sidebar-item--active {
-    -fx-background-color: rgba(10, 132, 255, 0.2);
-    -fx-text-fill: #0a84ff;
+    -fx-background-color: rgba(10, 132, 255, 0.34);
+    -fx-text-fill: #eef5ff;
 }
 
 .autogram-sidebar-item--active .autogram-sidebar-icon {
-    -fx-stroke: #0a84ff;
+    -fx-stroke: #eef5ff;
+}
+
+.autogram-sidebar-icon {
+    -fx-stroke: #a9abb4;
 }
 
 .autogram-sidebar-footer {
     -fx-border-color: #38383a transparent transparent transparent;
+}
+
+.autogram-sidebar-status {
+    -fx-text-fill: #9ea2ad;
 }
 
 /* Split pane dark */
@@ -288,6 +430,109 @@
 
 /* Sidebar metadata dark */
 .autogram-sidebar-metadata {
-    -fx-background-color: rgba(255, 255, 255, 0.03);
+    -fx-background-color: rgba(255, 255, 255, 0.06);
     -fx-border-color: rgba(255, 255, 255, 0.06) transparent rgba(255, 255, 255, 0.06) transparent;
+}
+
+.autogram-sidebar-section-title {
+    -fx-text-fill: #a8acb7;
+}
+
+.autogram-metadata-label {
+    -fx-text-fill: #b0b4be;
+}
+
+.autogram-metadata-value {
+    -fx-text-fill: #f3f4f7;
+}
+
+/* Settings in dark mode */
+.autogram-settings-content-wrapper {
+    -fx-background-color: #17191f;
+}
+
+.autogram-settings-shell {
+    -fx-background-color: #17191f;
+}
+
+.autogram-settings-nav-pane {
+    -fx-background-color: rgba(255, 255, 255, 0.04);
+    -fx-border-color: rgba(255, 255, 255, 0.08);
+}
+
+.autogram-settings-nav-item {
+    -fx-text-fill: #c0c4cf;
+}
+
+.autogram-settings-nav-item:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.10);
+}
+
+.autogram-settings-nav-item.autogram-tab-item--active {
+    -fx-background-color: rgba(10, 132, 255, 0.34);
+    -fx-text-fill: #f5f7ff;
+}
+
+.autogram-settings-nav-item .autogram-tab-icon-svg {
+    -fx-fill: #c0c4cf;
+}
+
+.autogram-settings-nav-item.autogram-tab-item--active .autogram-tab-icon-svg {
+    -fx-fill: #f5f7ff;
+}
+
+.autogram-settings-row .choice-box,
+.autogram-settings-row .autogram-input {
+    -fx-text-fill: #f2f4f8;
+}
+
+.autogram-settings-row .check-box .text,
+.autogram-settings-row .radio-button .text,
+.autogram-country-row .label,
+.autogram-country-row .check-box .text {
+    -fx-text-fill: #eef1f8;
+    -fx-fill: #eef1f8;
+}
+
+.autogram-settings-title {
+    -fx-text-fill: #f5f5f7;
+}
+
+.autogram-settings-subtitle {
+    -fx-text-fill: #a6acb8;
+}
+
+.autogram-settings-container {
+    -fx-background-color: transparent;
+}
+
+.autogram-settings-section {
+    -fx-background-color: rgba(255, 255, 255, 0.07);
+    -fx-border-color: rgba(255, 255, 255, 0.10);
+}
+
+.autogram-settings-row .autogram-heading-s {
+    -fx-text-fill: #f1f2f6;
+}
+
+.autogram-settings-row .autogram-description {
+    -fx-text-fill: #aeb4bf;
+}
+
+.autogram-settings-section Separator {
+    -fx-opacity: 0.25;
+}
+
+.autogram-settings-footer {
+    -fx-background-color: rgba(23, 25, 31, 0.96);
+    -fx-border-color: rgba(255, 255, 255, 0.10) transparent transparent transparent;
+}
+
+.autogram-settings-scroll-pane,
+.autogram-settings-scroll-pane .viewport {
+    -fx-background-color: transparent;
+}
+
+.autogram-country-row:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.08);
 }

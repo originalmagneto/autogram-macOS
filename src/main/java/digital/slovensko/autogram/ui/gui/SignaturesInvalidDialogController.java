@@ -12,6 +12,7 @@ import static digital.slovensko.autogram.ui.gui.GUIValidationUtils.*;
 public class SignaturesInvalidDialogController implements SuppressedFocusController {
     private final SigningDialogController signingDialogController;
     private final Reports reports;
+    private Runnable onClose;
 
     @FXML
     Button cancelButton;
@@ -27,6 +28,10 @@ public class SignaturesInvalidDialogController implements SuppressedFocusControl
         this.reports = reports;
     }
 
+    public void setOnClose(Runnable onClose) {
+        this.onClose = onClose;
+    }
+
     public void initialize() {
         signaturesTable.getChildren().clear();
         signaturesTable.getChildren().addAll(
@@ -36,9 +41,13 @@ public class SignaturesInvalidDialogController implements SuppressedFocusControl
     }
 
     public void close() {
-        var window = mainBox.getScene().getRoot().getScene().getWindow();
-        if (window instanceof Stage)
-            ((Stage) window).close();
+        if (onClose != null) {
+            onClose.run();
+        } else {
+            var window = mainBox.getScene().getRoot().getScene().getWindow();
+            if (window instanceof Stage)
+                ((Stage) window).close();
+        }
 
         signingDialogController.enableSigningOnAllJobs();
     }
@@ -49,9 +58,13 @@ public class SignaturesInvalidDialogController implements SuppressedFocusControl
     }
 
     public void onContinueAction() {
-        var window = mainBox.getScene().getRoot().getScene().getWindow();
-        if (window instanceof Stage)
-            ((Stage) window).close();
+        if (onClose != null) {
+            onClose.run();
+        } else {
+            var window = mainBox.getScene().getRoot().getScene().getWindow();
+            if (window instanceof Stage)
+                ((Stage) window).close();
+        }
         signingDialogController.sign();
     }
 

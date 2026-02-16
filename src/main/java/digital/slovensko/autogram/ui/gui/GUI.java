@@ -134,7 +134,10 @@ public class GUI implements UI {
             if (mainMenuController != null) {
                 controller.setOnClose(() -> mainMenuController.hideOverlayDialog());
                 controller.setOnCancel(onCancel);
-                mainMenuController.showOverlayDialog(root);
+                mainMenuController.showOverlayDialog(root, OverlaySpec.compact()
+                        .withAutoFocus(".radio-button")
+                        .withCancelAction("#cancelButton")
+                        .withCloseOnEscape(true));
             } else {
                 var stage = new Stage();
                 stage.setTitle("Výber úložiska certifikátu");
@@ -191,8 +194,15 @@ public class GUI implements UI {
         var root = GUIUtils.loadFXML(controller, "pick-key-dialog.fxml");
 
         if (mainMenuController != null) {
+            controller.setOnCancel(() -> {
+                refreshKeyOnAllJobs();
+                enableSigningOnAllJobs();
+            });
             controller.setOnClose(() -> mainMenuController.hideOverlayDialog());
-            mainMenuController.showOverlayDialog(root);
+            mainMenuController.showOverlayDialog(root, OverlaySpec.compact()
+                    .withAutoFocus(".radio-button")
+                    .withCancelAction("#cancelButton")
+                    .withCloseOnEscape(true));
         } else {
             var stage = new Stage();
             stage.setTitle("Výber certifikátu");
@@ -221,7 +231,10 @@ public class GUI implements UI {
             var controller = new ErrorController(e);
             var root = GUIUtils.loadFXML(controller, "error-dialog.fxml");
             controller.setOnClose(() -> mainMenuController.hideOverlayDialog());
-            mainMenuController.showOverlayDialog(root);
+            mainMenuController.showOverlayDialog(root, OverlaySpec.defaults()
+                    .withAutoFocus("#mainButton")
+                    .withCancelAction("#mainButton")
+                    .withCloseOnEscape(true));
         } else {
             GUIUtils.showError(e, "Pokračovať", false);
         }
@@ -233,7 +246,10 @@ public class GUI implements UI {
 
         if (mainMenuController != null) {
             controller.setOnClose(() -> mainMenuController.hideOverlayDialog());
-            mainMenuController.showOverlayDialog(root);
+            mainMenuController.showOverlayDialog(root, OverlaySpec.defaults()
+                    .withAutoFocus("#mainButton")
+                    .withCancelAction("#mainButton")
+                    .withCloseOnEscape(true));
         } else {
             var stage = new Stage();
             stage.setTitle(e.getSubheading());
@@ -261,7 +277,10 @@ public class GUI implements UI {
                     mainMenuController.hideOverlayDialog();
                     latch.countDown();
                 });
-                mainMenuController.showOverlayDialog(root);
+                mainMenuController.showOverlayDialog(root, OverlaySpec.compact()
+                        .withAutoFocus("#passwordField")
+                        .withCancelAction("#cancelButton")
+                        .withCloseOnEscape(true));
             });
 
             try {
@@ -316,7 +335,10 @@ public class GUI implements UI {
                     mainMenuController.hideOverlayDialog();
                     latch.countDown();
                 });
-                mainMenuController.showOverlayDialog(root);
+                mainMenuController.showOverlayDialog(root, OverlaySpec.compact()
+                        .withAutoFocus("#passwordField")
+                        .withCancelAction("#cancelButton")
+                        .withCloseOnEscape(true));
             });
 
             try {
@@ -362,7 +384,10 @@ public class GUI implements UI {
 
         if (mainMenuController != null) {
             controller.setOnClose(() -> mainMenuController.hideOverlayDialog());
-            mainMenuController.showOverlayDialog(root);
+            mainMenuController.showOverlayDialog(root, OverlaySpec.defaults()
+                    .withAutoFocus("#mainButton")
+                    .withCancelAction("#cancelButton")
+                    .withCloseOnEscape(true));
         } else {
             var stage = new Stage();
             stage.setTitle("Dostupná aktualizácia");
@@ -381,7 +406,10 @@ public class GUI implements UI {
 
         if (mainMenuController != null) {
             controller.setOnClose(() -> mainMenuController.hideOverlayDialog());
-            mainMenuController.showOverlayDialog(root);
+            mainMenuController.showOverlayDialog(root, OverlaySpec.wide()
+                    .withAutoFocus("#closeButton")
+                    .withCancelAction("#closeButton")
+                    .withCloseOnEscape(true));
         } else {
             var stage = new Stage();
             stage.setTitle("O projekte Autogram");
@@ -400,7 +428,10 @@ public class GUI implements UI {
             var controller = new PDFAComplianceDialogController(job, this);
             var root = GUIUtils.loadFXML(controller, "pdfa-compliance-dialog.fxml");
             controller.setOnClose(() -> mainMenuController.hideOverlayDialog());
-            mainMenuController.showOverlayDialog(root);
+            mainMenuController.showOverlayDialog(root, OverlaySpec.wide()
+                    .withAutoFocus("#continueButton")
+                    .withCancelAction("#cancelButton")
+                    .withCloseOnEscape(true));
         } else {
             var controller = new PDFAComplianceDialogController(job, this);
             var root = GUIUtils.loadFXML(controller, "pdfa-compliance-dialog.fxml");
@@ -479,20 +510,6 @@ public class GUI implements UI {
             // Or it will be handled by onSignatureCheckCompleted soon
 
             mainMenuController.showSigningContent(root);
-
-            // Auto-resize window if needed
-            Platform.runLater(() -> {
-                Window window = mainMenuController.splitPane.getScene().getWindow();
-                if (window instanceof Stage) {
-                    Stage stage = (Stage) window;
-                    double currentWidth = stage.getWidth();
-                    double neededWidth = 1000; // Optimal width for sidebar + document
-                    if (currentWidth < neededWidth) {
-                        stage.setWidth(neededWidth);
-                        stage.centerOnScreen();
-                    }
-                }
-            });
         } else {
             // Fallback: open in a separate stage
             var stage = new Stage();
@@ -641,7 +658,10 @@ public class GUI implements UI {
         }
 
         if (mainMenuController != null) {
-            mainMenuController.showOverlayDialog(root);
+            mainMenuController.showOverlayDialog(root, OverlaySpec.wide()
+                    .withAutoFocus("#mainButton")
+                    .withCancelAction("#mainButton")
+                    .withCloseOnEscape(true));
         } else {
             var stage = new Stage();
             stage.setTitle(title);

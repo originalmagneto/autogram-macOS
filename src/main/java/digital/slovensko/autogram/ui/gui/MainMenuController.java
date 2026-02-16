@@ -12,21 +12,27 @@ import digital.slovensko.autogram.ui.SaveFileResponder;
 import digital.slovensko.autogram.util.macos.MacOSNotification;
 import javafx.animation.FadeTransition;
 import javafx.animation.Interpolator;
+import javafx.animation.PauseTransition;
 import javafx.animation.TranslateTransition;
 import javafx.application.Platform;
 import javafx.event.ActionEvent;
+import javafx.event.EventHandler;
 import javafx.fxml.FXML;
 import javafx.scene.Node;
 import javafx.scene.Parent;
+import javafx.scene.control.TextInputControl;
 import javafx.scene.control.*;
 import javafx.scene.effect.GaussianBlur;
 import javafx.scene.input.*;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
+import javafx.stage.Window;
 import javafx.util.Duration;
 import java.io.File;
+import java.util.ArrayList;
 import java.util.List;
 
 public class MainMenuController implements SuppressedFocusController {
@@ -66,6 +72,8 @@ public class MainMenuController implements SuppressedFocusController {
 
     @FXML
     VBox dialogContentHost;
+    @FXML
+    VBox dialogContainer;
 
     @FXML
     Label statusLabel;
@@ -148,17 +156,14 @@ public class MainMenuController implements SuppressedFocusController {
             event.consume();
         });
 
-        dropZone.setOnDragExited(event -> {
-            dropZone.getStyleClass().remove("autogram-dropzone-active");
-            event.consume();
-        });
-
         dropZone.setOnDragEntered(event -> {
             dropZone.getStyleClass().add("autogram-dropzone--entered");
         });
 
         dropZone.setOnDragExited(event -> {
+            dropZone.getStyleClass().remove("autogram-dropzone-active");
             dropZone.getStyleClass().removeIf(style -> style.equals("autogram-dropzone--entered"));
+            event.consume();
         });
 
         dropZone.setOnDragDropped(event -> {
@@ -195,6 +200,9 @@ public class MainMenuController implements SuppressedFocusController {
             boolean alreadyVisible = rightDrawer.isVisible();
             rightDrawerContent.getChildren().clear();
             rightDrawerContent.getChildren().add(content);
+            rightDrawer.setMinWidth(320);
+            rightDrawer.setPrefWidth(500);
+            rightDrawer.setMaxWidth(800);
             rightDrawer.setManaged(true);
             rightDrawer.setVisible(true);
 
@@ -236,6 +244,7 @@ public class MainMenuController implements SuppressedFocusController {
             } else {
                 rightDrawer.setManaged(true);
                 rightDrawer.setVisible(true);
+                splitPane.setDividerPosition(1, Math.max(0.2, 1.0 - (rightDrawer.getPrefWidth() / Math.max(1, splitPane.getWidth()))));
             }
         });
     }
@@ -249,11 +258,18 @@ public class MainMenuController implements SuppressedFocusController {
 
                 var stage = (Stage) splitPane.getScene().getWindow();
                 if (stage != null) {
-                    stage.setWidth(stage.getWidth() - currentDrawerWidth);
+                    var targetWidth = Math.max(stage.getMinWidth(), stage.getWidth() - currentDrawerWidth);
+                    stage.setWidth(targetWidth);
                 }
             }
+            rightDrawer.setMinWidth(0);
+            rightDrawer.setPrefWidth(0);
+            rightDrawer.setMaxWidth(0);
             rightDrawer.setVisible(false);
             rightDrawer.setManaged(false);
+            if (splitPane != null && splitPane.getDividers().size() > 1) {
+                splitPane.setDividerPosition(1, 1.0);
+            }
         });
     }
 
@@ -465,11 +481,21 @@ public class MainMenuController implements SuppressedFocusController {
     StackPane contentPanelContainer;
 
     private FadeTransition activeOverlayTransition;
+    private OverlaySpec activeOverlaySpec = OverlaySpec.defaults();
+    private Parent activeOverlayContent;
+    private final EventHandler<KeyEvent> overlayKeyHandler = this::onOverlayKeyPressed;
 
     /**
      * Show a dialog integrated within the main window as an overlay.
      */
     public void showOverlayDialog(Parent content) {
+        showOverlayDialog(content, OverlaySpec.defaults());
+    }
+
+    /**
+     * Show a dialog integrated within the main window as an overlay.
+     */
+    public void showOverlayDialog(Parent content, OverlaySpec spec) {
         Platform.runLater(() -> {
             // Cancel any active transition to prevent race conditions (e.g. hiding clearing
             // content)
@@ -479,6 +505,13 @@ public class MainMenuController implements SuppressedFocusController {
 
             dialogContentHost.getChildren().clear();
             dialogContentHost.getChildren().add(content);
+            activeOverlaySpec = spec != null ? spec : OverlaySpec.defaults();
+            activeOverlayContent = content;
+            if (dialogContainer != null) {
+                dialogContainer.setMaxSize(Region.USE_COMPUTED_SIZE, Region.USE_COMPUTED_SIZE);
+                dialogContainer.setPrefSize(Region.USE_COMPUTED_SIZE, Region.USE_COMPUTED_SIZE);
+                applyDialogSizePreset(activeOverlaySpec.sizePreset());
+            }
             dialogOverlay.setOpacity(0);
             dialogOverlay.setVisible(true);
             dialogOverlay.setManaged(true);
@@ -499,9 +532,162 @@ public class MainMenuController implements SuppressedFocusController {
             activeOverlayTransition.setInterpolator(Interpolator.EASE_BOTH);
             activeOverlayTransition.play();
 
-            // Set Vgrow for content
-            VBox.setVgrow(content, javafx.scene.layout.Priority.ALWAYS);
+            // Keep dialog sized by its content to avoid oversized empty cards.
+            VBox.setVgrow(content, javafx.scene.layout.Priority.NEVER);
+            installOverlayKeyboardHandler();
+            requestOverlayInputFocus(content, activeOverlaySpec);
         });
+    }
+
+    private void applyDialogSizePreset(OverlaySizePreset sizePreset) {
+        dialogContainer.getStyleClass()
+                .removeAll("autogram-overlay-card--compact", "autogram-overlay-card--default", "autogram-overlay-card--wide");
+        var styleClass = switch (sizePreset) {
+            case COMPACT -> "autogram-overlay-card--compact";
+            case WIDE -> "autogram-overlay-card--wide";
+            case DEFAULT -> "autogram-overlay-card--default";
+        };
+        dialogContainer.getStyleClass().add(styleClass);
+
+        dialogContainer.setMinSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE);
+        dialogContainer.setPrefSize(Region.USE_COMPUTED_SIZE, Region.USE_COMPUTED_SIZE);
+
+        switch (sizePreset) {
+            case COMPACT -> {
+                dialogContainer.setMaxWidth(420);
+                dialogContainer.setMaxHeight(Region.USE_PREF_SIZE);
+            }
+            case WIDE -> {
+                dialogContainer.setMaxWidth(760);
+                dialogContainer.setMaxHeight(Region.USE_PREF_SIZE);
+            }
+            case DEFAULT -> {
+                dialogContainer.setMaxWidth(580);
+                dialogContainer.setMaxHeight(Region.USE_PREF_SIZE);
+            }
+        }
+    }
+
+    private void installOverlayKeyboardHandler() {
+        dialogOverlay.removeEventFilter(KeyEvent.KEY_PRESSED, overlayKeyHandler);
+        dialogOverlay.addEventFilter(KeyEvent.KEY_PRESSED, overlayKeyHandler);
+    }
+
+    private void onOverlayKeyPressed(KeyEvent event) {
+        if (!dialogOverlay.isVisible() || activeOverlayContent == null) {
+            return;
+        }
+
+        if (event.getCode() == KeyCode.ESCAPE && activeOverlaySpec.closeOnEscape()) {
+            if (!fireOverlayCancelAction()) {
+                hideOverlayDialog();
+            }
+            event.consume();
+            return;
+        }
+
+        if (event.getCode() == KeyCode.TAB && activeOverlaySpec.trapFocus()) {
+            trapOverlayFocus(event);
+        }
+    }
+
+    private boolean fireOverlayCancelAction() {
+        var selector = activeOverlaySpec.cancelActionSelector();
+        if (selector == null || selector.isBlank() || activeOverlayContent == null) {
+            return false;
+        }
+
+        var target = activeOverlayContent.lookup(selector);
+        if (target instanceof ButtonBase buttonBase && !buttonBase.isDisable()) {
+            buttonBase.fire();
+            return true;
+        }
+
+        return false;
+    }
+
+    private void trapOverlayFocus(KeyEvent event) {
+        if (activeOverlayContent == null || dialogOverlay.getScene() == null) {
+            return;
+        }
+
+        var focusableNodes = collectFocusableNodes(activeOverlayContent);
+        if (focusableNodes.isEmpty()) {
+            return;
+        }
+
+        var currentFocusOwner = dialogOverlay.getScene().getFocusOwner();
+        var currentIndex = focusableNodes.indexOf(currentFocusOwner);
+        final int nextIndex;
+        if (event.isShiftDown()) {
+            nextIndex = currentIndex <= 0 ? focusableNodes.size() - 1 : currentIndex - 1;
+        } else {
+            nextIndex = currentIndex < 0 || currentIndex == focusableNodes.size() - 1 ? 0 : currentIndex + 1;
+        }
+
+        focusableNodes.get(nextIndex).requestFocus();
+        event.consume();
+    }
+
+    private List<Node> collectFocusableNodes(Node root) {
+        var focusableNodes = new ArrayList<Node>();
+        collectFocusableNodesRecursive(root, focusableNodes);
+        return focusableNodes;
+    }
+
+    private void collectFocusableNodesRecursive(Node node, List<Node> focusableNodes) {
+        if (node == null || !node.isVisible() || !node.isManaged() || node.isDisable()) {
+            return;
+        }
+
+        if (node.isFocusTraversable()) {
+            focusableNodes.add(node);
+        }
+
+        if (node instanceof Parent parent) {
+            for (var child : parent.getChildrenUnmodifiable()) {
+                collectFocusableNodesRecursive(child, focusableNodes);
+            }
+        }
+    }
+
+    private void requestOverlayInputFocus(Parent content, OverlaySpec spec) {
+        var focusTarget = findOverlayFocusTarget(content, spec);
+        if (focusTarget == null) {
+            return;
+        }
+
+        focusNode(focusTarget);
+
+        var delayedFocus = new PauseTransition(Duration.millis(170));
+        delayedFocus.setOnFinished(event -> focusNode(focusTarget));
+        delayedFocus.play();
+    }
+
+    private Node findOverlayFocusTarget(Parent content, OverlaySpec spec) {
+        if (spec.autoFocusSelector() != null && !spec.autoFocusSelector().isBlank()) {
+            var selectedNode = content.lookup(spec.autoFocusSelector());
+            if (selectedNode != null) {
+                return selectedNode;
+            }
+        }
+
+        for (var selector : List.of(".password-field", ".text-field", ".choice-box", ".radio-button", ".button")) {
+            var selectedNode = content.lookup(selector);
+            if (selectedNode != null) {
+                return selectedNode;
+            }
+        }
+
+        var focusableNodes = collectFocusableNodes(content);
+        return focusableNodes.isEmpty() ? null : focusableNodes.get(0);
+    }
+
+    private void focusNode(Node target) {
+        target.requestFocus();
+        if (target instanceof TextInputControl inputControl) {
+            inputControl.positionCaret(inputControl.getLength());
+        }
     }
 
     /**
@@ -523,6 +709,9 @@ public class MainMenuController implements SuppressedFocusController {
                 dialogOverlay.setVisible(false);
                 dialogOverlay.setManaged(false);
                 dialogContentHost.getChildren().clear();
+                dialogOverlay.removeEventFilter(KeyEvent.KEY_PRESSED, overlayKeyHandler);
+                activeOverlayContent = null;
+                activeOverlaySpec = OverlaySpec.defaults();
             });
             activeOverlayTransition.play();
 
@@ -569,7 +758,8 @@ public class MainMenuController implements SuppressedFocusController {
 
     public void onUploadButtonAction() {
         var chooser = new FileChooser();
-        var list = chooser.showOpenMultipleDialog(new Stage());
+        Window owner = dropZone != null && dropZone.getScene() != null ? dropZone.getScene().getWindow() : null;
+        var list = chooser.showOpenMultipleDialog(owner);
 
         try {
             onFilesSelected(list);
@@ -640,9 +830,10 @@ public class MainMenuController implements SuppressedFocusController {
     }
 
     private void signDirectory(File dir) {
-        var directoryFiles = List.of(dir.listFiles());
-        if (directoryFiles.size() == 0)
+        var directoryArray = dir.listFiles();
+        if (directoryArray == null || directoryArray.length == 0)
             throw new EmptyDirectorySelectedException(dir.getAbsolutePath());
+        var directoryFiles = List.of(directoryArray);
 
         var filesList = getFilesList(directoryFiles);
         var targetDirectoryName = dir.getName() + "_signed";

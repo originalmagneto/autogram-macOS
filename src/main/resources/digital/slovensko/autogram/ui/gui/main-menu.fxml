@@ -149,11 +149,10 @@
                 </StackPane>
 
                 <!-- Modal Overlay for Dialogs -->
-                <StackPane fx:id="dialogOverlay" visible="false" managed="false" style="-fx-background-color: rgba(0,0,0,0.3);">
-                    <VBox fx:id="dialogContainer" alignment="CENTER" spacing="0" 
-                          maxWidth="500" maxHeight="400"
-                          style="-fx-background-color: #ffffff; -fx-background-radius: 12; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.2), 30, 0, 0, 10);">
-                        <VBox fx:id="dialogContentHost" VBox.vgrow="ALWAYS" alignment="CENTER" style="-fx-padding: 32;" />
+                <StackPane fx:id="dialogOverlay" visible="false" managed="false" styleClass="autogram-overlay-backdrop">
+                    <VBox fx:id="dialogContainer" alignment="CENTER" spacing="0"
+                          styleClass="autogram-overlay-card">
+                        <VBox fx:id="dialogContentHost" alignment="CENTER" styleClass="autogram-dialog-host" />
                     </VBox>
                 </StackPane>
             </StackPane>

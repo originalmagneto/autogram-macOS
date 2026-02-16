@@ -102,8 +102,9 @@ public class BatchSigningFailureDialogController implements SuppressedFocusContr
         } else {
             showErrorDetailsButton.getStyleClass().remove("autogram-error-summary__more-open");
         }
-
-        mainBox.getScene().getWindow().sizeToScene();
+        if (mainBox.getParent() != null) {
+            mainBox.getParent().requestLayout();
+        }
     }
 
     @Override
