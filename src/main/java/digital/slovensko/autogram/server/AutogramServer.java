@@ -8,6 +8,7 @@ import java.net.InetSocketAddress;
 import java.nio.file.Paths;
 import java.security.KeyStore;
 import java.util.List;
+import java.util.ResourceBundle;
 import java.util.concurrent.ExecutorService;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
@@ -29,6 +30,12 @@ public class AutogramServer {
         this.autogram = autogram;
         this.server = buildServer(hostname, port, isHttps);
         this.server.setExecutor(executorService);
+    }
+
+    // Compatibility bridge with upstream constructor that accepts language resources.
+    public AutogramServer(Autogram autogram, String hostname, int port, boolean isHttps, ExecutorService executorService,
+            ResourceBundle languageResources) {
+        this(autogram, hostname, port, isHttps, executorService);
     }
 
     public void start() {

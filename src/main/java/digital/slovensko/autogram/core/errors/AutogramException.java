@@ -4,6 +4,7 @@ import eu.europa.esig.dss.model.DSSException;
 import eu.europa.esig.dss.spi.exception.DSSExternalResourceException;
 
 import java.io.IOException;
+import java.util.ResourceBundle;
 
 public class AutogramException extends RuntimeException {
     private final String heading;
@@ -25,6 +26,24 @@ public class AutogramException extends RuntimeException {
         this.description = description;
     }
 
+    // Compatibility bridge with upstream i18n API where constructor takes errorCode.
+    public AutogramException(String errorCode, Throwable e, Object... i18nArgs) {
+        this(errorCode, "", "", e);
+    }
+
+    // Compatibility bridge with upstream i18n API where constructor takes errorCode.
+    public AutogramException(String errorCode, Object... i18nArgs) {
+        this(errorCode, "", "");
+    }
+
+    protected AutogramException(Throwable e, Object... i18nArgs) {
+        this("Nastala chyba", "", "", e);
+    }
+
+    protected AutogramException(Object... i18nArgs) {
+        this("Nastala chyba", "", "");
+    }
+
     public String getHeading() {
         return heading;
     }
@@ -35,6 +54,19 @@ public class AutogramException extends RuntimeException {
 
     public String getDescription() {
         return description;
+    }
+
+    // Compatibility bridge with upstream i18n API where getters require ResourceBundle.
+    public String getHeading(ResourceBundle resources) {
+        return getHeading();
+    }
+
+    public String getSubheading(ResourceBundle resources) {
+        return getSubheading();
+    }
+
+    public String getDescription(ResourceBundle resources) {
+        return getDescription();
     }
 
     public static AutogramException createFromDSSException(DSSException e) {

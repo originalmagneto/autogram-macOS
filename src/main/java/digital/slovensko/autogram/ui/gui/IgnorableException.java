@@ -13,6 +13,11 @@ public class IgnorableException extends AutogramException {
         this.onContinueCallback = onContinueCallback;
     }
 
+    // Compatibility bridge with upstream constructor.
+    public IgnorableException(Throwable e, SigningJob job, Runnable onContinueCallback) {
+        this("Pri zobrazovaní dokumentu nastala chyba", "", "", e, job, onContinueCallback);
+    }
+
     public SigningJob getJob() {
         return job;
     }
