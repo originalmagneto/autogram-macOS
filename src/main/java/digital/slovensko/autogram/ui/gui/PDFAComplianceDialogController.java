@@ -18,6 +18,7 @@ public class PDFAComplianceDialogController implements SuppressedFocusController
     Button cancelButton;
 
     private Runnable onClose;
+    private Runnable onContinue;
 
     public PDFAComplianceDialogController(SigningJob job, GUI gui) {
         this.job = job;
@@ -26,6 +27,10 @@ public class PDFAComplianceDialogController implements SuppressedFocusController
 
     public void setOnClose(Runnable onClose) {
         this.onClose = onClose;
+    }
+
+    public void setOnContinue(Runnable onContinue) {
+        this.onContinue = onContinue;
     }
 
     public void onCancelAction(ActionEvent ignored) {
@@ -38,6 +43,10 @@ public class PDFAComplianceDialogController implements SuppressedFocusController
     }
 
     public void onContinueAction(ActionEvent ignored) {
+        if (onContinue != null) {
+            onContinue.run();
+        }
+
         if (onClose != null) {
             onClose.run();
         } else {
