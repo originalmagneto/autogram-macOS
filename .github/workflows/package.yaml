@@ -3,7 +3,7 @@ name: Package
 on:
   push:
     tags:
-      - "v[0-9]+.[0-9]+.[0-9]+"
+      - "v*.*.*"
 
 jobs:
   macos:
@@ -12,11 +12,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/download-artifact@v4
         with:
-          merge-multiple: true
-          path: target
+          fetch-depth: 0
 
       - name: Update version in pom if tag pushed
         if: startsWith(github.ref, 'refs/tags/')
@@ -51,16 +48,49 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Generate release notes
+        id: release_notes
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TAG="${GITHUB_REF#refs/tags/}"
+          PREV_TAG="$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' | grep -v "^${TAG}$" | sort -V | tail -1 || true)"
+
+          {
+            echo "## 🍎 macOS Improvements Release ${TAG}"
+            echo
+            echo "### Changes in this release:"
+            echo
+            if [[ -n "${PREV_TAG}" ]]; then
+              git log "${PREV_TAG}..${TAG}" --pretty=format:"- %s"
+            else
+              git log "${TAG}" --pretty=format:"- %s"
+            fi
+            echo
+            echo
+            echo "### 📦 Installation"
+            echo
+            echo "- **macOS Package (.pkg)**: Download and double-click to install"
+            echo "- **macOS Disk Image (.dmg)**: Download, mount, and drag to Applications"
+            echo
+            echo "### 🔧 Technical Details"
+            echo
+            echo "- **Build date**: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+            echo "- **Commit SHA**: ${GITHUB_SHA}"
+          } > release_notes.md
+
 
       - name: Create release if tag pushed
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          draft: true
-          prerelease: true
+          name: "Autogram ${{ github.ref_name }} - macOS Improvements"
+          body_path: release_notes.md
+          draft: false
+          prerelease: false
           files: |
             target/*.pkg
             target/*.dmg
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-

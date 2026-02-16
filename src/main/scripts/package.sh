@@ -244,6 +244,34 @@ if [[ "${platform}" == "mac-universal" ]]; then
     exitValue=$?
     rm -rf ./DTempFiles
     checkExitCode $exitValue
+
+    # Create DMG from the app image
+    dmgArguments=(
+        "--app-image" "${appImageDir}/${appName}"
+        "--name" "${properties_name}"
+        "--type" "dmg"
+        "--app-version" "${properties_version:-$version}"
+        "--resource-dir" "./"
+        "--dest" "${output}"
+        "--description" "${properties_description}"
+        "--mac-app-category" "${properties_mac_appCategory:-business}"
+    )
+
+    if [[ -n "${properties_mac_identifier}" ]]; then
+        dmgArguments+=("--mac-package-identifier" "${properties_mac_identifier}")
+    fi
+
+    if [[ -n "${properties_mac_name}" ]]; then
+        dmgArguments+=("--mac-package-name" "${properties_mac_name}")
+    fi
+
+    if [[ "${properties_mac_sign}" == "1" ]]; then
+        dmgArguments+=("${signingArguments[@]}")
+    fi
+
+    $jpackage "${dmgArguments[@]}"
+    exitValue=$?
+    checkExitCode $exitValue
 fi
 
 if [[ "${platform}" == "mac" ]]; then
@@ -332,6 +360,35 @@ if [[ "${platform}" == "mac" ]]; then
 
     echo "Creating pkg at: ${output}"
     $jpackage "${pkgArguments[@]}"
+    exitValue=$?
+    checkExitCode $exitValue
+
+    # 3. Create DMG from App Image
+    dmgArguments=(
+        "--app-image" "${appImageDir}/${appName}"
+        "--name" "${properties_name}"
+        "--type" "dmg"
+        "--app-version" "${properties_version:-$version}"
+        "--resource-dir" "./"
+        "--dest" "${output}"
+        "--description" "${properties_description}"
+        "--mac-app-category" "${properties_mac_appCategory:-business}"
+    )
+
+    if [[ -n "${properties_mac_identifier}" ]]; then
+        dmgArguments+=("--mac-package-identifier" "${properties_mac_identifier}")
+    fi
+
+    if [[ -n "${properties_mac_name}" ]]; then
+        dmgArguments+=("--mac-package-name" "${properties_mac_name}")
+    fi
+
+    if [[ "${properties_mac_sign}" == "1" ]]; then
+        dmgArguments+=("${signingArguments[@]}")
+    fi
+
+    echo "Creating dmg at: ${output}"
+    $jpackage "${dmgArguments[@]}"
     exitValue=$?
     checkExitCode $exitValue
 fi

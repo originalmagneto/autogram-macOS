@@ -77,9 +77,9 @@ java -cp "target/classes:target/dependency/*" digital.slovensko.autogram.Main
 
 ## Releases for macOS Maintainers
 
-This repository includes a workflow that can publish macOS releases with `.dmg` and `.pkg`:
+This repository includes a workflow that publishes releases with macOS `.dmg` and `.pkg`:
 
-- file: `.github/workflows/macos-release.yml`
+- file: `.github/workflows/package.yaml`
 - triggers:
 1. push tag `v*.*.*`
 2. manual run via `workflow_dispatch`
