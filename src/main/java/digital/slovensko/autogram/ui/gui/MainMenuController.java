@@ -115,6 +115,7 @@ public class MainMenuController implements SuppressedFocusController {
     VBox rightDrawer;
     @FXML
     StackPane rightDrawerContent;
+    private VBox lastPrimaryPanel;
 
     public MainMenuController(Autogram autogram, UserSettings userSettings) {
         this.autogram = autogram;
@@ -133,6 +134,7 @@ public class MainMenuController implements SuppressedFocusController {
         if (menuBar != null) {
             menuBar.useSystemMenuBarProperty().set(true);
         }
+        lastPrimaryPanel = dropZonePanel;
 
         // Enhanced keyboard navigation
         dropZone.setFocusTraversable(true);
@@ -296,6 +298,10 @@ public class MainMenuController implements SuppressedFocusController {
         fadeIn.setToValue(1);
         fadeIn.setInterpolator(Interpolator.EASE_BOTH);
         fadeIn.play();
+
+        if (panel != settingsPanel) {
+            lastPrimaryPanel = panel;
+        }
 
         // Hide metadata if back to drop zone or in settings, show if in signing/success
         if (panel == dropZonePanel || panel == settingsPanel) {
@@ -751,6 +757,22 @@ public class MainMenuController implements SuppressedFocusController {
 
     @FXML
     public void onNavDropZone() {
+        if (settingsPanel != null
+                && settingsPanel.isVisible()
+                && lastPrimaryPanel != null
+                && lastPrimaryPanel != dropZonePanel) {
+            showPanel(lastPrimaryPanel);
+            if (lastPrimaryPanel == signingPanel) {
+                setStatus("Podpisovanie...");
+            } else if (lastPrimaryPanel == successPanel) {
+                setStatus("Podpísané ✓");
+            } else {
+                setStatus("Pripravený");
+            }
+            updateNavActive(navDropZone);
+            return;
+        }
+
         showDropZone();
     }
 

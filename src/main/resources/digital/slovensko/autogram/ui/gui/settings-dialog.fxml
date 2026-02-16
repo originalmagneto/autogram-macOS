@@ -8,7 +8,7 @@
       styleClass="autogram-settings-window">
 
     <HBox styleClass="autogram-settings-shell" VBox.vgrow="ALWAYS">
-        <VBox styleClass="autogram-settings-nav-pane" minWidth="220" maxWidth="260">
+        <VBox styleClass="autogram-settings-nav-pane" minWidth="190" prefWidth="206" maxWidth="220">
             <VBox spacing="4" styleClass="autogram-settings-nav-header">
                 <Label text="Nastavenia" styleClass="autogram-heading-l" />
                 <Label text="Prispôsobte podpisovanie, overovanie a bezpečnosť." styleClass="autogram-body-s" wrapText="true" />
