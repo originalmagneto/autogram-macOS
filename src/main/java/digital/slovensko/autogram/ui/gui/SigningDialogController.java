@@ -2,6 +2,7 @@ package digital.slovensko.autogram.ui.gui;
 
 import digital.slovensko.autogram.core.Autogram;
 import digital.slovensko.autogram.core.SignatureValidator;
+import digital.slovensko.autogram.core.errors.AutogramException;
 
 import digital.slovensko.autogram.core.visualization.Visualization;
 import digital.slovensko.autogram.ui.Visualizer;
@@ -95,6 +96,7 @@ public class SigningDialogController implements SuppressedFocusController, Visua
     private static final String ALERT_PDFA = "pdfa";
     private static final String ALERT_SIGNATURES_PENDING = "signatures-pending";
     private static final String ALERT_SIGNATURES_INVALID = "signatures-invalid";
+    private static final String ALERT_SIGNING_ERROR = "signing-error";
     private final Map<String, VBox> inlineAlerts = new HashMap<>();
 
     public SigningDialogController(Visualization visualization, Autogram autogram, GUI gui, String title,
@@ -462,6 +464,28 @@ public class SigningDialogController implements SuppressedFocusController, Visua
                 "Úrady nemusia takýto dokument akceptovať. Upozornenie vypnete v Nastaveniach -> Bezpečnosť -> Kontrola súladu s PDF/A formátom.");
     }
 
+    public void showSigningErrorInline(AutogramException e) {
+        var heading = (e != null && e.getHeading() != null && !e.getHeading().isBlank())
+                ? e.getHeading()
+                : "Podpisovanie zlyhalo";
+
+        String details = "";
+        if (e != null) {
+            var subheading = e.getSubheading() == null ? "" : e.getSubheading().trim();
+            var description = e.getDescription() == null ? "" : e.getDescription().trim();
+            details = subheading;
+            if (!description.isBlank() && !description.equals(subheading)) {
+                details = details.isBlank() ? description : details + " " + description;
+            }
+        }
+
+        if (details.isBlank()) {
+            details = "Skontrolujte certifikát, PIN alebo token a skúste to znova.";
+        }
+
+        showInlineErrorAlert(ALERT_SIGNING_ERROR, heading, details);
+    }
+
     private boolean containsInvalidSignatures(Reports reports) {
         if (reports == null || reports.getSimpleReport() == null) {
             return false;
@@ -481,6 +505,10 @@ public class SigningDialogController implements SuppressedFocusController, Visua
 
     private void showInlineInfoAlert(String key, String title, String message) {
         showInlineAlert(key, title, message, "autogram-inline-alert--info");
+    }
+
+    private void showInlineErrorAlert(String key, String title, String message) {
+        showInlineAlert(key, title, message, "autogram-inline-alert--error");
     }
 
     private void showInlineAlert(String key, String title, String message, String variantStyleClass) {

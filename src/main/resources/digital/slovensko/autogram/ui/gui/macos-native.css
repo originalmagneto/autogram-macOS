@@ -1646,6 +1646,16 @@ TextFlow.autogram-body-s {
   -fx-text-fill: #ffffff;
 }
 
+.autogram-inline-alert--error {
+  -fx-background-color: derive(-autogram-error-colour, 92%);
+  -fx-border-color: derive(-autogram-error-colour, 50%);
+}
+
+.autogram-inline-alert--error .autogram-inline-alert__icon {
+  -fx-background-color: -autogram-error-colour;
+  -fx-text-fill: #ffffff;
+}
+
 
 /* ============================================================
    41. SCROLL PANE — Clean container

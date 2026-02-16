@@ -574,7 +574,7 @@ public class GUI implements UI {
     public void onPickSigningKeyFailed(AutogramException e) {
         if (e instanceof PkcsEidWindowsDllException)
             showPkcsEidWindowsDllError(e);
-        else
+        else if (!showSigningInlineErrorOnAnyOpenJob(e))
             showError(e);
 
         resetSigningKey();
@@ -598,6 +598,18 @@ public class GUI implements UI {
     @Override
     public void onSigningFailed(AutogramException e, SigningJob job) {
         var controller = jobControllers.get(job);
+        if (controller == null) {
+            onSigningFailed(e);
+            return;
+        }
+
+        if (mainMenuController != null) {
+            controller.showSigningErrorInline(e);
+            refreshKeyOnAllJobs();
+            enableSigningOnAllJobs();
+            return;
+        }
+
         controller.close();
         jobControllers.remove(job);
         onSigningFailed(e);
@@ -605,13 +617,29 @@ public class GUI implements UI {
 
     @Override
     public void onSigningFailed(AutogramException e) {
-        showError(e);
+        if (!showSigningInlineErrorOnAnyOpenJob(e)) {
+            showError(e);
+        }
         if (e instanceof TokenRemovedException) {
             resetSigningKey();
         } else {
             refreshKeyOnAllJobs();
         }
         enableSigningOnAllJobs();
+    }
+
+    private boolean showSigningInlineErrorOnAnyOpenJob(AutogramException e) {
+        if (mainMenuController == null || jobControllers.isEmpty()) {
+            return false;
+        }
+
+        for (var controller : jobControllers.values()) {
+            if (controller != null) {
+                controller.showSigningErrorInline(e);
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
