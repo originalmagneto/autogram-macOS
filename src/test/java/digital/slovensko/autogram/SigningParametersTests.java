@@ -245,7 +245,7 @@ public class SigningParametersTests {
     @Test
     void testTransformationWithoutXdcXmlnsThrowsSigningParametersException() throws IOException {
         var transformation = new String(this.getClass().getResourceAsStream("crystal_test_data/PovolenieZdravotnictvo.sb.xslt").readAllBytes());
-        var schema = new String(this.getClass().getResourceAsStream("crystal_test_data/rozhodnutie_X4564-2.xsd").readAllBytes());
+        var schema = new String(this.getClass().getResourceAsStream("general_agenda.xsd").readAllBytes());
         var document = new InMemoryDocument(this.getClass().getResourceAsStream("crystal_test_data/rozhodnutie_X4564-2.xml"), "rozhodnutie_X4564-2.xml");
 
         Assertions.assertThrows(SigningParametersException.class,

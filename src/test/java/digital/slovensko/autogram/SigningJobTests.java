@@ -1,10 +1,7 @@
 package digital.slovensko.autogram;
 
 import digital.slovensko.autogram.core.SigningJob;
-import digital.slovensko.autogram.core.UserSettings;
-import digital.slovensko.autogram.core.visualization.DocumentVisualizationBuilder;
-import digital.slovensko.autogram.core.visualization.UnsupportedVisualization;
-import digital.slovensko.autogram.core.visualization.Visualization;
+import digital.slovensko.autogram.core.errors.SigningParametersException;
 import digital.slovensko.autogram.server.dto.Document;
 import digital.slovensko.autogram.server.dto.ServerSigningParameters;
 import digital.slovensko.autogram.server.dto.SignRequestBody;
@@ -50,13 +47,7 @@ public class SigningJobTests {
                 null);
 
         var signRequestBody = new SignRequestBody(new Document(content), ssParams, "application/xml;base64");
-        var job = SigningJob.buildFromRequest(signRequestBody.getDocument(), signRequestBody.getParameters(null, true), null);
-        Visualization visualization = null;
-        try {
-            visualization = DocumentVisualizationBuilder.fromJob(job, UserSettings.load());
-            assertInstanceOf(UnsupportedVisualization.class, visualization);
-        } catch (Exception e) {
-            fail();
-        }
+        assertThrows(SigningParametersException.class, () ->
+                SigningJob.buildFromRequest(signRequestBody.getDocument(), signRequestBody.getParameters(null, true), null));
     }
 }
