@@ -24,6 +24,23 @@ function checkExitCode() {
     fi
 }
 
+function alignMacBundleExecutable() {
+    local appBundlePath="${1}"
+    local plistPath="${appBundlePath}/Contents/Info.plist"
+    local macOsDir="${appBundlePath}/Contents/MacOS"
+
+    if [[ ! -f "${plistPath}" ]] || [[ ! -d "${macOsDir}" ]]; then
+        return
+    fi
+
+    # Some jpackage runs produce AutogramApp binary while Info.plist still points to Autogram.
+    # Align CFBundleExecutable with the actual launcher so Finder can open the app bundle.
+    if [[ -f "${macOsDir}/AutogramApp" ]] && [[ ! -f "${macOsDir}/Autogram" ]]; then
+        /usr/libexec/PlistBuddy -c "Set :CFBundleExecutable AutogramApp" "${plistPath}" >/dev/null 2>&1 \
+            || /usr/libexec/PlistBuddy -c "Add :CFBundleExecutable string AutogramApp" "${plistPath}" >/dev/null 2>&1
+    fi
+}
+
 IFS="="
 while read -r key value; do
     # Empty lines and comments
@@ -213,6 +230,7 @@ if [[ "${platform}" == "mac-universal" ]]; then
     checkExitCode $exitValue
 
     appName="${properties_name}.app"
+    alignMacBundleExecutable "${appImageDir}/${appName}"
 
     # Create PKG from the app image
     pkgArguments=(
@@ -334,6 +352,7 @@ if [[ "${platform}" == "mac" ]]; then
 
     # 2. Create PKG from App Image
     appName="${properties_name}.app"
+    alignMacBundleExecutable "${appImageDir}/${appName}"
     pkgArguments=(
         "--app-image" "${appImageDir}/${appName}"
         "--name" "${properties_name}"
