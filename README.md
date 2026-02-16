@@ -28,6 +28,23 @@ Use packages from [GitHub Releases](../../releases):
 2. Open the DMG and drag **Autogram.app** to **Applications**.
 3. Launch Autogram from Applications.
 
+### macOS (unsigned build) first run
+
+If a release is **not notarized/signed by Apple Developer ID**, macOS Gatekeeper may block first launch.
+
+Use one of these methods:
+
+1. Finder -> Applications -> right click **Autogram.app** -> **Open** -> confirm **Open**.
+2. System Settings -> Privacy & Security -> find blocked app message -> **Open Anyway**.
+
+If you still get launch issues, run:
+
+```bash
+xattr -dr com.apple.quarantine "/Applications/Autogram.app"
+codesign --force --deep --sign - --timestamp=none "/Applications/Autogram.app"
+open -a "/Applications/Autogram.app"
+```
+
 ## Run Locally (Developers)
 
 ### Prerequisites
@@ -88,6 +105,20 @@ To publish:
 
 1. Push a tag, e.g. `v1.2.3`
 2. GitHub Actions builds on macOS and creates a GitHub Release with installers attached
+
+## Upstream Sync (Original Autogram)
+
+This fork can be updated from upstream, but expect non-trivial merge work because both upstream and this fork changed significantly.
+
+Current status snapshot:
+- local-only commits: 73
+- upstream-only commits: 78
+- changed files in divergence range: ~165
+
+Recommended approach:
+1. Sync from upstream tag-to-tag (for example `v2.5.x` -> `v2.6.x` -> `v2.7.x`), not as one huge merge.
+2. Keep your macOS UI/UX and packaging changes isolated in dedicated commits.
+3. Re-run UI smoke checks after each sync step.
 
 ## License
 

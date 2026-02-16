@@ -82,6 +82,17 @@ jobs:
             echo "- **macOS Package (.pkg)**: Download and double-click to install"
             echo "- **macOS Disk Image (.dmg)**: Download, mount, and drag to Applications"
             echo
+            echo "### 🛡 Gatekeeper (Unsigned Builds)"
+            echo
+            echo "If macOS blocks first launch:"
+            echo "1. Finder -> Applications -> right click **Autogram.app** -> **Open**"
+            echo "2. Or System Settings -> Privacy & Security -> **Open Anyway**"
+            echo
+            echo "Terminal fallback:"
+            echo "\`xattr -dr com.apple.quarantine \"/Applications/Autogram.app\"\`"
+            echo "\`codesign --force --deep --sign - --timestamp=none \"/Applications/Autogram.app\"\`"
+            echo "\`open -a \"/Applications/Autogram.app\"\`"
+            echo
             echo "### 🔧 Technical Details"
             echo
             echo "- **Build date**: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
