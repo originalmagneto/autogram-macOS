@@ -15,9 +15,9 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Update version in pom if tag pushed
+      - name: Update version in pom from pushed tag
         if: startsWith(github.ref, 'refs/tags/')
-        run: ./mvnw versions:set -DnewVersion=$(git describe --tags --abbrev=0 | sed -r 's/^v//g')
+        run: ./mvnw versions:set -DnewVersion=${GITHUB_REF_NAME#v}
         shell: bash
 
       - name: Set up JDK
@@ -38,13 +38,21 @@ jobs:
             macos-maven-
 
 
-      - name: Disable macOS signing
+      - name: Configure macOS signing mode
         shell: bash
         run: |
-          sed -i.bak 's/^mac.sign=.*/mac.sign=0/' src/main/resources/digital/slovensko/autogram/build.properties
+          if [[ -n "${{ secrets.APPLE_DEVELOPER_IDENTITY }}" && -n "${{ secrets.APPLE_KEYCHAIN_PATH }}" ]]; then
+            echo "Apple signing secrets detected, enabling package signing."
+            sed -i.bak 's/^mac.sign=.*/mac.sign=1/' src/main/resources/digital/slovensko/autogram/build.properties
+            echo "APPLE_DEVELOPER_IDENTITY=${{ secrets.APPLE_DEVELOPER_IDENTITY }}" >> "$GITHUB_ENV"
+            echo "APPLE_KEYCHAIN_PATH=${{ secrets.APPLE_KEYCHAIN_PATH }}" >> "$GITHUB_ENV"
+          else
+            echo "Apple signing secrets not found, building unsigned installers."
+            sed -i.bak 's/^mac.sign=.*/mac.sign=0/' src/main/resources/digital/slovensko/autogram/build.properties
+          fi
 
       - name: Package with Maven
-        run: ./mvnw -B -C -V package -P system-jdk
+        run: ./mvnw -B -C -V clean package -P system-jdk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
