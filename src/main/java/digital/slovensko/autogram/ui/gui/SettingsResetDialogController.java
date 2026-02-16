@@ -4,7 +4,6 @@ import digital.slovensko.autogram.core.UserSettings;
 import javafx.fxml.FXML;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
-import javafx.stage.Stage;
 
 
 public class SettingsResetDialogController implements SuppressedFocusController {
@@ -19,7 +18,8 @@ public class SettingsResetDialogController implements SuppressedFocusController 
     private Button rejectResetButton;
 
     private UserSettings userSettings;
-    private Button resetButton;
+    private Runnable onClose;
+    private Runnable onReset;
 
 
     public SettingsResetDialogController() {
@@ -29,21 +29,18 @@ public class SettingsResetDialogController implements SuppressedFocusController 
     public void onConfirmResetButtonAction() {
 
         if (userSettings != null) {
-
             userSettings.reset();
-
-            var stage = (Stage) confirmResetButton.getScene().getWindow();
-            stage.close();
-
-            var parentStage = (Stage) resetButton.getScene().getWindow();
-            parentStage.close();
         }
+
+        if (onReset != null) {
+            onReset.run();
+        }
+
+        closeDialog();
     }
 
     public void onRejectResetButtonAction() {
-
-        var stage = (Stage) rejectResetButton.getScene().getWindow();
-        stage.close();
+        closeDialog();
     }
 
 
@@ -56,7 +53,19 @@ public class SettingsResetDialogController implements SuppressedFocusController 
         this.userSettings = userSettings;
     }
 
-    public void setResetButton(Button resetButton) {
-        this.resetButton = resetButton;
+    public void setOnClose(Runnable onClose) {
+        this.onClose = onClose;
+    }
+
+    public void setOnReset(Runnable onReset) {
+        this.onReset = onReset;
+    }
+
+    private void closeDialog() {
+        if (onClose != null) {
+            onClose.run();
+        } else {
+            GUIUtils.closeWindow(mainBox);
+        }
     }
 }

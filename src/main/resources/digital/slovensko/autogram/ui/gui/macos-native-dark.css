@@ -116,6 +116,10 @@
     -fx-text-fill: #f2f4f8;
 }
 
+.choice-box .label {
+    -fx-text-fill: #f2f4f8;
+}
+
 .choice-box .context-menu,
 .choice-box .context-menu .menu-item {
     -fx-background-color: rgba(35, 36, 41, 0.96);
@@ -486,6 +490,16 @@
     -fx-text-fill: #f2f4f8;
 }
 
+.autogram-settings-row .choice-box > .label,
+.autogram-settings-row .choice-box .label {
+    -fx-text-fill: #f2f4f8;
+    -fx-fill: #f2f4f8;
+}
+
+.autogram-settings-row .choice-box .arrow {
+    -fx-background-color: #c8cede;
+}
+
 .autogram-settings-row .check-box .text,
 .autogram-settings-row .radio-button .text,
 .autogram-country-row .label,
@@ -513,6 +527,19 @@
 
 .autogram-settings-row .autogram-heading-s {
     -fx-text-fill: #f1f2f6;
+}
+
+.autogram-options-row .label,
+.autogram-signing-control-bar .label,
+.autogram-signing-control-bar .check-box .text,
+.autogram-signing-control-bar .choice-box > .label,
+.autogram-signing-control-bar .choice-box .label {
+    -fx-text-fill: #f1f4fb;
+    -fx-fill: #f1f4fb;
+}
+
+.autogram-signing-control-bar .choice-box .arrow {
+    -fx-background-color: #b8becc;
 }
 
 .autogram-settings-row .autogram-description {

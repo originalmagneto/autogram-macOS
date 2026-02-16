@@ -80,8 +80,9 @@ public class PickKeyDialogController {
     public void onPickCertificateButtonAction(ActionEvent actionEvent) {
         if (toggleGroup.getSelectedToggle() == null) {
             error.setManaged(true);
+            error.setVisible(true);
             formGroup.getStyleClass().add("autogram-form-group--error");
-            formGroup.getScene().getWindow().sizeToScene();
+            formGroup.requestLayout();
         } else {
             if (onClose != null) {
                 onClose.run();

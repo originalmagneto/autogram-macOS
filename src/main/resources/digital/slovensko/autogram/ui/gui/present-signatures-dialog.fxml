@@ -8,14 +8,12 @@
 <?import javafx.scene.text.TextFlow?>
 <VBox xmlns="http://javafx.com/javafx"
       xmlns:fx="http://javafx.com/fxml"
-      maxHeight="800"
-      prefWidth="768"
       fx:id="mainBox">
 
     <TextFlow fx:id="signaturesHeader"><Text styleClass="autogram-heading-m" text="Podpisy"/></TextFlow>
 
-    <ScrollPane fx:id="scrollPane" fitToWidth="true" VBox.vgrow="ALWAYS" style="-fx-background-color: transparent; -fx-padding: 0;">
-        <VBox style="-fx-padding: 16;">
+    <ScrollPane fx:id="scrollPane" fitToWidth="true" VBox.vgrow="ALWAYS" styleClass="autogram-right-drawer-scroll">
+        <VBox>
             <VBox fx:id="signaturesBox" spacing="16" />
         </VBox>
     </ScrollPane>

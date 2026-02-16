@@ -9,7 +9,7 @@
 
 <VBox xmlns="http://javafx.com/javafx"
       xmlns:fx="http://javafx.com/fxml"
-      styleClass="autogram-dialog-content,autogram-dialog-content--wide"
+      styleClass="autogram-dialog-content"
       fx:id="mainBox" spacing="10">
 
     <VBox styleClass="autogram-warning-summary">

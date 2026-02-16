@@ -85,6 +85,8 @@ public class SettingsDialogController {
     private Button otherNavButton;
 
     private Runnable onSave;
+    private Runnable onReset;
+    private MainMenuController mainMenuController;
 
     private final UserSettings userSettings;
     private final List<String> preDefinedTsaServers = List.of(
@@ -98,6 +100,14 @@ public class SettingsDialogController {
 
     public void setOnSave(Runnable onSave) {
         this.onSave = onSave;
+    }
+
+    public void setOnReset(Runnable onReset) {
+        this.onReset = onReset;
+    }
+
+    public void setMainMenuController(MainMenuController mainMenuController) {
+        this.mainMenuController = mainMenuController;
     }
 
     public void initialize() {
@@ -412,17 +422,25 @@ public class SettingsDialogController {
 
         var controller = new SettingsResetDialogController();
         controller.setUserSettings(userSettings);
-        controller.setResetButton(resetButton);
+        controller.setOnReset(onReset);
 
         var root = GUIUtils.loadFXML(controller, "settings-reset-dialog.fxml");
 
-        var stage = new Stage();
-        stage.setTitle("Obnovenie pôvodných nastavení");
-        stage.setScene(new Scene(root));
-        stage.setResizable(false);
-        stage.initModality(Modality.APPLICATION_MODAL);
-        GUIUtils.suppressDefaultFocus(stage, controller);
-        stage.show();
+        if (mainMenuController != null) {
+            controller.setOnClose(mainMenuController::hideOverlayDialog);
+            mainMenuController.showOverlayDialog(root, OverlaySpec.compact()
+                    .withAutoFocus("#rejectResetButton")
+                    .withCancelAction("#rejectResetButton")
+                    .withCloseOnEscape(true));
+        } else {
+            var stage = new Stage();
+            stage.setTitle("Obnovenie pôvodných nastavení");
+            stage.setScene(new Scene(root));
+            stage.setResizable(false);
+            stage.initModality(Modality.APPLICATION_MODAL);
+            GUIUtils.suppressDefaultFocus(stage, controller);
+            stage.show();
+        }
     }
 
     @FXML

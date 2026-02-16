@@ -6,15 +6,17 @@
 
 <?import javafx.scene.text.TextFlow?>
 <?import javafx.scene.text.Text?>
-<?import javafx.scene.shape.SVGPath?>
 <VBox xmlns="http://javafx.com/javafx"
       xmlns:fx="http://javafx.com/fxml"
-      prefHeight="800"
-      maxHeight="800"
-      minWidth="768"
-      fx:id="mainBox">
+      fx:id="mainBox"
+      spacing="12"
+      styleClass="autogram-dialog-content,autogram-dialog-content--wide">
 
-    <TextFlow><Text styleClass="autogram-heading-m" text="Podpisy"/></TextFlow>
+    <HBox alignment="CENTER_LEFT" spacing="12">
+        <TextFlow HBox.hgrow="ALWAYS"><Text styleClass="autogram-heading-m" text="Detaily podpisov"/></TextFlow>
+        <Button fx:id="closeButton" styleClass="autogram-button,autogram-button--secondary"
+                text="Zavrieť" onAction="#onCloseButtonAction"/>
+    </HBox>
 
     <!-- HTML visualization of validation report -->
     <VBox fx:id="webViewContainer" managed="false" visible="false" VBox.vgrow="ALWAYS">

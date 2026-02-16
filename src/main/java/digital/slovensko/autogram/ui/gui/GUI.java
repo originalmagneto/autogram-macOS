@@ -428,7 +428,7 @@ public class GUI implements UI {
             var controller = new PDFAComplianceDialogController(job, this);
             var root = GUIUtils.loadFXML(controller, "pdfa-compliance-dialog.fxml");
             controller.setOnClose(() -> mainMenuController.hideOverlayDialog());
-            mainMenuController.showOverlayDialog(root, OverlaySpec.wide()
+            mainMenuController.showOverlayDialog(root, OverlaySpec.defaults()
                     .withAutoFocus("#continueButton")
                     .withCancelAction("#cancelButton")
                     .withCloseOnEscape(true));
@@ -767,25 +767,33 @@ public class GUI implements UI {
 
     @Override
     public void consentCertificateReadingAndThen(Consumer<Runnable> callback, Runnable onCancel) {
-        var controller = new ConsentCertificateReadingDialogController(hostServices, callback, onCancel);
+        var controller = new ConsentCertificateReadingDialogController(callback, onCancel);
         var root = GUIUtils.loadFXML(controller, "consent-certificate-reading-dialog.fxml");
 
-        var stage = new Stage();
-        stage.setTitle("Súhlas - Zoznam podpisových certifikátov");
-        stage.setScene(new Scene(root));
+        if (mainMenuController != null) {
+            controller.setOnClose(mainMenuController::hideOverlayDialog);
+            mainMenuController.showOverlayDialog(root, OverlaySpec.defaults()
+                    .withAutoFocus("#continueButton")
+                    .withCancelAction("#cancelButton")
+                    .withCloseOnEscape(true));
+        } else {
+            var stage = new Stage();
+            stage.setTitle("Súhlas - Zoznam podpisových certifikátov");
+            stage.setScene(new Scene(root));
 
-        stage.sizeToScene();
-        stage.setResizable(false);
-        stage.initModality(Modality.APPLICATION_MODAL);
+            stage.sizeToScene();
+            stage.setResizable(false);
+            stage.initModality(Modality.APPLICATION_MODAL);
 
-        stage.setOnCloseRequest(e -> {
-            if (onCancel != null)
-                onCancel.run();
-        });
+            stage.setOnCloseRequest(e -> {
+                if (onCancel != null)
+                    onCancel.run();
+            });
 
-        GUIUtils.suppressDefaultFocus(stage, controller);
+            GUIUtils.suppressDefaultFocus(stage, controller);
 
-        stage.show();
+            stage.show();
+        }
     }
 
     public void setBatchPin(char[] pin) {

@@ -1,27 +1,27 @@
 package digital.slovensko.autogram.ui.gui;
 
-import javafx.application.HostServices;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.scene.Node;
-import javafx.scene.control.Button;
 import javafx.scene.layout.VBox;
-import javafx.stage.Stage;
 
 import java.util.function.Consumer;
 
 public class ConsentCertificateReadingDialogController implements SuppressedFocusController {
-    private final HostServices hostServices;
     private final Consumer<Runnable> callback;
     private final Runnable cancelCallback;
+    private Runnable onClose;
 
     @FXML
     VBox mainBox;
 
-    public ConsentCertificateReadingDialogController(HostServices hostServices, Consumer<Runnable> callback, Runnable cancelCallback) {
-        this.hostServices = hostServices;
+    public ConsentCertificateReadingDialogController(Consumer<Runnable> callback, Runnable cancelCallback) {
         this.callback = callback;
         this.cancelCallback = cancelCallback;
+    }
+
+    public void setOnClose(Runnable onClose) {
+        this.onClose = onClose;
     }
 
     public void onContinueAction(ActionEvent event) {
@@ -29,14 +29,18 @@ public class ConsentCertificateReadingDialogController implements SuppressedFocu
     }
 
     public void onCancelAction(ActionEvent event) {
-        cancelCallback.run();
-        var stage = (Stage) mainBox.getScene().getWindow();
-        stage.close();
+        if (cancelCallback != null) {
+            cancelCallback.run();
+        }
+        close();
     }
 
     public void close() {
-        var stage = (Stage) mainBox.getScene().getWindow();
-        stage.close();
+        if (onClose != null) {
+            onClose.run();
+        } else {
+            GUIUtils.closeWindow(mainBox);
+        }
     }
 
     @Override

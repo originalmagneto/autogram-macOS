@@ -78,13 +78,25 @@ public class SignaturesController implements SuppressedFocusController {
         var controller = new SignatureDetailsController(signatureValidationReportsHTML);
         var root = GUIUtils.loadFXML(controller, "signature-details.fxml");
 
-        var stage = new Stage();
-        stage.setTitle("Detaily podpisov");
-        stage.setScene(new Scene(root));
-        stage.initModality(Modality.WINDOW_MODAL);
-        stage.initOwner(mainBox.getScene().getWindow());
-        stage.setResizable(false);
-        stage.show();
+        if (mainMenuController != null) {
+            controller.setOnClose(mainMenuController::hideOverlayDialog);
+            mainMenuController.showOverlayDialog(root, OverlaySpec.wide()
+                    .withAutoFocus("#closeButton")
+                    .withCancelAction("#closeButton")
+                    .withCloseOnEscape(true));
+        } else {
+            var stage = new Stage();
+            stage.setTitle("Detaily podpisov");
+            stage.setScene(new Scene(root));
+            stage.initModality(Modality.WINDOW_MODAL);
+            stage.initOwner(mainBox.getScene().getWindow());
+            stage.setWidth(760);
+            stage.setHeight(620);
+            stage.setMinWidth(680);
+            stage.setMinHeight(500);
+            controller.setOnClose(stage::close);
+            stage.show();
+        }
     }
 
     public void onCloseButtonAction() {

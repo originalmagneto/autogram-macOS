@@ -46,6 +46,7 @@ Skript:
 4. Modal sizing + alignment:
 - výber certifikátu nie je zbytočne veľký
 - PIN dialog je kompaktne centrovaný
+- reset nastavení sa otvorí ako kompaktný modal a nezatvára celé hlavné okno
 
 5. Keyboard workflow:
 - pri PIN dialógu je kurzor hneď v inpute

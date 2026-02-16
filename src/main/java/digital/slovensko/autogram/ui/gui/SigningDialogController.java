@@ -149,7 +149,7 @@ public class SigningDialogController implements SuppressedFocusController, Visua
         var root = GUIUtils.loadFXML(signaturesNotValidatedDialogController, "signatures-not-validated-dialog.fxml");
         if (mainMenuController != null) {
             signaturesNotValidatedDialogController.setOnClose(mainMenuController::hideOverlayDialog);
-            mainMenuController.showOverlayDialog(root, OverlaySpec.wide()
+            mainMenuController.showOverlayDialog(root, OverlaySpec.defaults()
                     .withAutoFocus("#continueButton")
                     .withCancelAction("#cancelButton")
                     .withCloseOnEscape(true));
@@ -175,7 +175,7 @@ public class SigningDialogController implements SuppressedFocusController, Visua
         var root = GUIUtils.loadFXML(signaturesInvalidDialogController, "signatures-invalid-dialog.fxml");
         if (mainMenuController != null) {
             signaturesInvalidDialogController.setOnClose(mainMenuController::hideOverlayDialog);
-            mainMenuController.showOverlayDialog(root, OverlaySpec.wide()
+            mainMenuController.showOverlayDialog(root, OverlaySpec.defaults()
                     .withAutoFocus("#continueButton")
                     .withCancelAction("#cancelButton")
                     .withCloseOnEscape(true));

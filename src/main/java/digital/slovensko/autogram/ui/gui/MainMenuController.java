@@ -554,15 +554,15 @@ public class MainMenuController implements SuppressedFocusController {
 
         switch (sizePreset) {
             case COMPACT -> {
-                dialogContainer.setMaxWidth(420);
+                dialogContainer.setMaxWidth(400);
                 dialogContainer.setMaxHeight(Region.USE_PREF_SIZE);
             }
             case WIDE -> {
-                dialogContainer.setMaxWidth(760);
+                dialogContainer.setMaxWidth(680);
                 dialogContainer.setMaxHeight(Region.USE_PREF_SIZE);
             }
             case DEFAULT -> {
-                dialogContainer.setMaxWidth(580);
+                dialogContainer.setMaxWidth(540);
                 dialogContainer.setMaxHeight(Region.USE_PREF_SIZE);
             }
         }
@@ -855,6 +855,7 @@ public class MainMenuController implements SuppressedFocusController {
     @FXML
     public void onSettingButtonAction() {
         var controller = new SettingsDialogController(userSettings);
+        controller.setMainMenuController(this);
         controller.setOnSave(() -> {
             MacOSNotification.notify("Autogram", "Nastavenia boli uložené");
             // If they changed the trusted list or validator settings, we might need to
@@ -862,6 +863,7 @@ public class MainMenuController implements SuppressedFocusController {
             autogram.initializeSignatureValidator(gui.scheduledExecutorService, gui.cachedExecutorService,
                     userSettings.getTrustedList());
         });
+        controller.setOnReset(this::onSettingButtonAction);
         var root = GUIUtils.loadFXML(controller, "settings-dialog.fxml");
 
         settingsPanel.getChildren().clear();

@@ -112,12 +112,13 @@
 .autogram-dialog-content {
   -fx-padding: 20px;
   -fx-spacing: 14px;
+  -fx-max-width: 520px;
 }
 
 .autogram-dialog-content--compact {
   -fx-padding: 16px;
   -fx-spacing: 10px;
-  -fx-max-width: 360px;
+  -fx-max-width: 340px;
 }
 
 .autogram-dialog-content--wide {
@@ -844,7 +845,7 @@ TextFlow.autogram-body-s {
   -fx-border-radius: 10px;
   -fx-border-width: 0;
   -fx-spacing: 10px;
-  -fx-max-width: 620px;
+  -fx-max-width: 520px;
 }
 
 .autogram-warning-summary>VBox {
@@ -864,8 +865,8 @@ TextFlow.autogram-body-s {
 
 .autogram-warning-summary__description,
 .autogram-warning-summary__title {
-  -fx-pref-width: 560px;
-  -fx-max-width: 560px;
+  -fx-pref-width: 500px;
+  -fx-max-width: 500px;
 }
 
 .autogram-warning-summary__title {
@@ -2182,17 +2183,16 @@ TextFlow.autogram-body-s {
 }
 
 .autogram-overlay-card--compact {
-  -fx-max-width: 420px;
+  -fx-max-width: 400px;
   -fx-padding: 14px;
 }
 
 .autogram-overlay-card--default {
-  -fx-max-width: 580px;
+  -fx-max-width: 540px;
 }
 
 .autogram-overlay-card--wide {
-  -fx-max-width: 760px;
-  -fx-max-height: 780px;
+  -fx-max-width: 680px;
 }
 
 /* Large overlay card for settings/about */

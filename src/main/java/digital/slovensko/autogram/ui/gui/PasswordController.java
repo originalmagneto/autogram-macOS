@@ -83,8 +83,7 @@ public class PasswordController {
             error.setVisible(true);
             formGroup.getStyleClass().add("autogram-form-group--error");
             passwordField.getStyleClass().add("autogram-input--error");
-
-            formGroup.getScene().getWindow().sizeToScene();
+            formGroup.requestLayout();
             passwordField.requestFocus();
         } else {
             this.password = passwordField.getText().toCharArray();
