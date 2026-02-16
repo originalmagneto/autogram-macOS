@@ -34,6 +34,8 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 
 import static digital.slovensko.autogram.ui.gui.GUIValidationUtils.*;
 
@@ -87,6 +89,13 @@ public class SigningDialogController implements SuppressedFocusController, Visua
     Label stepSignaturesLabel;
     @FXML
     Label stepSigningLabel;
+    @FXML
+    VBox inlineAlertsBox;
+
+    private static final String ALERT_PDFA = "pdfa";
+    private static final String ALERT_SIGNATURES_PENDING = "signatures-pending";
+    private static final String ALERT_SIGNATURES_INVALID = "signatures-invalid";
+    private final Map<String, VBox> inlineAlerts = new HashMap<>();
 
     public SigningDialogController(Visualization visualization, Autogram autogram, GUI gui, String title,
             boolean shouldCheckValidityBeforeSigning) {
@@ -102,6 +111,10 @@ public class SigningDialogController implements SuppressedFocusController, Visua
         setActiveStep(1);
         signaturesTable.setManaged(false);
         signaturesTable.setVisible(false);
+        if (shouldCheckValidityBeforeSigning) {
+            showInlineInfoAlert(ALERT_SIGNATURES_PENDING, "Kontrola podpisov prebieha",
+                    "Overujem existujúce podpisy v dokumente. Môžete pokračovať v čítaní dokumentu.");
+        }
         refreshSigningKey();
         visualization.initialize(this);
         autogram.checkPDFACompliance(visualization.getJob());
@@ -275,7 +288,14 @@ public class SigningDialogController implements SuppressedFocusController, Visua
         signatureCheckReports = reports;
         signatureCheckCompleted = true;
         setActiveStep(2);
+        if (reports == null) {
+            removeInlineAlert(ALERT_SIGNATURES_PENDING);
+            removeInlineAlert(ALERT_SIGNATURES_INVALID);
+            return;
+        }
         renderSignatures(reports, false, true);
+        showInlineInfoAlert(ALERT_SIGNATURES_PENDING, "Podpisy sa overujú",
+                "Dokument obsahuje podpisy. Dokončujem ich validáciu.");
 
         if (signaturesNotValidatedDialogController != null)
             signaturesNotValidatedDialogController.close();
@@ -285,7 +305,16 @@ public class SigningDialogController implements SuppressedFocusController, Visua
         signatureValidationCompleted = true;
         signatureValidationReports = reports;
         setActiveStep(2);
+        removeInlineAlert(ALERT_SIGNATURES_PENDING);
         renderSignatures(reports, true, SignatureValidator.getInstance().areTLsLoaded());
+
+        if (containsInvalidSignatures(reports)) {
+            showInlineWarningAlert(ALERT_SIGNATURES_INVALID, "Dokument obsahuje neplatné alebo nedôveryhodné podpisy",
+                    "Pred podpisom skontrolujte detail podpisov a zvážte, či chcete pokračovať.");
+        } else {
+            removeInlineAlert(ALERT_SIGNATURES_INVALID);
+        }
+
         if (signaturesController != null)
             signaturesController.onSignatureValidationCompleted(reports);
 
@@ -426,6 +455,105 @@ public class SigningDialogController implements SuppressedFocusController, Visua
     public void showUnsupportedVisualization() {
         unsupportedVisualizationInfoBox.setVisible(true);
         unsupportedVisualizationInfoBox.setManaged(true);
+    }
+
+    public void showPdfaInlineWarning() {
+        showInlineWarningAlert(ALERT_PDFA, "Dokument nie je vo formáte PDF/A",
+                "Úrady nemusia takýto dokument akceptovať. Upozornenie vypnete v Nastaveniach -> Bezpečnosť -> Kontrola súladu s PDF/A formátom.");
+    }
+
+    private boolean containsInvalidSignatures(Reports reports) {
+        if (reports == null || reports.getSimpleReport() == null) {
+            return false;
+        }
+
+        for (var signatureId : reports.getSimpleReport().getSignatureIdList()) {
+            if (!reports.getSimpleReport().isValid(signatureId)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void showInlineWarningAlert(String key, String title, String message) {
+        showInlineAlert(key, title, message, "autogram-inline-alert--warning");
+    }
+
+    private void showInlineInfoAlert(String key, String title, String message) {
+        showInlineAlert(key, title, message, "autogram-inline-alert--info");
+    }
+
+    private void showInlineAlert(String key, String title, String message, String variantStyleClass) {
+        if (inlineAlertsBox == null || key == null || key.isBlank()) {
+            return;
+        }
+
+        var existing = inlineAlerts.get(key);
+        if (existing != null) {
+            var titleNode = existing.lookup(".autogram-inline-alert__title");
+            var bodyNode = existing.lookup(".autogram-inline-alert__body");
+            if (titleNode instanceof Label titleLabelNode) {
+                titleLabelNode.setText(title);
+            }
+            if (bodyNode instanceof Label bodyLabelNode) {
+                bodyLabelNode.setText(message);
+            }
+            if (!(titleNode instanceof Label) || !(bodyNode instanceof Label)) {
+                removeInlineAlert(key);
+                showInlineAlert(key, title, message, variantStyleClass);
+            }
+            return;
+        }
+
+        var card = new VBox();
+        card.getStyleClass().addAll("autogram-inline-alert", variantStyleClass);
+
+        var header = new HBox();
+        header.getStyleClass().add("autogram-inline-alert__header");
+
+        var icon = new Label("!");
+        icon.getStyleClass().add("autogram-inline-alert__icon");
+
+        var titleLabel = new Label(title);
+        titleLabel.setWrapText(true);
+        titleLabel.getStyleClass().add("autogram-inline-alert__title");
+
+        var spacer = new javafx.scene.layout.Region();
+        HBox.setHgrow(spacer, javafx.scene.layout.Priority.ALWAYS);
+
+        var dismissButton = new Button("Skryť");
+        dismissButton.getStyleClass().addAll("autogram-link", "autogram-inline-alert__dismiss");
+        dismissButton.setOnAction(e -> removeInlineAlert(key));
+
+        header.getChildren().addAll(icon, titleLabel, spacer, dismissButton);
+
+        var bodyLabel = new Label(message);
+        bodyLabel.setWrapText(true);
+        bodyLabel.getStyleClass().add("autogram-inline-alert__body");
+
+        card.getChildren().addAll(header, bodyLabel);
+        inlineAlerts.put(key, card);
+
+        inlineAlertsBox.getChildren().add(card);
+        inlineAlertsBox.setManaged(true);
+        inlineAlertsBox.setVisible(true);
+    }
+
+    private void removeInlineAlert(String key) {
+        if (inlineAlertsBox == null) {
+            return;
+        }
+
+        var alertNode = inlineAlerts.remove(key);
+        if (alertNode == null) {
+            return;
+        }
+
+        inlineAlertsBox.getChildren().remove(alertNode);
+        if (inlineAlerts.isEmpty()) {
+            inlineAlertsBox.setManaged(false);
+            inlineAlertsBox.setVisible(false);
+        }
     }
 
     @Override

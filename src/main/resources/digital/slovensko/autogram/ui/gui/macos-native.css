@@ -1574,6 +1574,78 @@ TextFlow.autogram-body-s {
   -fx-text-fill: -autogram-text-primary;
 }
 
+.autogram-inline-alerts {
+  -fx-spacing: 8;
+}
+
+.autogram-inline-alert {
+  -fx-spacing: 8;
+  -fx-padding: 10 12;
+  -fx-background-radius: 10;
+  -fx-border-radius: 10;
+  -fx-border-width: 1px;
+}
+
+.autogram-inline-alert__header {
+  -fx-spacing: 8;
+  -fx-alignment: CENTER_LEFT;
+}
+
+.autogram-inline-alert__icon {
+  -fx-min-width: 20;
+  -fx-min-height: 20;
+  -fx-pref-width: 20;
+  -fx-pref-height: 20;
+  -fx-alignment: CENTER;
+  -fx-background-radius: 999;
+  -fx-font-size: 12px;
+  -fx-font-weight: 700;
+}
+
+.autogram-inline-alert__title {
+  -fx-font-size: 13px;
+  -fx-font-weight: 600;
+  -fx-text-fill: -autogram-text-primary;
+}
+
+.autogram-inline-alert__body {
+  -fx-font-size: 12px;
+  -fx-text-fill: -autogram-text-primary;
+  -fx-wrap-text: true;
+}
+
+.autogram-inline-alert__dismiss {
+  -fx-background-color: transparent;
+  -fx-border-color: transparent;
+  -fx-padding: 2 4;
+  -fx-font-size: 12px;
+  -fx-text-fill: -autogram-link-colour;
+}
+
+.autogram-inline-alert__dismiss:hover {
+  -fx-underline: true;
+}
+
+.autogram-inline-alert--warning {
+  -fx-background-color: derive(#ff9500, 92%);
+  -fx-border-color: derive(#ff9500, 50%);
+}
+
+.autogram-inline-alert--warning .autogram-inline-alert__icon {
+  -fx-background-color: #b86a00;
+  -fx-text-fill: #ffffff;
+}
+
+.autogram-inline-alert--info {
+  -fx-background-color: derive(-autogram-focus-colour, 88%);
+  -fx-border-color: derive(-autogram-focus-colour, 60%);
+}
+
+.autogram-inline-alert--info .autogram-inline-alert__icon {
+  -fx-background-color: -autogram-focus-colour;
+  -fx-text-fill: #ffffff;
+}
+
 
 /* ============================================================
    41. SCROLL PANE — Clean container

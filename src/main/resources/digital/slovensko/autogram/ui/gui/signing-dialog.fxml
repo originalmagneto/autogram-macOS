@@ -23,6 +23,8 @@
         </HBox>
     </VBox>
 
+    <VBox fx:id="inlineAlertsBox" styleClass="autogram-inline-alerts" managed="false" visible="false" />
+
     <StackPane styleClass="autogram-signing-preview-card" VBox.vgrow="ALWAYS">
         <!-- HTML visualization -->
         <VBox fx:id="webViewContainer" managed="false" visible="false" VBox.vgrow="ALWAYS">

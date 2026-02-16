@@ -542,6 +542,35 @@
     -fx-background-color: #b8becc;
 }
 
+.autogram-inline-alert__title,
+.autogram-inline-alert__body {
+    -fx-text-fill: #f1f4fb;
+}
+
+.autogram-inline-alert--warning {
+    -fx-background-color: #46320d;
+    -fx-border-color: #7b5920;
+}
+
+.autogram-inline-alert--warning .autogram-inline-alert__icon {
+    -fx-background-color: #8f6421;
+    -fx-text-fill: #ffffff;
+}
+
+.autogram-inline-alert--info {
+    -fx-background-color: rgba(10, 132, 255, 0.20);
+    -fx-border-color: rgba(10, 132, 255, 0.45);
+}
+
+.autogram-inline-alert--info .autogram-inline-alert__icon {
+    -fx-background-color: #0a84ff;
+    -fx-text-fill: #ffffff;
+}
+
+.autogram-inline-alert__dismiss {
+    -fx-text-fill: #8ec5ff;
+}
+
 .autogram-settings-row .autogram-description {
     -fx-text-fill: #aeb4bf;
 }

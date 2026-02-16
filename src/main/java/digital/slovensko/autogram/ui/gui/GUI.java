@@ -44,7 +44,6 @@ public class GUI implements UI {
     private final UserSettings userSettings;
     private BatchQueueController batchQueueController;
     private MainMenuController mainMenuController;
-    private boolean suppressPdfaWarningForSession = false;
 
     private int nWindows = 0;
     public final ScheduledExecutorService scheduledExecutorService;
@@ -426,12 +425,13 @@ public class GUI implements UI {
     public void onPDFAComplianceCheckFailed(SigningJob job) {
         if (mainMenuController != null) {
             mainMenuController.updateFormatMetadata("PDF (nie PDF/A compliant)");
-            if (suppressPdfaWarningForSession) {
+            var signingController = jobControllers.get(job);
+            if (signingController != null) {
+                signingController.showPdfaInlineWarning();
                 return;
             }
             var controller = new PDFAComplianceDialogController(job, this);
             var root = GUIUtils.loadFXML(controller, "pdfa-compliance-dialog.fxml");
-            controller.setOnContinue(() -> suppressPdfaWarningForSession = true);
             controller.setOnClose(() -> mainMenuController.hideOverlayDialog());
             mainMenuController.showOverlayDialog(root, OverlaySpec.defaults()
                     .withAutoFocus("#continueButton")
