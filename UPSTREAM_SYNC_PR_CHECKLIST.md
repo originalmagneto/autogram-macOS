@@ -9,11 +9,16 @@ This PR continues upstream sync while preserving local macOS UI/UX redesign and 
 - `32720efb` `but allow when xdc xmlns present` (security/workflow hardening path preserved)
 - `0b598ec2` `#541 [documentation] troubles during installing`
 - `8bd5d7fe` `Add ErrorResponseBuilder singleton` (resolved to local architecture)
+- `d73b1454` `update tests` (partial, safe subset only)
+- `77b6f36a` `#541 add i18n keys for token drivers` (safe subset with local compatibility fix)
+- `374765cc` `#541 add EN l10n`
 
 ## Local compatibility commits (this wave)
 
 - `08d199fa` Align transformation tests with XML Datacontainer constraints
 - `23a43e5d` Restore `AutogramServer` constructor compatibility for GUI bootstrap
+- `cd4611cd` Keep `DriverDetectorSettings` decoupled from missing language mixin
+- `bd405615` Align `SignRequestBodyTest` expectations with local validation behavior
 
 ## Key outcomes
 
