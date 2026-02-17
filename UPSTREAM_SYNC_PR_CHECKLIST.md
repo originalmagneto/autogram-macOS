@@ -12,6 +12,9 @@ This PR continues upstream sync while preserving local macOS UI/UX redesign and 
 - `d73b1454` `update tests` (partial, safe subset only)
 - `77b6f36a` `#541 add i18n keys for token drivers` (safe subset with local compatibility fix)
 - `374765cc` `#541 add EN l10n`
+- `958055b6` `allo baseline b and t values in signature level api wo format` (resolved with local underscore-safe level mapping)
+- `3134552c` `fix add underscore`
+- `20baf1ee` `rm unwanted file`
 
 ## Local compatibility commits (this wave)
 
@@ -19,6 +22,7 @@ This PR continues upstream sync while preserving local macOS UI/UX redesign and 
 - `23a43e5d` Restore `AutogramServer` constructor compatibility for GUI bootstrap
 - `cd4611cd` Keep `DriverDetectorSettings` decoupled from missing language mixin
 - `bd405615` Align `SignRequestBodyTest` expectations with local validation behavior
+- `a3f40405` Add i18n/base-controller compatibility bridge for future `#541` upstream sync
 
 ## Key outcomes
 
@@ -26,6 +30,8 @@ This PR continues upstream sync while preserving local macOS UI/UX redesign and 
 - Existing GUI bootstrap remains compatible (no break in server startup).
 - Upstream install troubleshooting docs merged into local README variants.
 - XML Datacontainer test expectations aligned with stricter signing parameter rules.
+- Added upstream-compatible `BaseController`/`HasI18n` scaffolding without changing current macOS UI/UX behavior.
+- API now supports baseline `B/T` level resolution path while preserving correct underscore mapping (`PAdES_BASELINE_*`, etc.).
 
 ## Explicitly skipped in this wave
 
