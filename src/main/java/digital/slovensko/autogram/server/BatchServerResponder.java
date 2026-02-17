@@ -27,7 +27,8 @@ public class BatchServerResponder extends BatchResponder {
             exchange.getResponseBody().write(gson.toJson(response).getBytes());
             exchange.getResponseBody().close();
         } catch (JsonSyntaxException e) {
-            var errorResponse = ErrorResponseBuilder.buildFromException(new MalformedBodyException(e.getMessage(), e));
+            var errorResponse = ErrorResponseBuilder
+                    .buildFromException(new MalformedBodyException(MalformedBodyException.Error.JSON_PARSING_FAILED, e));
             EndpointUtils.respondWithError(errorResponse, exchange);
         } catch (Exception e) {
             EndpointUtils.respondWithError(ErrorResponseBuilder.buildFromException(e), exchange);

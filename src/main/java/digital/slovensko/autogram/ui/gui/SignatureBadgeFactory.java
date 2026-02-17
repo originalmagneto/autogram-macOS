@@ -12,6 +12,7 @@ import javafx.scene.text.Text;
 import javafx.scene.text.TextFlow;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.ResourceBundle;
 
 import static digital.slovensko.autogram.ui.gui.HasI18n.translate;
@@ -20,6 +21,14 @@ import static eu.europa.esig.dss.enumerations.SignatureForm.PAdES;
 import static eu.europa.esig.dss.enumerations.SignatureForm.XAdES;
 
 public abstract class SignatureBadgeFactory {
+    private static ResourceBundle defaultResources() {
+        try {
+            return ResourceBundle.getBundle("digital.slovensko.autogram.ui.gui.language.l10n", Locale.getDefault());
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
     public static Node createBadge(String label, String styleClass) {
         var box = new HBox(new TextFlow(new Text(label)));
         box.getStyleClass().addAll("autogram-tag", styleClass);
@@ -29,6 +38,10 @@ public abstract class SignatureBadgeFactory {
 
     public static Node createInProgressBadge(ResourceBundle resources) {
         return createInProgressBadge(translate(resources, "signature.qualification.inProgress.label"));
+    }
+
+    public static Node createInProgressBadge() {
+        return createInProgressBadge(defaultResources());
     }
 
     public static Node createInProgressBadge(String label) {
@@ -88,6 +101,10 @@ public abstract class SignatureBadgeFactory {
         }
     }
 
+    public static Node createBadgeFromQualification(SignatureQualification qualification, SignatureForm signatureForm) {
+        return createBadgeFromQualification(qualification, signatureForm, defaultResources());
+    }
+
     public static Node createBadgeFromTSQualification(boolean isFailed, TimestampQualification timestampQualification, ResourceBundle resources) {
         if (timestampQualification == null)
             return createInProgressBadge(resources);
@@ -100,6 +117,10 @@ public abstract class SignatureBadgeFactory {
             case TSA -> createCustomValidQualifiedBadge(translate(resources, "signature.timestamp.TSA.label"));
             default -> createUnknownBadge(translate(resources, "signature.timestamp.unknown.label"));
         };
+    }
+
+    public static Node createBadgeFromTSQualification(boolean isFailed, TimestampQualification timestampQualification) {
+        return createBadgeFromTSQualification(isFailed, timestampQualification, defaultResources());
     }
 
     public static Node createCombinedBadgeFromQualification(ResourceBundle resources, SignatureQualification signatureQualification,
@@ -139,6 +160,12 @@ public abstract class SignatureBadgeFactory {
             default:
                 return createBadgeFromQualification(signatureQualification, signatureForm, resources);
         }
+    }
+
+    public static Node createCombinedBadgeFromQualification(SignatureQualification signatureQualification,
+                                                            Reports reports, String signatureId, double prefWrapLength) {
+        return createCombinedBadgeFromQualification(defaultResources(), signatureQualification, reports, signatureId,
+                prefWrapLength);
     }
 
     private static HBox createMultipleBadges(SignatureQualification signatureQualification, Reports reports,

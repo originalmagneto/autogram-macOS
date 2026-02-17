@@ -41,7 +41,8 @@ public class BatchEndpoint implements HttpHandler {
                 exchange.sendResponseHeaders(405, -1);
             }
         } catch (JsonSyntaxException e) {
-            var response = ErrorResponseBuilder.buildFromException(new MalformedBodyException(e.getMessage(), e));
+            var response = ErrorResponseBuilder
+                    .buildFromException(new MalformedBodyException(MalformedBodyException.Error.JSON_PARSING_FAILED, e));
             EndpointUtils.respondWithError(response, exchange);
         } catch (Exception e) {
             EndpointUtils.respondWithError(ErrorResponseBuilder.buildFromException(e), exchange);

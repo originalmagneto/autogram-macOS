@@ -90,9 +90,9 @@ public class AutogramException extends RuntimeException {
                 } else if (cause.getMessage().equals("Token has been removed")) {
                     return new TokenRemovedException();
                 } else if (cause instanceof DSSExternalResourceException) {
-                    return new TsaServerMisconfiguredException("Nastavený TSA server odmietol pridať časovú pečiatku. Skontrolujte nastavenia TSA servera.", cause);
+                    return new TsaServerMisconfiguredException(TsaServerMisconfiguredException.Error.REFUSED, cause);
                 } else if (cause instanceof NullPointerException && cause.getMessage().contains("Host name")) {
-                    return new TsaServerMisconfiguredException("Nie je nastavená žiadna adresa TSA servera. Skontrolujte nastavenia TSA servera.", cause);
+                    return new TsaServerMisconfiguredException(TsaServerMisconfiguredException.Error.MISSING_HOST_NAME, cause);
                 } else if (cause instanceof IOException && (cause.getMessage().contains("The specified module could not be found") || cause.getMessage().contains("Zadaný modul sa nepodarilo"))) {
                     return new PkcsEidWindowsDllException(e);
                 }

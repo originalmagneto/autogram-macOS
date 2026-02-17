@@ -15,7 +15,7 @@ import javafx.stage.Stage;
 
 import static digital.slovensko.autogram.ui.gui.GUIValidationUtils.*;
 
-public class SignaturesController implements SuppressedFocusController {
+public class SignaturesController extends BaseController implements SuppressedFocusController {
     private final GUI gui;
     private Reports signatureCheckReports;
     private Reports signatureValidationReports;

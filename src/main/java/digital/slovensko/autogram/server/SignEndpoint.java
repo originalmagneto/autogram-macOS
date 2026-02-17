@@ -36,7 +36,8 @@ public class SignEndpoint implements HttpHandler {
                 autogram.sign(job);
 
         } catch (JsonSyntaxException | IOException e) {
-            var response = ErrorResponseBuilder.buildFromException(new MalformedBodyException(e.getMessage(), e));
+            var response = ErrorResponseBuilder
+                    .buildFromException(new MalformedBodyException(MalformedBodyException.Error.JSON_PARSING_FAILED, e));
             EndpointUtils.respondWithError(response, exchange);
 
         } catch (AutogramException e) {

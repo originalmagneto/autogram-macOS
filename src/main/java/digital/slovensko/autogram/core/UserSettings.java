@@ -15,9 +15,6 @@ import java.util.*;
 import java.util.prefs.Preferences;
 import java.util.stream.Stream;
 
-import static digital.slovensko.autogram.ui.SupportedLanguage.getByLocale;
-
-
 public class UserSettings implements PasswordManagerSettings, SignatureTokenSettings, DriverDetectorSettings {
     private final String DEFAULT_SIGNATURE_LEVEL = SignatureLevelStringConverter.PADES;
     private final String DEFAULT_DRIVER = "";
@@ -198,10 +195,10 @@ public class UserSettings implements PasswordManagerSettings, SignatureTokenSett
         return Optional.ofNullable(language);
     }
 
-    public SupportedLanguage getLanguageOrDefault() {
-        return getLanguage()
-                .or(() -> Optional.ofNullable(getByLocale(Locale.getDefault())))
-                .orElse(SupportedLanguage.DEFAULT);
+    @Override
+    public Locale getLanguageLocale() {
+        return getLanguage().map(SupportedLanguage::getLocale)
+                .orElse(Locale.getDefault());
     }
 
     public void setLanguage(SupportedLanguage language) {

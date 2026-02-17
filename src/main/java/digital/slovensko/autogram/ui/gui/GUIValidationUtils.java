@@ -2,6 +2,7 @@ package digital.slovensko.autogram.ui.gui;
 
 import java.text.SimpleDateFormat;
 import java.util.List;
+import java.util.ResourceBundle;
 import java.util.function.Consumer;
 
 import javax.security.auth.x500.X500Principal;
@@ -90,6 +91,11 @@ public class GUIValidationUtils {
         }
 
         return table;
+    }
+
+    public static GridPane createSignatureTableRows(ResourceBundle resources, Reports reports, boolean isValidated,
+            Consumer<String> callback, int maxRows) {
+        return createSignatureTableRows(reports, isValidated, callback, maxRows);
     }
 
     private static String createRemainingSignaturesCountString(int i) {
@@ -188,6 +194,11 @@ public class GUIValidationUtils {
         var signatureBox = new VBox(nameBox, signatureDetailsBox);
         signatureBox.getStyleClass().add("autogram-signature-box");
         return signatureBox;
+    }
+
+    public static VBox createSignatureBox(ResourceBundle resources, Reports reports, boolean isValidated,
+            String signatureId, Consumer<String> callback, boolean areTLsLoaded) {
+        return createSignatureBox(reports, isValidated, signatureId, callback, areTLsLoaded);
     }
 
     private static String validityToString(boolean isValid, boolean isFailed, boolean areTLsLoaded,
