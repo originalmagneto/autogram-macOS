@@ -8,6 +8,8 @@ import java.net.InetSocketAddress;
 import java.nio.file.Paths;
 import java.security.KeyStore;
 import java.util.List;
+import java.util.Locale;
+import java.util.MissingResourceException;
 import java.util.ResourceBundle;
 import java.util.concurrent.ExecutorService;
 import javax.net.ssl.KeyManagerFactory;
@@ -30,6 +32,12 @@ public class AutogramServer {
         this.autogram = autogram;
         this.server = buildServer(hostname, port, isHttps, languageResources);
         this.server.setExecutor(executorService);
+    }
+
+    // Backward-compatible constructor used by existing GUI bootstrap.
+    public AutogramServer(Autogram autogram, String hostname, int port, boolean isHttps,
+            ExecutorService executorService) {
+        this(autogram, hostname, port, isHttps, executorService, getDefaultLanguageResources());
     }
 
     public void start() {
@@ -111,5 +119,13 @@ public class AutogramServer {
     public void stop() {
         ((ExecutorService) server.getExecutor()).shutdown(); // TODO find out why requests hang
         server.stop(1);
+    }
+
+    private static ResourceBundle getDefaultLanguageResources() {
+        try {
+            return ResourceBundle.getBundle("digital.slovensko.autogram.ui.gui.language.l10n", Locale.getDefault());
+        } catch (MissingResourceException e) {
+            return ResourceBundle.getBundle("digital.slovensko.autogram.ui.gui.language.l10n", Locale.ENGLISH);
+        }
     }
 }
