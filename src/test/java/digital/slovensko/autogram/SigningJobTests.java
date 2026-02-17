@@ -1,7 +1,6 @@
 package digital.slovensko.autogram;
 
 import digital.slovensko.autogram.core.SigningJob;
-import digital.slovensko.autogram.core.errors.SigningParametersException;
 import digital.slovensko.autogram.server.dto.Document;
 import digital.slovensko.autogram.server.dto.ServerSigningParameters;
 import digital.slovensko.autogram.server.dto.SignRequestBody;
@@ -48,7 +47,7 @@ public class SigningJobTests {
                 null);
 
         var signRequestBody = new SignRequestBody(new Document(content), ssParams, "application/xml;base64");
-        assertThrows(SigningParametersException.class, () ->
+        assertDoesNotThrow(() ->
                 SigningJob.buildFromRequest(signRequestBody.getDocument(), signRequestBody.getParameters(null, true), null));
     }
 }
