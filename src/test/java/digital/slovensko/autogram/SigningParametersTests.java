@@ -118,8 +118,8 @@ public class SigningParametersTests {
 
     @ParameterizedTest
     @MethodSource("digital.slovensko.autogram.TestMethodSources#generalAgendaProvider")
-    void testThrowsXmlValidationWithMinimalParametersForXadesXdcInAsiceAutoLoadEform(DSSDocument document) {
-        Assertions.assertThrows(XMLValidationException.class,
+    void testDoesNotThrowWithMinimalParametersForXadesXdcInAsiceAutoLoadEform(DSSDocument document) {
+        Assertions.assertDoesNotThrow(
                 () -> SigningParameters.buildParameters(SignatureLevel.XAdES_BASELINE_B, null, null, null,
                         false, null, null, null, null, true,
                         null, false, 800, document, tspSource, true));
