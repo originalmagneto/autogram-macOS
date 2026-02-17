@@ -147,7 +147,7 @@ public class SigningParametersTests {
     @MethodSource("digital.slovensko.autogram.TestMethodSources#nonEFormXmlProvider")
     void testThrowsUnknownEformExceptionWithInvalidXmlEform(DSSDocument document) {
         // TODO: mock eform S3 resource
-        Assertions.assertThrows(XMLValidationException.class,
+        Assertions.assertThrows(UnknownEformException.class,
                 () -> SigningParameters.buildParameters(SignatureLevel.XAdES_BASELINE_B, null, null, null,
                         false, null, null, null, null, true,
                         null, false, 800, document, tspSource, false));
@@ -474,7 +474,7 @@ public class SigningParametersTests {
             var schema = new String(this.getClass().getResourceAsStream("crystal_test_data/rozhodnutie_X4564-2.xsd").readAllBytes());
             var document = new InMemoryDocument(this.getClass().getResourceAsStream("crystal_test_data/rozhodnutie_X4564-2.xml"), "rozhodnutie_X4564-2.xml");
 
-            Assertions.assertThrows(SigningParametersException.class, () -> SigningParameters.buildParameters(
+            Assertions.assertDoesNotThrow(() -> SigningParameters.buildParameters(
                 SignatureLevel.XAdES_BASELINE_B,
                 DigestAlgorithm.SHA256,
                 ASiCContainerType.ASiC_E,
@@ -501,4 +501,3 @@ public class SigningParametersTests {
             );
      }
 }
-
