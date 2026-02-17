@@ -1,6 +1,6 @@
 package digital.slovensko.autogram.core;
 
-public interface DriverDetectorSettings extends LanguageSettings {
+public interface DriverDetectorSettings {
     String getCustomKeystorePath();
     String getCustomPKCS11DriverPath();
 }
