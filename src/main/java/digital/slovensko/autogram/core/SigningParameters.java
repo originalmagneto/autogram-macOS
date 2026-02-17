@@ -97,7 +97,10 @@ public class SigningParameters {
                 throw new SigningParametersException(WRONG_MIME_TYPE);
         }
 
-        if (AutogramMimeType.isXDC(extractedDocumentMimeType) || AutogramMimeType.isXML(extractedDocumentMimeType))
+        var isXdcEform = eFormAttributes.containerXmlns() != null
+                && eFormAttributes.containerXmlns().contains("xmldatacontainer");
+
+        if ((AutogramMimeType.isXDC(extractedDocumentMimeType) || AutogramMimeType.isXML(extractedDocumentMimeType)) && isXdcEform)
             XDCValidator.validateXml(
                     eFormAttributes.schema(), eFormAttributes.transformation(), extractedDocument,
                     propertiesCanonicalization, digestAlgorithm, eFormAttributes.embedUsedSchemas());
