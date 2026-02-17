@@ -97,17 +97,15 @@ public class SigningParameters {
                 throw new SigningParametersException("Nesprávny typ dokumentu", "Zadaný dokument nemožno podpísať ako elektronický formulár v XML Datacontaineri");
         }
 
-        if (AutogramMimeType.isXDC(extractedDocumentMimeType) || AutogramMimeType.isXML(extractedDocumentMimeType)) {
+        if (AutogramMimeType.isXDC(extractedDocumentMimeType))
             XDCValidator.validateXml(
                     eFormAttributes.schema(), eFormAttributes.transformation(), extractedDocument,
                     propertiesCanonicalization, digestAlgorithm, eFormAttributes.embedUsedSchemas());
-        } else {
-            if (eFormAttributes.containerXmlns() == null || !eFormAttributes.containerXmlns().contains("xmldatacontainer")) {
-                if (eFormAttributes.transformation() != null)
-                    throw new SigningParametersException(XSLT_NO_XDC);
+        else if (eFormAttributes.containerXmlns() == null || !eFormAttributes.containerXmlns().contains("xmldatacontainer")) {
+            if (eFormAttributes.transformation() != null)
+                throw new SigningParametersException(XSLT_NO_XDC);
 
                 eFormAttributes = new EFormAttributes(null, null, null, null, null, null, false);
-            }
         }
 
         if (!plainXmlEnabled && (AutogramMimeType.isXML(extractedDocumentMimeType) || AutogramMimeType.isXDC(extractedDocumentMimeType)) && (eFormAttributes.transformation() == null))
