@@ -7,6 +7,43 @@ Autogram is a multi-platform (Windows, MacOS, Linux) desktop JavaFX application 
 
 ![Screenshot](assets/autogram-screenshot-en.png?raw=true)
 
+## Run on macOS (including local self-sign)
+
+If you don't have an Apple Developer account, you can still run the app locally after download.
+
+### Option A: Run from source
+
+```sh
+./mvnw -Psystem-jdk -DskipTests package
+open target/app-image/Autogram.app
+```
+
+### Option B: Run from downloaded DMG (without notarization)
+
+```sh
+# 1) Remove quarantine from downloaded DMG
+xattr -dr com.apple.quarantine "$HOME/Downloads/Autogram-<version>.dmg"
+
+# 2) Mount DMG and copy app to Applications
+hdiutil attach "$HOME/Downloads/Autogram-<version>.dmg"
+ditto "/Volumes/Autogram/Autogram.app" "/Applications/Autogram.app"
+hdiutil detach "/Volumes/Autogram"
+
+# 3) Remove quarantine from installed app
+xattr -dr com.apple.quarantine "/Applications/Autogram.app"
+
+# 4) Ad-hoc self-sign locally
+codesign --remove-signature "/Applications/Autogram.app" || true
+codesign --force --deep --sign - --timestamp=none "/Applications/Autogram.app"
+codesign --verify --deep --strict --verbose=2 "/Applications/Autogram.app"
+
+# 5) Launch
+open -a "/Applications/Autogram.app"
+```
+
+Notes:
+- This is a local ad-hoc signature (`-`), not Apple notarization.
+- For public distribution without warnings, use Apple Developer signing + notarization.
 
 ## Integration
 
