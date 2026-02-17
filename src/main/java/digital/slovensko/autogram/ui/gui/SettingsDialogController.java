@@ -20,7 +20,7 @@ import javafx.stage.Stage;
 import java.util.List;
 import java.util.function.Consumer;
 
-public class SettingsDialogController {
+public class SettingsDialogController extends BaseController {
     @FXML
     private ChoiceBox<SignatureLevel> signatureLevelChoiceBoxBox;
     @FXML
@@ -110,6 +110,7 @@ public class SettingsDialogController {
         this.mainMenuController = mainMenuController;
     }
 
+    @FXML
     public void initialize() {
         initializeSignatureLevelChoiceBox();
         initializeDriverChoiceBox();

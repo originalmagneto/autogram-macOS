@@ -35,7 +35,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
-public class MainMenuController implements SuppressedFocusController {
+public class MainMenuController extends BaseController implements SuppressedFocusController {
     private final Autogram autogram;
     private final UserSettings userSettings;
     private GUI gui;
@@ -130,6 +130,7 @@ public class MainMenuController implements SuppressedFocusController {
         return gui;
     }
 
+    @FXML
     public void initialize() {
         if (menuBar != null) {
             menuBar.useSystemMenuBarProperty().set(true);
