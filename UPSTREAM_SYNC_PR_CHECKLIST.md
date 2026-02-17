@@ -15,6 +15,9 @@ This PR continues upstream sync while preserving local macOS UI/UX redesign and 
 - `958055b6` `allo baseline b and t values in signature level api wo format` (resolved with local underscore-safe level mapping)
 - `3134552c` `fix add underscore`
 - `20baf1ee` `rm unwanted file`
+- `15b9f208` `add a comment explaining that we ignore transformation for non-XDC documents`
+- `0b5172fd` `fix asset loading in tests`
+- `d1d05e11` `remove eform attributes from signing parameters unless signing eform`
 
 ## Local compatibility commits (this wave)
 
@@ -32,6 +35,8 @@ This PR continues upstream sync while preserving local macOS UI/UX redesign and 
 - XML Datacontainer test expectations aligned with stricter signing parameter rules.
 - Added upstream-compatible `BaseController`/`HasI18n` scaffolding without changing current macOS UI/UX behavior.
 - API now supports baseline `B/T` level resolution path while preserving correct underscore mapping (`PAdES_BASELINE_*`, etc.).
+- `SigningParameters` branch for non-XDC remains strict (rejects transformation without XDC) while staying aligned with upstream eForm-attribute cleanup intent.
+- Test assets/resource loading changes from upstream are retained where non-breaking, with local stronger tests preserved.
 
 ## Explicitly skipped in this wave
 
