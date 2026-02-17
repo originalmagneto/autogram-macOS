@@ -20,7 +20,6 @@ import digital.slovensko.autogram.core.errors.*;
 import digital.slovensko.autogram.core.visualization.Visualization;
 import digital.slovensko.autogram.drivers.TokenDriver;
 import digital.slovensko.autogram.ui.BatchUiResult;
-import digital.slovensko.autogram.ui.SupportedLanguage;
 import digital.slovensko.autogram.ui.UI;
 import digital.slovensko.autogram.util.PDFUtils;
 import digital.slovensko.autogram.util.macos.MacOSNotification;
@@ -481,7 +480,7 @@ public class GUI implements UI {
 
     public void showVisualization(Visualization visualization, Autogram autogram) {
         var doc = visualization.getJob().getDocument();
-        var title = SupportedLanguage.loadResources(userSettings).getString("general.document");
+        var title = "Dokument";
         if (doc.getName() != null)
             title += " " + doc.getName();
 
