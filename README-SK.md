@@ -9,6 +9,44 @@ Autogram je multi-platformová (Windows, MacOS, Linux) desktopová JavaFX aplik�
 
 - [Webstránka Autogram-u](https://sluzby.slovensko.digital/autogram/)
 
+## Spustenie na macOS (vrátane self-sign)
+
+Ak nemáte Apple Developer účet, appku viete spustiť lokálne aj tak.
+
+### Možnosť A: Spustenie zo zdrojákov
+
+```sh
+./mvnw -Psystem-jdk -DskipTests package
+open target/app-image/Autogram.app
+```
+
+### Možnosť B: Spustenie zo stiahnutého DMG (bez notarizácie)
+
+```sh
+# 1) Odstránenie quarantine atribútu z DMG
+xattr -dr com.apple.quarantine "$HOME/Downloads/Autogram-<verzia>.dmg"
+
+# 2) Pripojenie DMG a kopírovanie appky do Applications
+hdiutil attach "$HOME/Downloads/Autogram-<verzia>.dmg"
+ditto "/Volumes/Autogram/Autogram.app" "/Applications/Autogram.app"
+hdiutil detach "/Volumes/Autogram"
+
+# 3) Odstránenie quarantine z nainštalovanej appky
+xattr -dr com.apple.quarantine "/Applications/Autogram.app"
+
+# 4) Lokálny ad-hoc self-sign
+codesign --remove-signature "/Applications/Autogram.app" || true
+codesign --force --deep --sign - --timestamp=none "/Applications/Autogram.app"
+codesign --verify --deep --strict --verbose=2 "/Applications/Autogram.app"
+
+# 5) Spustenie
+open -a "/Applications/Autogram.app"
+```
+
+Poznámky:
+- Toto je lokálny ad-hoc podpis (`-`), nie Apple notarizácia.
+- Pre verejnú distribúciu bez varovaní treba Apple Developer signing + notarizáciu.
+
 ## Integrácia
 
 Swagger dokumentácia pre HTTP API je [dostupná na githube](https://generator3.swagger.io/index.html?url=https://raw.githubusercontent.com/slovensko-digital/autogram/main/src/main/resources/digital/slovensko/autogram/server/server.yml) alebo po spustení aplikácie je tiež dostupná na http://localhost:37200/docs.
@@ -113,6 +151,13 @@ docker compose up --build
 ```
 
 Výsledné balíčky sa objavia v `packaging/output/`.
+
+#### WiX Tools
+V prípade nasledujúcej chyby:
+> Can not find WiX tools (light.exe, candle.exe)
+> Download WiX 3.0 or later from https://wixtoolset.org and add it to the PATH.
+
+Stiahnite si z https://github.com/wixtoolset/wix3/releases a pridajte si do path (inštaluje bez opýtania do `C:\Program Files (x86)\WiX Toolset v3.14`)
 
 
 ## Autori a sponzori

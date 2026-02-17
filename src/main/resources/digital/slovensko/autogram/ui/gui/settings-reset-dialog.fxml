@@ -12,19 +12,22 @@
       spacing="12"
       styleClass="autogram-dialog-content,autogram-dialog-content--compact,autogram-prose">
     <TextFlow>
-        <Text styleClass="autogram-heading-m" text="Chcete zresetovať nastavenia?" />
+        <Text styleClass="autogram-heading-m" text="%settings.reset.summary.title" />
     </TextFlow>
 
     <TextFlow>
-        <Text styleClass="autogram-body"
-              text="Táto akcia zresetuje všetky nastavenia na ich pôvodné predvolené hodnoty." />
+        <Text styleClass="autogram-body" text="%settings.reset.text" />
     </TextFlow>
 
     <HBox styleClass="autogram-actions" alignment="CENTER_RIGHT">
         <Region HBox.hgrow="ALWAYS" />
-        <Button fx:id="rejectResetButton" onAction="#onRejectResetButtonAction"
-                styleClass="autogram-button,autogram-button--secondary" text="Zrušiť" />
-        <Button fx:id="confirmResetButton" onAction="#onConfirmResetButtonAction"
-                styleClass="autogram-button,autogram-button--primary" text="Resetovať nastavenia" />
+        <Button fx:id="rejectResetButton"
+                onAction="#onRejectResetButtonAction"
+                styleClass="autogram-button,autogram-button--secondary"
+                text="%general.cancel.btn" />
+        <Button fx:id="confirmResetButton"
+                onAction="#onConfirmResetButtonAction"
+                styleClass="autogram-button,autogram-button--primary"
+                text="%settings.reset.btn" />
     </HBox>
 </VBox>

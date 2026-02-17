@@ -8,7 +8,6 @@ import digital.slovensko.autogram.core.Batch;
 import digital.slovensko.autogram.core.BatchResponder;
 import digital.slovensko.autogram.core.errors.AutogramException;
 import digital.slovensko.autogram.server.dto.BatchStartResponseBody;
-import digital.slovensko.autogram.server.dto.ErrorResponse;
 import digital.slovensko.autogram.server.errors.MalformedBodyException;
 
 public class BatchServerResponder extends BatchResponder {
@@ -28,15 +27,16 @@ public class BatchServerResponder extends BatchResponder {
             exchange.getResponseBody().write(gson.toJson(response).getBytes());
             exchange.getResponseBody().close();
         } catch (JsonSyntaxException e) {
-            var errorResponse = ErrorResponse.buildFromException(new MalformedBodyException(e.getMessage(), e));
+            var errorResponse = ErrorResponseBuilder
+                    .buildFromException(new MalformedBodyException(MalformedBodyException.Error.JSON_PARSING_FAILED, e));
             EndpointUtils.respondWithError(errorResponse, exchange);
         } catch (Exception e) {
-            EndpointUtils.respondWithError(ErrorResponse.buildFromException(e), exchange);
+            EndpointUtils.respondWithError(ErrorResponseBuilder.buildFromException(e), exchange);
         }
     }
 
     @Override
     public void onBatchStartFailure(AutogramException error) {
-        EndpointUtils.respondWithError(ErrorResponse.buildFromException(error), exchange);
+        EndpointUtils.respondWithError(ErrorResponseBuilder.buildFromException(error), exchange);
     }
 }

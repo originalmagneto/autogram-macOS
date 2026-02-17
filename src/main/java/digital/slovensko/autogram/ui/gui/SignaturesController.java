@@ -15,7 +15,7 @@ import javafx.stage.Stage;
 
 import static digital.slovensko.autogram.ui.gui.GUIValidationUtils.*;
 
-public class SignaturesController implements SuppressedFocusController {
+public class SignaturesController extends BaseController implements SuppressedFocusController {
     private final GUI gui;
     private Reports signatureCheckReports;
     private Reports signatureValidationReports;
@@ -119,7 +119,7 @@ public class SignaturesController implements SuppressedFocusController {
         signaturesBox.getChildren().clear();
 
         for (var signatureId : reports.getDiagnosticData().getSignatureIdList())
-            signaturesBox.getChildren().add(createSignatureBox(reports, isValidated, signatureId, e -> {
+            signaturesBox.getChildren().add(createSignatureBox(resources, reports, isValidated, signatureId, e -> {
                 getNodeForLoosingFocus().requestFocus();
             }, isValidated && SignatureValidator.getInstance().areTLsLoaded()));
     }

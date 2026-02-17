@@ -1,5 +1,6 @@
 package digital.slovensko.autogram.core;
 
+import digital.slovensko.autogram.ui.SupportedLanguage;
 import digital.slovensko.autogram.ui.gui.SignatureLevelStringConverter;
 import eu.europa.esig.dss.enumerations.SignatureLevel;
 import eu.europa.esig.dss.service.http.commons.TimestampDataLoader;
@@ -13,7 +14,6 @@ import java.nio.file.Paths;
 import java.util.*;
 import java.util.prefs.Preferences;
 import java.util.stream.Stream;
-
 
 public class UserSettings implements PasswordManagerSettings, SignatureTokenSettings, DriverDetectorSettings {
     private final String DEFAULT_SIGNATURE_LEVEL = SignatureLevelStringConverter.PADES;
@@ -37,6 +37,7 @@ public class UserSettings implements PasswordManagerSettings, SignatureTokenSett
     private final String DEFAULT_CUSTOM_PKCS11_DRIVER_PATH = "";
     private final String DEFAULT_TSA_SERVER = "http://tsa.baltstamp.lt,http://ts.quovadisglobal.com/eu";
 
+    private SupportedLanguage language;
     private SignatureLevel signatureLevel;
     private String driver;
     private int slotIndex;
@@ -64,6 +65,7 @@ public class UserSettings implements PasswordManagerSettings, SignatureTokenSett
         var prefs = Preferences.userNodeForPackage(UserSettings.class);
         var settings = new UserSettings();
 
+        settings.setLanguage(SupportedLanguage.getByLanguage(prefs.get("LANGUAGE", null)));
         settings.setSignatureType(prefs.get("SIGNATURE_LEVEL", settings.DEFAULT_SIGNATURE_LEVEL));
         settings.setDriver(prefs.get("DRIVER", settings.DEFAULT_DRIVER));
         settings.setEn319132(prefs.getBoolean("EN319132", settings.DEFAULT_EN319132));
@@ -120,6 +122,7 @@ public class UserSettings implements PasswordManagerSettings, SignatureTokenSett
     public void save() {
         var prefs = Preferences.userNodeForPackage(UserSettings.class);
 
+        prefs.put("LANGUAGE", language == null ? "" : language.getLocale().getLanguage());
         prefs.put("SIGNATURE_LEVEL", new SignatureLevelStringConverter().toString(signatureLevel));
         prefs.put("DRIVER", driver == null ? "" : driver);
         prefs.putBoolean("EN319132", en319132);
@@ -148,6 +151,7 @@ public class UserSettings implements PasswordManagerSettings, SignatureTokenSett
     }
 
     public void reset() {
+        setLanguage(null);
         setSignatureType(DEFAULT_SIGNATURE_LEVEL);
         setDriver(DEFAULT_DRIVER);
         setEn319132(DEFAULT_EN319132);
@@ -185,6 +189,20 @@ public class UserSettings implements PasswordManagerSettings, SignatureTokenSett
 
     private void setTrustedList(String trustedList) {
         this.trustedList = trustedList == null ? new ArrayList<>() : new ArrayList<>(List.of(trustedList.split(",")));
+    }
+
+    public Optional<SupportedLanguage> getLanguage() {
+        return Optional.ofNullable(language);
+    }
+
+    @Override
+    public Locale getLanguageLocale() {
+        return getLanguage().map(SupportedLanguage::getLocale)
+                .orElse(Locale.getDefault());
+    }
+
+    public void setLanguage(SupportedLanguage language) {
+        this.language = language;
     }
 
     public SignatureLevel getSignatureLevel() {

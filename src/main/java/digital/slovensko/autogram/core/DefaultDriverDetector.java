@@ -2,8 +2,8 @@ package digital.slovensko.autogram.core;
 
 import digital.slovensko.autogram.drivers.FakeTokenDriver;
 import digital.slovensko.autogram.drivers.PKCS11TokenDriver;
-import digital.slovensko.autogram.drivers.TokenDriver;
 import digital.slovensko.autogram.drivers.PKCS12KeystoreTokenDriver;
+import digital.slovensko.autogram.drivers.TokenDriver;
 import digital.slovensko.autogram.util.OperatingSystem;
 
 import java.nio.file.Path;
@@ -23,6 +23,7 @@ public class DefaultDriverDetector implements DriverDetector {
         public static final String CUSTOM_PKCS11 = "custom_pkcs11";
     }
 
+    // FIXME use i18n
     private final String HELPER_TEXT_EID = "\n\nV prípade nového občianskeho preukazu to môže znamenať, že si potrebujete certifikáty na podpisovanie cez občiansky preukaz vydať. Robí sa to pomocou obslužného softvéru eID klient.";
     private final String HELPER_TEXT_CZ_EID = "";
     private final String HELPER_TEXT_SECURE_STORE = "";
@@ -36,6 +37,7 @@ public class DefaultDriverDetector implements DriverDetector {
         this.settings = settings;
     }
 
+    // FIXME use i18n
     private List<TokenDriver> getLinuxDrivers(){
         return List.of(
             new PKCS11TokenDriver("Občiansky preukaz (eID klient)", Path.of("/usr/lib/eID_klient/libpkcs11_x64.so"), TokenDriverShortnames.EID, HELPER_TEXT_EID),
@@ -53,6 +55,7 @@ public class DefaultDriverDetector implements DriverDetector {
     private List<TokenDriver> getWindowsDrivers() {
         return List.of(
             new PKCS11TokenDriver("Občiansky preukaz (eID klient)", Path.of("C:\\Program Files (x86)\\eID_klient\\pkcs11_x64.dll"), TokenDriverShortnames.EID, HELPER_TEXT_EID),
+            new PKCS11TokenDriver("Občiansky preukaz (eID klient)", Path.of("C:\\Program Files\\eID_klient\\pkcs11_x64.dll"), TokenDriverShortnames.EID, HELPER_TEXT_EID),
             new PKCS11TokenDriver("eObčanka", Path.of("C:\\Windows\\System32\\eopproxyp11.dll"), TokenDriverShortnames.CZ_EID, HELPER_TEXT_CZ_EID),
             new PKCS11TokenDriver("I.CA SecureStore", Path.of("C:\\Windows\\System32\\SecureStorePkcs11.dll"), TokenDriverShortnames.SECURE_STORE, HELPER_TEXT_SECURE_STORE),
             new PKCS11TokenDriver("MONET+ ProID+Q", Path.of( "C:\\Windows\\system32\\proidqcm11.dll"), TokenDriverShortnames.MONET, HELPER_TEXT_MONET),

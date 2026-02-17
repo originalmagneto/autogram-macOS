@@ -7,7 +7,6 @@ import digital.slovensko.autogram.core.Autogram;
 import digital.slovensko.autogram.core.ResponderInBatch;
 import digital.slovensko.autogram.core.SigningJob;
 import digital.slovensko.autogram.core.errors.AutogramException;
-import digital.slovensko.autogram.server.dto.ErrorResponse;
 import digital.slovensko.autogram.server.dto.SignRequestBody;
 import digital.slovensko.autogram.server.errors.MalformedBodyException;
 
@@ -37,14 +36,15 @@ public class SignEndpoint implements HttpHandler {
                 autogram.sign(job);
 
         } catch (JsonSyntaxException | IOException e) {
-            var response = ErrorResponse.buildFromException(new MalformedBodyException(e.getMessage(), e));
+            var response = ErrorResponseBuilder
+                    .buildFromException(new MalformedBodyException(MalformedBodyException.Error.JSON_PARSING_FAILED, e));
             EndpointUtils.respondWithError(response, exchange);
 
         } catch (AutogramException e) {
-            EndpointUtils.respondWithError(ErrorResponse.buildFromException(e), exchange);
+            EndpointUtils.respondWithError(ErrorResponseBuilder.buildFromException(e), exchange);
 
         } catch (Exception e) {
-            EndpointUtils.respondWithError(ErrorResponse.buildFromException(e), exchange);
+            EndpointUtils.respondWithError(ErrorResponseBuilder.buildFromException(e), exchange);
         }
     }
 }

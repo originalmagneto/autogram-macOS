@@ -2,18 +2,17 @@ package digital.slovensko.autogram.ui.gui;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.WeakHashMap;
-import java.util.ArrayList;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.FutureTask;
-import java.util.function.Consumer;
-
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.function.Consumer;
 
 import digital.slovensko.autogram.core.*;
 import digital.slovensko.autogram.core.errors.*;
@@ -479,10 +478,10 @@ public class GUI implements UI {
     }
 
     public void showVisualization(Visualization visualization, Autogram autogram) {
-        var title = "Dokument";
         var doc = visualization.getJob().getDocument();
+        var title = "Dokument";
         if (doc.getName() != null)
-            title = "Dokument " + doc.getName();
+            title += " " + doc.getName();
 
         var controller = new SigningDialogController(visualization, autogram, this, title,
                 userSettings.isSignaturesValidity());
@@ -556,7 +555,7 @@ public class GUI implements UI {
         var root = GUIUtils.loadFXML(controller, "ignorable-exception-dialog.fxml");
 
         var stage = new Stage();
-        stage.setTitle("Chyba pri zobrazovaní dokumentu");
+        stage.setTitle(controller.i18n("error.ignorable.title"));
         stage.setScene(new Scene(root));
         stage.setResizable(false);
         stage.initModality(Modality.WINDOW_MODAL);

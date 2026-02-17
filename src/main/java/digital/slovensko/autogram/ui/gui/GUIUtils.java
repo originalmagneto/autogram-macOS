@@ -1,5 +1,6 @@
 package digital.slovensko.autogram.ui.gui;
 
+import digital.slovensko.autogram.core.UserSettings;
 import digital.slovensko.autogram.core.errors.AutogramException;
 import digital.slovensko.autogram.util.OperatingSystem;
 import javafx.application.Platform;
@@ -19,6 +20,7 @@ import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.util.ResourceBundle;
 
 public class GUIUtils {
     private static final Logger logger = LoggerFactory.getLogger(GUIUtils.class);
@@ -78,6 +80,8 @@ public class GUIUtils {
             var loader = new FXMLLoader();
             loader.setLocation(controller.getClass().getResource(fxml));
             loader.setController(controller);
+            var language = UserSettings.load().getLanguageLocale();
+            loader.setResources(ResourceBundle.getBundle("digital.slovensko.autogram.ui.gui.language.l10n", language));
             return loader.load();
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -151,15 +155,15 @@ public class GUIUtils {
         w.setHeight(w.getHeight() - 1);
     }
 
-    public static void showError(AutogramException e, String buttonText, boolean wait) {
-        showError(e, buttonText, wait, false);
+    public static void showError(AutogramException e, String buttonI18nKey, boolean wait) {
+        showError(e, buttonI18nKey, wait, false);
     }
 
-    public static void showError(AutogramException e, String buttonText, boolean wait, boolean errorDetailsDisabled) {
+    public static void showError(AutogramException e, String buttonI18nKey, boolean wait, boolean errorDetailsDisabled) {
         logger.debug("GUI showing error", e);
         var controller = new ErrorController(e, errorDetailsDisabled);
         var root = GUIUtils.loadFXML(controller, "error-dialog.fxml");
-        controller.setMainButtonText(buttonText);
+        controller.setMainButtonText(buttonI18nKey);
 
         var stage = new Stage();
         GUIUtils.setAppIcon(stage);

@@ -1,5 +1,7 @@
 package digital.slovensko.autogram.core.settings;
 
+import java.util.Locale;
+
 public class Country {
 
     private String name;
@@ -13,6 +15,11 @@ public class Country {
 
     public String getName() {
         return name;
+    }
+
+    // Compatibility bridge with upstream API where country name is locale-aware.
+    public String getName(Locale inLocale) {
+        return getName();
     }
 
     public void setName(String name) {
