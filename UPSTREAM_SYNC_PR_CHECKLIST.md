@@ -18,6 +18,7 @@ This PR continues upstream sync while preserving local macOS UI/UX redesign and 
 - `15b9f208` `add a comment explaining that we ignore transformation for non-XDC documents`
 - `0b5172fd` `fix asset loading in tests`
 - `d1d05e11` `remove eform attributes from signing parameters unless signing eform`
+- `0591b523` `#541 add i18n keys for settings reset dialog - localize in english` (merged with local compact dialog layout)
 
 ## Local compatibility commits (this wave)
 
@@ -37,6 +38,7 @@ This PR continues upstream sync while preserving local macOS UI/UX redesign and 
 - API now supports baseline `B/T` level resolution path while preserving correct underscore mapping (`PAdES_BASELINE_*`, etc.).
 - `SigningParameters` branch for non-XDC remains strict (rejects transformation without XDC) while staying aligned with upstream eForm-attribute cleanup intent.
 - Test assets/resource loading changes from upstream are retained where non-breaking, with local stronger tests preserved.
+- Settings reset dialog now uses i18n keys while preserving the local macOS compact visual layout.
 
 ## Explicitly skipped in this wave
 
