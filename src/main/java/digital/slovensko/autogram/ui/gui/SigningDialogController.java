@@ -21,6 +21,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextArea;
+import javafx.scene.control.Tooltip;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.ContextMenuEvent;
@@ -80,6 +81,8 @@ public class SigningDialogController implements SuppressedFocusController, Visua
     VBox signaturesTable;
     @FXML
     Text headerText;
+    @FXML
+    Label activeCertificateLabel;
     @FXML
     javafx.scene.control.ChoiceBox<eu.europa.esig.dss.enumerations.SignatureLevel> signatureFormatChoice;
     @FXML
@@ -344,11 +347,32 @@ public class SigningDialogController implements SuppressedFocusController, Visua
     public void refreshSigningKey() {
         var key = gui.getActiveSigningKey();
         if (key == null) {
-            mainButton.setText("Podpísať");
+            mainButton.setText("Podpísať dokument");
             changeKeyButton.setVisible(false);
+            changeKeyButton.setManaged(false);
+            if (activeCertificateLabel != null) {
+                activeCertificateLabel.setText("");
+                activeCertificateLabel.setVisible(false);
+                activeCertificateLabel.setManaged(false);
+                activeCertificateLabel.setTooltip(null);
+            }
+            if (mainMenuController != null) {
+                mainMenuController.updateCertificateMetadata("Nevybraný");
+            }
         } else {
-            mainButton.setText("Podpísať ako " + DSSUtils.parseCN(key.getCertificate().getSubject().getRFC2253()));
+            var summary = buildSigningKeySummary(key);
+            mainButton.setText("Podpísať dokument");
             changeKeyButton.setVisible(true);
+            changeKeyButton.setManaged(true);
+            if (activeCertificateLabel != null) {
+                activeCertificateLabel.setText("Certifikát: " + summary);
+                activeCertificateLabel.setVisible(true);
+                activeCertificateLabel.setManaged(true);
+                activeCertificateLabel.setTooltip(new Tooltip(safeTooltip(summary, key.toString())));
+            }
+            if (mainMenuController != null) {
+                mainMenuController.updateCertificateMetadata(summary);
+            }
         }
     }
 
@@ -592,5 +616,31 @@ public class SigningDialogController implements SuppressedFocusController, Visua
     @Override
     public void setPrefWidth(double prefWidth) {
         mainBox.setPrefWidth(prefWidth);
+    }
+
+    private String buildSigningKeySummary(digital.slovensko.autogram.core.SigningKey key) {
+        try {
+            var parsedCn = DSSUtils.parseCN(key.getCertificate().getSubject().getRFC2253());
+            if (parsedCn != null && !parsedCn.isBlank()) {
+                return parsedCn;
+            }
+        } catch (RuntimeException ignored) {
+            // Fall back to the existing string representation below.
+        }
+
+        var fallback = key.toString();
+        if (fallback == null || fallback.isBlank()) {
+            return "Vybraný certifikát";
+        }
+
+        return fallback;
+    }
+
+    private String safeTooltip(String summary, String fullValue) {
+        if (fullValue == null || fullValue.isBlank() || fullValue.equals(summary)) {
+            return summary;
+        }
+
+        return summary + "\n" + fullValue;
     }
 }

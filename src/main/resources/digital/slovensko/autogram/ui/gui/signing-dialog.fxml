@@ -15,6 +15,12 @@
         <TextFlow>
             <Text fx:id="headerText" styleClass="autogram-heading-m" />
         </TextFlow>
+        <Label fx:id="activeCertificateLabel"
+               styleClass="autogram-selection-chip"
+               managed="false"
+               visible="false"
+               wrapText="true"
+               maxWidth="460" />
 
         <HBox styleClass="autogram-signing-stepper" spacing="8" alignment="CENTER_LEFT">
             <Label fx:id="stepPreviewLabel" text="1. Náhľad dokumentu" styleClass="autogram-signing-step,autogram-signing-step--active" />
@@ -79,6 +85,6 @@
         <Region HBox.hgrow="ALWAYS" />
         <Button fx:id="changeKeyButton" styleClass="autogram-button,autogram-button--secondary"
                 text="Zmeniť certifikát" visible="false" managed="false" onAction="#onChangeKeyButtonPressed" />
-        <Button fx:id="mainButton" styleClass="autogram-button" text="Podpísať" onAction="#onMainButtonPressed" />
+        <Button fx:id="mainButton" styleClass="autogram-button" text="Podpísať dokument" onAction="#onMainButtonPressed" />
     </HBox>
 </VBox>

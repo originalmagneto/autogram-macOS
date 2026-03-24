@@ -9,6 +9,7 @@ import digital.slovensko.autogram.core.errors.NoFilesSelectedException;
 import digital.slovensko.autogram.core.errors.UnrecognizedException;
 import digital.slovensko.autogram.ui.BatchGuiFileResponder;
 import digital.slovensko.autogram.ui.SaveFileResponder;
+import digital.slovensko.autogram.util.DSSUtils;
 import digital.slovensko.autogram.util.macos.MacOSNotification;
 import javafx.animation.FadeTransition;
 import javafx.animation.Interpolator;
@@ -330,11 +331,11 @@ public class MainMenuController extends BaseController implements SuppressedFocu
      */
     public void updateMetadata(String filename, String size, String pages, String format, String certificate) {
         Platform.runLater(() -> {
-            metaFilename.setText(filename);
-            metaSize.setText(size);
-            metaPages.setText(pages);
-            metaFormat.setText(format);
-            metaCertificate.setText(certificate);
+            updateLabelWithTooltip(metaFilename, filename);
+            updateLabelWithTooltip(metaSize, size);
+            updateLabelWithTooltip(metaPages, pages);
+            updateLabelWithTooltip(metaFormat, format);
+            updateLabelWithTooltip(metaCertificate, certificate);
             metadataPanel.setVisible(true);
             metadataPanel.setManaged(true);
         });
@@ -345,7 +346,7 @@ public class MainMenuController extends BaseController implements SuppressedFocu
      */
     public void updateCertificateMetadata(String certificate) {
         Platform.runLater(() -> {
-            metaCertificate.setText(certificate);
+            updateLabelWithTooltip(metaCertificate, certificate);
         });
     }
 
@@ -357,7 +358,7 @@ public class MainMenuController extends BaseController implements SuppressedFocu
      */
     public void updateFormatMetadata(String format) {
         Platform.runLater(() -> {
-            metaFormat.setText(format);
+            updateLabelWithTooltip(metaFormat, format);
         });
     }
 
@@ -375,6 +376,7 @@ public class MainMenuController extends BaseController implements SuppressedFocu
                     Label label = new Label(sig);
                     label.getStyleClass().add("autogram-metadata-value");
                     label.setWrapText(true);
+                    label.setTooltip(new Tooltip(sig));
                     existingSignaturesList.getChildren().add(label);
                 }
                 existingSignaturesPane.setVisible(true);
@@ -405,7 +407,7 @@ public class MainMenuController extends BaseController implements SuppressedFocu
             signingPanel.getChildren().add(content);
             VBox.setVgrow(content, javafx.scene.layout.Priority.ALWAYS);
             showPanel(signingPanel);
-            setStatus("Podpisovanie...");
+            setStatus("Dokument pripravený na podpis");
         });
     }
 
@@ -432,13 +434,14 @@ public class MainMenuController extends BaseController implements SuppressedFocu
                 signingPanel.getChildren().add(root);
                 VBox.setVgrow(root, javafx.scene.layout.Priority.ALWAYS);
                 showPanel(signingPanel);
+                setStatus("Náhľad dokumentu");
 
                 // Update metadata for this file
                 String filename = file.getName();
                 String size = formatFileSize(file);
                 String pages = formatPageCount(file);
                 String format = job.getDocument().getMimeType().getMimeTypeString();
-                String cert = gui.getActiveSigningKey() != null ? gui.getActiveSigningKey().toString() : "Nevybraný";
+                String cert = formatSigningKeySummary(gui.getActiveSigningKey());
                 updateMetadata(filename, size, pages, format, cert);
 
                 // Trigger signature check
@@ -738,15 +741,29 @@ public class MainMenuController extends BaseController implements SuppressedFocu
         Platform.runLater(() -> {
             if (statusLabel != null) {
                 statusLabel.setText(text);
+                statusLabel.setTooltip(text == null || text.isBlank() ? null : new Tooltip(text));
             }
         });
+    }
+
+    private void updateLabelWithTooltip(Label label, String text) {
+        if (label == null) {
+            return;
+        }
+
+        label.setText(text);
+        label.setTooltip(text == null || text.isBlank() ? null : new Tooltip(text));
     }
 
     /**
      * Update which sidebar nav item appears active.
      */
     private void updateNavActive(Button activeButton) {
-        navDropZone.getStyleClass().removeIf(s -> s.equals("autogram-sidebar-item--active"));
+        for (var button : List.of(navDropZone, navSettings, navAbout)) {
+            if (button != null) {
+                button.getStyleClass().removeIf(s -> s.equals("autogram-sidebar-item--active"));
+            }
+        }
         if (activeButton != null) {
             if (!activeButton.getStyleClass().contains("autogram-sidebar-item--active")) {
                 activeButton.getStyleClass().add("autogram-sidebar-item--active");
@@ -764,7 +781,7 @@ public class MainMenuController extends BaseController implements SuppressedFocu
                 && lastPrimaryPanel != dropZonePanel) {
             showPanel(lastPrimaryPanel);
             if (lastPrimaryPanel == signingPanel) {
-                setStatus("Podpisovanie...");
+                setStatus("Dokument pripravený na podpis");
             } else if (lastPrimaryPanel == successPanel) {
                 setStatus("Podpísané ✓");
             } else {
@@ -835,12 +852,14 @@ public class MainMenuController extends BaseController implements SuppressedFocu
         var filesList = getFilesList(list);
         if (filesList.size() == 1) {
             var file = filesList.get(0);
+            setStatus("Načítavam dokument…");
             var job = SigningJob.buildFromFile(file,
                     new SaveFileResponder(file, autogram, userSettings.shouldSignPDFAsPades()),
                     userSettings.isPdfaCompliance(), userSettings.getSignatureLevel(), userSettings.isEn319132(),
                     tspSource, userSettings.isPlainXmlEnabled());
             autogram.sign(job);
         } else {
+            setStatus("Hromadné podpisovanie: " + filesList.size() + " súborov");
             autogram.batchStart(filesList.size(), new BatchGuiFileResponder(autogram, filesList,
                     filesList.get(0).toPath().getParent().resolve("signed"), userSettings.isPdfaCompliance(),
                     userSettings.getSignatureLevel(), userSettings.shouldSignPDFAsPades(), userSettings.isEn319132(),
@@ -857,6 +876,7 @@ public class MainMenuController extends BaseController implements SuppressedFocu
         var filesList = getFilesList(directoryFiles);
         var targetDirectoryName = dir.getName() + "_signed";
         var targetDirectory = dir.toPath().getParent().resolve(targetDirectoryName);
+        setStatus("Hromadné podpisovanie priečinka: " + dir.getName());
 
         // send null tspSource if signature shouldn't be timestamped
         var tspSource = userSettings.getTsaEnabled() ? userSettings.getTspSource() : null;
@@ -865,6 +885,24 @@ public class MainMenuController extends BaseController implements SuppressedFocu
                 new BatchGuiFileResponder(autogram, filesList, targetDirectory, userSettings.isPdfaCompliance(),
                         userSettings.getSignatureLevel(), userSettings.shouldSignPDFAsPades(),
                         userSettings.isEn319132(), tspSource, userSettings.isPlainXmlEnabled()));
+    }
+
+    private String formatSigningKeySummary(digital.slovensko.autogram.core.SigningKey key) {
+        if (key == null) {
+            return "Nevybraný";
+        }
+
+        try {
+            var parsedCn = DSSUtils.parseCN(key.getCertificate().getSubject().getRFC2253());
+            if (parsedCn != null && !parsedCn.isBlank()) {
+                return parsedCn;
+            }
+        } catch (RuntimeException ignored) {
+            // Fall back to the existing string representation below.
+        }
+
+        var fallback = key.toString();
+        return fallback == null || fallback.isBlank() ? "Vybraný certifikát" : fallback;
     }
 
     public void onAboutButtonAction() {

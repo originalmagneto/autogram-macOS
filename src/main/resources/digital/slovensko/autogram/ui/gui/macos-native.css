@@ -666,6 +666,13 @@ TextFlow.autogram-body-s {
   -fx-alignment: center;
 }
 
+.autogram-dropzone-hint {
+  -fx-font-size: 11px;
+  -fx-text-fill: -autogram-secondary-text-colour;
+  -fx-alignment: center;
+  -fx-text-alignment: center;
+}
+
 .autogram-dropzone--entered {
   -fx-border-color: -autogram-focus-colour;
   -fx-border-width: 2px;
@@ -1517,6 +1524,17 @@ TextFlow.autogram-body-s {
 
 .autogram-signing-head {
   -fx-spacing: 8;
+}
+
+.autogram-selection-chip {
+  -fx-background-color: -autogram-surface-1;
+  -fx-border-color: -autogram-border-colour;
+  -fx-border-width: 1px;
+  -fx-border-radius: 999;
+  -fx-background-radius: 999;
+  -fx-padding: 6 12;
+  -fx-font-size: 12px;
+  -fx-text-fill: -autogram-text-primary;
 }
 
 .autogram-signing-stepper {

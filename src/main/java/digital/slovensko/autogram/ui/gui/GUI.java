@@ -20,6 +20,7 @@ import digital.slovensko.autogram.core.visualization.Visualization;
 import digital.slovensko.autogram.drivers.TokenDriver;
 import digital.slovensko.autogram.ui.BatchUiResult;
 import digital.slovensko.autogram.ui.UI;
+import digital.slovensko.autogram.util.DSSUtils;
 import digital.slovensko.autogram.util.PDFUtils;
 import digital.slovensko.autogram.util.macos.MacOSNotification;
 import eu.europa.esig.dss.model.DSSDocument;
@@ -506,7 +507,7 @@ public class GUI implements UI {
             String size = formatFileSize(doc);
             String pages = formatPageCount(doc);
             String format = doc.getMimeType().getMimeTypeString();
-            String cert = activeKey != null ? activeKey.toString() : "Nevybraný";
+            String cert = formatSigningKeySummary(activeKey);
 
             mainMenuController.updateMetadata(filename, size, pages, format, cert);
 
@@ -547,6 +548,24 @@ public class GUI implements UI {
     private String formatPageCount(DSSDocument doc) {
         int pages = PDFUtils.getPageCount(doc);
         return pages > 0 ? String.valueOf(pages) : "N/A";
+    }
+
+    private String formatSigningKeySummary(SigningKey key) {
+        if (key == null) {
+            return "Nevybraný";
+        }
+
+        try {
+            var parsedCn = DSSUtils.parseCN(key.getCertificate().getSubject().getRFC2253());
+            if (parsedCn != null && !parsedCn.isBlank()) {
+                return parsedCn;
+            }
+        } catch (RuntimeException ignored) {
+            // Fall back to the existing string representation below.
+        }
+
+        var fallback = key.toString();
+        return fallback == null || fallback.isBlank() ? "Vybraný certifikát" : fallback;
     }
 
     @Override
