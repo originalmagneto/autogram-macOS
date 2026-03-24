@@ -110,6 +110,9 @@ public class MainMenuController extends BaseController implements SuppressedFocu
     TitledPane existingSignaturesPane;
 
     @FXML
+    VBox existingSignaturesCard;
+
+    @FXML
     VBox existingSignaturesList;
 
     @FXML
@@ -369,6 +372,10 @@ public class MainMenuController extends BaseController implements SuppressedFocu
         Platform.runLater(() -> {
             existingSignaturesList.getChildren().clear();
             if (signatures == null || signatures.isEmpty()) {
+                if (existingSignaturesCard != null) {
+                    existingSignaturesCard.setVisible(false);
+                    existingSignaturesCard.setManaged(false);
+                }
                 existingSignaturesPane.setVisible(false);
                 existingSignaturesPane.setManaged(false);
             } else {
@@ -378,6 +385,10 @@ public class MainMenuController extends BaseController implements SuppressedFocu
                     label.setWrapText(true);
                     label.setTooltip(new Tooltip(sig));
                     existingSignaturesList.getChildren().add(label);
+                }
+                if (existingSignaturesCard != null) {
+                    existingSignaturesCard.setVisible(true);
+                    existingSignaturesCard.setManaged(true);
                 }
                 existingSignaturesPane.setVisible(true);
                 existingSignaturesPane.setManaged(true);

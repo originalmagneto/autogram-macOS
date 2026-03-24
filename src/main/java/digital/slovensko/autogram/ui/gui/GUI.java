@@ -384,7 +384,7 @@ public class GUI implements UI {
 
         if (mainMenuController != null) {
             controller.setOnClose(() -> mainMenuController.hideOverlayDialog());
-            mainMenuController.showOverlayDialog(root, OverlaySpec.defaults()
+            mainMenuController.showOverlayDialog(root, OverlaySpec.wide()
                     .withAutoFocus("#mainButton")
                     .withCancelAction("#cancelButton")
                     .withCloseOnEscape(true));

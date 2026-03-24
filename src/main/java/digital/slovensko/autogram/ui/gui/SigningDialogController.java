@@ -25,6 +25,7 @@ import javafx.scene.control.Tooltip;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.ContextMenuEvent;
+import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.scene.text.Text;
@@ -82,6 +83,16 @@ public class SigningDialogController implements SuppressedFocusController, Visua
     @FXML
     Text headerText;
     @FXML
+    Label signingStateLabel;
+    @FXML
+    Label headerHelpLabel;
+    @FXML
+    FlowPane signingBadgeRow;
+    @FXML
+    Label documentTypeBadge;
+    @FXML
+    Label signatureStateBadge;
+    @FXML
     Label activeCertificateLabel;
     @FXML
     javafx.scene.control.ChoiceBox<eu.europa.esig.dss.enumerations.SignatureLevel> signatureFormatChoice;
@@ -116,6 +127,7 @@ public class SigningDialogController implements SuppressedFocusController, Visua
         setActiveStep(1);
         signaturesTable.setManaged(false);
         signaturesTable.setVisible(false);
+        configureHeader();
         if (shouldCheckValidityBeforeSigning) {
             showInlineInfoAlert(ALERT_SIGNATURES_PENDING, "Kontrola podpisov prebieha",
                     "Overujem existujúce podpisy v dokumente. Môžete pokračovať v čítaní dokumentu.");
@@ -294,11 +306,17 @@ public class SigningDialogController implements SuppressedFocusController, Visua
         signatureCheckCompleted = true;
         setActiveStep(2);
         if (reports == null) {
+            updateSignatureFeedback("Dokument je pripravený na podpis",
+                    "Nenašli sa žiadne existujúce podpisy. Skontrolujte zvolený certifikát a môžete pokračovať.",
+                    "Bez existujúcich podpisov", "autogram-pill--success");
             removeInlineAlert(ALERT_SIGNATURES_PENDING);
             removeInlineAlert(ALERT_SIGNATURES_INVALID);
             return;
         }
         renderSignatures(reports, false, true);
+        updateSignatureFeedback("Kontrola podpisov pokračuje",
+                "Dokument už obsahuje podpisy. Autogram teraz dokončuje ich úplnú validáciu.",
+                "Podpisy nájdené", "autogram-pill--info");
         showInlineInfoAlert(ALERT_SIGNATURES_PENDING, "Podpisy sa overujú",
                 "Dokument obsahuje podpisy. Dokončujem ich validáciu.");
 
@@ -314,9 +332,15 @@ public class SigningDialogController implements SuppressedFocusController, Visua
         renderSignatures(reports, true, SignatureValidator.getInstance().areTLsLoaded());
 
         if (containsInvalidSignatures(reports)) {
+            updateSignatureFeedback("Podpis vyžaduje pozornosť",
+                    "Dokument obsahuje neplatné alebo nedôveryhodné podpisy. Pred pokračovaním si pozrite detail podpisov.",
+                    "Vyžaduje pozornosť", "autogram-pill--warning");
             showInlineWarningAlert(ALERT_SIGNATURES_INVALID, "Dokument obsahuje neplatné alebo nedôveryhodné podpisy",
                     "Pred podpisom skontrolujte detail podpisov a zvážte, či chcete pokračovať.");
         } else {
+            updateSignatureFeedback("Podpisy sú overené",
+                    "Existujúce podpisy boli overené. Ak je obsah dokumentu v poriadku, môžete pokračovať v podpise.",
+                    "Podpisy overené", "autogram-pill--success");
             removeInlineAlert(ALERT_SIGNATURES_INVALID);
         }
 
@@ -334,6 +358,19 @@ public class SigningDialogController implements SuppressedFocusController, Visua
         signaturesTable.setManaged(true);
         signaturesTable.setVisible(true);
         signaturesTable.getChildren().clear();
+
+        var header = new HBox();
+        header.setSpacing(10);
+        header.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+
+        var titleLabel = new Label("Podpisy v dokumente");
+        titleLabel.getStyleClass().add("autogram-section-title");
+
+        var badge = new Label(isValidated ? "Overené" : "Zistené podpisy");
+        badge.getStyleClass().addAll("autogram-pill", isValidated ? "autogram-pill--success" : "autogram-pill--info");
+
+        header.getChildren().addAll(titleLabel, badge);
+        signaturesTable.getChildren().add(header);
 
         if (!areTLsLoaded)
             signaturesTable.getChildren().add(
@@ -399,6 +436,8 @@ public class SigningDialogController implements SuppressedFocusController, Visua
     }
 
     public void disableKeyPicking() {
+        updateSigningStateText("Načítavam certifikáty",
+                "Autogram pripravuje dostupné certifikáty a úložiská. Počkajte prosím chvíľu.");
         mainButton.setText("Načítavam certifikáty…");
         mainButton.setDisable(true);
         changeKeyButton.setDisable(true);
@@ -406,6 +445,12 @@ public class SigningDialogController implements SuppressedFocusController, Visua
 
     public void disableSigning() {
         setActiveStep(3);
+        updateSigningStateText("Podpisovanie prebieha",
+                "Dokument sa práve podpisuje. Po dokončení sa zobrazí výsledok a cieľové umiestnenie súboru.");
+        updateBadgeStyle(signatureStateBadge, "autogram-pill--info");
+        if (signatureStateBadge != null) {
+            signatureStateBadge.setText("Prebieha podpisovanie");
+        }
         mainButton.setText("Prebieha podpisovanie…");
         mainButton.setDisable(true);
         changeKeyButton.setDisable(true);
@@ -484,6 +529,9 @@ public class SigningDialogController implements SuppressedFocusController, Visua
     }
 
     public void showPdfaInlineWarning() {
+        updateSignatureFeedback("Dokument vyžaduje pozornosť",
+                "Dokument nie je vo formáte PDF/A. Ak podpisujete pre úrad, odporúčame skontrolovať jeho akceptovateľnosť.",
+                "PDF/A upozornenie", "autogram-pill--warning");
         showInlineWarningAlert(ALERT_PDFA, "Dokument nie je vo formáte PDF/A",
                 "Úrady nemusia takýto dokument akceptovať. Upozornenie vypnete v Nastaveniach -> Bezpečnosť -> Kontrola súladu s PDF/A formátom.");
     }
@@ -507,6 +555,7 @@ public class SigningDialogController implements SuppressedFocusController, Visua
             details = "Skontrolujte certifikát, PIN alebo token a skúste to znova.";
         }
 
+        updateSignatureFeedback("Podpisovanie zlyhalo", details, "Chyba podpisu", "autogram-pill--warning");
         showInlineErrorAlert(ALERT_SIGNING_ERROR, heading, details);
     }
 
@@ -642,5 +691,73 @@ public class SigningDialogController implements SuppressedFocusController, Visua
         }
 
         return summary + "\n" + fullValue;
+    }
+
+    private void configureHeader() {
+        var document = visualization != null && visualization.getJob() != null ? visualization.getJob().getDocument() : null;
+        var mime = document != null && document.getMimeType() != null
+                ? document.getMimeType().getMimeTypeString()
+                : "Dokument";
+
+        if (documentTypeBadge != null) {
+            documentTypeBadge.setText(buildDocumentTypeBadgeText(mime));
+        }
+
+        if (shouldCheckValidityBeforeSigning) {
+            updateSignatureFeedback("Kontrola dokumentu",
+                    "Skontrolujte náhľad dokumentu, existujúce podpisy a zvolený certifikát pred podpisom.",
+                    "Kontrola podpisov prebieha", "autogram-pill--info");
+        } else {
+            updateSignatureFeedback("Dokument pripravený na podpis",
+                    "Skontrolujte náhľad dokumentu a zvolený certifikát. Kontrola existujúcich podpisov je vypnutá.",
+                    "Kontrola podpisov vypnutá", "autogram-pill--neutral");
+        }
+    }
+
+    private String buildDocumentTypeBadgeText(String mime) {
+        if (mime == null || mime.isBlank()) {
+            return "Dokument";
+        }
+
+        if (mime.toLowerCase().contains("pdf")) {
+            return "PDF dokument";
+        }
+        if (mime.toLowerCase().contains("xml")) {
+            return "XML dokument";
+        }
+        if (mime.toLowerCase().contains("asice")) {
+            return "ASiC kontajner";
+        }
+
+        return mime;
+    }
+
+    private void updateSignatureFeedback(String stateTitle, String helpText, String badgeText, String badgeStyleClass) {
+        updateSigningStateText(stateTitle, helpText);
+        if (signatureStateBadge != null) {
+            signatureStateBadge.setText(badgeText);
+            updateBadgeStyle(signatureStateBadge, badgeStyleClass);
+        }
+    }
+
+    private void updateSigningStateText(String stateTitle, String helpText) {
+        if (signingStateLabel != null && stateTitle != null) {
+            signingStateLabel.setText(stateTitle);
+        }
+        if (headerHelpLabel != null && helpText != null) {
+            headerHelpLabel.setText(helpText);
+        }
+    }
+
+    private void updateBadgeStyle(Label label, String styleClass) {
+        if (label == null) {
+            return;
+        }
+
+        label.getStyleClass().removeAll("autogram-pill--neutral", "autogram-pill--info",
+                "autogram-pill--success", "autogram-pill--warning");
+        if (styleClass != null && !styleClass.isBlank()) {
+            label.getStyleClass().add(styleClass);
+        }
     }
 }

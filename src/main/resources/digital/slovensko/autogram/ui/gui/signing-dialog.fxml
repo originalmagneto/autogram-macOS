@@ -11,10 +11,19 @@
       xmlns:fx="http://javafx.com/fxml"
       fx:id="mainBox" styleClass="autogram-signing-shell">
 
-    <VBox styleClass="autogram-signing-head" spacing="10">
+    <VBox styleClass="autogram-signing-head,autogram-signing-head-card" spacing="10">
+        <Label fx:id="signingStateLabel" styleClass="autogram-eyebrow" text="Kontrola dokumentu" />
         <TextFlow>
-            <Text fx:id="headerText" styleClass="autogram-heading-m" />
+            <Text fx:id="headerText" styleClass="autogram-hero-title" />
         </TextFlow>
+        <Label fx:id="headerHelpLabel"
+               styleClass="autogram-signing-help"
+               wrapText="true"
+               text="Skontrolujte náhľad dokumentu, existujúce podpisy a zvolený certifikát pred podpisom." />
+        <FlowPane fx:id="signingBadgeRow" styleClass="autogram-pill-row,autogram-signing-badges" hgap="8" vgap="8">
+            <Label fx:id="documentTypeBadge" styleClass="autogram-pill,autogram-pill--neutral" text="Dokument" />
+            <Label fx:id="signatureStateBadge" styleClass="autogram-pill,autogram-pill--info" text="Kontrola podpisov prebieha" />
+        </FlowPane>
         <Label fx:id="activeCertificateLabel"
                styleClass="autogram-selection-chip"
                managed="false"
@@ -78,13 +87,18 @@
 
     <VBox fx:id="signaturesTable" styleClass="autogram-signatures-summary-card" />
 
-    <HBox spacing="14" alignment="CENTER_LEFT" styleClass="autogram-options-row,autogram-signing-control-bar">
-        <Label text="Formát podpisu" styleClass="autogram-label" />
-        <ChoiceBox fx:id="signatureFormatChoice" styleClass="autogram-choicebox" prefWidth="220" />
-        <CheckBox fx:id="timestampCheckbox" text="Pridať časovú pečiatku" styleClass="autogram-checkbox" />
-        <Region HBox.hgrow="ALWAYS" />
-        <Button fx:id="changeKeyButton" styleClass="autogram-button,autogram-button--secondary"
-                text="Zmeniť certifikát" visible="false" managed="false" onAction="#onChangeKeyButtonPressed" />
-        <Button fx:id="mainButton" styleClass="autogram-button" text="Podpísať dokument" onAction="#onMainButtonPressed" />
-    </HBox>
+    <VBox styleClass="autogram-signing-control-surface" spacing="10">
+        <HBox spacing="14" alignment="CENTER_LEFT" styleClass="autogram-options-row,autogram-signing-control-bar">
+            <Label text="Formát podpisu" styleClass="autogram-label" />
+            <ChoiceBox fx:id="signatureFormatChoice" styleClass="autogram-choicebox" prefWidth="220" />
+            <CheckBox fx:id="timestampCheckbox" text="Pridať časovú pečiatku" styleClass="autogram-checkbox" />
+            <Region HBox.hgrow="ALWAYS" />
+            <Button fx:id="changeKeyButton" styleClass="autogram-button,autogram-button--secondary"
+                    text="Zmeniť certifikát" visible="false" managed="false" onAction="#onChangeKeyButtonPressed" />
+            <Button fx:id="mainButton" styleClass="autogram-button" text="Podpísať dokument" onAction="#onMainButtonPressed" />
+        </HBox>
+        <Label styleClass="autogram-body-s"
+               wrapText="true"
+               text="Pred podpisom môžete upraviť certifikát, formát podpisu alebo pridať časovú pečiatku." />
+    </VBox>
 </VBox>

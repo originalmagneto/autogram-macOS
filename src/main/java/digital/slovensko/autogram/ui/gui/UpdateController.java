@@ -7,10 +7,13 @@ import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.scene.Node;
 import javafx.scene.control.*;
+import javafx.scene.layout.VBox;
 import javafx.scene.text.Text;
-import javafx.concurrent.Task;
 
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
 
 public class UpdateController implements SuppressedFocusController {
@@ -20,8 +23,6 @@ public class UpdateController implements SuppressedFocusController {
     @FXML
     Node mainBox;
     @FXML
-    Hyperlink link;
-    @FXML
     Button mainButton;
     @FXML
     Button cancelButton;
@@ -30,9 +31,17 @@ public class UpdateController implements SuppressedFocusController {
     @FXML
     Text progressText;
     @FXML
-    Text versionText;
+    Label versionText;
     @FXML
-    TextArea releaseNotesArea;
+    Label priorityBadge;
+    @FXML
+    Label summaryText;
+    @FXML
+    Label downloadMetaText;
+    @FXML
+    VBox releaseNotesCard;
+    @FXML
+    VBox releaseNotesHighlights;
 
     public UpdateController(HostServices hostServices) {
         this.hostServices = hostServices;
@@ -43,12 +52,24 @@ public class UpdateController implements SuppressedFocusController {
     public void initialize() {
         if (updateInfo != null) {
             if (versionText != null) {
-                versionText.setText("Verzia " + updateInfo.version);
+                versionText.setText(updateInfo.version);
             }
-            if (releaseNotesArea != null && !updateInfo.releaseNotes.isEmpty()) {
-                releaseNotesArea.setText(updateInfo.releaseNotes);
-                releaseNotesArea.setVisible(true);
-                releaseNotesArea.setManaged(true);
+            if (summaryText != null) {
+                summaryText.setText(buildSummaryText(updateInfo));
+            }
+            if (downloadMetaText != null) {
+                var meta = buildDownloadMeta(updateInfo);
+                downloadMetaText.setText(meta);
+                downloadMetaText.setVisible(!meta.isBlank());
+                downloadMetaText.setManaged(!meta.isBlank());
+            }
+            if (priorityBadge != null) {
+                var isSecurityRelease = isSecurityRelease(updateInfo.releaseNotes);
+                priorityBadge.setVisible(isSecurityRelease);
+                priorityBadge.setManaged(isSecurityRelease);
+            }
+            if (releaseNotesHighlights != null && releaseNotesCard != null) {
+                populateReleaseNoteHighlights(updateInfo.releaseNotes);
             }
         }
 
@@ -113,7 +134,7 @@ public class UpdateController implements SuppressedFocusController {
                     if (progressText != null) {
                         progressText.setText("Sťahovanie dokončené!");
                     }
-                    mainButton.setText("Inštalovať");
+                    mainButton.setText("Otvoriť inštalátor");
                     mainButton.setDisable(false);
 
                     // Set up install action
@@ -177,5 +198,108 @@ public class UpdateController implements SuppressedFocusController {
     @Override
     public Node getNodeForLoosingFocus() {
         return mainBox;
+    }
+
+    static boolean isSecurityRelease(String releaseNotes) {
+        if (releaseNotes == null || releaseNotes.isBlank()) {
+            return false;
+        }
+
+        var normalized = releaseNotes.toLowerCase(Locale.ROOT);
+        return normalized.contains("security")
+                || normalized.contains("warning")
+                || normalized.contains("critical")
+                || normalized.contains("urgent");
+    }
+
+    static List<String> extractReleaseHighlights(String releaseNotes) {
+        if (releaseNotes == null || releaseNotes.isBlank()) {
+            return List.of("Vylepšenia stability, kompatibility a používateľského zážitku.");
+        }
+
+        var highlights = new ArrayList<String>();
+        for (var rawLine : releaseNotes.split("\\R")) {
+            var normalized = normalizeReleaseLine(rawLine);
+            if (normalized.isBlank()) {
+                continue;
+            }
+            if (!highlights.contains(normalized)) {
+                highlights.add(normalized);
+            }
+            if (highlights.size() == 5) {
+                break;
+            }
+        }
+
+        return highlights.isEmpty()
+                ? List.of("Podrobnosti o vydaní sú dostupné po otvorení stránky s aktualizáciou.")
+                : highlights;
+    }
+
+    private void populateReleaseNoteHighlights(String releaseNotes) {
+        var highlights = extractReleaseHighlights(releaseNotes);
+        releaseNotesHighlights.getChildren().clear();
+        for (var highlight : highlights) {
+            var label = new Label(highlight);
+            label.setWrapText(true);
+            label.getStyleClass().add("autogram-update-note");
+            releaseNotesHighlights.getChildren().add(label);
+        }
+        releaseNotesCard.setVisible(true);
+        releaseNotesCard.setManaged(true);
+    }
+
+    private String buildSummaryText(Updater.UpdateInfo info) {
+        if (info == null) {
+            return "Je dostupná nová verzia a odporúčame ju nainštalovať.";
+        }
+
+        if (isSecurityRelease(info.releaseNotes)) {
+            return "Táto aktualizácia obsahuje dôležité bezpečnostné alebo stabilitné opravy. Odporúčame ju nainštalovať čo najskôr.";
+        }
+
+        return "Je dostupná nová verzia Autogramu s vylepšeniami stability, kompatibility a používateľského zážitku.";
+    }
+
+    private String buildDownloadMeta(Updater.UpdateInfo info) {
+        if (info == null) {
+            return "";
+        }
+
+        var parts = new ArrayList<String>();
+        if (info.downloadUrl != null && info.downloadUrl.endsWith(".dmg")) {
+            parts.add("Balík pre macOS");
+        }
+        if (info.fileSize > 0) {
+            parts.add(formatFileSize(info.fileSize));
+        }
+        return String.join(" • ", parts);
+    }
+
+    private static String normalizeReleaseLine(String line) {
+        if (line == null) {
+            return "";
+        }
+
+        var normalized = line.trim();
+        normalized = normalized.replaceFirst("^[-*+#>\\s]+", "");
+        normalized = normalized.replace("`", "");
+        normalized = normalized.replaceFirst("(?i)^\\[(warning|security|info)]\\s*", "");
+        normalized = normalized.replaceAll("\\s+", " ").trim();
+        return normalized;
+    }
+
+    private static String formatFileSize(long bytes) {
+        if (bytes < 1024) {
+            return bytes + " B";
+        }
+        var units = new String[] { "KB", "MB", "GB" };
+        double value = bytes;
+        var unitIndex = -1;
+        while (value >= 1024 && unitIndex < units.length - 1) {
+            value /= 1024;
+            unitIndex++;
+        }
+        return String.format(Locale.US, "%.1f %s", value, units[Math.max(unitIndex, 0)]);
     }
 }

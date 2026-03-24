@@ -276,6 +276,57 @@
   -fx-font-size: 11px;
 }
 
+.autogram-eyebrow {
+  -fx-font-size: 11px;
+  -fx-font-weight: 700;
+  -fx-text-fill: -autogram-accent;
+  -fx-letter-spacing: 0.8px;
+}
+
+.autogram-hero-title {
+  -fx-text-fill: -autogram-text-colour;
+  -fx-fill: -autogram-text-colour;
+  -fx-font-size: 28px;
+  -fx-font-weight: 650;
+}
+
+.autogram-pill-row {
+  -fx-alignment: CENTER_LEFT;
+}
+
+.autogram-pill {
+  -fx-padding: 5 10;
+  -fx-font-size: 11px;
+  -fx-font-weight: 600;
+  -fx-background-radius: 999;
+  -fx-border-radius: 999;
+  -fx-border-width: 1px;
+}
+
+.autogram-pill--neutral {
+  -fx-background-color: -autogram-surface-1;
+  -fx-border-color: -autogram-border-colour;
+  -fx-text-fill: -autogram-text-secondary;
+}
+
+.autogram-pill--info {
+  -fx-background-color: rgba(0, 122, 255, 0.12);
+  -fx-border-color: rgba(0, 122, 255, 0.22);
+  -fx-text-fill: -autogram-accent;
+}
+
+.autogram-pill--success {
+  -fx-background-color: rgba(52, 199, 89, 0.14);
+  -fx-border-color: rgba(52, 199, 89, 0.24);
+  -fx-text-fill: #1f8f43;
+}
+
+.autogram-pill--warning {
+  -fx-background-color: rgba(255, 149, 0, 0.18);
+  -fx-border-color: rgba(255, 149, 0, 0.28);
+  -fx-text-fill: #9a5d00;
+}
+
 TextFlow.autogram-heading-l,
 TextFlow.autogram-heading-m,
 TextFlow.autogram-heading-s {
@@ -664,6 +715,13 @@ TextFlow.autogram-body-s {
   -fx-background-color: -autogram-secondary-background-colour;
   -fx-padding: 30px;
   -fx-alignment: center;
+}
+
+.autogram-dropzone--hero {
+  -fx-background-color: rgba(255, 255, 255, 0.72);
+  -fx-border-color: rgba(0, 0, 0, 0.12);
+  -fx-border-width: 1.5px;
+  -fx-padding: 34px;
 }
 
 .autogram-dropzone-hint {
@@ -1522,8 +1580,26 @@ TextFlow.autogram-body-s {
   -fx-padding: 0;
 }
 
+.autogram-signing-head-card {
+  -fx-background-color: linear-gradient(to bottom right, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.56));
+  -fx-border-color: rgba(0, 0, 0, 0.08);
+  -fx-border-width: 1px;
+  -fx-border-radius: 16;
+  -fx-background-radius: 16;
+  -fx-padding: 18 20;
+}
+
 .autogram-signing-head {
   -fx-spacing: 8;
+}
+
+.autogram-signing-help {
+  -fx-font-size: 13px;
+  -fx-text-fill: -autogram-text-secondary;
+}
+
+.autogram-signing-badges {
+  -fx-padding: 2 0 0 0;
 }
 
 .autogram-selection-chip {
@@ -1570,13 +1646,22 @@ TextFlow.autogram-body-s {
   -fx-border-width: 1px;
   -fx-border-radius: 12;
   -fx-background-radius: 12;
-  -fx-padding: 10 12;
+  -fx-padding: 14 16;
 }
 
 .autogram-signing-control-bar {
   -fx-spacing: 12;
-  -fx-padding: 8 0 0 0;
+  -fx-padding: 0;
   -fx-alignment: CENTER_LEFT;
+}
+
+.autogram-signing-control-surface {
+  -fx-background-color: rgba(255, 255, 255, 0.7);
+  -fx-border-color: rgba(0, 0, 0, 0.08);
+  -fx-border-width: 1px;
+  -fx-border-radius: 14;
+  -fx-background-radius: 14;
+  -fx-padding: 14 16;
 }
 
 .autogram-signing-control-bar .autogram-choicebox {
@@ -1642,6 +1727,12 @@ TextFlow.autogram-body-s {
 
 .autogram-inline-alert__dismiss:hover {
   -fx-underline: true;
+}
+
+.autogram-section-title {
+  -fx-font-size: 13px;
+  -fx-font-weight: 600;
+  -fx-text-fill: -autogram-text-primary;
 }
 
 .autogram-inline-alert--warning {
@@ -1841,8 +1932,9 @@ TextFlow.autogram-body-s {
 }
 
 .autogram-sidebar-status {
-  -fx-font-size: 11px;
-  -fx-text-fill: #86868b;
+  -fx-font-size: 12px;
+  -fx-font-weight: 500;
+  -fx-text-fill: -autogram-text-secondary;
 }
 
 .autogram-content-area {
@@ -1855,11 +1947,73 @@ TextFlow.autogram-body-s {
   -fx-spacing: 24;
 }
 
+.autogram-welcome-panel {
+  -fx-padding: 34 36 36 36;
+}
+
+.autogram-hero-card {
+  -fx-background-color: linear-gradient(to bottom right, rgba(255, 255, 255, 0.76), rgba(255, 255, 255, 0.58));
+  -fx-border-color: rgba(0, 0, 0, 0.08);
+  -fx-border-width: 1px;
+  -fx-border-radius: 22;
+  -fx-background-radius: 22;
+  -fx-padding: 26 28 28 28;
+  -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.08), 28, 0, 0, 10);
+}
+
+.autogram-hero-copy {
+  -fx-max-width: 760px;
+}
+
+.autogram-hero-steps {
+  -fx-padding: 4 0 0 0;
+}
+
+.autogram-hero-step {
+  -fx-background-color: rgba(255, 255, 255, 0.56);
+  -fx-border-color: rgba(0, 0, 0, 0.08);
+  -fx-border-width: 1px;
+  -fx-border-radius: 16;
+  -fx-background-radius: 16;
+  -fx-padding: 14 16;
+}
+
+.autogram-hero-step__index {
+  -fx-min-width: 24px;
+  -fx-min-height: 24px;
+  -fx-alignment: CENTER;
+  -fx-background-color: rgba(0, 122, 255, 0.12);
+  -fx-background-radius: 999;
+  -fx-text-fill: -autogram-accent;
+  -fx-font-size: 11px;
+  -fx-font-weight: 700;
+}
+
+.autogram-hero-step__title {
+  -fx-font-size: 13px;
+  -fx-font-weight: 600;
+  -fx-text-fill: -autogram-text-primary;
+}
+
+.autogram-hero-step__body {
+  -fx-font-size: 12px;
+  -fx-text-fill: -autogram-text-secondary;
+}
+
 .autogram-sidebar-metadata {
   -fx-padding: 24 20;
   -fx-spacing: 12;
   -fx-border-color: rgba(0, 0, 0, 0.05) transparent transparent transparent;
   -fx-border-width: 1 0 0 0;
+}
+
+.autogram-sidebar-card {
+  -fx-background-color: rgba(255, 255, 255, 0.48);
+  -fx-border-color: rgba(0, 0, 0, 0.06);
+  -fx-border-width: 1px;
+  -fx-border-radius: 14;
+  -fx-background-radius: 14;
+  -fx-padding: 14 14 12 14;
 }
 
 .autogram-sidebar-section-title {
@@ -1869,17 +2023,103 @@ TextFlow.autogram-body-s {
   -fx-text-transform: uppercase;
 }
 
+.autogram-metadata-row {
+  -fx-padding: 0 0 2 0;
+}
+
 .autogram-metadata-label {
   -fx-font-family: "SF Pro Text", -apple-system, "Helvetica Neue", Arial, sans-serif;
   -fx-font-size: 11px;
   -fx-text-fill: -autogram-secondary-text-colour;
-  -fx-min-width: 60;
 }
 
 .autogram-metadata-value {
   -fx-font-family: "SF Pro Text", -apple-system, "Helvetica Neue", Arial, sans-serif;
-  -fx-font-size: 11px;
+  -fx-font-size: 12px;
   -fx-text-fill: -autogram-text-colour;
+}
+
+.autogram-metadata-value--strong {
+  -fx-font-weight: 600;
+}
+
+.autogram-sidebar-card .title {
+  -fx-background-color: transparent;
+  -fx-padding: 0;
+}
+
+.autogram-sidebar-card .titled-pane > .title {
+  -fx-background-color: transparent;
+  -fx-padding: 0;
+}
+
+.autogram-sidebar-card .titled-pane > .content {
+  -fx-border-color: transparent;
+  -fx-background-color: transparent;
+  -fx-padding: 10 0 0 0;
+}
+
+.autogram-update-shell {
+  -fx-spacing: 16;
+}
+
+.autogram-update-topline {
+  -fx-padding: 0 0 2 0;
+}
+
+.autogram-update-badge {
+  -fx-padding: 5 10;
+  -fx-background-color: rgba(0, 122, 255, 0.12);
+  -fx-border-color: rgba(0, 122, 255, 0.22);
+  -fx-border-width: 1px;
+  -fx-border-radius: 999;
+  -fx-background-radius: 999;
+  -fx-text-fill: -autogram-accent;
+  -fx-font-size: 11px;
+  -fx-font-weight: 700;
+}
+
+.autogram-update-badge--warning {
+  -fx-background-color: rgba(255, 149, 0, 0.18);
+  -fx-border-color: rgba(255, 149, 0, 0.28);
+  -fx-text-fill: #9a5d00;
+}
+
+.autogram-update-version-pill {
+  -fx-padding: 5 10;
+  -fx-background-color: -autogram-surface-1;
+  -fx-border-color: -autogram-border-colour;
+  -fx-border-width: 1px;
+  -fx-border-radius: 999;
+  -fx-background-radius: 999;
+  -fx-text-fill: -autogram-text-primary;
+  -fx-font-size: 12px;
+  -fx-font-weight: 600;
+}
+
+.autogram-update-notes-card {
+  -fx-background-color: rgba(255, 255, 255, 0.7);
+  -fx-border-color: rgba(0, 0, 0, 0.08);
+  -fx-border-width: 1px;
+  -fx-border-radius: 14;
+  -fx-background-radius: 14;
+  -fx-padding: 16 18;
+}
+
+.autogram-update-notes-list {
+  -fx-spacing: 8;
+}
+
+.autogram-update-note {
+  -fx-wrap-text: true;
+  -fx-padding: 10 12;
+  -fx-background-color: -autogram-surface-1;
+  -fx-border-color: rgba(0, 0, 0, 0.06);
+  -fx-border-width: 1px;
+  -fx-border-radius: 10;
+  -fx-background-radius: 10;
+  -fx-text-fill: -autogram-text-primary;
+  -fx-font-size: 12px;
 }
 
 /* --- Settings Redesign --- */

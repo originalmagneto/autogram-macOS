@@ -169,6 +169,11 @@
     -fx-background-color: rgba(255, 255, 255, 0.07);
 }
 
+.autogram-dropzone--hero {
+    -fx-background-color: rgba(255, 255, 255, 0.04);
+    -fx-border-color: rgba(255, 255, 255, 0.12);
+}
+
 .autogram-dropzone--entered {
     -fx-border-color: -autogram-focus-colour;
     -fx-background-color: derive(-autogram-focus-colour, -60%);
@@ -255,6 +260,15 @@
 .autogram-signing-step--active {
     -fx-background-color: rgba(10, 132, 255, 0.28);
     -fx-text-fill: #e6f1ff;
+}
+
+.autogram-signing-head-card,
+.autogram-signing-control-surface,
+.autogram-hero-card,
+.autogram-sidebar-card,
+.autogram-update-notes-card {
+    -fx-background-color: rgba(255, 255, 255, 0.05);
+    -fx-border-color: rgba(255, 255, 255, 0.10);
 }
 
 .autogram-signing-preview-card {
@@ -388,6 +402,49 @@
     -fx-text-fill: -autogram-text-colour;
 }
 
+.autogram-update-version-pill {
+    -fx-background-color: rgba(255, 255, 255, 0.08);
+    -fx-border-color: rgba(255, 255, 255, 0.10);
+    -fx-text-fill: #f4f7ff;
+}
+
+.autogram-update-badge {
+    -fx-background-color: rgba(10, 132, 255, 0.22);
+    -fx-border-color: rgba(10, 132, 255, 0.28);
+    -fx-text-fill: #d9ebff;
+}
+
+.autogram-update-badge--warning,
+.autogram-pill--warning {
+    -fx-background-color: rgba(255, 159, 10, 0.22);
+    -fx-border-color: rgba(255, 159, 10, 0.30);
+    -fx-text-fill: #ffd39a;
+}
+
+.autogram-pill--neutral {
+    -fx-background-color: rgba(255, 255, 255, 0.08);
+    -fx-border-color: rgba(255, 255, 255, 0.10);
+    -fx-text-fill: #c2c7d3;
+}
+
+.autogram-pill--info {
+    -fx-background-color: rgba(10, 132, 255, 0.24);
+    -fx-border-color: rgba(10, 132, 255, 0.30);
+    -fx-text-fill: #d9ebff;
+}
+
+.autogram-pill--success {
+    -fx-background-color: rgba(48, 209, 88, 0.18);
+    -fx-border-color: rgba(48, 209, 88, 0.24);
+    -fx-text-fill: #b8ffd0;
+}
+
+.autogram-update-note {
+    -fx-background-color: rgba(255, 255, 255, 0.05);
+    -fx-border-color: rgba(255, 255, 255, 0.08);
+    -fx-text-fill: #f1f4fb;
+}
+
 /* Sidebar dark — dark glass */
 .autogram-sidebar {
     -fx-background-color: rgba(33, 34, 39, 0.92);
@@ -434,7 +491,7 @@
 
 /* Sidebar metadata dark */
 .autogram-sidebar-metadata {
-    -fx-background-color: rgba(255, 255, 255, 0.06);
+    -fx-background-color: transparent;
     -fx-border-color: rgba(255, 255, 255, 0.06) transparent rgba(255, 255, 255, 0.06) transparent;
 }
 
@@ -448,6 +505,16 @@
 
 .autogram-metadata-value {
     -fx-text-fill: #f3f4f7;
+}
+
+.autogram-hero-step {
+    -fx-background-color: rgba(255, 255, 255, 0.04);
+    -fx-border-color: rgba(255, 255, 255, 0.08);
+}
+
+.autogram-hero-step__index {
+    -fx-background-color: rgba(10, 132, 255, 0.24);
+    -fx-text-fill: #d9ebff;
 }
 
 /* Settings in dark mode */

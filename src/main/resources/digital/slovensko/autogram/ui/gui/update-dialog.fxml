@@ -6,55 +6,41 @@
 <VBox xmlns="http://javafx.com/javafx"
       xmlns:fx="http://javafx.com/fxml"
       fx:id="mainBox"
-      styleClass="autogram-dialog-content,autogram-dialog-content--default">
-    <VBox>
-        <TextFlow styleClass="autogram-heading-m">
-            <Text styleClass="autogram-heading-m" text="Nová verzia "/>
-            <Label styleClass="autogram-claim,autogram-heading-m">Autogram</Label>
-            <Text styleClass="autogram-heading-m" text="u"/>
-        </TextFlow>
-        
-        <!-- Version information -->
-        <VBox styleClass="autogram-prose">
-            <Text fx:id="versionText" styleClass="autogram-body-strong" text="Verzia"/>
-        </VBox>
+      styleClass="autogram-dialog-content,autogram-dialog-content--wide,autogram-update-shell">
+    <HBox styleClass="autogram-update-topline" alignment="CENTER_LEFT" spacing="10">
+        <Label styleClass="autogram-update-badge" text="Aktualizácia" />
+        <Label fx:id="priorityBadge" styleClass="autogram-update-badge,autogram-update-badge--warning" text="Bezpečnostná aktualizácia" visible="false" managed="false" />
+        <Region HBox.hgrow="ALWAYS" />
+        <Label fx:id="versionText" styleClass="autogram-update-version-pill" text="Verzia" />
+    </HBox>
 
-        <VBox styleClass="autogram-prose">
-            <TextFlow styleClass="autogram-body">
-                <Text styleClass="autogram-body" text="Je dostupná nová verzia a odporúčame stiahnuť aktualizáciu."/>
-            </TextFlow>
-        </VBox>
-        
-        <!-- Release notes -->
-        <VBox styleClass="autogram-prose">
-            <Label styleClass="autogram-body-strong" text="Čo je nové:"/>
-            <TextArea fx:id="releaseNotesArea" 
-                     styleClass="autogram-textarea,release-notes" 
-                     editable="false" 
-                     wrapText="true" 
-                     prefRowCount="4" 
-                     maxHeight="120"
-                     visible="false" 
-                     managed="false"/>
-        </VBox>
-        
-        <!-- Progress indicators -->
-        <VBox styleClass="autogram-prose">
-            <ProgressBar fx:id="progressBar" 
-                        styleClass="autogram-progress" 
-                        prefWidth="Infinity" 
-                        visible="false" 
-                        managed="false"/>
-            <Text fx:id="progressText" 
-                  styleClass="autogram-body-small" 
-                  text="" 
-                  visible="false" 
-                  managed="false"/>
-        </VBox>
-        
-        <HBox styleClass="autogram-actions">
-            <Button fx:id="mainButton" styleClass="autogram-button" text="Stiahnuť novú verziu" onAction="#downloadAction"/>
-            <Button fx:id="cancelButton" styleClass="autogram-link" text="Teraz nie" onAction="#onCancelButtonPressed"/>
-        </HBox>
+    <VBox styleClass="autogram-prose" spacing="10">
+        <TextFlow><Text styleClass="autogram-hero-title" text="Dostupná nová verzia Autogramu" /></TextFlow>
+        <Label fx:id="summaryText" styleClass="autogram-body-l" wrapText="true"
+               text="Je dostupná nová verzia a odporúčame ju nainštalovať." />
+        <Label fx:id="downloadMetaText" styleClass="autogram-body-s" text="" visible="false" managed="false" wrapText="true" />
     </VBox>
+
+    <VBox fx:id="releaseNotesCard" styleClass="autogram-update-notes-card" spacing="12" visible="false" managed="false">
+        <Label styleClass="autogram-body-strong" text="Najdôležitejšie zmeny" />
+        <VBox fx:id="releaseNotesHighlights" styleClass="autogram-update-notes-list" spacing="8" />
+    </VBox>
+
+    <VBox styleClass="autogram-prose" spacing="8">
+        <ProgressBar fx:id="progressBar"
+                     styleClass="autogram-progress-bar,progress-bar"
+                     prefWidth="Infinity"
+                     visible="false"
+                     managed="false"/>
+        <Text fx:id="progressText"
+              styleClass="autogram-body-small"
+              text=""
+              visible="false"
+              managed="false"/>
+    </VBox>
+
+    <HBox styleClass="autogram-actions">
+        <Button fx:id="mainButton" styleClass="autogram-button" text="Stiahnuť novú verziu" onAction="#downloadAction"/>
+        <Button fx:id="cancelButton" styleClass="autogram-link" text="Teraz nie" onAction="#onCancelButtonPressed"/>
+    </HBox>
 </VBox>

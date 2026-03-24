@@ -79,37 +79,41 @@
 
                 <!-- Document Information Sidebar Section -->
                 <VBox fx:id="metadataPanel" styleClass="autogram-sidebar-metadata" visible="false" managed="false" spacing="12">
-                    <VBox spacing="8">
+                    <VBox styleClass="autogram-sidebar-card" spacing="12">
                         <Label styleClass="autogram-sidebar-section-title">Informácie o dokumente</Label>
-                        <VBox spacing="4">
-                            <HBox spacing="10">
-                                <Label styleClass="autogram-metadata-label" text="Súbor:"/>
-                                <Label fx:id="metaFilename" styleClass="autogram-metadata-value" wrapText="true"/>
-                            </HBox>
-                            <HBox spacing="10">
-                                <Label styleClass="autogram-metadata-label" text="Veľkosť:"/>
+                        <Label styleClass="autogram-body-s" wrapText="true"
+                               text="Prehľad práve otvoreného dokumentu a aktívneho certifikátu."/>
+                        <VBox spacing="10">
+                            <VBox styleClass="autogram-metadata-row" spacing="2">
+                                <Label styleClass="autogram-metadata-label" text="Súbor"/>
+                                <Label fx:id="metaFilename" styleClass="autogram-metadata-value,autogram-metadata-value--strong" wrapText="true"/>
+                            </VBox>
+                            <VBox styleClass="autogram-metadata-row" spacing="2">
+                                <Label styleClass="autogram-metadata-label" text="Veľkosť"/>
                                 <Label fx:id="metaSize" styleClass="autogram-metadata-value"/>
-                            </HBox>
-                            <HBox spacing="10">
-                                <Label styleClass="autogram-metadata-label" text="Strany:"/>
+                            </VBox>
+                            <VBox styleClass="autogram-metadata-row" spacing="2">
+                                <Label styleClass="autogram-metadata-label" text="Strany"/>
                                 <Label fx:id="metaPages" styleClass="autogram-metadata-value"/>
-                            </HBox>
-                            <HBox spacing="10">
-                                <Label styleClass="autogram-metadata-label" text="Formát:"/>
+                            </VBox>
+                            <VBox styleClass="autogram-metadata-row" spacing="2">
+                                <Label styleClass="autogram-metadata-label" text="Formát"/>
                                 <Label fx:id="metaFormat" styleClass="autogram-metadata-value"/>
-                            </HBox>
-                            <HBox spacing="10">
-                                <Label styleClass="autogram-metadata-label" text="Certifikát:"/>
+                            </VBox>
+                            <VBox styleClass="autogram-metadata-row" spacing="2">
+                                <Label styleClass="autogram-metadata-label" text="Certifikát"/>
                                 <Label fx:id="metaCertificate" styleClass="autogram-metadata-value" wrapText="true"/>
-                            </HBox>
+                            </VBox>
                         </VBox>
                     </VBox>
 
                     <Separator fx:id="existingSignaturesSeparator" styleClass="autogram-separator" visible="false" managed="false"/>
 
-                    <TitledPane fx:id="existingSignaturesPane" text="Existujúce podpisy" expanded="false" visible="false" managed="false" animated="true">
-                        <VBox fx:id="existingSignaturesList" spacing="6" />
-                    </TitledPane>
+                    <VBox styleClass="autogram-sidebar-card" visible="false" managed="false" fx:id="existingSignaturesCard">
+                        <TitledPane fx:id="existingSignaturesPane" text="Existujúce podpisy" expanded="false" visible="false" managed="false" animated="true">
+                            <VBox fx:id="existingSignaturesList" spacing="6" />
+                        </TitledPane>
+                    </VBox>
                 </VBox>
 
                 <VBox styleClass="autogram-sidebar-footer">
@@ -122,21 +126,59 @@
                 <!-- Content Panel Container (Blurred Background) -->
                 <StackPane fx:id="contentPanelContainer">
                     <!-- Drop zone (default view) -->
-                    <VBox fx:id="dropZonePanel" styleClass="autogram-content-panel" alignment="CENTER">
-                        <VBox spacing="20" alignment="CENTER" VBox.vgrow="ALWAYS">
-                            <TextFlow textAlignment="CENTER"><Text styleClass="autogram-heading-m" text="Vyberte súbor na&#160;podpísanie alebo overenie"/></TextFlow>
-                            <TextFlow textAlignment="CENTER">
-                                <Text styleClass="autogram-body" text="Môžete otvoriť jeden dokument alebo viac súborov naraz pre hromadné podpisovanie." />
-                            </TextFlow>
-                            <VBox fx:id="dropZone" alignment="CENTER" spacing="20.0" styleClass="autogram-dropzone" VBox.vgrow="ALWAYS" minHeight="160" accessibleRole="BUTTON" accessibleText="Oblasť pre výber súborov. Stlačte Enter alebo medzerník pre výber súborov, alebo sem presuňte súbory myšou.">
-                                <SVGPath styleClass="autogram-icon,autogram-icon--big" content="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m3.75 9v6m3-3H9m1.5-12H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" accessibleText="Ikona nahrávania súborov"/>
-                                <TextFlow textAlignment="CENTER">
-                                    <Button styleClass="autogram-button,autogram-button--secondary" fx:id="uploadButton" onAction="#onUploadButtonAction" accessibleText="Tlačidlo pre výber súborov na podpísanie">Vyberte súbor</Button>
-                                    <Text styleClass="autogram-body" text=" alebo ho presuňte sem" />
-                                </TextFlow>
-                                <Label styleClass="autogram-dropzone-hint"
-                                       wrapText="true"
-                                       text="Klávesnica: Enter alebo medzerník. Menu: Súbor → Otvoriť súbor…" />
+                    <VBox fx:id="dropZonePanel" styleClass="autogram-content-panel,autogram-welcome-panel" alignment="TOP_CENTER">
+                        <VBox spacing="28" alignment="TOP_CENTER" maxWidth="900" VBox.vgrow="ALWAYS">
+                            <VBox styleClass="autogram-hero-card" spacing="24">
+                                <VBox styleClass="autogram-hero-copy" spacing="12">
+                                    <Label styleClass="autogram-eyebrow" text="Podpisovanie a overovanie dokumentov" />
+                                    <TextFlow textAlignment="LEFT"><Text styleClass="autogram-hero-title" text="Vyberte dokument a skontrolujte ho pred podpisom" /></TextFlow>
+                                    <TextFlow>
+                                        <Text styleClass="autogram-body-l" text="Autogram vás prevedie otvorením súboru, kontrolou existujúcich podpisov a samotným podpisom v jednom okne. Otvoriť môžete jeden dokument aj viac súborov naraz pre hromadné podpisovanie." />
+                                    </TextFlow>
+                                </VBox>
+
+                                <FlowPane styleClass="autogram-hero-steps" hgap="12" vgap="12">
+                                    <VBox styleClass="autogram-hero-step" prefWidth="250" spacing="6">
+                                        <Label styleClass="autogram-hero-step__index" text="1" />
+                                        <Label styleClass="autogram-hero-step__title" text="Vyberte dokument" />
+                                        <Label styleClass="autogram-hero-step__body" wrapText="true"
+                                               text="Otvorte PDF, XML alebo iný podporovaný súbor z disku alebo ho presuňte myšou." />
+                                    </VBox>
+                                    <VBox styleClass="autogram-hero-step" prefWidth="250" spacing="6">
+                                        <Label styleClass="autogram-hero-step__index" text="2" />
+                                        <Label styleClass="autogram-hero-step__title" text="Skontrolujte obsah" />
+                                        <Label styleClass="autogram-hero-step__body" wrapText="true"
+                                               text="Pozrite si náhľad dokumentu, existujúce podpisy a upozornenia pred finálnym podpisom." />
+                                    </VBox>
+                                    <VBox styleClass="autogram-hero-step" prefWidth="250" spacing="6">
+                                        <Label styleClass="autogram-hero-step__index" text="3" />
+                                        <Label styleClass="autogram-hero-step__title" text="Podpíšte s istotou" />
+                                        <Label styleClass="autogram-hero-step__body" wrapText="true"
+                                               text="Zvoľte certifikát, formát podpisu a časovú pečiatku bez prepínania medzi oknami." />
+                                    </VBox>
+                                </FlowPane>
+
+                                <VBox fx:id="dropZone" alignment="CENTER" spacing="20.0" styleClass="autogram-dropzone,autogram-dropzone--hero" VBox.vgrow="ALWAYS" minHeight="190" accessibleRole="BUTTON" accessibleText="Oblasť pre výber súborov. Stlačte Enter alebo medzerník pre výber súborov, alebo sem presuňte súbory myšou.">
+                                    <SVGPath styleClass="autogram-icon,autogram-icon--big" content="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m3.75 9v6m3-3H9m1.5-12H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" accessibleText="Ikona nahrávania súborov"/>
+                                    <TextFlow textAlignment="CENTER">
+                                        <Button styleClass="autogram-button,autogram-button--secondary" fx:id="uploadButton" onAction="#onUploadButtonAction" accessibleText="Tlačidlo pre výber súborov na podpísanie">Vyberte súbor</Button>
+                                        <Text styleClass="autogram-body" text=" alebo ho presuňte sem" />
+                                    </TextFlow>
+                                    <Label styleClass="autogram-dropzone-hint"
+                                           wrapText="true"
+                                           text="Klávesnica: Enter alebo medzerník. Menu: Súbor → Otvoriť súbor…" />
+                                </VBox>
+
+                                <VBox spacing="10">
+                                    <Label styleClass="autogram-sidebar-section-title" text="Najčastejšie formáty" />
+                                    <FlowPane styleClass="autogram-pill-row" hgap="8" vgap="8">
+                                        <Label styleClass="autogram-pill,autogram-pill--neutral" text="PDF" />
+                                        <Label styleClass="autogram-pill,autogram-pill--neutral" text="XAdES XML" />
+                                        <Label styleClass="autogram-pill,autogram-pill--neutral" text="CAdES" />
+                                        <Label styleClass="autogram-pill,autogram-pill--neutral" text="eForm" />
+                                        <Label styleClass="autogram-pill,autogram-pill--neutral" text="Hromadné podpisovanie" />
+                                    </FlowPane>
+                                </VBox>
                             </VBox>
                         </VBox>
                     </VBox>
