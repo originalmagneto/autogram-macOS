@@ -43,8 +43,8 @@ Detailnejší plán rollout-u je v [PLAN.md](PLAN.md). Postup synchronizácie s 
 
 Podpisovacia obrazovka po redizajne:
 - drží náhľad dokumentu ako dominantný prvok,
-- zobrazuje varovania a existujúce podpisy bez opustenia obrazovky,
-- ponecháva v sidebare dôležité metadáta dokumentu a certifikátu,
+- zobrazuje stav podpisovania a zvolený certifikát priamo nad náhľadom,
+- dáva jasne najavo, či je dokument pripravený na podpis,
 - sústreďuje formát podpisu, časovú pečiatku a podpisové CTA do jedného čitateľného bloku.
 
 ## Hlavné Funkcionality

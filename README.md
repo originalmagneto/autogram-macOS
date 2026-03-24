@@ -43,8 +43,8 @@ The home screen now explains the workflow before the user starts:
 
 The signing workflow keeps the document preview dominant while surfacing the right decisions:
 - review the PDF preview before signing,
-- inspect warnings and existing signatures without leaving the screen,
-- see active document metadata in the sidebar,
+- see the current signing state and selected certificate immediately above the preview,
+- understand whether the document is ready for signing before the final action,
 - choose signature format, timestamp, and certificate in one place.
 
 ## Main Capabilities
