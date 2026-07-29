@@ -391,13 +391,8 @@ public class SettingsDialogController extends BaseController {
     }
 
     public void onResetButtonAction() {
-
-        var controller = new SettingsResetDialogController();
-        controller.setUserSettings(userSettings);
-        controller.setResetButton(resetButton);
-
+        var controller = new SettingsResetDialogController(autogram, userSettings, resetButton);
         var root = GUIUtils.loadFXML(controller, "settings-reset-dialog.fxml");
-
         var stage = new Stage();
         stage.setTitle(controller.i18n("settings.reset.title"));
         stage.setScene(new Scene(root));
