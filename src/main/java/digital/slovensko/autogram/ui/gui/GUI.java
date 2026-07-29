@@ -224,7 +224,7 @@ public class GUI implements UI {
 
     public char[] getKeystorePassword() {
         var futurePassword = new FutureTask<>(() -> {
-            var controller = new PasswordController("password.keystore.text", "password.keystore.error.text", false, true);
+            var controller = new PasswordController("password.keystore.text", "password.keystore.error.text", "password.keystore.subtitle", false, true);
             var root = GUIUtils.loadFXML(controller, "password-dialog.fxml");
 
             var stage = new Stage();
@@ -253,7 +253,7 @@ public class GUI implements UI {
 
     public char[] getContextSpecificPassword() {
         var futurePassword = new FutureTask<>(() -> {
-            var controller = new PasswordController("password.context.text", "password.context.error.text", true, false);
+            var controller = new PasswordController("password.context.text", "password.context.error.text", null, true, false);
             var root = GUIUtils.loadFXML(controller, "password-dialog.fxml");
 
             var stage = new Stage();
