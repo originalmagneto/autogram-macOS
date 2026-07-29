@@ -454,7 +454,7 @@ public abstract class EFormUtils {
             var mediaDestinationType = nullOrNodeValue(node.getAttributes().getNamedItem("media-destination-type"));
 
             if (mediaDestination == null) {
-                if (Stream.of(".sb..xslt", ".html.xslt").noneMatch(fullPath::endsWith))
+                if (Stream.of(".sb.xslt", ".html.xslt").noneMatch(fullPath::endsWith))
                     continue;
 
                 mediaDestination = fullPath.contains(".sb.xslt") ? "sign" : "view";
@@ -509,7 +509,7 @@ public abstract class EFormUtils {
         return node != null ? node.getNodeValue() : null;
     }
 
-    public static ManifestXsltEntry selectXslt(ArrayList<ManifestXsltEntry> entries, String xsltDestinationType, String xsltLanguage, String xsltTarget) {
+    public static ManifestXsltEntry selectXslt(ArrayList<ManifestXsltEntry> entries, String xsltDestinationType, String xsltLanguage, String xsltTarget, String xsltDigest, String canonicalizationMethod, String sourcePrefix) {
         if (xsltDestinationType != null)
             entries.removeIf(entry -> !xsltDestinationType.equals(entry.destinationType()));
 
@@ -525,6 +525,22 @@ public abstract class EFormUtils {
         entries = filterIfExist(entries, e -> e.destinationType().equals("XHTML"));
         entries = filterIfExist(entries, e -> e.language().equals("sk"));
         entries = filterIfExist(entries, e -> e.language().equals("en"));
+
+
+        if (xsltDigest != null)
+            entries.removeIf(entry -> {
+                try {
+                    var xsltString = getResource(sourcePrefix + entry.fullPath());
+                    if (xsltString == null)
+                        return false;
+
+                    var canidateDigest = computeDigest(xsltString, canonicalizationMethod, DigestAlgorithm.SHA256, ENCODING);
+
+                    return !canidateDigest.equals(xsltDigest);
+                } catch (XMLValidationException e) {
+                    return true;
+                }
+            });
 
         return entries.stream().findFirst().orElse(null);
     }

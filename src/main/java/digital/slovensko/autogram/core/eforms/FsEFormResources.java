@@ -144,7 +144,7 @@ public class FsEFormResources extends EFormResources {
         if (entries.isEmpty())
             return false;
 
-        var entry = selectXslt(entries, xsltDestinationType, xsltLanguage, xsltTarget);
+        var entry = selectXslt(entries, xsltDestinationType, xsltLanguage, xsltTarget, this.xsltDigest, canonicalizationMethod, SOURCE_URL + url + "/");
         if (entry == null)
             return false;
 
