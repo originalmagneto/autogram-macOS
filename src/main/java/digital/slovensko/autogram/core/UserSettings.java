@@ -305,6 +305,14 @@ public class UserSettings implements PasswordManagerSettings, SignatureTokenSett
         this.expiredCertsEnabled = expiredCertsEnabled;
     }
 
+    public boolean tlCountriesChanged() {
+        var prefs = Preferences.userNodeForPackage(UserSettings.class);
+        var savedTrustedList = prefs.get("TRUSTED_LIST", DEFAULT_TRUSTED_LIST);
+        var currentTrustedList = String.join(",", trustedList);
+
+        return !savedTrustedList.equals(currentTrustedList);
+    }
+
     public List<String> getTrustedList() {
         return trustedList;
     }
