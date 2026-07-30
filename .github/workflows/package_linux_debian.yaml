@@ -62,8 +62,8 @@ jobs:
         if: ${{ inputs.environment == 'dev-build' }}
         uses: actions/upload-artifact@v6
         with:
-          name: autogram-${VERSION}-debian.deb
-          path: target/autogram-${VERSION}-debian.deb
+          name: autogram-${{ inputs.version }}-debian.deb
+          path: target/autogram-${{ inputs.version }}-debian.deb
           if-no-files-found: ignore
 
       - name: Create release if tag pushed
@@ -73,4 +73,4 @@ jobs:
           draft: true
           prerelease: true
           files: |
-            target/autogram-${VERSION}-debian.deb
+            target/autogram-${{ inputs.version }}-debian.deb

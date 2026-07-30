@@ -110,8 +110,8 @@ jobs:
         if: ${{ inputs.environment == 'dev-build' }}
         uses: actions/upload-artifact@v6
         with:
-          name: autogram-${VERSION}-macos-intel.pkg
-          path: target/autogram-${VERSION}-macos-intel.pkg
+          name: autogram-${{ inputs.version }}-macos-intel.pkg
+          path: target/autogram-${{ inputs.version }}-macos-intel.pkg
           if-no-files-found: ignore
 
       - name: Create release if tag pushed
@@ -121,4 +121,4 @@ jobs:
           draft: true
           prerelease: true
           files: |
-            target/autogram-${VERSION}-macos-intel.pkg
+            target/autogram-${{ inputs.version }}-macos-intel.pkg
