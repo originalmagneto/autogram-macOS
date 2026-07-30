@@ -29,7 +29,7 @@ public class Version implements Comparable<Version> {
             return new Version(new int[]{});
         }
 
-        if (version.equals("dev")) {
+        if (version.equals("dev") || version.equals("0.0.0")) {
             return new Version();
         }
 
