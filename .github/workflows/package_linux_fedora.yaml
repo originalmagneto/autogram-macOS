@@ -21,7 +21,7 @@ on:
         required: true
         type: choice
         options:
-          - "0.0.0"
+          - "1.0.0"
 
 jobs:
   package:
