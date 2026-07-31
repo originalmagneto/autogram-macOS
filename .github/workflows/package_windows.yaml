@@ -21,7 +21,7 @@ on:
         required: true
         type: choice
         options:
-          - "dev"
+          - "1.0.0"
 
 jobs:
   package:
@@ -74,8 +74,8 @@ jobs:
         if: ${{ inputs.environment == 'dev-build' }}
         uses: actions/upload-artifact@v6
         with:
-          name: autogram-${VERSION}-windows.msi
-          path: target/autogram-${VERSION}-windows.msi
+          name: autogram-${{ inputs.version }}-windows.msi
+          path: target/autogram-${{ inputs.version }}-windows.msi
           if-no-files-found: ignore
 
       - name: Create release if tag pushed
@@ -85,4 +85,4 @@ jobs:
           draft: true
           prerelease: true
           files: |
-            target/autogram-${VERSION}-windows.msi
+            target/autogram-${{ inputs.version }}-windows.msi

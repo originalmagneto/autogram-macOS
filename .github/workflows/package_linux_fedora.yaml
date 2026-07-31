@@ -21,7 +21,7 @@ on:
         required: true
         type: choice
         options:
-          - "dev"
+          - "1.0.0"
 
 jobs:
   package:
@@ -59,8 +59,8 @@ jobs:
         if: ${{ inputs.environment == 'dev-build' }}
         uses: actions/upload-artifact@v6
         with:
-          name: autogram-${VERSION}-fedora.rpm
-          path: target/autogram-${VERSION}-fedora.rpm
+          name: autogram-${{ inputs.version }}-fedora.rpm
+          path: target/autogram-${{ inputs.version }}-fedora.rpm
           if-no-files-found: ignore
 
       - name: Create release if tag pushed
@@ -70,4 +70,4 @@ jobs:
           draft: true
           prerelease: true
           files: |
-            target/autogram-${VERSION}-fedora.rpm
+            target/autogram-${{ inputs.version }}-fedora.rpm
