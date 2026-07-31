@@ -393,6 +393,8 @@
                                 <module>java.naming</module>
                                 <module>java.datatransfer</module>
                                 <module>java.net.http</module>
+                                <!-- Apache HttpClient 5 uses jdk.net.Sockets for socket options. -->
+                                <module>jdk.net</module>
                                 <module>java.logging</module>
                                 <module>java.sql</module>
                                 <module>java.scripting</module>
