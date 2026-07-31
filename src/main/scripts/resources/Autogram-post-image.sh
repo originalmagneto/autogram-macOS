@@ -1,21 +1,28 @@
 #!/bin/bash
 set -euo pipefail
 
-trap 'echo "[Autogram-post-image] ERROR at line ${LINENO} (last command: ${BASH_COMMAND}, exit code: $?)" >&2' ERR
-echo "[Autogram-post-image] invoked as: ${BASH_SOURCE[0]}"
+trap 'echo "[Autogram-post-image] ERROR at line ${LINENO} (exit code: $?)" >&2' ERR
+echo "[Autogram-post-image] invoked as: $0"
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 echo "[Autogram-post-image] script dir: ${SCRIPT_DIR}"
 
 if [[ -d "./Contents" ]]; then
     TARGET="$(cd "./Contents" && pwd)"
-elif compgen -G "../images/*/*/Contents" > /dev/null; then
-    TARGET="$(cd ../images/*/*/Contents && pwd)"
 else
-    echo "[Autogram-post-image] ERROR: could not locate .app Contents directory (cwd=$(pwd))" >&2
-    echo "[Autogram-post-image] cwd listing:" >&2
-    ls -la . >&2
-    exit 1
+    for contents_dir in ../images/*/*/Contents; do
+        if [[ -d "${contents_dir}" ]]; then
+            TARGET="$(cd "${contents_dir}" && pwd)"
+            break
+        fi
+    done
+
+    if [[ -z "${TARGET:-}" ]]; then
+        echo "[Autogram-post-image] ERROR: could not locate .app Contents directory (cwd=$(pwd))" >&2
+        echo "[Autogram-post-image] cwd listing:" >&2
+        ls -la . >&2
+        exit 1
+    fi
 fi
 echo "[Autogram-post-image] target Contents dir: ${TARGET}"
 
