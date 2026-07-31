@@ -82,7 +82,6 @@ public class SettingsDialogController extends BaseController {
     private final UserSettings userSettings;
     private final List<String> preDefinedTsaServers = List.of(
             UserSettings.DEFAULT_TSA_SERVER,
-            "http://ts.quovadisglobal.com/eu",
             "http://timestamp.sectigo.com/qualified",
             "http://tsa.belgium.be/connect"
     );

@@ -43,7 +43,7 @@ public class UserSettings implements PasswordManagerSettings, SignatureTokenSett
     private static final int DEFAULT_PDF_DPI = 100;
     private static final long DEFAULT_TOKEN_SESSION_TIMEOUT = 5L;
     private static final String DEFAULT_CUSTOM_PKCS11_DRIVER_PATH = "";
-    public static final String DEFAULT_TSA_SERVER = "http://ts.quovadisglobal.com/eu,http://timestamp.sectigo.com/qualified,http://tsa.belgium.be/connect";
+    public static final String DEFAULT_TSA_SERVER = "http://timestamp.sectigo.com/qualified,http://tsa.belgium.be/connect";
 
     private final List<String> PROBLEMATIC_DEFAULT_TSA_SERVERS = List.of(
         "http://tsa.belgium.be/connect,http://ts.quovadisglobal.com/eu,http://tsa.sep.bg",
