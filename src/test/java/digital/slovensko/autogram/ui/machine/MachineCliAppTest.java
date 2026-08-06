@@ -120,7 +120,7 @@ class MachineCliAppTest {
     @Test
     void dispatchesCertificatesOnlyForExactDriverId() throws Exception {
         var driver = new InstalledTestDriver("fake");
-        var events = startFailure("CERTIFICATES", "{\"driver\":\"FAKE\",\"pin\":\"1234\"}", serviceWith(driver));
+        var events = startFailure("CERTIFICATES", "{\"driver\":\"FAKE\",\"pin\":\"1234\"}", serviceWith(driver), 69);
 
         assertEquals(List.of("session.started", "session.failed"), eventTypes(events));
         assertEquals("DRIVER_NOT_FOUND", events.get(1).getAsJsonObject("payload").get("code").getAsString());
@@ -132,7 +132,7 @@ class MachineCliAppTest {
     @Test
     void redactsPinAndDriverPathWhenCertificateReadFails() throws Exception {
         var events = startFailure("CERTIFICATES", "{\"driver\":\"broken\",\"pin\":\"1234\"}",
-                serviceWith(new BrokenDriver()));
+                serviceWith(new BrokenDriver()), 69);
 
         assertEquals(List.of("session.started", "session.failed"), eventTypes(events));
         assertEquals("DRIVER_UNAVAILABLE", events.get(1).getAsJsonObject("payload").get("code").getAsString());
@@ -218,7 +218,12 @@ class MachineCliAppTest {
 
     private static List<com.google.gson.JsonObject> startFailure(String operation, String payload,
             MachineDriverService service) throws Exception {
-        return start(operation, payload, service, 64);
+        return startFailure(operation, payload, service, 64);
+    }
+
+    private static List<com.google.gson.JsonObject> startFailure(String operation, String payload,
+            MachineDriverService service, int expectedCode) throws Exception {
+        return start(operation, payload, service, expectedCode);
     }
 
     private static List<com.google.gson.JsonObject> start(String operation, String payload, MachineDriverService service,

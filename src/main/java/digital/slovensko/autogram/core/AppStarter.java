@@ -65,7 +65,9 @@ public class AppStarter {
                                 new PrintWriter(System.err, true, StandardCharsets.UTF_8)));
                 System.out.flush();
                 System.err.flush();
-                if (requiresIntelCliCleanup(cmd))
+                if (cmd.hasOption("machine-readable")) {
+                    System.exit(exitCode);
+                } else if (requiresIntelCliCleanup(cmd))
                     terminateCliProcess(exitCode);
                 else
                     System.exit(exitCode);

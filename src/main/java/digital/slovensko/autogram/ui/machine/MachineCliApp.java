@@ -15,8 +15,6 @@ import java.util.Arrays;
 import java.util.List;
 
 public final class MachineCliApp {
-    private static final int USAGE_ERROR = 64;
-
     private MachineCliApp() {
     }
 
@@ -41,17 +39,18 @@ public final class MachineCliApp {
             MachineDriverService driverService, MachineInspectionService inspectionService, Runnable trustInitializer,
             SigningServiceFactory signingServiceFactory) {
         var writer = new MachineEventWriter(output);
+        var errorMapper = new MachineErrorMapper();
         try {
             MachineRequestValidator.validateCommandLine(commandLine);
         } catch (MachineProtocolException exception) {
-            return fail(writer, "unknown", exception.getMessage());
+            return fail(writer, "unknown", errorMapper, exception);
         }
 
         String rawRequest;
         try {
             rawRequest = readRequest(input);
         } catch (IOException exception) {
-            return fail(writer, "unknown", "PROTOCOL_INVALID_REQUEST");
+            return fail(writer, "unknown", errorMapper, new MachineProtocolException("PROTOCOL_INVALID_REQUEST", exception));
         }
 
         try {
@@ -59,9 +58,12 @@ public final class MachineCliApp {
             MachineRequestValidator.validate(commandLine, request);
             return dispatch(writer, request, driverService, inspectionService, trustInitializer, signingServiceFactory);
         } catch (MachineProtocolException exception) {
-            return fail(writer, requestId(rawRequest), errorCode(exception, rawRequest));
+            var mappedException = hasUnsupportedProtocolVersion(rawRequest)
+                    ? new MachineProtocolException("PROTOCOL_UNSUPPORTED_VERSION", exception)
+                    : exception;
+            return fail(writer, requestId(rawRequest), errorMapper, mappedException);
         } catch (Exception exception) {
-            return fail(writer, requestId(rawRequest), "OPERATION_FAILED");
+            return fail(writer, requestId(rawRequest), errorMapper, exception);
         }
     }
 
@@ -119,8 +121,10 @@ public final class MachineCliApp {
         var signRequest = requiredSignRequest(request.payload());
         try {
             MachineRequestValidator.validateSign(signRequest);
-            signingServiceFactory.create(writer, inspectionService, trustInitializer).sign(request.requestId(), signRequest);
-            return 0;
+            var failureCode = signingServiceFactory.create(writer, inspectionService, trustInitializer)
+                    .sign(request.requestId(), signRequest);
+            return failureCode == null ? MachineErrorMapper.COMPLETED
+                    : new MachineErrorMapper().exitCode(new MachineProtocolException(failureCode));
         } finally {
             Arrays.fill(signRequest.pin(), '\0');
         }
@@ -139,8 +143,8 @@ public final class MachineCliApp {
     }
 
     private static int complete(MachineEventWriter writer, String requestId, JsonObject payload) {
-        writer.write("session.completed", requestId, null, payload);
-        return 0;
+        writer.writeTerminal("session.completed", requestId, payload);
+        return MachineErrorMapper.COMPLETED;
     }
 
     private static void requireEmptyPayload(JsonObject payload) {
@@ -249,15 +253,11 @@ public final class MachineCliApp {
         return request.toString();
     }
 
-    private static int fail(MachineEventWriter writer, String sessionId, String code) {
-        var payload = new com.google.gson.JsonObject();
-        payload.addProperty("code", code);
-        writer.write("session.failed", sessionId, null, payload);
-        return USAGE_ERROR;
-    }
-
-    private static String errorCode(MachineProtocolException exception, String rawRequest) {
-        return hasUnsupportedProtocolVersion(rawRequest) ? "PROTOCOL_UNSUPPORTED_VERSION" : exception.getMessage();
+    private static int fail(MachineEventWriter writer, String sessionId, MachineErrorMapper errorMapper,
+            Throwable exception) {
+        var error = errorMapper.map(exception);
+        writer.writeTerminal("session.failed", sessionId, error.toPayload());
+        return errorMapper.exitCode(exception);
     }
 
     private static boolean hasUnsupportedProtocolVersion(String rawRequest) {

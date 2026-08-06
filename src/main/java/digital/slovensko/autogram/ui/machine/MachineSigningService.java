@@ -62,7 +62,7 @@ public final class MachineSigningService {
         this.fileSystem = Objects.requireNonNull(fileSystem);
     }
 
-    public void sign(String requestId, SignRequest request) {
+    public String sign(String requestId, SignRequest request) {
         writer.write("session.started", requestId, null, new JsonObject());
         String sessionFailureCode = null;
         List<PreparedFile> preparedFiles = List.of();
@@ -95,10 +95,12 @@ public final class MachineSigningService {
         }
 
         if (sessionFailureCode != null) {
-            writer.write("session.failed", requestId, null, failure(sessionFailureCode));
+            var error = new MachineErrorMapper().map(new MachineProtocolException(sessionFailureCode));
+            writer.writeTerminal("session.failed", requestId, error.toPayload());
         } else {
-            writer.write("session.completed", requestId, null, new JsonObject());
+            writer.writeTerminal("session.completed", requestId, new JsonObject());
         }
+        return sessionFailureCode;
     }
 
     private List<PreparedFile> prepare(List<ValidatedMachineFile> files) {

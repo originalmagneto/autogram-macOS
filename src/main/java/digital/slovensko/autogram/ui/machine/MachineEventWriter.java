@@ -21,4 +21,9 @@ public final class MachineEventWriter {
         output.print('\n');
         output.flush();
     }
+
+    public synchronized void writeTerminal(String type, String sessionId, JsonObject payload) {
+        write(type, sessionId, null, payload);
+        output.flush();
+    }
 }

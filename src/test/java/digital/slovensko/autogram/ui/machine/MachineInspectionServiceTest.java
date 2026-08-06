@@ -102,7 +102,7 @@ class MachineInspectionServiceTest {
                 .map(com.google.gson.JsonParser::parseString)
                 .map(element -> element.getAsJsonObject())
                 .toList();
-        assertEquals(64, code);
+        assertEquals(69, code);
         assertFalse(inspectionCalled.get());
         assertEquals(List.of("session.started", "session.failed"),
                 events.stream().map(event -> event.get("type").getAsString()).toList());
