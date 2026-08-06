@@ -18,6 +18,12 @@ public final class MachineCliApp {
 
     public static int start(CommandLine commandLine, Reader input, PrintWriter output, PrintWriter error) {
         var writer = new MachineEventWriter(output);
+        try {
+            MachineRequestValidator.validateCommandLine(commandLine);
+        } catch (MachineProtocolException exception) {
+            return fail(writer, "unknown", exception.getMessage());
+        }
+
         String rawRequest;
         try {
             rawRequest = readRequest(input);

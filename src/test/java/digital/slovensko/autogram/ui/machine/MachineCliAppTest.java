@@ -7,6 +7,7 @@ import org.apache.commons.cli.Options;
 import org.junit.jupiter.api.Test;
 
 import java.io.PrintWriter;
+import java.io.Reader;
 import java.io.StringReader;
 import java.io.StringWriter;
 
@@ -42,6 +43,28 @@ class MachineCliAppTest {
                 JsonParser.parseString(stdout.toString()).getAsJsonObject().getAsJsonObject("payload").get("code").getAsString());
     }
 
+    @Test
+    void rejectsMissingProtocolVersionWithoutReadingStandardInput() throws Exception {
+        var stdout = new StringWriter();
+        var unreadableInput = new Reader() {
+            @Override
+            public int read(char[] buffer, int offset, int length) {
+                throw new AssertionError("standard input must not be read");
+            }
+
+            @Override
+            public void close() {
+            }
+        };
+
+        var code = MachineCliApp.start(commandLineWithoutProtocolVersion(), unreadableInput, new PrintWriter(stdout),
+                new PrintWriter(new StringWriter()));
+
+        assertEquals(64, code);
+        assertEquals("PROTOCOL_INVALID_REQUEST",
+                JsonParser.parseString(stdout.toString()).getAsJsonObject().getAsJsonObject("payload").get("code").getAsString());
+    }
+
     private static CommandLine commandLine(String operation) throws Exception {
         var options = new Options()
                 .addOption(null, "machine-readable", false, "")
@@ -49,5 +72,13 @@ class MachineCliAppTest {
                 .addOption(null, "operation", true, "");
         return new DefaultParser().parse(options,
                 new String[] { "--machine-readable", "--protocol-version", "1", "--operation", operation });
+    }
+
+    private static CommandLine commandLineWithoutProtocolVersion() throws Exception {
+        var options = new Options()
+                .addOption(null, "machine-readable", false, "")
+                .addOption(null, "protocol-version", true, "")
+                .addOption(null, "operation", true, "");
+        return new DefaultParser().parse(options, new String[] { "--machine-readable", "--operation", "CAPABILITIES" });
     }
 }
