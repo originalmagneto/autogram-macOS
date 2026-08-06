@@ -356,7 +356,6 @@ final class MacNativeFileSystem implements MachineSigningFileSystem {
                 }
                 throw new NativeIOException("fclonefileat", error);
             }
-            check(calls.fsync(parent.descriptor()), "fsync target parent");
         }
 
         @Override
