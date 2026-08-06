@@ -178,6 +178,7 @@ Výsledné balíčky sa objavia v `packaging/output/`.
 - [PORTING.md](PORTING.md)
 - [PLAN.md](PLAN.md)
 - [UPSTREAM_SYNC_PR_CHECKLIST.md](UPSTREAM_SYNC_PR_CHECKLIST.md)
+- [macOS CLI a Finder Quick Action](docs/macos-cli-automation.md)
 
 ## Autori a Sponzori
 Jakub Ďuraš, Slovensko.Digital, CRYSTAL CONSULTING, s.r.o., Solver IT s.r.o. a ďalší spoluautori.

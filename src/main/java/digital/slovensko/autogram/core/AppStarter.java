@@ -5,8 +5,6 @@ import digital.slovensko.autogram.ui.gui.GUIApp;
 import javafx.application.Application;
 import org.apache.commons.cli.*;
 
-import org.slf4j.bridge.SLF4JBridgeHandler;
-
 import java.io.PrintWriter;
 
 public class AppStarter {
@@ -24,11 +22,17 @@ public class AppStarter {
             .addOption(null, "parents", false, "Create all parent directories for target if needed.")
             .addOption("d", "driver", true,
                     "PCKS driver name for signing. Supported values: eid, cz_eid, secure_store, monet, gemalto, keystore, custom_pkcs11 (requires valid path within pkcs11-driver-path option).")
+            .addOption(null, "key", true,
+                    "Certificate serial number or common name to use without an interactive key prompt.")
+            .addOption(null, "pin-stdin", false,
+                    "Read the signing PIN or password from standard input without an interactive prompt.")
+            .addOption(null, "list-keys", false,
+                    "List available signing certificates and exit.")
             .addOption(null, "keystore", true, "Absolute path to a keystore file that can be used for signing.")
             .addOption(null, "slot-id", true,
                     "Slot ID for PKCS11 driver. If not specified, first available slot is used.")
             .addOption(null, "pdf-level", true,
-                    "PDF signature level. Supported values: PAdES_BASELINE_B (default), XAdES_BASELINE_B, CAdES_BASELINE_B.")
+                    "PDF signature level. Supported values include PAdES_BASELINE_B and PAdES_BASELINE_T.")
             .addOption(null, "en319132", false, "Sign according to EN 319 132 or EN 319 122.")
             .addOption(null, "tsa-server", true,
                     "Url of TimeStamp Authority server that should be used for timestamping in signature level BASELINE_T. If provided, BASELINE_T signatures are made.")
@@ -40,10 +44,6 @@ public class AppStarter {
         System.setProperty("apple.awt.application.name", "Autogram");
         System.setProperty("com.apple.mrj.application.apple.menu.about.name", "Autogram");
 
-        // Suppress VeraPDF logs (uses JUL) by bridging to SLF4J
-        SLF4JBridgeHandler.removeHandlersForRootLogger();
-        SLF4JBridgeHandler.install();
-
         try {
             CommandLine cmd = new DefaultParser().parse(options, args);
 
@@ -52,7 +52,13 @@ public class AppStarter {
             } else if (cmd.hasOption("u")) {
                 printUsage();
             } else if (cmd.hasOption("c")) {
-                CliApp.start(cmd);
+                var exitCode = CliApp.start(cmd);
+                System.out.flush();
+                System.err.flush();
+                if (isIntelProcess())
+                    terminateCliProcess(exitCode);
+                else
+                    System.exit(exitCode);
             } else {
                 Application.launch(GUIApp.class, args);
             }
@@ -60,6 +66,22 @@ public class AppStarter {
             System.err.println("Unable to parse program args");
             System.err.println(e);
         }
+    }
+
+    private static void terminateCliProcess(int exitCode) {
+        // The Intel jpackage launcher aborts in native cleanup after SunPKCS11 is loaded.
+        // CLI output and files are flushed before terminating the short-lived process.
+        try {
+            new ProcessBuilder("/bin/kill", "-KILL", Long.toString(ProcessHandle.current().pid())).start();
+            while (true)
+                Thread.onSpinWait();
+        } catch (java.io.IOException e) {
+            Runtime.getRuntime().halt(exitCode);
+        }
+    }
+
+    private static boolean isIntelProcess() {
+        return "x86_64".equals(System.getProperty("os.arch"));
     }
 
     public static void printHelp() {
