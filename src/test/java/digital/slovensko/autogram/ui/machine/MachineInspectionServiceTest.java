@@ -15,8 +15,11 @@ import java.time.Instant;
 import java.util.Date;
 import java.util.List;
 import java.util.concurrent.AbstractExecutorService;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -153,6 +156,56 @@ class MachineInspectionServiceTest {
         assertFalse(trustInitialized.get());
         assertTrue(stdout.toString().contains("PROTOCOL_INVALID_REQUEST"));
         assertFalse(stdout.toString().contains(source));
+    }
+
+    @Test
+    void rejectsMalformedLaterBatchEntryBeforeTrustOrInspection() throws Exception {
+        var trustInitialized = new AtomicBoolean();
+        var inspectionCalled = new AtomicBoolean();
+        var stdout = new java.io.StringWriter();
+        var input = "{\"protocolVersion\":1,\"requestId\":\"request-1\",\"operation\":\"INSPECT\",\"payload\":{\"files\":["
+                + "{\"id\":\"opaque-1\",\"source\":\"/selected/one.pdf\",\"target\":\"/selected/one-target.pdf\"},"
+                + "{\"id\":\"opaque-2\",\"source\":\"/selected/two.pdf\"}]}}";
+
+        var code = MachineCliApp.start(commandLine("INSPECT"), new java.io.StringReader(input), new java.io.PrintWriter(stdout),
+                new java.io.PrintWriter(new java.io.StringWriter()), new MachineDriverService(),
+                new MachineInspectionService(path -> {
+                    inspectionCalled.set(true);
+                    return reportWithOneQualifiedTimestamp();
+                }), () -> trustInitialized.set(true));
+
+        assertEquals(64, code);
+        assertFalse(trustInitialized.get());
+        assertFalse(inspectionCalled.get());
+        assertTrue(stdout.toString().contains("PROTOCOL_INVALID_REQUEST"));
+    }
+
+    @Test
+    void continuesWithValidSecondFileAfterFirstInspectionFailure() throws Exception {
+        var stdout = new java.io.StringWriter();
+        var input = "{\"protocolVersion\":1,\"requestId\":\"request-1\",\"operation\":\"INSPECT\",\"payload\":{\"files\":["
+                + "{\"id\":\"opaque-failed\",\"source\":\"/selected/broken.pdf\",\"target\":\"/selected/broken-target.pdf\"},"
+                + "{\"id\":\"opaque-valid\",\"source\":\"/selected/valid.pdf\",\"target\":\"/selected/valid-target.pdf\"}]}}";
+        var inspectionService = new MachineInspectionService(path -> {
+            if (path.getFileName().toString().equals("broken.pdf")) {
+                throw new IllegalArgumentException("unreadable");
+            }
+            return reportWithOneQualifiedTimestamp();
+        });
+
+        var code = MachineCliApp.start(commandLine("INSPECT"), new java.io.StringReader(input), new java.io.PrintWriter(stdout),
+                new java.io.PrintWriter(new java.io.StringWriter()), new MachineDriverService(), inspectionService, () -> {
+                });
+
+        var events = java.util.Arrays.stream(stdout.toString().strip().split("\\n"))
+                .map(com.google.gson.JsonParser::parseString)
+                .map(element -> element.getAsJsonObject())
+                .toList();
+        assertEquals(0, code);
+        assertEquals(List.of("session.started", "file.failed", "inspection.completed", "session.completed"),
+                events.stream().map(event -> event.get("type").getAsString()).toList());
+        assertEquals("opaque-failed", events.get(1).get("fileId").getAsString());
+        assertEquals("opaque-valid", events.get(2).get("fileId").getAsString());
     }
 
     @Test
@@ -322,6 +375,110 @@ class MachineInspectionServiceTest {
     }
 
     @Test
+    void failsClosedWhenTrustStateLoadsAfterTheDeadline() {
+        var executor = new RecordingExecutorService(true, true);
+        var initialized = new AtomicBoolean();
+        var now = new AtomicLong();
+        var trustChecks = new AtomicInteger();
+        var trust = trust(
+                () -> executor,
+                ignored -> initialized.set(true),
+                () -> initialized.get() && trustChecks.getAndIncrement() > 0,
+                Duration.ofNanos(10),
+                nanos -> now.set(11),
+                now);
+
+        var failure = assertThrows(MachineProtocolException.class, trust::initialize);
+
+        assertEquals("TRUSTED_LIST_UNAVAILABLE", failure.getMessage());
+        assertEquals(0, executor.awaitedNanos);
+    }
+
+    @Test
+    void invokesShutdownNowInsteadOfGracefulShutdown() {
+        var executor = new RecordingExecutorService(true, true);
+        var initialized = new AtomicBoolean();
+        var trust = trust(
+                () -> executor,
+                ignored -> initialized.set(true),
+                initialized::get,
+                Duration.ofNanos(10),
+                nanos -> {
+                });
+
+        trust.initialize();
+
+        assertTrue(executor.shutdownNowCalled);
+        assertFalse(executor.shutdownCalled);
+    }
+
+    @Test
+    void interruptsBlockingInitializerAndAwaitsRealExecutorTermination() throws Exception {
+        var executor = new RecordingSingleThreadExecutor();
+        var workerStarted = new CountDownLatch(1);
+        var workerInterrupted = new CountDownLatch(1);
+        var trust = new MachineTrustService(
+                () -> executor,
+                ignored -> {
+                    workerStarted.countDown();
+                    try {
+                        new CountDownLatch(1).await();
+                    } catch (InterruptedException exception) {
+                        workerInterrupted.countDown();
+                        Thread.currentThread().interrupt();
+                    }
+                },
+                () -> false,
+                Duration.ofMillis(100),
+                Duration.ofMillis(1),
+                System::nanoTime,
+                nanos -> {
+                    if (!workerStarted.await(1, TimeUnit.SECONDS)) {
+                        throw new AssertionError("initializer did not start");
+                    }
+                    throw new InterruptedException("stop");
+                });
+
+        try {
+            var failure = assertThrows(MachineProtocolException.class, trust::initialize);
+
+            assertEquals("TRUSTED_LIST_UNAVAILABLE", failure.getMessage());
+            assertTrue(Thread.currentThread().isInterrupted());
+            Thread.interrupted();
+            assertTrue(workerStarted.await(1, TimeUnit.SECONDS));
+            assertTrue(workerInterrupted.await(1, TimeUnit.SECONDS));
+            assertTrue(executor.awaitTerminationCalled.get());
+            assertTrue(executor.isTerminated());
+        } finally {
+            Thread.interrupted();
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    void restoresInterruptFlagWhenAwaitTerminationIsInterrupted() {
+        var executor = new InterruptingAwaitExecutorService();
+        var initialized = new AtomicBoolean();
+        var trust = trust(
+                () -> executor,
+                ignored -> initialized.set(true),
+                initialized::get,
+                Duration.ofNanos(10),
+                nanos -> {
+                });
+
+        try {
+            var failure = assertThrows(MachineProtocolException.class, trust::initialize);
+
+            assertEquals("TRUSTED_LIST_UNAVAILABLE", failure.getMessage());
+            assertTrue(executor.shutdownNowCalled);
+            assertTrue(Thread.currentThread().isInterrupted());
+        } finally {
+            Thread.interrupted();
+        }
+    }
+
+    @Test
     void preservesInterruptionWhileClosingDedicatedExecutor() {
         var executor = new RecordingExecutorService(false, true);
         var trust = trust(
@@ -478,41 +635,42 @@ class MachineInspectionServiceTest {
         }
     }
 
-    private static final class RecordingExecutorService extends AbstractExecutorService {
+    private static class RecordingExecutorService extends AbstractExecutorService {
         private final boolean runTasks;
         private final boolean terminates;
-        private boolean shutdown;
+        private boolean shutdownCalled;
+        protected boolean shutdownNowCalled;
         private long awaitedNanos = -1;
         private Future<?> submittedTask;
 
-        private RecordingExecutorService(boolean runTasks, boolean terminates) {
+        protected RecordingExecutorService(boolean runTasks, boolean terminates) {
             this.runTasks = runTasks;
             this.terminates = terminates;
         }
 
         @Override
         public void shutdown() {
-            shutdown = true;
+            shutdownCalled = true;
         }
 
         @Override
         public List<Runnable> shutdownNow() {
-            shutdown = true;
+            shutdownNowCalled = true;
             return List.of();
         }
 
         @Override
         public boolean isShutdown() {
-            return shutdown;
+            return shutdownCalled || shutdownNowCalled;
         }
 
         @Override
         public boolean isTerminated() {
-            return shutdown && terminates;
+            return isShutdown() && terminates;
         }
 
         @Override
-        public boolean awaitTermination(long timeout, TimeUnit unit) {
+        public boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedException {
             awaitedNanos = unit.toNanos(timeout);
             return terminates;
         }
@@ -525,6 +683,31 @@ class MachineInspectionServiceTest {
             if (runTasks) {
                 command.run();
             }
+        }
+    }
+
+    private static final class RecordingSingleThreadExecutor extends ThreadPoolExecutor {
+        private final AtomicBoolean awaitTerminationCalled = new AtomicBoolean();
+
+        private RecordingSingleThreadExecutor() {
+            super(1, 1, 0, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>());
+        }
+
+        @Override
+        public boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedException {
+            awaitTerminationCalled.set(true);
+            return super.awaitTermination(timeout, unit);
+        }
+    }
+
+    private static final class InterruptingAwaitExecutorService extends RecordingExecutorService {
+        private InterruptingAwaitExecutorService() {
+            super(true, true);
+        }
+
+        @Override
+        public boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedException {
+            throw new InterruptedException("stop");
         }
     }
 }

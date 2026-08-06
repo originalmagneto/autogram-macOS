@@ -72,15 +72,15 @@ public final class MachineTrustService {
 
     private void waitForTrustedLists(Future<?> initialization, long deadline) throws InterruptedException, ExecutionException {
         while (true) {
+            var remainingNanos = remainingNanos(deadline);
+            if (remainingNanos <= 0) {
+                throw unavailable(null);
+            }
             if (initialization.isDone()) {
                 initialization.get();
                 if (areTrustedListsLoaded()) {
                     return;
                 }
-            }
-            var remainingNanos = remainingNanos(deadline);
-            if (remainingNanos <= 0) {
-                throw unavailable(null);
             }
             var sleepNanos = Math.min(remainingNanos, pollInterval.toNanos());
             if (sleepNanos > 0) {
@@ -94,13 +94,18 @@ public final class MachineTrustService {
             initialization.cancel(true);
         }
         executor.shutdownNow();
+        var interrupted = Thread.interrupted();
         try {
             if (!executor.awaitTermination(remainingNanos(deadline), TimeUnit.NANOSECONDS)) {
                 throw unavailable(null);
             }
         } catch (InterruptedException exception) {
-            Thread.currentThread().interrupt();
+            interrupted = true;
             throw unavailable(exception);
+        } finally {
+            if (interrupted) {
+                Thread.currentThread().interrupt();
+            }
         }
     }
 
