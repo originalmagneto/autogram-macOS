@@ -28,8 +28,8 @@ public final class MachineInspectionService {
         return mapReport(reportReader.read(path));
     }
 
-    static SimpleReport readStructuralReport(Path path) {
-        return SignatureValidator.getSignedDocumentSimpleReport(new FileDocument(path.toFile()));
+    static int readStructuralSignatureCount(Path path) {
+        return new PDFDocumentValidator(new FileDocument(path.toFile())).getSignatures().size();
     }
 
     private static SimpleReport readTrustedReport(Path path) {

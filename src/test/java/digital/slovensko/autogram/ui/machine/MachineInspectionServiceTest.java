@@ -18,10 +18,10 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -29,11 +29,24 @@ import static org.mockito.Mockito.when;
 
 class MachineInspectionServiceTest {
     @Test
-    void dispatchesInspectionOnlyAfterTrustedListInitialization() throws Exception {
+    void dispatchesEachBatchEntryWithOpaqueIdAndRedactsSourceAndTargetPaths() throws Exception {
         var report = reportWithOneQualifiedTimestamp();
-        var inspectionService = new MachineInspectionService(path -> report);
+        var inspectedSources = new java.util.ArrayList<Path>();
+        var inspectionService = new MachineInspectionService(path -> {
+            inspectedSources.add(path);
+            if (path.toString().contains("broken")) {
+                throw new IllegalArgumentException("unreadable source");
+            }
+            return report;
+        });
         var stdout = new java.io.StringWriter();
-        var input = "{\"protocolVersion\":1,\"requestId\":\"request-1\",\"operation\":\"INSPECT\",\"payload\":{\"path\":\"/selected/signed.pdf\"}}";
+        var source = "/sensitive/source.pdf";
+        var target = "/sensitive/target.pdf";
+        var brokenSource = "/sensitive/broken.pdf";
+        var brokenTarget = "/sensitive/broken-target.pdf";
+        var input = "{\"protocolVersion\":1,\"requestId\":\"request-1\",\"operation\":\"INSPECT\",\"payload\":{\"files\":["
+                + "{\"id\":\"opaque-1\",\"source\":\"" + source + "\",\"target\":\"" + target + "\"},"
+                + "{\"id\":\"opaque-2\",\"source\":\"" + brokenSource + "\",\"target\":\"" + brokenTarget + "\"}]}}";
         var trustInitialized = new AtomicBoolean();
 
         var code = MachineCliApp.start(commandLine("INSPECT"), new java.io.StringReader(input), new java.io.PrintWriter(stdout),
@@ -46,11 +59,18 @@ class MachineInspectionServiceTest {
                 .toList();
         assertEquals(0, code);
         assertTrue(trustInitialized.get());
-        assertEquals(List.of("session.started", "inspection.completed", "session.completed"),
+        assertEquals(List.of("session.started", "inspection.completed", "file.failed", "session.completed"),
                 events.stream().map(event -> event.get("type").getAsString()).toList());
-        assertEquals("/selected/signed.pdf", events.get(1).get("fileId").getAsString());
+        assertEquals("opaque-1", events.get(1).get("fileId").getAsString());
         assertTrue(events.get(1).getAsJsonObject("payload").getAsJsonArray("signatures").get(0).getAsJsonObject()
                 .get("qualifiedTimestampValid").getAsBoolean());
+        assertEquals("opaque-2", events.get(2).get("fileId").getAsString());
+        assertEquals("INSPECTION_FAILED", events.get(2).getAsJsonObject("payload").get("code").getAsString());
+        assertEquals(List.of(Path.of(source), Path.of(brokenSource)), inspectedSources);
+        assertFalse(stdout.toString().contains(source));
+        assertFalse(stdout.toString().contains(target));
+        assertFalse(stdout.toString().contains(brokenSource));
+        assertFalse(stdout.toString().contains(brokenTarget));
     }
 
     @Test
@@ -61,7 +81,7 @@ class MachineInspectionServiceTest {
             return reportWithOneQualifiedTimestamp();
         });
         var stdout = new java.io.StringWriter();
-        var input = "{\"protocolVersion\":1,\"requestId\":\"request-1\",\"operation\":\"INSPECT\",\"payload\":{\"path\":\"/selected/signed.pdf\"}}";
+        var input = "{\"protocolVersion\":1,\"requestId\":\"request-1\",\"operation\":\"INSPECT\",\"payload\":{\"files\":[{\"id\":\"opaque-1\",\"source\":\"/selected/signed.pdf\",\"target\":\"/selected/target.pdf\"}]}}";
 
         var code = MachineCliApp.start(commandLine("INSPECT"), new java.io.StringReader(input), new java.io.PrintWriter(stdout),
                 new java.io.PrintWriter(new java.io.StringWriter()), new MachineDriverService(), inspectionService,
@@ -100,14 +120,31 @@ class MachineInspectionServiceTest {
     }
 
     @Test
-    void readsSignatureStructureFromSampleSignedPdfWithoutTrustedListDownload() {
+    void readsSignatureStructureFromSampleSignedPdfWithoutDssValidation() {
         var sample = Path.of(MachineInspectionServiceTest.class
                 .getResource("/digital/slovensko/autogram/sample_signed.pdf").getFile());
 
-        var report = MachineInspectionService.readStructuralReport(sample);
+        var signatures = MachineInspectionService.readStructuralSignatureCount(sample);
 
-        assertNotNull(report);
-        assertFalse(report.getSignatureIdList().isEmpty());
+        assertTrue(signatures > 0);
+    }
+
+    @Test
+    void rejectsBatchEntryWithoutTargetBeforeTrustInitialization() throws Exception {
+        var trustInitialized = new AtomicBoolean();
+        var stdout = new java.io.StringWriter();
+        var source = "/sensitive/source.pdf";
+        var input = "{\"protocolVersion\":1,\"requestId\":\"request-1\",\"operation\":\"INSPECT\",\"payload\":{\"files\":[{\"id\":\"opaque-1\",\"source\":\""
+                + source + "\"}]}}";
+
+        var code = MachineCliApp.start(commandLine("INSPECT"), new java.io.StringReader(input), new java.io.PrintWriter(stdout),
+                new java.io.PrintWriter(new java.io.StringWriter()), new MachineDriverService(),
+                new MachineInspectionService(path -> reportWithOneQualifiedTimestamp()), () -> trustInitialized.set(true));
+
+        assertEquals(64, code);
+        assertFalse(trustInitialized.get());
+        assertTrue(stdout.toString().contains("PROTOCOL_INVALID_REQUEST"));
+        assertFalse(stdout.toString().contains(source));
     }
 
     @Test
@@ -152,18 +189,100 @@ class MachineInspectionServiceTest {
 
     @Test
     void closesDedicatedExecutorAfterTrustedListsLoad() {
-        var executor = new ImmediateExecutorService();
+        var executor = new RecordingExecutorService(true, true);
         var initialized = new AtomicBoolean();
-        var trust = new MachineTrustService(
+        var trust = trust(
                 () -> executor,
                 ignored -> initialized.set(true),
                 initialized::get,
-                Duration.ofSeconds(1),
-                Duration.ZERO);
+                Duration.ofNanos(10),
+                nanos -> {
+                });
 
         trust.initialize();
 
         assertTrue(executor.isShutdown());
+        assertEquals(10, executor.awaitedNanos);
+    }
+
+    @Test
+    void closesDedicatedExecutorAfterInitializationFailure() {
+        var executor = new RecordingExecutorService(true, true);
+        var trust = trust(
+                () -> executor,
+                ignored -> { throw new IllegalStateException("initialization failed"); },
+                () -> false,
+                Duration.ofNanos(10),
+                nanos -> {
+                });
+
+        var failure = assertThrows(MachineProtocolException.class, trust::initialize);
+
+        assertEquals("TRUSTED_LIST_UNAVAILABLE", failure.getMessage());
+        assertTrue(executor.isShutdown());
+        assertEquals(10, executor.awaitedNanos);
+    }
+
+    @Test
+    void failsClosedWhenExecutorDoesNotTerminateWithinRemainingDeadline() {
+        var executor = new RecordingExecutorService(true, false);
+        var initialized = new AtomicBoolean();
+        var trust = trust(
+                () -> executor,
+                ignored -> initialized.set(true),
+                initialized::get,
+                Duration.ofNanos(10),
+                nanos -> {
+                });
+
+        var failure = assertThrows(MachineProtocolException.class, trust::initialize);
+
+        assertEquals("TRUSTED_LIST_UNAVAILABLE", failure.getMessage());
+        assertTrue(executor.isShutdown());
+        assertEquals(10, executor.awaitedNanos);
+    }
+
+    @Test
+    void timesOutPendingInitializationThenAwaitsOnlyRemainingDeadline() {
+        var executor = new RecordingExecutorService(false, true);
+        var now = new AtomicLong();
+        var trust = trust(
+                () -> executor,
+                ignored -> {
+                },
+                () -> false,
+                Duration.ofNanos(10),
+                nanos -> now.addAndGet(nanos),
+                now);
+
+        var failure = assertThrows(MachineProtocolException.class, trust::initialize);
+
+        assertEquals("TRUSTED_LIST_UNAVAILABLE", failure.getMessage());
+        assertTrue(executor.isShutdown());
+        assertEquals(0, executor.awaitedNanos);
+    }
+
+    @Test
+    void preservesInterruptionWhileClosingDedicatedExecutor() {
+        var executor = new RecordingExecutorService(false, true);
+        var trust = trust(
+                () -> executor,
+                ignored -> {
+                },
+                () -> false,
+                Duration.ofNanos(10),
+                nanos -> { throw new InterruptedException("stop"); });
+
+        try {
+            var failure = assertThrows(MachineProtocolException.class, trust::initialize);
+
+            assertEquals("TRUSTED_LIST_UNAVAILABLE", failure.getMessage());
+            assertTrue(Thread.currentThread().isInterrupted());
+            assertTrue(executor.isShutdown());
+            assertEquals(10, executor.awaitedNanos);
+        } finally {
+            Thread.interrupted();
+        }
     }
 
     @Test
@@ -216,6 +335,19 @@ class MachineInspectionServiceTest {
                 .addOption(null, "operation", true, "");
         return new org.apache.commons.cli.DefaultParser().parse(options,
                 new String[] { "--machine-readable", "--protocol-version", "1", "--operation", operation });
+    }
+
+    private static MachineTrustService trust(java.util.function.Supplier<ExecutorService> executorFactory,
+            java.util.function.Consumer<ExecutorService> initializer, java.util.function.BooleanSupplier trustedListsLoaded,
+            Duration timeout, MachineTrustService.Sleeper sleeper) {
+        return trust(executorFactory, initializer, trustedListsLoaded, timeout, sleeper, new AtomicLong());
+    }
+
+    private static MachineTrustService trust(java.util.function.Supplier<ExecutorService> executorFactory,
+            java.util.function.Consumer<ExecutorService> initializer, java.util.function.BooleanSupplier trustedListsLoaded,
+            Duration timeout, MachineTrustService.Sleeper sleeper, AtomicLong now) {
+        return new MachineTrustService(executorFactory, initializer, trustedListsLoaded, timeout, Duration.ofNanos(1),
+                now::get, sleeper);
     }
 
     private static final class ImmediateExecutorService extends AbstractExecutorService {
@@ -284,6 +416,52 @@ class MachineInspectionServiceTest {
 
         @Override
         public void execute(Runnable command) {
+        }
+    }
+
+    private static final class RecordingExecutorService extends AbstractExecutorService {
+        private final boolean runTasks;
+        private final boolean terminates;
+        private boolean shutdown;
+        private long awaitedNanos = -1;
+
+        private RecordingExecutorService(boolean runTasks, boolean terminates) {
+            this.runTasks = runTasks;
+            this.terminates = terminates;
+        }
+
+        @Override
+        public void shutdown() {
+            shutdown = true;
+        }
+
+        @Override
+        public List<Runnable> shutdownNow() {
+            shutdown = true;
+            return List.of();
+        }
+
+        @Override
+        public boolean isShutdown() {
+            return shutdown;
+        }
+
+        @Override
+        public boolean isTerminated() {
+            return shutdown && terminates;
+        }
+
+        @Override
+        public boolean awaitTermination(long timeout, TimeUnit unit) {
+            awaitedNanos = unit.toNanos(timeout);
+            return terminates;
+        }
+
+        @Override
+        public void execute(Runnable command) {
+            if (runTasks) {
+                command.run();
+            }
         }
     }
 }

@@ -10,6 +10,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
+import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 
 public final class MachineTrustService {
@@ -21,41 +22,54 @@ public final class MachineTrustService {
     private final BooleanSupplier trustedListsLoaded;
     private final Duration loadTimeout;
     private final Duration pollInterval;
+    private final LongSupplier nanoTime;
+    private final Sleeper sleeper;
 
     public MachineTrustService() {
         this(() -> Executors.newFixedThreadPool(2),
                 executor -> SignatureValidator.getInstance().initialize(executor, new MachineSettings().getTrustedList()),
                 () -> SignatureValidator.getInstance().areTLsLoaded(),
                 LOAD_TIMEOUT,
-                POLL_INTERVAL);
+                POLL_INTERVAL,
+                System::nanoTime,
+                TimeUnit.NANOSECONDS::sleep);
     }
 
     MachineTrustService(Supplier<ExecutorService> executorFactory, Consumer<ExecutorService> initializer,
             BooleanSupplier trustedListsLoaded, Duration loadTimeout, Duration pollInterval) {
+        this(executorFactory, initializer, trustedListsLoaded, loadTimeout, pollInterval, System::nanoTime,
+                TimeUnit.NANOSECONDS::sleep);
+    }
+
+    MachineTrustService(Supplier<ExecutorService> executorFactory, Consumer<ExecutorService> initializer,
+            BooleanSupplier trustedListsLoaded, Duration loadTimeout, Duration pollInterval, LongSupplier nanoTime,
+            Sleeper sleeper) {
         this.executorFactory = executorFactory;
         this.initializer = initializer;
         this.trustedListsLoaded = trustedListsLoaded;
         this.loadTimeout = loadTimeout;
         this.pollInterval = pollInterval;
+        this.nanoTime = nanoTime;
+        this.sleeper = sleeper;
     }
 
     public void initialize() {
         var executor = executorFactory.get();
+        var deadline = nanoTime.getAsLong() + loadTimeout.toNanos();
         try {
             Future<?> initialization = executor.submit(() -> initializer.accept(executor));
-            waitForTrustedLists(initialization);
+            waitForTrustedLists(initialization, deadline);
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
             throw unavailable(exception);
         } catch (ExecutionException | RuntimeException exception) {
             throw unavailable(exception);
         } finally {
-            executor.shutdownNow();
+            closeExecutor(executor, deadline);
         }
     }
 
-    private void waitForTrustedLists(Future<?> initialization) throws InterruptedException, ExecutionException {
-        var deadline = System.nanoTime() + loadTimeout.toNanos();
+    private void waitForTrustedLists(Future<?> initialization, long deadline) throws InterruptedException, ExecutionException {
         while (true) {
             if (initialization.isDone()) {
                 initialization.get();
@@ -63,15 +77,31 @@ public final class MachineTrustService {
                     return;
                 }
             }
-            var remainingNanos = deadline - System.nanoTime();
+            var remainingNanos = remainingNanos(deadline);
             if (remainingNanos <= 0) {
                 throw unavailable(null);
             }
             var sleepNanos = Math.min(remainingNanos, pollInterval.toNanos());
             if (sleepNanos > 0) {
-                TimeUnit.NANOSECONDS.sleep(sleepNanos);
+                sleeper.sleep(sleepNanos);
             }
         }
+    }
+
+    private void closeExecutor(ExecutorService executor, long deadline) {
+        executor.shutdownNow();
+        try {
+            if (!executor.awaitTermination(remainingNanos(deadline), TimeUnit.NANOSECONDS)) {
+                throw unavailable(null);
+            }
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw unavailable(exception);
+        }
+    }
+
+    private long remainingNanos(long deadline) {
+        return Math.max(0, deadline - nanoTime.getAsLong());
     }
 
     private static MachineProtocolException unavailable(Throwable cause) {
@@ -86,5 +116,10 @@ public final class MachineTrustService {
         } catch (NullPointerException exception) {
             return false;
         }
+    }
+
+    @FunctionalInterface
+    interface Sleeper {
+        void sleep(long nanos) throws InterruptedException;
     }
 }
