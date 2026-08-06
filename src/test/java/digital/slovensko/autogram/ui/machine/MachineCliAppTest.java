@@ -1,6 +1,10 @@
 package digital.slovensko.autogram.ui.machine;
 
 import com.google.gson.JsonParser;
+import eu.europa.esig.dss.enumerations.Indication;
+import eu.europa.esig.dss.enumerations.SignatureLevel;
+import eu.europa.esig.dss.simplereport.SimpleReport;
+import eu.europa.esig.dss.simplereport.jaxb.XmlTimestamp;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.Options;
@@ -21,6 +25,8 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class MachineCliAppTest {
     @TempDir
@@ -145,19 +151,20 @@ class MachineCliAppTest {
                 + "\"signatureLevel\":\"PAdES_BASELINE_T\",\"timestamp\":{\"required\":true,"
                 + "\"servers\":[\"https://tsa.example.test\"]},\"files\":[{\"id\":\"one\",\"source\":\""
                 + source + "\",\"target\":\"" + target + "\"}]}}";
-        var inspection = new MachineInspectionService(path -> { throw new AssertionError("not used"); });
+        var inspection = new MachineInspectionService(path -> { throw new AssertionError("not used"); }, content ->
+                new String(content).contains("signed") ? qualifiedReport("new") : qualifiedReport());
         var signingFactory = (MachineCliApp.SigningServiceFactory) (writer, ignoredInspection, ignoredTrust) ->
                 new MachineSigningService(writer, request -> new MachineSigningService.SigningSession() {
                     @Override
-                    public void sign(MachineFile file, Runnable completed) throws Exception {
-                        Files.writeString(Path.of(file.target()), "%PDF-1.7\nsigned\n%%EOF");
+                    public void sign(MachineSigningService.SigningInput input, Runnable completed) throws Exception {
+                        input.writeSignedContent("%PDF-1.7\nsigned\n%%EOF".getBytes());
                         completed.run();
                     }
 
                     @Override
                     public void close() {
                     }
-                }, content -> true);
+                }, new MachineSigningService.PdfOutputValidator(ignoredInspection), ignoredTrust);
 
         var code = MachineCliApp.start(commandLine("SIGN"), new StringReader(input), new PrintWriter(stdout),
                 new PrintWriter(new StringWriter()), new MachineDriverService(), inspection, () -> { }, signingFactory);
@@ -168,6 +175,23 @@ class MachineCliAppTest {
         assertEquals("%PDF-1.7\nsigned\n%%EOF", Files.readString(target));
         assertEquals(List.of("session.started", "file.signingStarted", "file.completed", "session.completed"),
                 eventTypes(events));
+    }
+
+    private static SimpleReport qualifiedReport(String... ids) {
+        var report = mock(SimpleReport.class);
+        when(report.getSignatureIdList()).thenReturn(List.of(ids));
+        for (var id : ids) {
+            var timestamp = new XmlTimestamp();
+            timestamp.setId("ts-" + id);
+            when(report.getSignatureFormat(id)).thenReturn(SignatureLevel.PAdES_BASELINE_T);
+            when(report.isValid(id)).thenReturn(true);
+            when(report.getIndication(id)).thenReturn(Indication.TOTAL_PASSED);
+            when(report.getSignatureTimestamps(id)).thenReturn(List.of(timestamp));
+            when(report.isValid("ts-" + id)).thenReturn(true);
+            when(report.getTimestampQualification("ts-" + id)).thenReturn(
+                    eu.europa.esig.dss.enumerations.TimestampQualification.QTSA);
+        }
+        return report;
     }
 
     private static CommandLine commandLine(String operation) throws Exception {

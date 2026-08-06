@@ -4,17 +4,14 @@ import digital.slovensko.autogram.core.Responder;
 import digital.slovensko.autogram.core.SignedDocument;
 import digital.slovensko.autogram.core.errors.AutogramException;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.io.ByteArrayOutputStream;
 import java.util.Objects;
-import java.util.function.Consumer;
 
 public final class MachineFileResponder extends Responder {
-    private final Path target;
-    private final Consumer<Path> completed;
+    private final MachineSigningFileSystem.RetainedFile target;
+    private final Runnable completed;
 
-    public MachineFileResponder(Path target, Consumer<Path> completed) {
+    MachineFileResponder(MachineSigningFileSystem.RetainedFile target, Runnable completed) {
         this.target = Objects.requireNonNull(target);
         this.completed = Objects.requireNonNull(completed);
     }
@@ -22,10 +19,11 @@ public final class MachineFileResponder extends Responder {
     @Override
     public void onDocumentSigned(SignedDocument signedDocument) {
         try {
-            Files.createFile(target);
-            signedDocument.getDocument().save(target.toString());
-            completed.accept(target);
-        } catch (IOException | RuntimeException exception) {
+            var content = new ByteArrayOutputStream();
+            signedDocument.getDocument().writeTo(content);
+            target.replaceContent(content.toByteArray());
+            completed.run();
+        } catch (Throwable exception) {
             throw new MachineProtocolException("OUTPUT_WRITE_FAILED", exception);
         }
     }

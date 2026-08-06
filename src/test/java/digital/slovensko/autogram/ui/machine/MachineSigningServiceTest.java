@@ -38,13 +38,33 @@ class MachineSigningServiceTest {
     Path temporaryDirectory;
 
     @Test
+    void uncheckedCleanupFailureClearsPinAndEmitsNoDuplicateTerminalEvents() throws Exception {
+        var writer = new RecordingWriter();
+        var pin = "1234".toCharArray();
+        var fileSystem = new TrackingFileSystem();
+        fileSystem.cleanupFailure = new AssertionError("unchecked cleanup detail");
+        var service = new MachineSigningService(writer.writer(), request -> new FakeSession((input, completed) -> {
+            input.writeSignedContent("%PDF-1.7\nsigned\n%%EOF".getBytes());
+            completed.run();
+        }), content -> true, () -> { }, fileSystem);
+
+        service.sign("request-1", request(pin, file("one", "source.pdf", "cleanup-error.pdf")));
+
+        assertTrue(Arrays.equals(new char[pin.length], pin));
+        assertEquals(List.of("session.started", "file.signingStarted", "file.completed", "session.failed"),
+                writer.eventTypes());
+        assertEquals("OUTPUT_CLEANUP_FAILED", writer.payloadCode(3));
+        assertFalse(writer.serialized().contains("unchecked cleanup detail"));
+    }
+
+    @Test
     void continuesAfterOneFileFails() throws Exception {
         var writer = new RecordingWriter();
         var session = new FakeSession((file, completed) -> {
-            if (file.id().equals("bad")) {
+            if (file.file().id().equals("bad")) {
                 throw new IllegalStateException("sensitive failure");
             }
-            Files.writeString(Path.of(file.target()), "%PDF-1.7\ngood\n%%EOF");
+            file.writeSignedContent("%PDF-1.7\ngood\n%%EOF".getBytes());
             completed.run();
         });
         var service = new MachineSigningService(writer.writer(), request -> session, path -> true);
@@ -65,7 +85,7 @@ class MachineSigningServiceTest {
         var writer = new RecordingWriter();
         var target = target("invalid-signed.pdf");
         var service = new MachineSigningService(writer.writer(), request -> new FakeSession((file, completed) -> {
-            Files.writeString(Path.of(file.target()), "%PDF-1.7\ninvalid\n%%EOF");
+            file.writeSignedContent("%PDF-1.7\ninvalid\n%%EOF".getBytes());
             completed.run();
         }), path -> false);
 
@@ -99,7 +119,7 @@ class MachineSigningServiceTest {
     void emitsNoDuplicateFileEventsWhenSessionCloseFails() throws Exception {
         var writer = new RecordingWriter();
         var service = new MachineSigningService(writer.writer(), request -> new FakeSession((file, completed) -> {
-            Files.writeString(Path.of(file.target()), "%PDF-1.7\ngood\n%%EOF");
+            file.writeSignedContent("%PDF-1.7\ngood\n%%EOF".getBytes());
             completed.run();
         }, true), path -> true);
 
@@ -110,29 +130,26 @@ class MachineSigningServiceTest {
     }
 
     @Test
-    void explicitTargetResponderNeverDeletesAnExistingTarget() throws Exception {
-        var source = Files.writeString(temporaryDirectory.resolve("source.pdf"), "%PDF-1.7\nsource\n%%EOF");
-        var target = Files.writeString(target("existing.pdf"), "%PDF-1.7\nexisting\n%%EOF");
-        var responder = new MachineFileResponder(target, ignored -> { });
+    void responderWritesOnlyThroughTheRetainedStagingHandle() {
+        var target = new MemoryRetainedFile();
+        var responder = new MachineFileResponder(target, () -> { });
 
-        assertThrows(MachineProtocolException.class,
-                () -> responder.onDocumentSigned(new SignedDocument(new InMemoryDocument("replacement".getBytes()), null)));
+        responder.onDocumentSigned(new SignedDocument(new InMemoryDocument("replacement".getBytes()), null));
 
-        assertEquals("%PDF-1.7\nsource\n%%EOF", Files.readString(source));
-        assertEquals("%PDF-1.7\nexisting\n%%EOF", Files.readString(target));
+        assertEquals("replacement", new String(target.content));
     }
 
     @Test
     void completionCallbackFailureLeavesThePrivateOwnerToCleanItsTarget() throws Exception {
-        var target = target("callback-failed.pdf");
-        var responder = new MachineFileResponder(target, ignored -> {
+        var target = new MemoryRetainedFile();
+        var responder = new MachineFileResponder(target, () -> {
             throw new IllegalStateException("callback failure");
         });
 
         assertThrows(MachineProtocolException.class,
                 () -> responder.onDocumentSigned(new SignedDocument(new InMemoryDocument("replacement".getBytes()), null)));
 
-        assertTrue(Files.exists(target));
+        assertEquals("replacement", new String(target.content));
     }
 
     @Test
@@ -175,8 +192,8 @@ class MachineSigningServiceTest {
         var sourceSeenBySigner = new AtomicReference<String>();
         var sessionOpened = new AtomicReference<Boolean>(false);
         var service = new MachineSigningService(writer.writer(), request -> new FakeSession((file, completed) -> {
-            sourceSeenBySigner.set(Files.readString(Path.of(file.source())));
-            Files.writeString(Path.of(file.target()), "%PDF-1.7\nsigned\n%%EOF");
+            sourceSeenBySigner.set(new String(file.sourceContent()));
+            file.writeSignedContent("%PDF-1.7\nsigned\n%%EOF".getBytes());
             completed.run();
         }), path -> true, () -> {
             try {
@@ -206,7 +223,7 @@ class MachineSigningServiceTest {
                         ? qualifiedReport("new") : qualifiedReport());
         var service = new MachineSigningService(writer.writer(), request -> new FakeSession((file, completed) -> {
             targetSeenDuringSigning.set(Files.exists(target));
-            Files.writeString(Path.of(file.target()), "%PDF-1.7\nsigned\n%%EOF");
+            file.writeSignedContent("%PDF-1.7\nsigned\n%%EOF".getBytes());
             completed.run();
         }), new MachineSigningService.PdfOutputValidator(inspection));
 
@@ -219,30 +236,11 @@ class MachineSigningServiceTest {
     }
 
     @Test
-    void stagedReplacementCannotChangeTheBytesPublishedAfterValidation() throws Exception {
-        var writer = new RecordingWriter();
-        var target = target("stable-publication.pdf");
-        var stagedOutput = new AtomicReference<Path>();
-        var service = new MachineSigningService(writer.writer(), request -> new FakeSession((file, completed) -> {
-            stagedOutput.set(Path.of(file.target()));
-            Files.writeString(stagedOutput.get(), "%PDF-1.7\nvalidated-A\n%%EOF");
-            completed.run();
-        }), path -> {
-            Files.writeString(stagedOutput.get(), "%PDF-1.7\nreplacement-B\n%%EOF");
-            return true;
-        });
-
-        service.sign("request-1", request("1234".toCharArray(), file("one", "source.pdf", target.getFileName().toString())));
-
-        assertEquals("%PDF-1.7\nvalidated-A\n%%EOF", Files.readString(target));
-    }
-
-    @Test
     void validationFailureNeverDeletesAConcurrentUserTargetReplacement() throws Exception {
         var writer = new RecordingWriter();
         var target = target("concurrent-user-target.pdf");
         var service = new MachineSigningService(writer.writer(), request -> new FakeSession((file, completed) -> {
-            Files.writeString(Path.of(file.target()), "%PDF-1.7\ninvalid\n%%EOF");
+            file.writeSignedContent("%PDF-1.7\ninvalid\n%%EOF".getBytes());
             completed.run();
         }), path -> {
             Files.writeString(target, "%PDF-1.7\nuser-replacement\n%%EOF");
@@ -260,7 +258,7 @@ class MachineSigningServiceTest {
         var writer = new RecordingWriter();
         var target = target("replaced.pdf");
         var service = new MachineSigningService(writer.writer(), request -> new FakeSession((file, completed) -> {
-            Files.writeString(Path.of(file.target()), "%PDF-1.7\ninvalid\n%%EOF");
+            file.writeSignedContent("%PDF-1.7\ninvalid\n%%EOF".getBytes());
             completed.run();
         }), content -> {
             Files.writeString(target, "%PDF-1.7\nreplacement\n%%EOF");
@@ -278,7 +276,7 @@ class MachineSigningServiceTest {
         var writer = new RecordingWriter();
         var target = target("validator-threw.pdf");
         var service = new MachineSigningService(writer.writer(), request -> new FakeSession((file, completed) -> {
-            Files.writeString(Path.of(file.target()), "%PDF-1.7\nsigned\n%%EOF");
+            file.writeSignedContent("%PDF-1.7\nsigned\n%%EOF".getBytes());
             completed.run();
         }), path -> {
             throw new java.io.IOException("report unavailable");
@@ -294,23 +292,19 @@ class MachineSigningServiceTest {
     void preparationCleanupFailureIsReportedBeforeTokenWork() throws Exception {
         var writer = new RecordingWriter();
         var tokenOpened = new AtomicBoolean();
+        var nativeFiles = MacNativeFileSystem.createForCurrentPlatform();
         var service = new MachineSigningService(writer.writer(), request -> {
             tokenOpened.set(true);
             throw new AssertionError("Token must not open after preparation cleanup failure");
-        }, content -> true, () -> { }, targetParent -> new MachineSigningService.StagingWorkspace() {
+        }, content -> true, () -> { }, new MachineSigningFileSystem() {
             @Override
-            public Path createFile(String prefix, String suffix) throws java.io.IOException {
-                throw new java.io.IOException("identity capture failed");
+            public RetainedFile openSource(Path source) throws java.io.IOException {
+                return nativeFiles.openSource(source);
             }
 
             @Override
-            public Path newOutputPath(String prefix, String suffix) {
-                throw new AssertionError("staging output must not be allocated");
-            }
-
-            @Override
-            public boolean cleanup() {
-                return false;
+            public Workspace createWorkspace(Path targetParent) {
+                return failingWorkspace(false);
             }
         });
 
@@ -323,39 +317,34 @@ class MachineSigningServiceTest {
     }
 
     @Test
-    void sourceSetupFailureCleansThePrivateWorkspaceBeforeTokenWork() throws Exception {
+    void identitySetupFailureCleansThePreparedSourceBeforeTokenWork() throws Exception {
         var writer = new RecordingWriter();
         var tokenOpened = new AtomicBoolean();
+        var sourceClosed = new AtomicBoolean();
         var service = new MachineSigningService(writer.writer(), request -> {
             tokenOpened.set(true);
             throw new AssertionError("Token must not open after source setup failure");
-        }, content -> true, () -> { }, targetParent -> {
-            var workspace = MachineSigningService.PrivateWorkspace.create(targetParent);
-            return new MachineSigningService.StagingWorkspace() {
-                @Override
-                public Path createFile(String prefix, String suffix) throws java.io.IOException {
-                    workspace.createFile(prefix, suffix);
-                    throw new java.io.IOException("identity capture failed");
-                }
+        }, content -> true, () -> { }, new MachineSigningFileSystem() {
+            @Override
+            public RetainedFile openSource(Path source) {
+                return new MemoryRetainedFile("%PDF-1.7\nsource\n%%EOF".getBytes()) {
+                    @Override
+                    public void close() {
+                        sourceClosed.set(true);
+                    }
+                };
+            }
 
-                @Override
-                public Path newOutputPath(String prefix, String suffix) throws java.io.IOException {
-                    return workspace.newOutputPath(prefix, suffix);
-                }
-
-                @Override
-                public boolean cleanup() {
-                    return workspace.cleanup();
-                }
-            };
+            @Override
+            public Workspace createWorkspace(Path targetParent) {
+                throw new IllegalStateException("identity capture failed");
+            }
         });
 
         service.sign("request-1", request("1234".toCharArray(), file("one", "source.pdf", "target.pdf")));
 
         assertFalse(tokenOpened.get());
-        try (var entries = Files.list(temporaryDirectory.toRealPath())) {
-            assertFalse(entries.anyMatch(path -> path.getFileName().toString().startsWith(".autogram-machine-")));
-        }
+        assertTrue(sourceClosed.get());
         assertEquals("SIGNING_UNAVAILABLE", writer.payloadCode(2));
     }
 
@@ -480,12 +469,13 @@ class MachineSigningServiceTest {
     void signingJobUsesTheRequiredPadesBaselineTPolicy() throws Exception {
         var source = Path.of(MachineSigningServiceTest.class
                 .getResource("/digital/slovensko/autogram/sample.pdf").getFile());
-        var responder = new MachineFileResponder(target("policy-signed.pdf"), ignored -> { });
+        var responder = new MachineFileResponder(new MemoryRetainedFile(), () -> { });
         var settings = new MachineSettings(true);
         settings.setTsaServer("https://tsa.example.test");
         settings.setTsaEnabled(true);
 
-        var job = MachineSigningService.DefaultSigningSession.signingJob(source, responder, settings);
+        var job = MachineSigningService.DefaultSigningSession.signingJob(Files.readAllBytes(source), source.toString(),
+                responder, settings);
 
         assertEquals(SignatureLevel.PAdES_BASELINE_T, job.getParameters().getLevel());
         assertEquals(eu.europa.esig.dss.enumerations.SignatureForm.PAdES, job.getParameters().getSignatureType());
@@ -588,6 +578,92 @@ class MachineSigningServiceTest {
         }
     }
 
+    private static MachineSigningFileSystem.Workspace failingWorkspace(boolean cleanupResult) {
+        return new MachineSigningFileSystem.Workspace() {
+            @Override
+            public MachineSigningFileSystem.RetainedFile createStagingFile() throws java.io.IOException {
+                throw new java.io.IOException("identity capture failed");
+            }
+
+            @Override
+            public void publish(MachineSigningFileSystem.RetainedFile source, String targetLeaf) {
+                throw new AssertionError("Publication must not run");
+            }
+
+            @Override
+            public boolean cleanup() {
+                return cleanupResult;
+            }
+
+            @Override
+            public void close() {
+            }
+        };
+    }
+
+    private static class MemoryRetainedFile implements MachineSigningFileSystem.RetainedFile {
+        private byte[] content;
+
+        private MemoryRetainedFile() {
+            this(new byte[0]);
+        }
+
+        private MemoryRetainedFile(byte[] content) {
+            this.content = content.clone();
+        }
+
+        @Override
+        public byte[] readAll() {
+            return content.clone();
+        }
+
+        @Override
+        public void replaceContent(byte[] content) {
+            this.content = content.clone();
+        }
+
+        @Override
+        public void close() {
+        }
+    }
+
+    private static final class TrackingFileSystem implements MachineSigningFileSystem {
+        private final MemoryRetainedFile source = new MemoryRetainedFile("%PDF-1.7\nsource\n%%EOF".getBytes());
+        private final MemoryRetainedFile staging = new MemoryRetainedFile();
+        private Error cleanupFailure;
+
+        @Override
+        public RetainedFile openSource(Path source) {
+            return this.source;
+        }
+
+        @Override
+        public Workspace createWorkspace(Path targetParent) {
+            return new Workspace() {
+                @Override
+                public RetainedFile createStagingFile() {
+                    return staging;
+                }
+
+                @Override
+                public void publish(RetainedFile source, String targetLeaf) throws java.io.IOException {
+                }
+
+                @Override
+                public boolean cleanup() {
+                    if (cleanupFailure != null) {
+                        throw cleanupFailure;
+                    }
+                    return true;
+                }
+
+                @Override
+                public void close() {
+                }
+            };
+        }
+    }
+
     private static final class FakeSession implements MachineSigningService.SigningSession {
         private final SignBehavior behavior;
         private final boolean closeFails;
@@ -603,8 +679,8 @@ class MachineSigningServiceTest {
         }
 
         @Override
-        public void sign(MachineFile file, Runnable completed) throws Exception {
-            behavior.sign(file, completed);
+        public void sign(MachineSigningService.SigningInput input, Runnable completed) throws Exception {
+            behavior.sign(input, completed);
         }
 
         @Override
@@ -618,7 +694,7 @@ class MachineSigningServiceTest {
 
     @FunctionalInterface
     private interface SignBehavior {
-        void sign(MachineFile file, Runnable completed) throws Exception;
+        void sign(MachineSigningService.SigningInput file, Runnable completed) throws Exception;
     }
 
     private static final class RecordingWriter {
