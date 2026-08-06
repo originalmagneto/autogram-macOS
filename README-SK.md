@@ -150,7 +150,7 @@ Doplnenie ďalších kariet je zvyčajne jednoduché, pokiaľ používajú PKCS#
 
 ## Vývoj
 ### Predpoklady
-- JDK 24 s JavaFX
+- JDK 25 s JavaFX
 - Maven
 - Voliteľne Visual Studio Code alebo IntelliJ IDEA Community Edition
 

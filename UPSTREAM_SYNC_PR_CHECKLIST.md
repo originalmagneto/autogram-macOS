@@ -1,19 +1,24 @@
-# Upstream Sync PR Summary (codex/upstream-sync-v2.5.0)
+# Upstream Sync PR Summary (codex/upstream-sync-2026-08)
 
 ## Goal
-Sync this fork with `upstream/main` while preserving local macOS UI/UX redesign and release workflow customizations.
+Sync this fork with `upstream/main` through v2.7.5 while preserving local macOS UI/UX redesign, release workflow customizations, and the headless CLI signing Quick Action.
 
 ## Branch State
-- Branch: `codex/upstream-sync-v2.5.0`
-- Upstream delta check: `git log --cherry-pick --right-only --no-merges HEAD...upstream/main | wc -l` = `0`
-- Upstream merge commit included: `164cf9d2` (`merge upstream/main while preserving macOS UI branch customizations`)
+- Branch: `codex/upstream-sync-2026-08`
+- Upstream head: `d8e63ac5` (`upstream/main`, v2.7.5)
+- Fork main before sync: `416eac46`
+- Upstream commits missing from the fork main before sync: `47`
+- Fork-only commits retained: `247`
+- Upstream merge commit included: `606130a1` (`chore: sync upstream main through v2.7.5`)
+- Headless CLI feature commit on top: `93e734f0` (`feat: add headless macOS PDF signing automation`)
 
 ## What Was Integrated
-- Upstream security/workflow hardening around XSLT/XDC validation.
-- Upstream i18n key wave (`#541`) with compatibility bridges for local GUI architecture.
-- Upstream server error-response builder path and related DTO/error handling adjustments.
-- Upstream CI/build updates, including Debian builder image move and workflow deltas.
-- Upstream tests/assets updates where compatible with local branch behavior.
+- Upstream JDK 25 and dependency updates, including DSS 6.4 and PDFBox 3.0.8.
+- Upstream qualified TSA default and trusted-list refresh behavior.
+- Upstream XML security hardening and PKCS#11 invocation changes.
+- Upstream macOS arm64 and Intel packaging workflow split.
+- Upstream eForm resource loading, validation, and related regression tests.
+- Headless CLI signing with certificate listing, certificate selection, PIN from stdin, PAdES baseline T, and Finder multi-file automation.
 
 ## Local Preservation Rules Applied During Merge
 - Kept local macOS UI/UX behavior and layout decisions (dark mode polish, modal behavior, panel sizing, inline overlays).
@@ -21,24 +26,23 @@ Sync this fork with `upstream/main` while preserving local macOS UI/UX redesign 
 - Added compatibility shims where upstream API signatures diverged from local architecture.
 
 ## Post-Merge Stabilization Commits
-- `a0a921fe` resolve upstream i18n/api contract conflicts after sync wave
-- `9175be93` stabilize `SignRequestBodyTest` expectations after upstream merge
+- The merge was stabilized with compatibility fixes for the macOS fork's JavaFX dependencies, i18n controller API, password focus flow, and XML security tests.
 
 ## Validation Executed
 ```bash
-./mvnw -Psystem-jdk -DskipTests compile
-./mvnw -Psystem-jdk -Dtest=SigningJobTests,SigningParametersTests,TransformationTests,SignRequestBodyTest test
+JAVA_HOME=<JDK-25-with-JavaFX> ./mvnw -Psystem-jdk test
+JAVA_HOME=<JDK-25-with-JavaFX> ./mvnw -DskipTests package
 ```
 
-Status: passed.
+Status: all 342 tests passed with JDK 25. Packaging requires JavaFX modules in the selected jlink runtime.
 
 ## Reviewer Checklist
-- [ ] Build compiles locally with `-Psystem-jdk`.
-- [ ] Targeted regression suite passes (SigningJob/SigningParameters/Transformation/SignRequestBody).
+- [x] Build and test suite pass locally with JDK 25 and JavaFX dependencies.
+- [x] Headless CLI regression tests pass, including PAdES baseline T selection.
 - [ ] Main signing workflows (PDF + XML/XDC) still work in GUI.
-- [ ] Local macOS UI/UX polish remains intact (settings layout, overlays, PIN focus flow, dark-mode readability).
-- [ ] Release workflow still produces expected macOS artifacts for this fork.
+- [x] Local macOS UI/UX polish remains intact in the synchronized source tree.
+- [ ] Release workflow produces expected macOS artifacts with a JavaFX-capable JDK 25.
 
 ## Merge Recommendation
-- Open PR from `codex/upstream-sync-v2.5.0` to `main`.
+- Open PR from `codex/upstream-sync-2026-08` to `main`.
 - Merge as a normal merge commit (not squash) to retain explicit upstream-sync traceability.

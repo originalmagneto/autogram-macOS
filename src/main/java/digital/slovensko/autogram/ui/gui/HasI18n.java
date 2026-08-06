@@ -1,6 +1,5 @@
 package digital.slovensko.autogram.ui.gui;
 
-import org.checkerframework.checker.propkey.qual.PropertyKey;
 import org.slf4j.LoggerFactory;
 
 import java.text.MessageFormat;
@@ -14,11 +13,11 @@ public interface HasI18n {
 
     ResourceBundle getResources();
 
-    default String i18n(@PropertyKey String key, Object... args) {
+    default String i18n(String key, Object... args) {
         return translate(getResources(), key, args);
     }
 
-    static String translate(ResourceBundle resources, @PropertyKey String key, Object... args) {
+    static String translate(ResourceBundle resources, String key, Object... args) {
         if (key == null) {
             return "null";
         }
@@ -36,11 +35,11 @@ public interface HasI18n {
         }
     }
 
-    default String translate(@PropertyKey String key, Object... args) {
+    default String translate(String key, Object... args) {
         return i18n(key, args);
     }
 
-    default String tr(@PropertyKey String key, Object... args) {
+    default String tr(String key, Object... args) {
         return translate(key, args);
     }
 }

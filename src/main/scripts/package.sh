@@ -10,34 +10,10 @@ platform=${5}
 version=${6}
 output=${7}
 
-# Determine whether jpackage supports the new --arch parameter
-# Modern jpackage versions use --arch instead of --target-arch
-archOption="--arch"
-if "$jpackage" --help 2>&1 | grep -q -- '--target-arch' && ! "$jpackage" --help 2>&1 | grep -q -- '--arch'; then
-    archOption="--target-arch"
-fi
-
 function checkExitCode() {
     exitValue=${1}
     if [[ ${exitValue} -ne 0 ]]; then
         exit "${exitValue}"
-    fi
-}
-
-function alignMacBundleExecutable() {
-    local appBundlePath="${1}"
-    local plistPath="${appBundlePath}/Contents/Info.plist"
-    local macOsDir="${appBundlePath}/Contents/MacOS"
-
-    if [[ ! -f "${plistPath}" ]] || [[ ! -d "${macOsDir}" ]]; then
-        return
-    fi
-
-    # Some jpackage runs produce AutogramApp binary while Info.plist still points to Autogram.
-    # Align CFBundleExecutable with the actual launcher so Finder can open the app bundle.
-    if [[ -f "${macOsDir}/AutogramApp" ]] && [[ ! -f "${macOsDir}/Autogram" ]]; then
-        /usr/libexec/PlistBuddy -c "Set :CFBundleExecutable AutogramApp" "${plistPath}" >/dev/null 2>&1 \
-            || /usr/libexec/PlistBuddy -c "Add :CFBundleExecutable string AutogramApp" "${plistPath}" >/dev/null 2>&1
     fi
 }
 
@@ -56,7 +32,6 @@ unset IFS
 
 jvmOptions="-Dfile.encoding=UTF-8 \
     -Dprism.maxvram=2G \
-    --add-exports javafx.graphics/com.sun.javafx.tk=ALL-UNNAMED \
     --add-exports jdk.crypto.cryptoki/sun.security.pkcs11.wrapper=ALL-UNNAMED \
     --add-opens java.base/java.security=ALL-UNNAMED \
     --add-opens jdk.crypto.cryptoki/sun.security.pkcs11=ALL-UNNAMED \
@@ -174,240 +149,57 @@ if [[ "$platform" == "linux" ]]; then
     checkExitCode $?
 fi
 
-if [[ "${platform}" == "mac-universal" ]]; then
-    cp "./Info.plist.template" "./Info.plist"
-    sed -i.bak "s/PROTOCOL_NAME/${properties_protocol}/g" "./Info.plist" && rm "./Info.plist.bak"
-
-    baseArguments=(
-        "--input" "${appDirectory}"
-        "--runtime-image" "${jdkDirectory}"
-        "--main-jar" "autogram.jar"
-        "--app-version" "${properties_version:-$version}"
-        "--copyright" "${properties_copyright}"
-        "--vendor" "${properties_vendor}"
-        "--resource-dir" "./"
-        "--description" "${properties_description}"
-        "--name" "${properties_name}"
-        "--icon" "./Autogram.icns"
-        "--java-options" "${jvmOptions}"
-        "--mac-app-category" "${properties_mac_appCategory:-business}"
-        "--temp" "./DTempFiles"
-        "--type" "app-image"
-    )
-
-    if [[ -n "${properties_mac_identifier}" ]]; then
-        baseArguments+=("--mac-package-identifier" "${properties_mac_identifier}")
-    fi
-
-    if [[ -n "${properties_mac_name}" ]]; then
-        baseArguments+=("--mac-package-name" "${properties_mac_name}")
-    fi
-
-    signingArguments=()
-    if [[ "${properties_mac_sign}" == "1" ]]; then
-        export JPACKAGE_MAC_SIGN="1"
-        if [[ -z "${APPLE_DEVELOPER_IDENTITY}" ]] || [[ -z "${APPLE_KEYCHAIN_PATH}" ]]; then
-            echo "Missing APPLE_DEVELOPER_IDENTITY or APPLE_KEYCHAIN_PATH env variable"
-            exit 1
-        fi
-
-        mac_signingKeyUserName=$(echo ${APPLE_DEVELOPER_IDENTITY} | sed -ne 's/Developer ID Application\:[[:space:]]\(.*\)[[:space:]]([0-9A-Z]*)/\1/p')
-        signingArguments=(
-            "--mac-sign"
-            "--mac-signing-keychain" "${APPLE_KEYCHAIN_PATH}"
-            "--mac-signing-key-user-name" "${mac_signingKeyUserName}"
-            "--mac-entitlements" "./Autogram.entitlements"
-        )
-    fi
-
-    # Build a single app image for the current architecture
-    # Universal binary creation requires architecture-specific options not available in this jpackage version
-    appImageDir="${output}/app-image"
-    mkdir -p "${appImageDir}"
-    $jpackage "${baseArguments[@]}" "${signingArguments[@]}" --dest "${appImageDir}"
-    exitValue=$?
-    rm -rf ./DTempFiles
-    checkExitCode $exitValue
-
-    appName="${properties_name}.app"
-    alignMacBundleExecutable "${appImageDir}/${appName}"
-
-    # Create PKG from the app image
-    pkgArguments=(
-        "--app-image" "${appImageDir}/${appName}"
-        "--name" "${properties_name}"
-        "--type" "pkg"
-        "--icon" "./Autogram.icns"
-        "--app-version" "${properties_version:-$version}"
-        "--resource-dir" "./"
-        "--dest" "${output}"
-        "--description" "${properties_description}"
-        "--mac-app-category" "${properties_mac_appCategory:-business}"
-    )
-    
-    if [[ -n "${properties_mac_identifier}" ]]; then
-        pkgArguments+=("--mac-package-identifier" "${properties_mac_identifier}")
-    fi
-    
-    if [[ -n "${properties_mac_name}" ]]; then
-        pkgArguments+=("--mac-package-name" "${properties_mac_name}")
-    fi
-    
-    # Add signing arguments if signing is enabled
-    if [[ "${properties_mac_sign}" == "1" ]]; then
-        pkgArguments+=("${signingArguments[@]}")
-    fi
-    
-    $jpackage "${pkgArguments[@]}"
-    exitValue=$?
-    rm -rf ./DTempFiles
-    checkExitCode $exitValue
-
-    # Create DMG from the app image
-    dmgArguments=(
-        "--app-image" "${appImageDir}/${appName}"
-        "--name" "${properties_name}"
-        "--type" "dmg"
-        "--app-version" "${properties_version:-$version}"
-        "--resource-dir" "./"
-        "--dest" "${output}"
-        "--description" "${properties_description}"
-        "--mac-app-category" "${properties_mac_appCategory:-business}"
-    )
-
-    if [[ -n "${properties_mac_identifier}" ]]; then
-        dmgArguments+=("--mac-package-identifier" "${properties_mac_identifier}")
-    fi
-
-    if [[ -n "${properties_mac_name}" ]]; then
-        dmgArguments+=("--mac-package-name" "${properties_mac_name}")
-    fi
-
-    if [[ "${properties_mac_sign}" == "1" ]]; then
-        dmgArguments+=("${signingArguments[@]}")
-    fi
-
-    $jpackage "${dmgArguments[@]}"
-    exitValue=$?
-    checkExitCode $exitValue
-fi
-
 if [[ "${platform}" == "mac" ]]; then
+    # jpackage requires --temp to be missing or empty. Remove artifacts from an
+    # interrupted prior build and clean this build's temporary files on any exit.
+    rm -rf ./DTempFiles
+    trap 'rm -rf ./DTempFiles' EXIT
+
     cp "./Info.plist.template" "./Info.plist"
     sed -i.bak "s/PROTOCOL_NAME/${properties_protocol}/g" "./Info.plist" && rm "./Info.plist.bak"
 
-    # Base arguments for app-image creation
-    appImageArguments=()
-    appImageArguments+=(
-        "--input" "${appDirectory}"
-        "--runtime-image" "${jdkDirectory}"
-        "--main-jar" "autogram.jar"
-        "--app-version" "${properties_version:-$version}"
-        "--copyright" "${properties_copyright}"
-        "--vendor" "${properties_vendor}"
-        "--resource-dir" "./"
-        "--description" "${properties_description}"
-        "--name" "${properties_name}"
-        "--icon" "./Autogram.icns"
-        "--java-options" "${jvmOptions}"
-        "--mac-app-category" "${properties_mac_appCategory:-business}"
-        "--temp" "./DTempFiles"
-        "--type" "app-image"
-    )
-
-    if [[ -n "${properties_mac_identifier}" ]]; then
-        appImageArguments+=("--mac-package-identifier" "${properties_mac_identifier}")
-    fi
-
-    if [[ -n "${properties_mac_name}" ]]; then
-        appImageArguments+=("--mac-package-name" "${properties_mac_name}")
-    fi
-
-    signingArguments=()
-    if [[ "${properties_mac_sign}" == "1" ]]; then
-        export JPACKAGE_MAC_SIGN="1"
-        if [[ -z "${APPLE_DEVELOPER_IDENTITY}" ]] || [[ -z "${APPLE_KEYCHAIN_PATH}" ]]; then
-            echo "Missing APPLE_DEVELOPER_IDENTITY or APPLE_KEYCHAIN_PATH env variable"
-            exit 1
-        fi
-
-        mac_signingKeyUserName=$(echo ${APPLE_DEVELOPER_IDENTITY} | sed -ne 's/Developer ID Application\:[[:space:]]\(.*\)[[:space:]]([0-9A-Z]*)/\1/p')
-        signingArguments=(
-            "--mac-sign"
-            "--mac-signing-keychain" "${APPLE_KEYCHAIN_PATH}"
-            "--mac-signing-key-user-name" "${mac_signingKeyUserName}"
-            "--mac-entitlements" "./Autogram.entitlements"
-        )
-    fi
-
-    # 1. Create App Image (.app)
-    appImageDir="${output}/app-image"
-    mkdir -p "${appImageDir}"
-    
-    echo "Creating app-image at: ${appImageDir}"
-    $jpackage "${appImageArguments[@]}" "${signingArguments[@]}" --dest "${appImageDir}"
-    exitValue=$?
-    rm -rf ./DTempFiles
-    checkExitCode $exitValue
-
-    # 2. Create PKG from App Image
-    appName="${properties_name}.app"
-    alignMacBundleExecutable "${appImageDir}/${appName}"
-    pkgArguments=(
-        "--app-image" "${appImageDir}/${appName}"
+    arguments+=(
         "--name" "${properties_name}"
         "--type" "pkg"
         "--icon" "./Autogram.icns"
-        "--app-version" "${properties_version:-$version}"
-        "--resource-dir" "./"
-        "--dest" "${output}"
-        "--description" "${properties_description}"
+        "--java-options" "${jvmOptions}"
         "--mac-app-category" "${properties_mac_appCategory:-business}"
+        "--mac-entitlements" "./Autogram.entitlements"
+        # Building on mac requires modifying of image files
+        # So the temp files have to be on relative path
+        "--temp" "./DTempFiles"
     )
 
     if [[ -n "${properties_mac_identifier}" ]]; then
-        pkgArguments+=("--mac-package-identifier" "${properties_mac_identifier}")
-    fi
-    
-    if [[ -n "${properties_mac_name}" ]]; then
-        pkgArguments+=("--mac-package-name" "${properties_mac_name}")
-    fi
-
-    if [[ "${properties_mac_sign}" == "1" ]]; then
-        pkgArguments+=("${signingArguments[@]}")
-    fi
-
-    echo "Creating pkg at: ${output}"
-    $jpackage "${pkgArguments[@]}"
-    exitValue=$?
-    checkExitCode $exitValue
-
-    # 3. Create DMG from App Image
-    dmgArguments=(
-        "--app-image" "${appImageDir}/${appName}"
-        "--name" "${properties_name}"
-        "--type" "dmg"
-        "--app-version" "${properties_version:-$version}"
-        "--resource-dir" "./"
-        "--dest" "${output}"
-        "--description" "${properties_description}"
-        "--mac-app-category" "${properties_mac_appCategory:-business}"
-    )
-
-    if [[ -n "${properties_mac_identifier}" ]]; then
-        dmgArguments+=("--mac-package-identifier" "${properties_mac_identifier}")
+        arguments+=(
+            "--mac-package-identifier" "${properties_mac_identifier}"
+        )
     fi
 
     if [[ -n "${properties_mac_name}" ]]; then
-        dmgArguments+=("--mac-package-name" "${properties_mac_name}")
+        arguments+=(
+            "--mac-package-name" "${properties_mac_name}"
+        )
     fi
 
     if [[ "${properties_mac_sign}" == "1" ]]; then
-        dmgArguments+=("${signingArguments[@]}")
+        if [[ -z "${APPLE_DEVELOPER_IDENTITY}" ]] || [[ -z "${APPLE_KEYCHAIN_PATH}" ]]; then
+            echo "Warning: APPLE_DEVELOPER_IDENTITY or APPLE_KEYCHAIN_PATH not set, skipping code signing"
+        else
+            export JPACKAGE_MAC_SIGN="1"
+
+            mac_signingKeyUserName=$(echo ${APPLE_DEVELOPER_IDENTITY} | sed -ne 's/Developer ID Application\:[[:space:]]\(.*\)[[:space:]]([0-9A-Z]*)/\1/p')
+            arguments+=(
+                "--mac-sign"
+                "--mac-signing-keychain" "${APPLE_KEYCHAIN_PATH}"
+                "--mac-signing-key-user-name" "${mac_signingKeyUserName}"
+            )
+        fi
     fi
 
-    echo "Creating dmg at: ${output}"
-    $jpackage "${dmgArguments[@]}"
+    # cwd je ./src/main/scripts/resources
+    $jpackage "${arguments[@]}"
     exitValue=$?
+
     checkExitCode $exitValue
 fi
