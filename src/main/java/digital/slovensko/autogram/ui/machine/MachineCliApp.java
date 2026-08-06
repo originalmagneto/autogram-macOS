@@ -11,6 +11,7 @@ import java.io.PrintWriter;
 import java.io.Reader;
 import java.io.StringReader;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public final class MachineCliApp {
@@ -64,7 +65,7 @@ public final class MachineCliApp {
             case DRIVERS -> dispatchDrivers(writer, request, driverService);
             case CERTIFICATES -> dispatchCertificates(writer, request, driverService);
             case INSPECT -> dispatchInspection(writer, request, inspectionService, trustInitializer);
-            case SIGN -> fail(writer, request.requestId(), "OPERATION_NOT_AVAILABLE");
+            case SIGN -> dispatchSigning(writer, request, inspectionService, trustInitializer);
         };
     }
 
@@ -104,6 +105,18 @@ public final class MachineCliApp {
             inspectFile(writer, request.requestId(), inspectionService, file);
         }
         return complete(writer, request.requestId(), new JsonObject());
+    }
+
+    private static int dispatchSigning(MachineEventWriter writer, MachineRequest request,
+            MachineInspectionService inspectionService, Runnable trustInitializer) {
+        var signRequest = requiredSignRequest(request.payload());
+        try {
+            MachineRequestValidator.validateSign(signRequest);
+            new MachineSigningService(writer, inspectionService, trustInitializer).sign(request.requestId(), signRequest);
+            return 0;
+        } finally {
+            Arrays.fill(signRequest.pin(), '\0');
+        }
     }
 
     private static void inspectFile(MachineEventWriter writer, String requestId, MachineInspectionService inspectionService,
@@ -167,6 +180,49 @@ public final class MachineCliApp {
             files.add(new MachineFile(file.get("id").getAsString(), source, target));
         }
         return new InspectRequest(List.copyOf(files));
+    }
+
+    private static SignRequest requiredSignRequest(JsonObject payload) {
+        if (payload.size() != 6 || !payload.has("driver") || !payload.has("certificateSerial") || !payload.has("pin")
+                || !payload.has("signatureLevel") || !payload.has("timestamp") || !payload.has("files")
+                || !isNonBlankString(payload.get("driver")) || !isNonBlankString(payload.get("certificateSerial"))
+                || !isNonBlankString(payload.get("pin")) || !isNonBlankString(payload.get("signatureLevel"))
+                || !payload.get("timestamp").isJsonObject()) {
+            throw new MachineProtocolException("PROTOCOL_INVALID_REQUEST");
+        }
+        var pin = payload.get("pin").getAsString().toCharArray();
+        try {
+            var timestamp = requiredTimestamp(payload.getAsJsonObject("timestamp"));
+            var files = requiredInspectionRequest(filesPayload(payload.get("files"))).files();
+            return new SignRequest(payload.get("driver").getAsString(), payload.get("certificateSerial").getAsString(),
+                    pin, payload.get("signatureLevel").getAsString(), timestamp, files);
+        } catch (RuntimeException exception) {
+            Arrays.fill(pin, '\0');
+            throw exception;
+        }
+    }
+
+    private static JsonObject filesPayload(JsonElement files) {
+        var payload = new JsonObject();
+        payload.add("files", files);
+        return payload;
+    }
+
+    private static QualifiedTimestampRequest requiredTimestamp(JsonObject timestamp) {
+        if (timestamp.size() != 2 || !timestamp.has("required") || !timestamp.has("servers")
+                || !timestamp.get("required").isJsonPrimitive()
+                || !timestamp.getAsJsonPrimitive("required").isBoolean()
+                || !timestamp.get("servers").isJsonArray()) {
+            throw new MachineProtocolException("PROTOCOL_INVALID_REQUEST");
+        }
+        var servers = new ArrayList<String>();
+        for (var server : timestamp.getAsJsonArray("servers")) {
+            if (!isNonBlankString(server)) {
+                throw new MachineProtocolException("PROTOCOL_INVALID_REQUEST");
+            }
+            servers.add(server.getAsString());
+        }
+        return new QualifiedTimestampRequest(timestamp.get("required").getAsBoolean(), List.copyOf(servers));
     }
 
     private static boolean isNonBlankString(JsonElement element) {
