@@ -3,12 +3,26 @@ import SwiftUI
 
 struct SigningInspector: View {
     let workspace: WorkspaceModel
+    @State private var certificateSerial: String?
+    @State private var pin = ""
+    @State private var isPINSheetPresented = false
 
     var body: some View {
         Form {
             Section("Signing") {
                 LabeledContent("Profile", value: "PAdES baseline")
                 LabeledContent("Timestamp", value: "Qualified")
+            }
+
+            if !workspace.credentialCertificates.isEmpty {
+                Section("Certificate") {
+                    CertificatePicker(
+                        certificates: workspace.credentialCertificates,
+                        selectedSerial: $certificateSerial
+                    ) {
+                        isPINSheetPresented = true
+                    }
+                }
             }
 
             if completedCount > 0 || failedCount > 0 {
@@ -28,6 +42,11 @@ struct SigningInspector: View {
         }
         .formStyle(.grouped)
         .inspectorColumnWidth(min: 260, ideal: 300)
+        .sheet(isPresented: $isPINSheetPresented) {
+            PINSheet(pin: $pin) { secret in
+                _ = secret.consumeBytes()
+            }
+        }
     }
 
     private var completedCount: Int {

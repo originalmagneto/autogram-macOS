@@ -7,12 +7,18 @@ import UniformTypeIdentifiers
 final class WorkspaceModel {
     private(set) var items: [PDFItem] = []
     var selection: PDFItem.ID?
+    let credentialCertificates: [SigningCertificate]
     private let engine: any SigningEngine
     @ObservationIgnored private var coordinator: SigningCoordinator?
 
-    init(engine: any SigningEngine = FakeSigningEngine.launchEngine(), items: [PDFItem] = []) {
+    init(
+        engine: any SigningEngine = FakeSigningEngine.launchEngine(),
+        items: [PDFItem] = [],
+        credentialCertificates: [SigningCertificate] = []
+    ) {
         self.engine = engine
         self.items = items
+        self.credentialCertificates = credentialCertificates
         self.selection = items.first?.id
         self.coordinator = SigningCoordinator(engine: engine, workspace: self)
     }
@@ -25,10 +31,22 @@ final class WorkspaceModel {
                 PDFItem(descriptor: PDFItemDescriptor(id: "agreement", sourceURL: URL(fileURLWithPath: "/tmp/Agreement.pdf"))),
                 PDFItem(descriptor: PDFItemDescriptor(id: "invoice", sourceURL: URL(fileURLWithPath: "/tmp/Invoice.pdf")))
             ]
+        } else if environment["AUTOGRAM_FAKE_ENGINE"] == "credential-flow" {
+            items = [
+                PDFItem(descriptor: PDFItemDescriptor(id: "credential-flow", sourceURL: URL(fileURLWithPath: "/tmp/Document.pdf")))
+            ]
         } else {
             items = []
         }
-        return WorkspaceModel(engine: engine, items: items)
+        let credentialCertificates: [SigningCertificate]
+        if environment["AUTOGRAM_FAKE_ENGINE"] == "credential-flow" {
+            credentialCertificates = [
+                SigningCertificate(serialNumber: "TEST-CERTIFICATE-1", displayName: "Test Certificate")
+            ]
+        } else {
+            credentialCertificates = []
+        }
+        return WorkspaceModel(engine: engine, items: items, credentialCertificates: credentialCertificates)
     }
 
     func setItems(_ items: [PDFItem]) {
