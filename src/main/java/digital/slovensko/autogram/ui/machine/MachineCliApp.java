@@ -18,11 +18,18 @@ public final class MachineCliApp {
     }
 
     public static int start(CommandLine commandLine, Reader input, PrintWriter output, PrintWriter error) {
-        return start(commandLine, input, output, error, new MachineDriverService());
+        return start(commandLine, input, output, error, new MachineDriverService(), new MachineInspectionService(),
+                new MachineTrustService()::initialize);
     }
 
     static int start(CommandLine commandLine, Reader input, PrintWriter output, PrintWriter error,
             MachineDriverService driverService) {
+        return start(commandLine, input, output, error, driverService, new MachineInspectionService(),
+                new MachineTrustService()::initialize);
+    }
+
+    static int start(CommandLine commandLine, Reader input, PrintWriter output, PrintWriter error,
+            MachineDriverService driverService, MachineInspectionService inspectionService, Runnable trustInitializer) {
         var writer = new MachineEventWriter(output);
         try {
             MachineRequestValidator.validateCommandLine(commandLine);
@@ -40,7 +47,7 @@ public final class MachineCliApp {
         try {
             var request = new MachineProtocolCodec().decodeRequest(new StringReader(rawRequest));
             MachineRequestValidator.validate(commandLine, request);
-            return dispatch(writer, request, driverService);
+            return dispatch(writer, request, driverService, inspectionService, trustInitializer);
         } catch (MachineProtocolException exception) {
             return fail(writer, requestId(rawRequest), errorCode(exception, rawRequest));
         } catch (Exception exception) {
@@ -48,12 +55,14 @@ public final class MachineCliApp {
         }
     }
 
-    private static int dispatch(MachineEventWriter writer, MachineRequest request, MachineDriverService driverService) {
+    private static int dispatch(MachineEventWriter writer, MachineRequest request, MachineDriverService driverService,
+            MachineInspectionService inspectionService, Runnable trustInitializer) {
         return switch (request.operation()) {
             case CAPABILITIES -> dispatchCapabilities(writer, request, driverService);
             case DRIVERS -> dispatchDrivers(writer, request, driverService);
             case CERTIFICATES -> dispatchCertificates(writer, request, driverService);
-            case INSPECT, SIGN -> fail(writer, request.requestId(), "OPERATION_NOT_AVAILABLE");
+            case INSPECT -> dispatchInspection(writer, request, inspectionService, trustInitializer);
+            case SIGN -> fail(writer, request.requestId(), "OPERATION_NOT_AVAILABLE");
         };
     }
 
@@ -84,6 +93,15 @@ public final class MachineCliApp {
         }
     }
 
+    private static int dispatchInspection(MachineEventWriter writer, MachineRequest request,
+            MachineInspectionService inspectionService, Runnable trustInitializer) {
+        var path = requiredPath(request.payload());
+        writer.write("session.started", request.requestId(), null, new JsonObject());
+        trustInitializer.run();
+        writer.write("inspection.completed", request.requestId(), path.toString(), inspectionService.inspect(path));
+        return complete(writer, request.requestId(), new JsonObject());
+    }
+
     private static int complete(MachineEventWriter writer, String requestId, JsonObject payload) {
         writer.write("session.completed", requestId, null, payload);
         return 0;
@@ -104,6 +122,17 @@ public final class MachineCliApp {
             throw new MachineProtocolException("PROTOCOL_INVALID_REQUEST");
         }
         return payload.get(field).getAsString();
+    }
+
+    private static java.nio.file.Path requiredPath(JsonObject payload) {
+        if (payload.size() != 1 || !payload.has("path") || !isNonBlankString(payload.get("path"))) {
+            throw new MachineProtocolException("PROTOCOL_INVALID_REQUEST");
+        }
+        try {
+            return java.nio.file.Path.of(payload.get("path").getAsString());
+        } catch (java.nio.file.InvalidPathException exception) {
+            throw new MachineProtocolException("PROTOCOL_INVALID_REQUEST", exception);
+        }
     }
 
     private static boolean isNonBlankString(JsonElement element) {
