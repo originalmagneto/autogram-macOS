@@ -1,5 +1,6 @@
 package digital.slovensko.autogram.ui.gui;
 
+import digital.slovensko.autogram.core.Autogram;
 import digital.slovensko.autogram.core.UserSettings;
 import javafx.fxml.FXML;
 import javafx.scene.Node;
@@ -18,6 +19,7 @@ public class SettingsResetDialogController implements SuppressedFocusController 
     private Button rejectResetButton;
 
     private UserSettings userSettings;
+    private Autogram autogram;
     private Runnable onClose;
     private Runnable onReset;
 
@@ -30,6 +32,10 @@ public class SettingsResetDialogController implements SuppressedFocusController 
 
         if (userSettings != null) {
             userSettings.reset();
+        }
+
+        if (autogram != null && userSettings != null) {
+            autogram.updateSignatureValidatorLotl(userSettings.getTrustedList());
         }
 
         if (onReset != null) {
@@ -51,6 +57,10 @@ public class SettingsResetDialogController implements SuppressedFocusController 
 
     public void setUserSettings(UserSettings userSettings) {
         this.userSettings = userSettings;
+    }
+
+    public void setAutogram(Autogram autogram) {
+        this.autogram = autogram;
     }
 
     public void setOnClose(Runnable onClose) {

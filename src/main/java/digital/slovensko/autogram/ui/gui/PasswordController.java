@@ -2,19 +2,20 @@ package digital.slovensko.autogram.ui.gui;
 
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
-import javafx.application.Platform;
 import javafx.animation.PauseTransition;
+import javafx.application.Platform;
 import javafx.scene.control.Button;
 import javafx.scene.control.PasswordField;
-import javafx.scene.layout.VBox;
 import javafx.scene.input.KeyCode;
+import javafx.scene.layout.VBox;
 import javafx.scene.text.Text;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 
-public class PasswordController {
-    private final String questionText;
-    private final String errorText;
+public class PasswordController extends BaseController {
+    private final String questionKey;
+    private final String errorKey;
+    private final String subtitleKey;
     private final boolean isSigningStep;
     private final boolean allowEmpty;
     private Runnable onClose;
@@ -26,6 +27,8 @@ public class PasswordController {
     @FXML
     Text question;
     @FXML
+    Text subtitle;
+    @FXML
     Text error;
     @FXML
     VBox formGroup;
@@ -36,23 +39,31 @@ public class PasswordController {
     @FXML
     VBox mainBox;
 
-    public PasswordController(String questionText, String blankPasswordErrorText, boolean isSigningStep,
-            boolean allowEmpty) {
-        this.questionText = questionText;
-        this.errorText = blankPasswordErrorText;
+    public PasswordController(String questionKey, String blankPasswordErrorKey, String subtitleKey, boolean isSigningStep, boolean allowEmpty) {
+        this.questionKey = questionKey;
+        this.errorKey = blankPasswordErrorKey;
+        this.subtitleKey = subtitleKey;
         this.isSigningStep = isSigningStep;
         this.allowEmpty = allowEmpty;
     }
 
-    public void setOnClose(Runnable onClose) {
-        this.onClose = onClose;
+    public PasswordController(String questionKey, String blankPasswordErrorKey, boolean isSigningStep, boolean allowEmpty) {
+        this(questionKey, blankPasswordErrorKey, null, isSigningStep, allowEmpty);
     }
 
+    @Override
     public void initialize() {
-        question.setText(questionText);
-        error.setText(errorText);
-        if (isSigningStep) {
-            mainButton.setText("Podpísať");
+        question.setText(i18n(questionKey));
+        error.setText(i18n(errorKey));
+        if(subtitleKey != null) {
+            subtitle.setText(i18n(subtitleKey));
+            subtitle.setManaged(true);
+            subtitle.setVisible(true);
+        }
+
+        if(isSigningStep) {
+            var signLabel = i18n("general.sign.btn");
+            mainButton.setText(signLabel.equals("general.sign.btn") ? "Podpísať" : signLabel);
             cancelButton.setManaged(true);
             cancelButton.setVisible(true);
         }
@@ -64,17 +75,14 @@ public class PasswordController {
             }
         });
 
-        // Allow immediate PIN typing when dialog appears.
-        Platform.runLater(() -> {
-            focusPasswordFieldForTyping();
-        });
-
-        // Re-focus once more after overlay fade-in to avoid focus loss.
+        Platform.runLater(this::focusPasswordFieldForTyping);
         var delayedFocus = new PauseTransition(Duration.millis(220));
-        delayedFocus.setOnFinished(event -> {
-            focusPasswordFieldForTyping();
-        });
+        delayedFocus.setOnFinished(event -> focusPasswordFieldForTyping());
         delayedFocus.play();
+    }
+
+    public void setOnClose(Runnable onClose) {
+        this.onClose = onClose;
     }
 
     public void onPasswordAction() {
@@ -83,7 +91,8 @@ public class PasswordController {
             error.setVisible(true);
             formGroup.getStyleClass().add("autogram-form-group--error");
             passwordField.getStyleClass().add("autogram-input--error");
-            formGroup.requestLayout();
+
+            formGroup.getScene().getWindow().sizeToScene();
             passwordField.requestFocus();
         } else {
             this.password = passwordField.getText().toCharArray();
@@ -98,11 +107,12 @@ public class PasswordController {
     public void onCancelButtonPressed(ActionEvent event) {
         if (onClose != null) {
             onClose.run();
-        } else {
-            var window = mainBox.getScene().getRoot().getScene().getWindow();
-            if (window instanceof Stage) {
-                ((Stage) window).close();
-            }
+            return;
+        }
+
+        var window = mainBox.getScene().getRoot().getScene().getWindow();
+        if (window instanceof Stage) {
+            ((Stage) window).close();
         }
     }
 

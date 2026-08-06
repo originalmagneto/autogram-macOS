@@ -1,5 +1,6 @@
 package digital.slovensko.autogram.ui.gui;
 
+import digital.slovensko.autogram.core.Autogram;
 import digital.slovensko.autogram.core.DefaultDriverDetector;
 import digital.slovensko.autogram.core.UserSettings;
 import digital.slovensko.autogram.core.settings.Country;
@@ -88,13 +89,19 @@ public class SettingsDialogController extends BaseController {
     private Runnable onReset;
     private MainMenuController mainMenuController;
 
+    private Autogram autogram;
     private final UserSettings userSettings;
     private final List<String> preDefinedTsaServers = List.of(
-            "http://tsa.baltstamp.lt,http://ts.quovadisglobal.com/eu",
-            "http://tsa.baltstamp.lt",
-            "http://ts.quovadisglobal.com/eu");
+            UserSettings.DEFAULT_TSA_SERVER,
+            "http://timestamp.sectigo.com/qualified",
+            "http://tsa.belgium.be/connect");
 
     public SettingsDialogController(UserSettings userSettings) {
+        this.userSettings = userSettings;
+    }
+
+    public SettingsDialogController(Autogram autogram, UserSettings userSettings) {
+        this.autogram = autogram;
         this.userSettings = userSettings;
     }
 
@@ -409,6 +416,10 @@ public class SettingsDialogController extends BaseController {
     }
 
     public void onSaveButtonAction() {
+        if (autogram != null && userSettings.tlCountriesChanged()) {
+            autogram.updateSignatureValidatorLotl(userSettings.getTrustedList());
+        }
+
         userSettings.save();
 
         if (onSave != null) {
@@ -423,6 +434,7 @@ public class SettingsDialogController extends BaseController {
 
         var controller = new SettingsResetDialogController();
         controller.setUserSettings(userSettings);
+        controller.setAutogram(autogram);
         controller.setOnReset(onReset);
 
         var root = GUIUtils.loadFXML(controller, "settings-reset-dialog.fxml");

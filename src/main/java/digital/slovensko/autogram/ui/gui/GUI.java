@@ -117,7 +117,8 @@ public class GUI implements UI {
                 try {
                     driverWasAlreadySet = true;
                     var defaultDriver = drivers.stream()
-                            .filter(d -> d.getName().equals(userSettings.getDefaultDriver()))
+                            .filter(d -> d.getShortname().equals(userSettings.getDefaultDriver())
+                                    || d.getName().equals(userSettings.getDefaultDriver()))
                             .findFirst().get();
 
                     if (defaultDriver != null) {
@@ -268,8 +269,8 @@ public class GUI implements UI {
     public char[] getKeystorePassword() {
         if (mainMenuController != null) {
             var latch = new java.util.concurrent.CountDownLatch(1);
-            var controller = new PasswordController("Aký je kód k úložisku klúčov?", "Zadajte kód k úložisku klúčov.",
-                    false, true);
+            var controller = new PasswordController("password.keystore.text", "password.keystore.error.text",
+                    "password.keystore.subtitle", false, true);
 
             Platform.runLater(() -> {
                 var root = GUIUtils.loadFXML(controller, "password-dialog.fxml");
@@ -292,8 +293,8 @@ public class GUI implements UI {
         }
 
         var futurePassword = new FutureTask<>(() -> {
-            var controller = new PasswordController("Aký je kód k úložisku klúčov?", "Zadajte kód k úložisku klúčov.",
-                    false, true);
+            var controller = new PasswordController("password.keystore.text", "password.keystore.error.text",
+                    "password.keystore.subtitle", false, true);
             var root = GUIUtils.loadFXML(controller, "password-dialog.fxml");
 
             var stage = new Stage();
@@ -326,8 +327,8 @@ public class GUI implements UI {
 
         if (mainMenuController != null) {
             var latch = new java.util.concurrent.CountDownLatch(1);
-            var controller = new PasswordController("Aký je podpisový PIN alebo heslo?",
-                    "Zadajte podpisový PIN alebo heslo ku klúču.", true, false);
+            var controller = new PasswordController("password.context.text", "password.context.error.text", null,
+                    true, false);
 
             Platform.runLater(() -> {
                 var root = GUIUtils.loadFXML(controller, "password-dialog.fxml");
@@ -350,8 +351,8 @@ public class GUI implements UI {
         }
 
         var futurePassword = new FutureTask<>(() -> {
-            var controller = new PasswordController("Aký je podpisový PIN alebo heslo?",
-                    "Zadajte podpisový PIN alebo heslo ku klúču.", true, false);
+            var controller = new PasswordController("password.context.text", "password.context.error.text", null,
+                    true, false);
             var root = GUIUtils.loadFXML(controller, "password-dialog.fxml");
 
             var stage = new Stage();

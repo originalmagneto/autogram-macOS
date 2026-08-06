@@ -127,7 +127,7 @@ Adding more cards is typically straightforward as long as they expose PKCS#11.
 
 ## Development
 ### Prerequisites
-- JDK 24 with JavaFX
+- JDK 25 with JavaFX
 - Maven
 - Optional: Visual Studio Code or IntelliJ IDEA Community Edition
 
