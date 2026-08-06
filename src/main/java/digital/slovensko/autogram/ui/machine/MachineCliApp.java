@@ -18,6 +18,11 @@ public final class MachineCliApp {
     }
 
     public static int start(CommandLine commandLine, Reader input, PrintWriter output, PrintWriter error) {
+        return start(commandLine, input, output, error, new MachineDriverService());
+    }
+
+    static int start(CommandLine commandLine, Reader input, PrintWriter output, PrintWriter error,
+            MachineDriverService driverService) {
         var writer = new MachineEventWriter(output);
         try {
             MachineRequestValidator.validateCommandLine(commandLine);
@@ -35,7 +40,7 @@ public final class MachineCliApp {
         try {
             var request = new MachineProtocolCodec().decodeRequest(new StringReader(rawRequest));
             MachineRequestValidator.validate(commandLine, request);
-            return dispatch(writer, request);
+            return dispatch(writer, request, driverService);
         } catch (MachineProtocolException exception) {
             return fail(writer, requestId(rawRequest), errorCode(exception, rawRequest));
         } catch (Exception exception) {
@@ -43,35 +48,35 @@ public final class MachineCliApp {
         }
     }
 
-    private static int dispatch(MachineEventWriter writer, MachineRequest request) {
+    private static int dispatch(MachineEventWriter writer, MachineRequest request, MachineDriverService driverService) {
         return switch (request.operation()) {
-            case CAPABILITIES -> dispatchCapabilities(writer, request);
-            case DRIVERS -> dispatchDrivers(writer, request);
-            case CERTIFICATES -> dispatchCertificates(writer, request);
+            case CAPABILITIES -> dispatchCapabilities(writer, request, driverService);
+            case DRIVERS -> dispatchDrivers(writer, request, driverService);
+            case CERTIFICATES -> dispatchCertificates(writer, request, driverService);
             case INSPECT, SIGN -> fail(writer, request.requestId(), "OPERATION_NOT_AVAILABLE");
         };
     }
 
-    private static int dispatchCapabilities(MachineEventWriter writer, MachineRequest request) {
+    private static int dispatchCapabilities(MachineEventWriter writer, MachineRequest request, MachineDriverService driverService) {
         requireEmptyPayload(request.payload());
         writer.write("session.started", request.requestId(), null, new JsonObject());
-        return complete(writer, request.requestId(), new MachineDriverService().capabilities());
+        return complete(writer, request.requestId(), driverService.capabilities());
     }
 
-    private static int dispatchDrivers(MachineEventWriter writer, MachineRequest request) {
+    private static int dispatchDrivers(MachineEventWriter writer, MachineRequest request, MachineDriverService driverService) {
         requireEmptyPayload(request.payload());
-        var payload = new MachineDriverService().drivers();
+        var payload = driverService.drivers();
         writer.write("session.started", request.requestId(), null, new JsonObject());
         writer.write("driver.detected", request.requestId(), null, payload);
         return complete(writer, request.requestId(), new JsonObject());
     }
 
-    private static int dispatchCertificates(MachineEventWriter writer, MachineRequest request) {
+    private static int dispatchCertificates(MachineEventWriter writer, MachineRequest request, MachineDriverService driverService) {
         var driver = requiredString(request.payload(), "driver");
         var pin = requiredString(request.payload(), "pin").toCharArray();
         try {
             writer.write("session.started", request.requestId(), null, new JsonObject());
-            var payload = new MachineDriverService().certificates(driver, pin);
+            var payload = driverService.certificates(driver, pin);
             writer.write("certificates.available", request.requestId(), null, payload);
             return complete(writer, request.requestId(), new JsonObject());
         } finally {

@@ -10,8 +10,12 @@ import java.io.PrintWriter;
 import java.io.Reader;
 import java.io.StringReader;
 import java.io.StringWriter;
+import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class MachineCliAppTest {
@@ -65,6 +69,59 @@ class MachineCliAppTest {
                 JsonParser.parseString(stdout.toString()).getAsJsonObject().getAsJsonObject("payload").get("code").getAsString());
     }
 
+    @Test
+    void dispatchesCapabilitiesWithRequiredTimestampPolicy() throws Exception {
+        var events = start("CAPABILITIES", "{}", serviceWith());
+
+        assertEquals(List.of("session.started", "session.completed"), eventTypes(events));
+        assertTrue(events.get(1).getAsJsonObject("payload").getAsJsonObject("timestampPolicy")
+                .get("required").getAsBoolean());
+    }
+
+    @Test
+    void dispatchesDriversWithDriverMetadata() throws Exception {
+        var events = start("DRIVERS", "{}", serviceWith(new digital.slovensko.autogram.drivers.FakeTokenDriver(
+                "Driver", Path.of("driver"), "fake", "")));
+
+        assertEquals(List.of("session.started", "driver.detected", "session.completed"), eventTypes(events));
+        assertEquals("fake", events.get(1).getAsJsonObject("payload").getAsJsonArray("drivers").get(0)
+                .getAsJsonObject().get("id").getAsString());
+    }
+
+    @Test
+    void dispatchesCertificatesWithCertificatePayload() throws Exception {
+        var events = start("CERTIFICATES", "{\"driver\":\"fake\",\"pin\":\"1234\"}",
+                serviceWith(new digital.slovensko.autogram.drivers.FakeTokenDriver("Driver", Path.of("driver"), "fake", "")));
+
+        assertEquals(List.of("session.started", "certificates.available", "session.completed"), eventTypes(events));
+        var certificate = events.get(1).getAsJsonObject("payload").getAsJsonArray("certificates").get(0).getAsJsonObject();
+        assertTrue(certificate.has("serial"));
+        assertTrue(certificate.has("commonName"));
+        assertTrue(certificate.has("validFrom"));
+        assertTrue(certificate.has("validUntil"));
+        assertTrue(certificate.has("expired"));
+    }
+
+    @Test
+    void dispatchesCertificatesOnlyForExactDriverId() throws Exception {
+        var events = startFailure("CERTIFICATES", "{\"driver\":\"FAKE\",\"pin\":\"1234\"}", serviceWith());
+
+        assertEquals(List.of("session.started", "session.failed"), eventTypes(events));
+        assertEquals("DRIVER_NOT_FOUND", events.get(1).getAsJsonObject("payload").get("code").getAsString());
+    }
+
+    @Test
+    void redactsPinAndDriverPathWhenCertificateReadFails() throws Exception {
+        var events = startFailure("CERTIFICATES", "{\"driver\":\"broken\",\"pin\":\"1234\"}",
+                serviceWith(new BrokenDriver()));
+
+        assertEquals(List.of("session.started", "session.failed"), eventTypes(events));
+        assertEquals("DRIVER_UNAVAILABLE", events.get(1).getAsJsonObject("payload").get("code").getAsString());
+        var serialized = events.toString();
+        assertFalse(serialized.contains("1234"));
+        assertFalse(serialized.contains("/sensitive/driver-path"));
+    }
+
     private static CommandLine commandLine(String operation) throws Exception {
         var options = new Options()
                 .addOption(null, "machine-readable", false, "")
@@ -80,5 +137,49 @@ class MachineCliAppTest {
                 .addOption(null, "protocol-version", true, "")
                 .addOption(null, "operation", true, "");
         return new DefaultParser().parse(options, new String[] { "--machine-readable", "--operation", "CAPABILITIES" });
+    }
+
+    private static List<com.google.gson.JsonObject> start(String operation, String payload, MachineDriverService service)
+            throws Exception {
+        return start(operation, payload, service, 0);
+    }
+
+    private static List<com.google.gson.JsonObject> startFailure(String operation, String payload,
+            MachineDriverService service) throws Exception {
+        return start(operation, payload, service, 64);
+    }
+
+    private static List<com.google.gson.JsonObject> start(String operation, String payload, MachineDriverService service,
+            int expectedCode) throws Exception {
+        var stdout = new StringWriter();
+        var input = "{\"protocolVersion\":1,\"requestId\":\"request-1\",\"operation\":\"" + operation
+                + "\",\"payload\":" + payload + "}";
+
+        assertEquals(expectedCode, MachineCliApp.start(commandLine(operation), new StringReader(input), new PrintWriter(stdout),
+                new PrintWriter(new StringWriter()), service));
+
+        return Arrays.stream(stdout.toString().strip().split("\\n"))
+                .map(JsonParser::parseString).map(element -> element.getAsJsonObject()).toList();
+    }
+
+    private static List<String> eventTypes(List<com.google.gson.JsonObject> events) {
+        return events.stream().map(event -> event.get("type").getAsString()).toList();
+    }
+
+    private static MachineDriverService serviceWith(digital.slovensko.autogram.drivers.TokenDriver... drivers) {
+        return new MachineDriverService(() -> List.of(drivers), new MachineSettings());
+    }
+
+    private static final class BrokenDriver extends digital.slovensko.autogram.drivers.TokenDriver {
+        private BrokenDriver() {
+            super("Broken", Path.of("/sensitive/driver-path"), "broken", "");
+        }
+
+        @Override
+        public eu.europa.esig.dss.token.AbstractKeyStoreTokenConnection createToken(
+                digital.slovensko.autogram.core.PasswordManager passwordManager,
+                digital.slovensko.autogram.core.SignatureTokenSettings settings) {
+            throw new RuntimeException("/sensitive/driver-path 1234");
+        }
     }
 }

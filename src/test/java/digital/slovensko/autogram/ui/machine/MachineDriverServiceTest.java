@@ -1,16 +1,23 @@
 package digital.slovensko.autogram.ui.machine;
 
 import com.google.gson.JsonArray;
+import digital.slovensko.autogram.core.DefaultDriverDetector;
+import digital.slovensko.autogram.core.PasswordManager;
 import digital.slovensko.autogram.drivers.FakeTokenDriver;
 import digital.slovensko.autogram.drivers.TokenDriver;
+import eu.europa.esig.dss.token.AbstractKeyStoreTokenConnection;
+import eu.europa.esig.dss.token.Pkcs12SignatureToken;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
 import java.nio.file.Path;
+import java.security.KeyStore;
 import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -74,6 +81,42 @@ class MachineDriverServiceTest {
                 () -> secretUI.pickTokenDriverAndThen(List.of(), driver -> { }, () -> { }));
     }
 
+    @Test
+    void machineSettingsDoNotExposeBlankCustomDriversAsInstalled() {
+        var drivers = new DefaultDriverDetector(new MachineSettings()).getAvailableDrivers();
+
+        assertFalse(drivers.stream().map(TokenDriver::getShortname).anyMatch(id -> id.equals("keystore")
+                || id.equals("custom_pkcs11")));
+    }
+
+    @Test
+    void certificateLifecycleDeliversCachedPinClearsCopiesAndClosesToken() {
+        var driver = new RecordingDriver("recording", false);
+        var pin = "1234".toCharArray();
+        var service = new MachineDriverService(() -> List.of(driver), new MachineSettings(true));
+
+        service.certificates("recording", pin);
+
+        assertTrue(driver.passwordDelivered);
+        assertSame(driver.firstContextPassword, driver.secondContextPassword);
+        assertCleared(pin, driver.keystorePassword, driver.firstContextPassword, driver.secondContextPassword);
+        assertTrue(driver.token.closed);
+    }
+
+    @Test
+    void certificateFailureClearsCachedPinCopiesAndClosesToken() {
+        var driver = new RecordingDriver("recording", true);
+        var pin = "1234".toCharArray();
+        var service = new MachineDriverService(() -> List.of(driver), new MachineSettings(true));
+
+        assertThrows(MachineProtocolException.class, () -> service.certificates("recording", pin));
+
+        assertTrue(driver.passwordDelivered);
+        assertSame(driver.firstContextPassword, driver.secondContextPassword);
+        assertCleared(pin, driver.keystorePassword, driver.firstContextPassword, driver.secondContextPassword);
+        assertTrue(driver.token.closed);
+    }
+
     private static MachineDriverService serviceWith(TokenDriver... drivers) {
         return new MachineDriverService(() -> List.of(drivers), new MachineSettings());
     }
@@ -84,5 +127,69 @@ class MachineDriverServiceTest {
 
     private static List<String> strings(JsonArray values) {
         return values.asList().stream().map(value -> value.getAsString()).toList();
+    }
+
+    private static void assertCleared(char[]... values) {
+        for (var value : values) {
+            assertTrue(Arrays.equals(new char[value.length], value));
+        }
+    }
+
+    private static final class RecordingDriver extends TokenDriver {
+        private final boolean failOnGetKeys;
+        private RecordingToken token;
+        private char[] keystorePassword;
+        private char[] firstContextPassword;
+        private char[] secondContextPassword;
+        private boolean passwordDelivered;
+
+        private RecordingDriver(String shortname, boolean failOnGetKeys) {
+            super("Recording driver", Path.of("/sensitive/driver-path"), shortname, "");
+            this.failOnGetKeys = failOnGetKeys;
+        }
+
+        @Override
+        public AbstractKeyStoreTokenConnection createToken(PasswordManager passwordManager,
+                digital.slovensko.autogram.core.SignatureTokenSettings settings) {
+            keystorePassword = passwordManager.getPassword();
+            passwordDelivered = hasExpectedPin(keystorePassword);
+            firstContextPassword = passwordManager.getContextSpecificPassword();
+            secondContextPassword = passwordManager.getContextSpecificPassword();
+            try {
+                token = new RecordingToken(failOnGetKeys);
+                return token;
+            } catch (IOException exception) {
+                throw new RuntimeException(exception);
+            }
+        }
+    }
+
+    private static final class RecordingToken extends Pkcs12SignatureToken {
+        private final boolean failOnGetKeys;
+        private boolean closed;
+
+        private RecordingToken(boolean failOnGetKeys) throws IOException {
+            super(MachineDriverServiceTest.class.getResource("/digital/slovensko/autogram/test.keystore").getFile(),
+                    new KeyStore.PasswordProtection(new char[0]));
+            this.failOnGetKeys = failOnGetKeys;
+        }
+
+        @Override
+        public List<eu.europa.esig.dss.token.DSSPrivateKeyEntry> getKeys() {
+            if (failOnGetKeys) {
+                throw new RuntimeException("token failure");
+            }
+            return super.getKeys();
+        }
+
+        @Override
+        public void close() {
+            closed = true;
+            super.close();
+        }
+    }
+
+    private static boolean hasExpectedPin(char[] value) {
+        return value.length == 4 && value[0] == '1' && value[1] == '2' && value[2] == '3' && value[3] == '4';
     }
 }
