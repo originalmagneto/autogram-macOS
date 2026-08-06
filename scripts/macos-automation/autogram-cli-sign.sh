@@ -92,8 +92,8 @@ Usage:
   autogram-cli-sign.sh [options] <file-or-dir> [...]
 
 Examples:
-  autogram-cli-sign.sh "/Users/me/Documents/sample.pdf"
-  autogram-cli-sign.sh --driver eid --pdfa "/Users/me/Documents/invoice.pdf"
+  autogram-cli-sign.sh "/path/to/sample.pdf"
+  autogram-cli-sign.sh --driver eid --pdfa "/path/to/invoice.pdf"
 
 Notes:
   - Signed outputs are created by Autogram CLI defaults (e.g. *_signed).
