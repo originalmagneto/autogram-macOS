@@ -7,8 +7,9 @@ final class CredentialFlowTests: XCTestCase {
         app.launchEnvironment["AUTOGRAM_FAKE_ENGINE"] = "credential-flow"
         app.launch()
 
-        XCTAssertTrue(app.otherElements["Certificate Picker"].waitForExistence(timeout: 3))
-        app.staticTexts["Test Certificate"].click()
+        let certificate = app.staticTexts["Test Certificate"]
+        XCTAssertTrue(certificate.waitForExistence(timeout: 3))
+        certificate.click()
         app.buttons["Use Certificate"].click()
 
         let pinField = app.secureTextFields["PIN"]
