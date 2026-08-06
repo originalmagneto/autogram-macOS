@@ -2,10 +2,13 @@ package digital.slovensko.autogram.core;
 
 import digital.slovensko.autogram.ui.cli.CliApp;
 import digital.slovensko.autogram.ui.gui.GUIApp;
+import digital.slovensko.autogram.ui.machine.MachineCliApp;
 import javafx.application.Application;
 import org.apache.commons.cli.*;
 
+import java.io.InputStreamReader;
 import java.io.PrintWriter;
+import java.nio.charset.StandardCharsets;
 
 public class AppStarter {
     private static final Options options = new Options().addOptionGroup(new OptionGroup().addOption(new Option(null,
@@ -37,7 +40,10 @@ public class AppStarter {
             .addOption(null, "tsa-server", true,
                     "Url of TimeStamp Authority server that should be used for timestamping in signature level BASELINE_T. If provided, BASELINE_T signatures are made.")
             .addOption(null, "plain-xml", false, "Enable signing plain (non-slovak-eform) XML files.")
-            .addOption(null, "pkcs11-driver-path", true, "Absolute path to a file with custom PKCS11 driver.");
+            .addOption(null, "pkcs11-driver-path", true, "Absolute path to a file with custom PKCS11 driver.")
+            .addOption(null, "machine-readable", false, "Run the CLI using the machine protocol.")
+            .addOption(null, "protocol-version", true, "Machine protocol version.")
+            .addOption(null, "operation", true, "Machine protocol operation.");
 
     public static void start(String[] args) {
         // macOS App Name Fix
@@ -45,14 +51,19 @@ public class AppStarter {
         System.setProperty("com.apple.mrj.application.apple.menu.about.name", "Autogram");
 
         try {
-            CommandLine cmd = new DefaultParser().parse(options, args);
+            CommandLine cmd = parse(args);
 
             if (cmd.hasOption("h")) {
                 printHelp();
             } else if (cmd.hasOption("u")) {
                 printUsage();
             } else if (cmd.hasOption("c")) {
-                var exitCode = CliApp.start(cmd);
+                var exitCode = cmd.hasOption("machine-readable")
+                        ? MachineCliApp.start(cmd,
+                                new InputStreamReader(System.in, StandardCharsets.UTF_8),
+                                new PrintWriter(System.out, true, StandardCharsets.UTF_8),
+                                new PrintWriter(System.err, true, StandardCharsets.UTF_8))
+                        : CliApp.start(cmd);
                 System.out.flush();
                 System.err.flush();
                 if (isIntelProcess())
@@ -66,6 +77,10 @@ public class AppStarter {
             System.err.println("Unable to parse program args");
             System.err.println(e);
         }
+    }
+
+    static CommandLine parse(String[] args) throws ParseException {
+        return new DefaultParser().parse(options, args);
     }
 
     private static void terminateCliProcess(int exitCode) {
