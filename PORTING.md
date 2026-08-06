@@ -16,10 +16,22 @@ To sync with the latest changes:
    git fetch upstream
    ```
 
-2. **Merge changes**:
+2. **Create a sync branch**:
    ```bash
-   git merge upstream/master
+   git switch -c codex/upstream-sync-YYYY-MM
    ```
+
+3. **Merge changes**:
+   ```bash
+   git merge upstream/main
+   ```
+
+4. **Reapply local feature commits**:
+   ```bash
+   git cherry-pick <local-feature-commit>
+   ```
+
+Keep the upstream merge and local feature commits separate so the resulting PRs remain easy to review.
 
 ## Conflict Resolution & Protected Files
 Our fork modifies specific parts of the UI and build configuration. Pay close attention to these files during a merge:
@@ -30,16 +42,20 @@ Our fork modifies specific parts of the UI and build configuration. Pay close at
 | **FXML Layouts** | `main-menu.fxml`, `settings-dialog.fxml` |
 | **Build Setup** | `pom.xml`, `run.sh` |
 | **macOS Native** | `GUIUtils.java`, `MacOSNotification.java` |
+| **CLI automation** | `scripts/macos-automation/`, `docs/macos-cli-automation.md` |
 
 ### Merge Recommendation
 If a merge conflict occurs in `macos-native.css`, prioritize our changes (Apple HIG colors) while keeping any new structural classes introduced by upstream.
 
 ## Verification after Porting
-After every merge from upstream, run:
+After every merge from upstream, run with JDK 25 and JavaFX:
 ```bash
-./run.sh
+./mvnw -Psystem-jdk test
+./mvnw -DskipTests package
 ```
 Verify that:
 1. The app menu still says **Autogram**.
 2. Only one Dock icon appears.
 3. The "macOS Native" styles (glassmorphism sidebar) are preserved.
+4. `autogram --help` still exposes CLI mode and `PAdES_BASELINE_T`.
+5. The Finder Quick Action still signs one or more selected PDFs without opening the GUI.
