@@ -78,9 +78,17 @@ public final class MachineTrustService {
             }
             if (initialization.isDone()) {
                 initialization.get();
-                if (areTrustedListsLoaded()) {
+                var trustedListsLoaded = areTrustedListsLoaded();
+                if (remainingNanos(deadline) <= 0) {
+                    throw unavailable(null);
+                }
+                if (trustedListsLoaded) {
                     return;
                 }
+            }
+            remainingNanos = remainingNanos(deadline);
+            if (remainingNanos <= 0) {
+                throw unavailable(null);
             }
             var sleepNanos = Math.min(remainingNanos, pollInterval.toNanos());
             if (sleepNanos > 0) {

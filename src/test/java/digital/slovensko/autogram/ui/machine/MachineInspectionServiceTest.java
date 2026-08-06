@@ -395,6 +395,51 @@ class MachineInspectionServiceTest {
     }
 
     @Test
+    void failsClosedWhenTrustSupplierReturnsTrueAfterAdvancingPastDeadline() {
+        var executor = new RecordingExecutorService(true, true);
+        var initialized = new AtomicBoolean();
+        var now = new AtomicLong();
+        var trust = trust(
+                () -> executor,
+                ignored -> initialized.set(true),
+                () -> {
+                    now.set(11);
+                    return initialized.get();
+                },
+                Duration.ofNanos(10),
+                nanos -> {
+                },
+                now);
+
+        var failure = assertThrows(MachineProtocolException.class, trust::initialize);
+
+        assertEquals("TRUSTED_LIST_UNAVAILABLE", failure.getMessage());
+    }
+
+    @Test
+    void doesNotSleepWhenTrustSupplierReturnsFalseAfterAdvancingPastDeadline() {
+        var executor = new RecordingExecutorService(true, true);
+        var initialized = new AtomicBoolean();
+        var now = new AtomicLong();
+        var sleeps = new java.util.ArrayList<Long>();
+        var trust = trust(
+                () -> executor,
+                ignored -> initialized.set(true),
+                () -> {
+                    now.set(11);
+                    return false;
+                },
+                Duration.ofNanos(10),
+                sleeps::add,
+                now);
+
+        var failure = assertThrows(MachineProtocolException.class, trust::initialize);
+
+        assertEquals("TRUSTED_LIST_UNAVAILABLE", failure.getMessage());
+        assertTrue(sleeps.isEmpty());
+    }
+
+    @Test
     void invokesShutdownNowInsteadOfGracefulShutdown() {
         var executor = new RecordingExecutorService(true, true);
         var initialized = new AtomicBoolean();
@@ -429,7 +474,7 @@ class MachineInspectionServiceTest {
                     }
                 },
                 () -> false,
-                Duration.ofMillis(100),
+                Duration.ofSeconds(5),
                 Duration.ofMillis(1),
                 System::nanoTime,
                 nanos -> {
