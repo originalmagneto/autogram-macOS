@@ -10,7 +10,9 @@ import java.io.PrintWriter;
 import java.io.Reader;
 import java.io.StringReader;
 import java.io.StringWriter;
+import java.io.IOException;
 import java.nio.file.Path;
+import java.security.KeyStore;
 import java.util.Arrays;
 import java.util.List;
 
@@ -80,12 +82,14 @@ class MachineCliAppTest {
 
     @Test
     void dispatchesDriversWithDriverMetadata() throws Exception {
-        var events = start("DRIVERS", "{}", serviceWith(new digital.slovensko.autogram.drivers.FakeTokenDriver(
-                "Driver", Path.of("driver"), "fake", "")));
+        var events = start("DRIVERS", "{}", serviceWith(new InstalledTestDriver("fake")));
 
         assertEquals(List.of("session.started", "driver.detected", "session.completed"), eventTypes(events));
-        assertEquals("fake", events.get(1).getAsJsonObject("payload").getAsJsonArray("drivers").get(0)
-                .getAsJsonObject().get("id").getAsString());
+        var driver = events.get(1).getAsJsonObject("payload").getAsJsonArray("drivers").get(0).getAsJsonObject();
+        assertEquals("fake", driver.get("id").getAsString());
+        assertEquals("Installed test driver", driver.get("name").getAsString());
+        assertEquals("/installed/test-driver", driver.get("path").getAsString());
+        assertTrue(driver.get("installed").getAsBoolean());
     }
 
     @Test
@@ -104,10 +108,14 @@ class MachineCliAppTest {
 
     @Test
     void dispatchesCertificatesOnlyForExactDriverId() throws Exception {
-        var events = startFailure("CERTIFICATES", "{\"driver\":\"FAKE\",\"pin\":\"1234\"}", serviceWith());
+        var driver = new InstalledTestDriver("fake");
+        var events = startFailure("CERTIFICATES", "{\"driver\":\"FAKE\",\"pin\":\"1234\"}", serviceWith(driver));
 
         assertEquals(List.of("session.started", "session.failed"), eventTypes(events));
         assertEquals("DRIVER_NOT_FOUND", events.get(1).getAsJsonObject("payload").get("code").getAsString());
+
+        var exactEvents = start("CERTIFICATES", "{\"driver\":\"fake\",\"pin\":\"1234\"}", serviceWith(driver));
+        assertEquals(List.of("session.started", "certificates.available", "session.completed"), eventTypes(exactEvents));
     }
 
     @Test
@@ -180,6 +188,30 @@ class MachineCliAppTest {
                 digital.slovensko.autogram.core.PasswordManager passwordManager,
                 digital.slovensko.autogram.core.SignatureTokenSettings settings) {
             throw new RuntimeException("/sensitive/driver-path 1234");
+        }
+    }
+
+    private static final class InstalledTestDriver extends digital.slovensko.autogram.drivers.TokenDriver {
+        private InstalledTestDriver(String shortname) {
+            super("Installed test driver", Path.of("/installed/test-driver"), shortname, "");
+        }
+
+        @Override
+        public boolean isInstalled() {
+            return true;
+        }
+
+        @Override
+        public eu.europa.esig.dss.token.AbstractKeyStoreTokenConnection createToken(
+                digital.slovensko.autogram.core.PasswordManager passwordManager,
+                digital.slovensko.autogram.core.SignatureTokenSettings settings) {
+            try {
+                return new eu.europa.esig.dss.token.Pkcs12SignatureToken(
+                        MachineCliAppTest.class.getResource("/digital/slovensko/autogram/test.keystore").getFile(),
+                        new KeyStore.PasswordProtection(new char[0]));
+            } catch (IOException exception) {
+                throw new RuntimeException(exception);
+            }
         }
     }
 }

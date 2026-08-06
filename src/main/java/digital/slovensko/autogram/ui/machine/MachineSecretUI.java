@@ -22,6 +22,7 @@ import java.util.function.Consumer;
 public final class MachineSecretUI implements UI, AutoCloseable {
     private final char[] secret;
     private final List<char[]> issuedSecrets = new ArrayList<>();
+    private boolean closed;
 
     public MachineSecretUI(char[] secret) {
         this.secret = secret.clone();
@@ -39,6 +40,7 @@ public final class MachineSecretUI implements UI, AutoCloseable {
 
     @Override
     public void close() {
+        closed = true;
         Arrays.fill(secret, '\0');
         issuedSecrets.forEach(value -> Arrays.fill(value, '\0'));
         issuedSecrets.clear();
@@ -48,6 +50,10 @@ public final class MachineSecretUI implements UI, AutoCloseable {
         var issuedSecret = secret.clone();
         issuedSecrets.add(issuedSecret);
         return issuedSecret;
+    }
+
+    boolean isClosed() {
+        return closed;
     }
 
     @Override

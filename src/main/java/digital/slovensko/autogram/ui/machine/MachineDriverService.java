@@ -11,10 +11,12 @@ import digital.slovensko.autogram.ui.cli.CliKeySelector;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.function.BiFunction;
 
 public final class MachineDriverService {
     private final DriverDetector driverDetector;
     private final MachineSettings settings;
+    private final BiFunction<MachineSecretUI, MachineSettings, PasswordManager> passwordManagerFactory;
 
     public MachineDriverService() {
         this(new MachineSettings());
@@ -25,8 +27,14 @@ public final class MachineDriverService {
     }
 
     MachineDriverService(DriverDetector driverDetector, MachineSettings settings) {
+        this(driverDetector, settings, PasswordManager::new);
+    }
+
+    MachineDriverService(DriverDetector driverDetector, MachineSettings settings,
+            BiFunction<MachineSecretUI, MachineSettings, PasswordManager> passwordManagerFactory) {
         this.driverDetector = driverDetector;
         this.settings = settings;
+        this.passwordManagerFactory = passwordManagerFactory;
     }
 
     public JsonObject capabilities() {
@@ -64,7 +72,7 @@ public final class MachineDriverService {
 
     private JsonObject certificates(TokenDriver driver, char[] pin) {
         try (var secretUI = new MachineSecretUI(pin)) {
-            var passwordManager = new PasswordManager(secretUI, settings);
+            var passwordManager = passwordManagerFactory.apply(secretUI, settings);
             try (var token = driver.createToken(passwordManager, settings)) {
                 var certificates = new JsonArray();
                 token.getKeys().forEach(key -> certificates.add(certificatePayload(key)));

@@ -93,7 +93,8 @@ class MachineDriverServiceTest {
     void certificateLifecycleDeliversCachedPinClearsCopiesAndClosesToken() {
         var driver = new RecordingDriver("recording", false);
         var pin = "1234".toCharArray();
-        var service = new MachineDriverService(() -> List.of(driver), new MachineSettings(true));
+        var lifecycle = new PasswordLifecycle();
+        var service = lifecycleService(driver, lifecycle);
 
         service.certificates("recording", pin);
 
@@ -101,13 +102,16 @@ class MachineDriverServiceTest {
         assertSame(driver.firstContextPassword, driver.secondContextPassword);
         assertCleared(pin, driver.keystorePassword, driver.firstContextPassword, driver.secondContextPassword);
         assertTrue(driver.token.closed);
+        assertTrue(lifecycle.passwordManager.resetCalled);
+        assertTrue(lifecycle.passwordManager.resetBeforeUiClosed);
     }
 
     @Test
     void certificateFailureClearsCachedPinCopiesAndClosesToken() {
         var driver = new RecordingDriver("recording", true);
         var pin = "1234".toCharArray();
-        var service = new MachineDriverService(() -> List.of(driver), new MachineSettings(true));
+        var lifecycle = new PasswordLifecycle();
+        var service = lifecycleService(driver, lifecycle);
 
         assertThrows(MachineProtocolException.class, () -> service.certificates("recording", pin));
 
@@ -115,10 +119,16 @@ class MachineDriverServiceTest {
         assertSame(driver.firstContextPassword, driver.secondContextPassword);
         assertCleared(pin, driver.keystorePassword, driver.firstContextPassword, driver.secondContextPassword);
         assertTrue(driver.token.closed);
+        assertTrue(lifecycle.passwordManager.resetCalled);
+        assertTrue(lifecycle.passwordManager.resetBeforeUiClosed);
     }
 
     private static MachineDriverService serviceWith(TokenDriver... drivers) {
         return new MachineDriverService(() -> List.of(drivers), new MachineSettings());
+    }
+
+    private static MachineDriverService lifecycleService(RecordingDriver driver, PasswordLifecycle lifecycle) {
+        return new MachineDriverService(() -> List.of(driver), new MachineSettings(true), lifecycle::create);
     }
 
     private static FakeTokenDriver fakeDriver() {
@@ -191,5 +201,32 @@ class MachineDriverServiceTest {
 
     private static boolean hasExpectedPin(char[] value) {
         return value.length == 4 && value[0] == '1' && value[1] == '2' && value[2] == '3' && value[3] == '4';
+    }
+
+    private static final class PasswordLifecycle {
+        private RecordingPasswordManager passwordManager;
+
+        private PasswordManager create(MachineSecretUI secretUI, MachineSettings settings) {
+            passwordManager = new RecordingPasswordManager(secretUI, settings);
+            return passwordManager;
+        }
+    }
+
+    private static final class RecordingPasswordManager extends PasswordManager {
+        private final MachineSecretUI secretUI;
+        private boolean resetCalled;
+        private boolean resetBeforeUiClosed;
+
+        private RecordingPasswordManager(MachineSecretUI secretUI, MachineSettings settings) {
+            super(secretUI, settings);
+            this.secretUI = secretUI;
+        }
+
+        @Override
+        public void reset() {
+            resetCalled = true;
+            resetBeforeUiClosed = !secretUI.isClosed();
+            super.reset();
+        }
     }
 }
