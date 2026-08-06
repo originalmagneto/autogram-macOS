@@ -102,7 +102,17 @@ Notes:
 
 ## Finder Quick Action: CLI PDF Signing
 
-This repository includes a macOS Finder Quick Action that signs one or more selected PDF files through the Autogram CLI. It opens macOS dialogs for the certificate store, signing certificate, and PIN, but it does not open the Autogram GUI or a Terminal window.
+This repository includes a macOS Finder Quick Action that signs one or more selected PDF files through the Autogram CLI. It is an Automator Quick Action available from Finder's right-click menu. It opens macOS dialogs for the certificate store, signing certificate, and PIN, but it does not open the Autogram GUI or a Terminal window. This is not a macOS Shortcuts workflow.
+
+### Requirements
+
+- macOS with Finder and Automator.
+- A CLI-capable Autogram application, installed from a release package or built locally.
+- The required signing token or card, its PKCS#11 driver, and the PIN.
+- Network access to the configured qualified timestamp service when using PAdES Baseline T.
+- On Apple Silicon, Rosetta and an Intel Autogram build when the installed PKCS#11 driver is Intel-only.
+
+The Quick Action runs the signing process in the background. Certificate store selection, certificate selection, and PIN entry are intentionally shown as macOS dialogs. The original PDFs are never overwritten. The scripts are integration files and do not install the Autogram application or the token driver.
 
 The default Quick Action configuration is:
 
@@ -124,7 +134,7 @@ On Apple Silicon, an Intel-only I.CA SecureStore PKCS#11 driver requires Rosetta
 
 ### Create the Finder Quick Action
 
-1. Open Automator and choose **New Document > Quick Action**.
+1. Open **Automator** and choose **New Document > Quick Action**. Do not create a macOS Shortcut for this integration.
 2. Set **Workflow receives current** to `files or folders` and **In** to `Finder`.
 3. Add the **Run Shell Script** action.
 4. Set **Shell** to `/bin/bash` and **Pass input** to `as arguments`.
@@ -137,7 +147,7 @@ REPO_DIR="/path/to/autogram-macOS"
 
 6. Save the Quick Action as `Sign PDFs Autogram`.
 
-Select one or more PDF files in Finder, right-click, open **Quick Actions**, and choose `Sign PDFs Autogram`. The original files are not overwritten. The signing process is CLI-based and the PIN is entered through a hidden macOS dialog.
+Select one or more PDF files in Finder, right-click, open **Quick Actions**, and choose `Sign PDFs Autogram`. The original files are not overwritten. The signing process is CLI-based and the PIN is entered through a hidden macOS dialog. Only PDF files are processed; if the selection contains no PDF files, the action reports that there is nothing to sign.
 
 For manual CLI use, run:
 

@@ -123,6 +123,32 @@ Poznámky:
 - Ide o lokálny ad-hoc podpis, nie Apple notarizáciu.
 - Na verejnú distribúciu bez varovaní treba Apple Developer signing a notarizáciu.
 
+## Finder Quick Action pre CLI podpisovanie PDF
+
+Repozitár obsahuje macOS Quick Action vytvorenú v Automatore. Spúšťa sa vo Finderi cez pravé tlačidlo myši, menu **Quick Actions** a položku `Sign PDFs Autogram`. Nie je to workflow pre macOS Shortcuts.
+
+Quick Action podpíše jeden alebo viac označených PDF súborov cez Autogram CLI. Neotvára grafické rozhranie Autogramu ani okno Terminálu. Výber úložiska certifikátu, certifikátu a zadanie PIN-u prebieha cez macOS dialógy.
+
+### Požiadavky
+
+- macOS s Finderom a aplikáciou Automator.
+- Nainštalovaný Autogram s CLI, buď z release balíka, alebo zo zdrojového kódu.
+- Pripojený podpisový token alebo karta, príslušný PKCS#11 ovládač a PIN.
+- Sieťové pripojenie ku kvalifikovanej službe časových pečiatok pri podpise PAdES Baseline T.
+- Na Apple Silicon Rosetta a Intel build Autogramu, ak je používaný PKCS#11 ovládač iba pre Intel.
+
+Quick Action používa predvolene PAdES Baseline T a kvalifikovanú časovú pečiatku. Výstup uloží vedľa pôvodného súboru ako `<názov>_signed.pdf`, pričom pôvodný PDF nemení. Ak výstup už existuje, vytvorí očíslovanú alternatívu. Skripty v tomto repozitári neinštalujú Autogram ani ovládač tokenu.
+
+### Inštalácia Quick Action
+
+1. Otvor **Automator** a zvoľ **New Document > Quick Action**.
+2. Nastav **Workflow receives current** na `files or folders` a **In** na `Finder`.
+3. Pridaj akciu **Run Shell Script**, nastav shell `/bin/bash` a **Pass input** na `as arguments`.
+4. Vlož skript uvedený v anglickej časti [README](README.md) a nahraď cestu k repozitáru.
+5. Ulož akciu ako `Sign PDFs Autogram`.
+
+Potom označ jeden alebo viac PDF súborov vo Finderi, klikni pravým tlačidlom, otvor **Quick Actions** a vyber `Sign PDFs Autogram`. Podrobná konfigurácia, Apple Silicon, Rosetta, kvalifikované časové pečiatky a riešenie problémov sú v [dokumentácii macOS CLI a Finder Quick Action](docs/macos-cli-automation.md).
+
 ## Integrácia
 Swagger dokumentácia pre HTTP API je dostupná na [GitHube](https://generator3.swagger.io/index.html?url=https://raw.githubusercontent.com/slovensko-digital/autogram/main/src/main/resources/digital/slovensko/autogram/server/server.yml) alebo po spustení aplikácie na [http://localhost:37200/docs](http://localhost:37200/docs).
 

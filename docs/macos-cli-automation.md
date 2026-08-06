@@ -1,12 +1,22 @@
 # Autogram CLI Automation on macOS
 
-Autogram supports CLI mode via `--cli` and can be automated from Finder/Quick Actions.
+Autogram supports CLI mode via `--cli` and can be automated from Finder through an Automator Quick Action. This document describes the macOS integration in this fork. It is not a macOS Shortcuts workflow.
 
 ## What was prepared
 
 - `scripts/macos-automation/autogram-cli-sign.sh`
 - `scripts/macos-automation/autogram-quick-action.sh`
 - `scripts/macos-automation/autogram-finder-selection.sh`
+
+## Requirements
+
+- macOS with Finder and Automator.
+- A CLI-capable Autogram application. The scripts do not install Autogram.
+- The signing token or card, its PKCS#11 driver, and the PIN.
+- Network access to the qualified timestamp service when PAdES Baseline T is required.
+- Rosetta and an Intel Autogram build on Apple Silicon when the PKCS#11 driver is Intel-only.
+
+The Quick Action does not open the Autogram GUI or a Terminal window. It uses macOS dialogs for certificate store selection, certificate selection, and PIN entry, then runs the CLI in the background.
 
 ## 1) Make scripts executable
 
@@ -31,7 +41,7 @@ REPO_DIR="/path/to/autogram-macOS"
 "$REPO_DIR/scripts/macos-automation/autogram-quick-action.sh" "$@"
 ```
 
-When triggered, it uses macOS dialogs for the certificate store, certificate and PIN, then runs Autogram CLI in the background. No Autogram window or Terminal window is opened.
+When triggered from Finder, it uses macOS dialogs for the certificate store, certificate and PIN, then runs Autogram CLI in the background. No Autogram window or Terminal window is opened. Select one or more PDF files in Finder to process them as a batch.
 
 The Quick Action always configures:
 
