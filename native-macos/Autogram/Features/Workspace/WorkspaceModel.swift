@@ -23,15 +23,14 @@ final class WorkspaceModel {
         self.coordinator = SigningCoordinator(engine: engine, workspace: self)
     }
 
-    static func launchWorkspace(environment: [String: String] = ProcessInfo.processInfo.environment) -> WorkspaceModel {
-        let engine = FakeSigningEngine.launchEngine(environment: environment)
+    static func launchWorkspace(engine: any SigningEngine, fixtureMode: String? = nil) -> WorkspaceModel {
         let items: [PDFItem]
-        if environment["AUTOGRAM_FAKE_ENGINE"] == "partial-failure" {
+        if fixtureMode == "partial-failure" {
             items = [
                 PDFItem(descriptor: PDFItemDescriptor(id: "agreement", sourceURL: URL(fileURLWithPath: "/tmp/Agreement.pdf"))),
                 PDFItem(descriptor: PDFItemDescriptor(id: "invoice", sourceURL: URL(fileURLWithPath: "/tmp/Invoice.pdf")))
             ]
-        } else if environment["AUTOGRAM_FAKE_ENGINE"] == "credential-flow" {
+        } else if fixtureMode == "credential-flow" {
             items = [
                 PDFItem(descriptor: PDFItemDescriptor(id: "credential-flow", sourceURL: URL(fileURLWithPath: "/tmp/Document.pdf")))
             ]
@@ -39,7 +38,7 @@ final class WorkspaceModel {
             items = []
         }
         let credentialCertificates: [SigningCertificate]
-        if environment["AUTOGRAM_FAKE_ENGINE"] == "credential-flow" {
+        if fixtureMode == "credential-flow" {
             credentialCertificates = [
                 SigningCertificate(serialNumber: "TEST-CERTIFICATE-1", displayName: "Test Certificate")
             ]
