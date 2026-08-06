@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>AMApplicationBuild</key>
+    <string>523</string>
+    <key>AMApplicationVersion</key>
+    <string>2.10</string>
+    <key>actions</key>
+    <array>
+        <dict>
+            <key>action</key>
+            <dict>
+                <key>AMAccepts</key>
+                <dict>
+                    <key>Container</key>
+                    <string>List</string>
+                    <key>Optional</key>
+                    <true/>
+                    <key>Types</key>
+                    <array>
+                        <string>com.adobe.pdf</string>
+                    </array>
+                </dict>
+                <key>AMActionVersion</key>
+                <string>2.0.3</string>
+                <key>AMApplication</key>
+                <array>
+                    <string>Automator</string>
+                </array>
+                <key>AMParameterProperties</key>
+                <dict>
+                    <key>source</key>
+                    <dict>
+                        <key>default value</key>
+                        <string>on run {input, parameters}
+    tell application id "digital.slovensko.autogram.native"
+        open input
+        activate
+    end tell
+    return input
+end run</string>
+                    </dict>
+                </dict>
+                <key>AMProvides</key>
+                <dict>
+                    <key>Results</key>
+                    <dict>
+                        <key>Types</key>
+                        <array>
+                            <string>com.adobe.pdf</string>
+                        </array>
+                    </dict>
+                </dict>
+                <key>ActionBundlePath</key>
+                <string>/System/Library/Automator/Run AppleScript.action</string>
+                <key>ActionName</key>
+                <string>Run AppleScript</string>
+                <key>ActionParameters</key>
+                <dict>
+                    <key>inputMethod</key>
+                    <integer>0</integer>
+                    <key>script</key>
+                    <string>on run {input, parameters}
+    tell application id "digital.slovensko.autogram.native"
+        open input
+        activate
+    end tell
+    return input
+end run</string>
+                </dict>
+                <key>CFBundleIdentifier</key>
+                <string>com.apple.Automator.RunAppleScript</string>
+                <key>CFBundleVersion</key>
+                <string>2.0.3</string>
+            </dict>
+            <key>isViewVisible</key>
+            <true/>
+        </dict>
+    </array>
+    <key>workflowMetaData</key>
+    <dict>
+        <key>applicationBundleIDsByPath</key>
+        <dict>
+            <key>/System/Library/Automator/Run AppleScript.action</key>
+            <string>com.apple.Automator.RunAppleScript</string>
+        </dict>
+        <key>inputTypeIdentifier</key>
+        <string>com.adobe.pdf</string>
+        <key>outputTypeIdentifier</key>
+        <string>com.adobe.pdf</string>
+        <key>presentationMode</key>
+        <integer>15</integer>
+        <key>processesInput</key>
+        <false/>
+        <key>serviceApplicationBundleID</key>
+        <string>com.apple.finder</string>
+    </dict>
+</dict>
+</plist>
