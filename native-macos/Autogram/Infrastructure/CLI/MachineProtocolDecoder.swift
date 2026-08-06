@@ -1,10 +1,20 @@
 import Foundation
 
 enum MachineRequestEncoder {
-    static func encode(_ request: MachineRequest) -> Data {
+    static func encode(_ request: MachineRequest, pin: [UInt8]? = nil) -> Data {
+        var payload = request.payload
+        if let pin {
+            payload["pin"] = .string(String(decoding: pin, as: UTF8.self))
+        }
+        let envelope = MachineRequest(
+            protocolVersion: request.protocolVersion,
+            requestID: request.requestID,
+            operation: request.operation,
+            payload: payload
+        )
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.withoutEscapingSlashes]
-        return (try? encoder.encode(request)) ?? Data()
+        return (try? encoder.encode(envelope)) ?? Data()
     }
 }
 

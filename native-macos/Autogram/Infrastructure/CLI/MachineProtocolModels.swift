@@ -48,6 +48,16 @@ struct MachineRequest: Codable, Sendable, Equatable {
     }
 }
 
+struct SecureMachineRequest: Sendable {
+    let envelope: MachineRequest
+    let pin: Secret?
+
+    init(envelope: MachineRequest, pin: Secret? = nil) {
+        self.envelope = envelope
+        self.pin = pin
+    }
+}
+
 enum MachineEventType: String, Codable, Sendable, Equatable {
     case sessionStarted = "session.started"
     case driverDetected = "driver.detected"

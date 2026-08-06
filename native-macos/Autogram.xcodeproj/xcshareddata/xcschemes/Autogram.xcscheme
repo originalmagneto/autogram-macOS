@@ -12,6 +12,9 @@
       <TestableReference skipped="NO">
         <BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="A10000000000000000000012" BuildableName="AutogramTests.xctest" BlueprintName="AutogramTests" ReferencedContainer="container:Autogram.xcodeproj"/>
       </TestableReference>
+      <TestableReference skipped="NO">
+        <BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="A10000000000000000000013" BuildableName="AutogramIntegrationTests.xctest" BlueprintName="AutogramIntegrationTests" ReferencedContainer="container:Autogram.xcodeproj"/>
+      </TestableReference>
     </Testables>
   </TestAction>
   <LaunchAction buildConfiguration="Debug" selectedDebuggerIdentifier="Xcode.DebuggerFoundation.Debugger.LLDB" selectedLauncherIdentifier="Xcode.DebuggerFoundation.Launcher.LLDB" launchStyle="0" useCustomWorkingDirectory="NO" ignoresPersistentStateOnLaunch="NO" debugDocumentVersioning="YES" debugServiceExtension="internal" allowLocationSimulation="YES">
