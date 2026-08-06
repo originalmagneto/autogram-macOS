@@ -74,19 +74,19 @@ final class WorkspaceModel {
             let urls = panel.urls
             guard response == .OK else { return }
             Task { @MainActor in
-                _ = self?.addPDFs(urls)
+                _ = self?.addFiles(urls)
             }
         }
     }
 
     @discardableResult
-    func addPDFs(_ urls: [URL]) -> Bool {
-        let existingURLs = Set(items.map { $0.descriptor.sourceURL.standardizedFileURL })
+    func addFiles(_ urls: [URL]) -> Bool {
+        let existingURLs = Set(items.map { $0.descriptor.sourceURL.resolvingSymlinksInPath().standardizedFileURL })
         var acceptedURLs = Set<URL>()
         let validURLs = urls.filter { url in
-            let standardizedURL = url.standardizedFileURL
-            guard url.isFileURL,
-                  url.pathExtension.caseInsensitiveCompare("pdf") == .orderedSame,
+            let standardizedURL = url.resolvingSymlinksInPath().standardizedFileURL
+            guard standardizedURL.isFileURL,
+                  (try? standardizedURL.resourceValues(forKeys: [.contentTypeKey]).contentType?.conforms(to: .pdf)) == true,
                   !existingURLs.contains(standardizedURL),
                   acceptedURLs.insert(standardizedURL).inserted else {
                 return false
@@ -102,6 +102,11 @@ final class WorkspaceModel {
             selection = newItems.first?.id
         }
         return !newItems.isEmpty
+    }
+
+    @discardableResult
+    func addPDFs(_ urls: [URL]) -> Bool {
+        addFiles(urls)
     }
 
     func moveItems(fromOffsets source: IndexSet, toOffset destination: Int) {

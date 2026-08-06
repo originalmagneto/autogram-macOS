@@ -10,6 +10,7 @@ enum AppIdentity {
 @main
 struct AutogramApp: App {
     @State private var workspace: WorkspaceModel
+    @NSApplicationDelegateAdaptor(OpenDocumentAppDelegate.self) private var appDelegate
 
     init() {
         let dependencies = AppLaunchDependencies.make()
@@ -22,6 +23,14 @@ struct AutogramApp: App {
     var body: some Scene {
         WindowGroup {
             WorkspaceView(workspace: workspace)
+                .onAppear {
+                    appDelegate.openEventHandler = OpenEventHandler(workspace: workspace)
+                }
+                .onOpenURL { url in
+                    Task { @MainActor in
+                        await OpenEventHandler(workspace: workspace).handle([url])
+                    }
+                }
         }
         .commands {
             AppCommands(workspace: workspace)
