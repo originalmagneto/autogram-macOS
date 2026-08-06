@@ -16,6 +16,7 @@
 - The machine protocol version is exactly `1`.
 - PIN values are accepted only through standard input and are never logged.
 - Human CLI output and behavior must remain backward compatible.
+- Native macOS machine mode targets one ARM64 Autogram helper and contains no Intel, Rosetta, or x86_64 compatibility branch.
 - One failed file must not stop later files in the batch.
 - Original files must never be overwritten.
 - Comments and documentation use English and contain no em dash characters.
@@ -326,13 +327,13 @@ void rejectsOrdinaryTsaQualification() {
 
 Run: `./mvnw -Psystem-jdk -Dtest=MachineInspectionServiceTest,TimestampQualificationEvaluatorTest test`
 
-- [ ] **Step 3: Implement report mapping**
+- [ ] **Step 3: Implement batch report mapping**
 
-For every signature ID return format, signer display name, signing time, validity, indication, and timestamp entries. For every timestamp return production time, producer, validity, and qualification. Keep signer-certificate qualification separate from timestamp qualification.
+Decode the locked `InspectRequest(List<MachineFile> files)` payload. For each file emit file-scoped inspection success or failure events and continue after a file failure. For every signature ID return format, signer display name, signing time, validity, indication, and timestamp entries. For every timestamp return production time, producer, validity, and qualification. Keep signer-certificate qualification separate from timestamp qualification.
 
 - [ ] **Step 4: Initialize EU trusted lists with a bounded lifecycle**
 
-`MachineTrustService` creates a dedicated executor, calls `SignatureValidator.initialize(executor, settings.getTrustedList())`, waits up to 60 seconds for `areTLsLoaded()`, and closes the executor. Emit `TRUSTED_LIST_UNAVAILABLE` and fail closed when no trusted list is loaded before the deadline.
+`MachineSettings` must initialize the same non-null EU trusted-list collection used by the existing human application. `MachineTrustService` creates a dedicated executor, calls `SignatureValidator.initialize(executor, settings.getTrustedList())`, waits up to 60 seconds for `areTLsLoaded()`, cancels unfinished initialization, calls `shutdownNow()`, and awaits bounded executor termination. Emit `TRUSTED_LIST_UNAVAILABLE` and fail closed when no trusted list is loaded before the deadline.
 
 - [ ] **Step 5: Add post-signing inspection fixture**
 
@@ -441,9 +442,9 @@ Run: `./mvnw -Psystem-jdk -Dtest=MachineErrorMapperTest,MachinePrivacyTest test`
 
 Use `0` for a completed request, including partial file failures described by events; `64` for protocol or request errors; `69` for unavailable driver or service; and `70` for an internal machine-mode failure. Unknown exceptions map to `INTERNAL_ERROR` without class names or stack traces on standard output.
 
-- [ ] **Step 4: Isolate Intel cleanup compatibility**
+- [ ] **Step 4: Enforce deterministic ARM64 shutdown**
 
-Keep the existing Intel termination workaround for the human CLI. Machine mode must flush its terminal event and use deterministic termination. If the Intel runtime still aborts, document the exact compatibility exit and require artifact validation before Swift accepts a file.
+Machine mode must flush its terminal event, close resources, and terminate deterministically in the native ARM64 runtime. Do not add Intel-specific exit handling, translated-runtime fallbacks, or rules that convert an abnormal helper exit into success.
 
 - [ ] **Step 5: Document the complete protocol**
 

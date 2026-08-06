@@ -4,7 +4,7 @@
 
 **Goal:** Deliver the native Autogram application as a Finder-integrated, Developer ID signed, notarized, privacy-checked macOS 27 preview release.
 
-**Architecture:** Native open-document events accept PDFs from Finder and an installable Automator Quick Action that contains AppleScript but no shell signing logic. Release scripts assemble ARM64 and Intel Java helpers, apply least-privilege entitlements, sign nested code from the inside out, notarize the DMG, and verify a clean artifact.
+**Architecture:** Native open-document events accept PDFs from Finder and an installable Automator Quick Action that contains AppleScript but no shell signing logic. Release scripts assemble one ARM64 Java helper, apply least-privilege entitlements, sign nested code from the inside out, notarize the DMG, and verify a clean ARM64-only artifact.
 
 **Tech Stack:** macOS 27, Xcode 27, SwiftUI, AppKit open-document events, Automator workflow plist, AppleScript, codesign, notarytool, hdiutil, GitHub Actions
 
@@ -19,6 +19,9 @@
 - The Finder Quick Action accepts one or more PDF files and does not open Terminal.
 - Release artifacts contain no secrets, private documents, logs, or personal absolute paths.
 - Preview releases target macOS 27 beta; stable release waits for final macOS 27 and Xcode 27.
+- The release contains one native ARM64 Autogram 2.7.5 or newer helper.
+- Intel helpers, translated processes, and x86_64-only compatibility artifacts are forbidden.
+- I.CA support requires SecureStore 8.3.1 or newer and an arm64 PKCS#11 slice.
 - Comments and documentation use English and contain no em dash characters.
 
 ---
@@ -159,14 +162,14 @@ Commit: `feat(mac): add Finder PDF Quick Action`
 
 **Interfaces:**
 - Consumes: native Xcode project and Java machine CLI.
-- Produces: `build/native/Autogram.app` with ARM64 Swift app, ARM64 Java helper, and optional x86_64 Java helper.
+- Produces: `build/native/Autogram.app` with the ARM64 Swift app and one ARM64 Java helper.
 
 - [ ] **Step 1: Write a failing bundle-layout smoke test**
 
 ```bash
 test -x build/native/Autogram.app/Contents/MacOS/Autogram
 test -x build/native/Autogram.app/Contents/Helpers/AutogramCLI-arm64
-test -x build/native/Autogram.app/Contents/Helpers/AutogramCLI-x86_64
+test ! -e build/native/Autogram.app/Contents/Helpers/AutogramCLI-x86_64
 test "$(plutil -extract LSMinimumSystemVersion raw build/native/Autogram.app/Contents/Info.plist)" = "27.0"
 ```
 
@@ -178,7 +181,7 @@ The main entitlement file contains no `com.apple.security.cs.disable-library-val
 
 - [ ] **Step 4: Implement deterministic assembly**
 
-The script runs `xcodebuild` for ARM64, runs Maven packaging for ARM64 and Intel helper distributions, copies only documented runtime files, removes debug logs and source metadata, and fails when either required executable has the wrong architecture.
+The script runs `xcodebuild` for ARM64, packages the native ARM64 Autogram helper, copies only documented runtime files, removes debug logs and source metadata, and fails when any required executable lacks an arm64 slice or when an Intel helper artifact is present.
 
 - [ ] **Step 5: Run smoke test and commit**
 
@@ -233,11 +236,11 @@ spctl --assess --type open --context context:primary-signature --verbose=4 "$DMG
 
 - [ ] **Step 2: Add release privacy and architecture checks**
 
-Mount the DMG read-only, enumerate files, reject logs, source maps, private keys, provisioning profiles, repository metadata, personal absolute paths, and unexpected executables. Verify ARM64 main app, expected helper architectures, protocol fixture version, and Quick Action plist validity.
+Mount the DMG read-only, enumerate files, reject logs, source maps, private keys, provisioning profiles, repository metadata, personal absolute paths, unexpected executables, and Intel helpers. Verify the ARM64 main app, the single ARM64 helper, protocol fixture version, and Quick Action plist validity.
 
 - [ ] **Step 3: Add manual hardware checklist**
 
-Cover eID, I.CA Intel PKCS#11, correct and incorrect PIN, card removal, one and many PDFs, existing signatures, unavailable TSA, local and cloud files, Finder Quick Action, and a fresh macOS 27 user account.
+Cover eID with an ARM64-capable PKCS#11 library, I.CA SecureStore 8.3.1 or newer, rejection of an x86_64-only test dylib, rejection of I.CA 8.1.0 metadata, correct and incorrect PIN, card removal, one and many PDFs, existing signatures, unavailable TSA, local and cloud files, Finder Quick Action, and a fresh macOS 27 user account.
 
 - [ ] **Step 4: Run on a signed candidate and commit**
 
@@ -298,7 +301,7 @@ Commit: `ci(mac): build native preview and release`
 
 - [ ] **Step 1: Write the installation guide**
 
-Document macOS 27+, Apple silicon, supported card middleware, network requirement for qualified timestamping, I.CA Intel translation limitation through macOS 27, DMG installation, Quick Action installation from Settings, batch behavior, output naming, privacy model, and troubleshooting.
+Document macOS 27+, Apple silicon, Autogram 2.7.5 or newer, supported card middleware, I.CA SecureStore 8.3.1 or newer, the startup arm64 driver check, network requirement for qualified timestamping, DMG installation, Quick Action installation from Settings, batch behavior, output naming, privacy model, and troubleshooting.
 
 - [ ] **Step 2: Update the root README**
 
@@ -327,6 +330,8 @@ Commit: `docs(mac): add native installation guide`
 - No Terminal or JavaFX UI appears.
 - Main app and nested helpers pass strict signing validation.
 - Only Java helpers carry the library-validation exception.
+- The release contains no Intel helper or x86_64-only compatibility path.
+- Startup diagnostics reject an incompatible PKCS#11 dylib with a clear middleware repair instruction.
 - DMG is notarized, stapled, and accepted by Gatekeeper.
 - Release artifact contains no private paths, secrets, logs, or client data.
 - Preview CI uses the current Xcode 27 public preview on `macos-26`; a stable release waits for final Xcode 27.

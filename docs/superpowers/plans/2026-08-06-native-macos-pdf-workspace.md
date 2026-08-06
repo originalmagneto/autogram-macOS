@@ -12,6 +12,10 @@
 
 - Deployment target is macOS 27.0.
 - Supported architecture is ARM64 only.
+- The app supervises one native ARM64 Autogram 2.7.5 or newer helper.
+- No Intel helper, Rosetta fallback, or translated process is allowed.
+- I.CA requires SecureStore 8.3.1 or newer.
+- Every selected PKCS#11 library must contain an arm64 slice before helper launch.
 - Swift 6 strict concurrency is enabled.
 - The application signs PDF only.
 - `PAdES_BASELINE_T` and a qualified timestamp are mandatory and not user-disableable.
@@ -312,6 +316,7 @@ Commit: `feat(mac): supervise Autogram CLI helper`
 **Files:**
 - Create: `native-macos/Autogram/Infrastructure/Drivers/DriverResolver.swift`
 - Create: `native-macos/Autogram/Infrastructure/Drivers/MachOInspector.swift`
+- Create: `native-macos/Autogram/Infrastructure/Drivers/MiddlewareRequirementValidator.swift`
 - Create: `native-macos/Autogram/Infrastructure/FileSystem/OutputService.swift`
 - Create: `native-macos/Autogram/Infrastructure/FileSystem/PDFArtifactValidator.swift`
 - Create: `native-macos/Autogram/Infrastructure/FileSystem/CloudFileMaterializer.swift`
@@ -320,14 +325,23 @@ Commit: `feat(mac): supervise Autogram CLI helper`
 - Test: `native-macos/AutogramTests/CloudFileMaterializerTests.swift`
 
 **Interfaces:**
-- Produces: `ResolvedHelper(executableURL: URL, architecture: HelperArchitecture)` and `OutputReservation(temporaryURL: URL, finalURL: URL)`.
+- Produces: `ResolvedDriver(helperURL: URL, driverURL: URL, architecture: HelperArchitecture, middlewareVersion: String?)` and `OutputReservation(temporaryURL: URL, finalURL: URL)`.
 
 - [ ] **Step 1: Write failing resolver and collision tests**
 
 ```swift
-@Test func intelDriverSelectsIntelHelper() throws {
-    let result = try resolver.resolve(driver: .fixture(architecture: .x86_64))
-    #expect(result.architecture == .x86_64Translated)
+@Test func driverWithoutArm64SliceIsRejected() throws {
+    let driver = DriverFixture(architectures: [.x86_64], middlewareVersion: "8.3.1")
+    #expect(throws: DriverRequirementError.arm64Required) {
+        try resolver.resolve(driver: driver)
+    }
+}
+
+@Test func oldICASecureStoreIsRejected() throws {
+    let driver = DriverFixture(architectures: [.arm64], middlewareVersion: "8.1.0")
+    #expect(throws: DriverRequirementError.icaSecureStoreUpdateRequired(minimum: "8.3.1")) {
+        try resolver.resolve(driver: driver)
+    }
 }
 
 @Test func collisionUsesNextNumberWithoutOverwrite() throws {
@@ -339,9 +353,9 @@ Commit: `feat(mac): supervise Autogram CLI helper`
 
 - [ ] **Step 2: Run and confirm failure**
 
-- [ ] **Step 3: Implement Mach-O inspection and helper selection**
+- [ ] **Step 3: Implement ARM64 middleware validation and helper resolution**
 
-Inspect binaries with system `lipo -archs` through a small injectable process interface. Do not infer architecture from file names. The Swift app remains ARM64 while only the Java helper may be translated.
+Inspect the bundled Autogram helper and every selected PKCS#11 dylib with system `lipo -archs` through a small injectable process interface. Do not infer architecture from file names. Require an arm64 slice for both binaries. Require I.CA SecureStore 8.3.1 or newer for I.CA. Return a localized repair instruction when either requirement fails. Launch only the single ARM64 helper and provide no translated fallback.
 
 - [ ] **Step 4: Implement exclusive output reservation**
 
@@ -419,7 +433,7 @@ Use `SecureField`, disable submission when empty, clear the binding on dismissal
 
 - [ ] **Step 4: Add diagnostics without personal data**
 
-Show helper version, driver architecture, protocol version, and redacted status. Exclude full paths, signer names, certificate serials, and PIN state.
+Show Autogram helper version, ARM64 validation status, middleware version, protocol version, and redacted status. Exclude full paths, signer names, certificate serials, and PIN state. For I.CA failures, state that SecureStore 8.3.1 or newer is required and link to the official download page.
 
 - [ ] **Step 5: Run tests and commit**
 

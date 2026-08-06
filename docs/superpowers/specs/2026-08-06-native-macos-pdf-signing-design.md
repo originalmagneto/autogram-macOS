@@ -1,6 +1,6 @@
 # Native macOS PDF Signing Workspace Design
 
-Status: Approved in design review on 2026-08-06
+Status: Approved in design review on 2026-08-06, revised for ARM64-only runtime on 2026-08-06
 
 ## Summary
 
@@ -16,6 +16,8 @@ The first release is intentionally limited to PDF signing. XML, eForms, XAdES, C
 - User interface: native SwiftUI with focused AppKit bridges.
 - PDF rendering: PDFKit.
 - Signing engine: existing Autogram Java core exposed through a non-interactive CLI protocol.
+- Signing runtime: native macOS ARM Autogram 2.7.5 or newer with DSS 6.4.
+- I.CA middleware: I.CA SecureStore 8.3.1 or newer.
 - Signature profile: PAdES Baseline T.
 - Timestamping: a qualified electronic timestamp is mandatory.
 - Distribution: Developer ID signed and notarized outside the Mac App Store.
@@ -59,7 +61,9 @@ The current fork already provides important building blocks:
 - PAdES level selection through `--pdf-level`.
 - Timestamp server selection through `--tsa-server`.
 - A Finder Quick Action wrapper and macOS dialogs.
-- Detection of an Intel-only I.CA PKCS#11 library.
+- Native macOS ARM packaging in Autogram 2.7.5.
+- Universal ARM64 support in I.CA SecureStore 8.3.1 PKCS#11.
+- Universal ARM64 support in the supported Slovak eID PKCS#11 library.
 - Correct routing of `PAdES_BASELINE_T` to PDF signing.
 - Regression coverage for the PAdES Baseline T routing issue.
 
@@ -73,22 +77,22 @@ The application targets macOS 27 and Xcode 27 to use the current SwiftUI appeara
 
 Development builds created against beta SDKs must be labeled as previews. A stable release cannot be declared until it is built and tested against the final macOS 27 SDK and final Xcode 27.
 
-### Apple Silicon and Intel Driver Translation
+### Apple Silicon Runtime and Driver Validation
 
-The Swift application and its normal Java helper are ARM64. macOS 27 is the final system with general-purpose Intel binary translation. An Intel Java helper may therefore be used for an Intel-only I.CA PKCS#11 library.
+The Swift application, bundled Java runtime, Autogram helper, and selected PKCS#11 driver all run natively on ARM64. The target architecture contains no Intel helper, Rosetta fallback, translated process, or x86_64-only compatibility path.
 
 The application must not load a third-party PKCS#11 library into the Swift process. Driver loading stays inside the isolated Java helper process.
 
 The driver resolver must:
 
 1. Discover supported PKCS#11 driver locations without assuming that a file exists.
-2. Inspect each driver architecture.
-3. Select the ARM64 helper for an ARM64 driver.
-4. Select the Intel helper for an x86_64-only driver on macOS 27.
-5. Report a clear unsupported-driver error when no compatible helper is available.
-6. Keep all translation-specific behavior behind the driver resolver.
+2. Inspect every selected driver with a native Mach-O architecture check before starting Autogram.
+3. Require an arm64 slice and reject x86_64-only drivers.
+4. Require I.CA SecureStore 8.3.1 or newer for the I.CA driver.
+5. Report a clear repair instruction that names the required middleware version when validation fails.
+6. Launch the single ARM64 Autogram helper only after all startup checks pass.
 
-General Intel translation is not available for this use case from macOS 28. I.CA support after macOS 27 therefore requires an Apple silicon PKCS#11 library from the provider.
+The local I.CA SecureStore 8.3.1 library was verified with both file and lipo -info at /usr/local/lib/pkcs11/libICASecureStorePkcs11.dylib; it contains an arm64 slice. This local path is evidence for development only and must not be embedded in distributable configuration or documentation.
 
 ## High-Level Architecture
 
@@ -100,8 +104,7 @@ flowchart LR
     Coordinator[Signing Coordinator Actor]
     Engine[Signing Engine Protocol]
     CLI[Autogram CLI Engine]
-    ARM[ARM64 Java Helper]
-    Intel[Intel Java Helper]
+    ARM[ARM64 Autogram and DSS Helper]
     Token[eID or I.CA PKCS11]
     TSA[Qualified TSA]
 
@@ -111,11 +114,8 @@ flowchart LR
     Coordinator --> Engine
     Engine --> CLI
     CLI --> ARM
-    CLI --> Intel
     ARM --> Token
-    Intel --> Token
     ARM --> TSA
-    Intel --> TSA
 ```
 
 The Swift layer owns presentation, workflow state, file intake, output naming, process supervision, and user-facing error recovery. The Java layer owns token access, certificate access, signing, timestamping, and cryptographic validation.
@@ -400,7 +400,7 @@ A zero process exit does not by itself prove signing success. A successful file 
 5. a PAdES signature at the requested level,
 6. a present and validated qualified timestamp.
 
-The current Intel helper may terminate abnormally during native PKCS#11 cleanup after creating a valid output. Machine mode must make shutdown deterministic. During migration, the adapter may recognize the documented cleanup failure only when all artifact checks pass. Unknown non-zero exits remain failures.
+Machine mode must make shutdown deterministic. Any non-zero helper exit remains a failure even when an output file exists. Artifact validation is mandatory but never converts an abnormal process exit into success.
 
 ## Qualified Timestamp Policy
 
@@ -437,8 +437,8 @@ Error domains include:
 - output file,
 - cloud materialization,
 - driver discovery,
-- helper architecture,
-- Intel translation,
+- ARM64 runtime validation,
+- unsupported middleware version,
 - token connection,
 - certificate enumeration,
 - PIN authentication,
@@ -541,7 +541,7 @@ The baseline used Liberica JDK 25.0.4 with JavaFX and `./mvnw test -Psystem-jdk`
 ### Manual Hardware Matrix
 
 - eID with the supported eID client.
-- I.CA SecureStore with an Intel-only PKCS#11 library.
+- I.CA SecureStore 8.3.1 or newer with an ARM64-capable PKCS#11 library.
 - Correct PIN and rejected PIN.
 - Card removal during signing.
 - One PDF and multiple PDFs.
@@ -559,8 +559,8 @@ The release pipeline must:
 
 1. build and test the Java component with JDK 25,
 2. build and test the Swift component with Xcode 27,
-3. assemble the ARM64 app and required Java helpers,
-4. include the Intel helper only where required for I.CA compatibility,
+3. assemble the ARM64 app and the single ARM64 Java helper,
+4. reject Intel helper artifacts and any bundled executable without an ARM64 slice,
 5. sign all nested code from the inside out,
 6. verify signatures with strict validation,
 7. notarize and staple the application or DMG,
@@ -600,7 +600,7 @@ No implementation agent starts before this design and the subsequent implementat
 - Implement the Java machine protocol.
 - Create the Xcode project and Swift domain layer.
 - Implement the fake engine and process runner.
-- Prove ARM64 and Intel helper selection.
+- Prove ARM64 helper and PKCS#11 driver validation.
 
 ### Phase 2: PDF Workspace
 
@@ -627,8 +627,7 @@ No implementation agent starts before this design and the subsequent implementat
 - Visible PDF signature placement.
 - App Intents and richer Shortcuts integration.
 - Sparkle automatic updates.
-- ARM64 I.CA migration when a compatible provider library is available.
-- Reassessment of macOS 28 support after Intel driver translation ends.
+- Additional qualified middleware providers with native ARM64 drivers.
 
 ## Acceptance Checklist
 
@@ -636,7 +635,9 @@ No implementation agent starts before this design and the subsequent implementat
 - [ ] JavaFX and Terminal never appear in the signing workflow.
 - [ ] One or more PDFs can be added from the app or Finder.
 - [ ] PDFKit renders the selected PDF.
-- [ ] eID and I.CA drivers are detected with correct architecture handling.
+- [ ] eID and I.CA drivers are detected and contain an ARM64 slice.
+- [ ] I.CA SecureStore older than 8.3.1 is rejected with a clear repair instruction.
+- [ ] Every bundled executable runs natively on ARM64.
 - [ ] Certificates are listed and selectable.
 - [ ] PIN is entered securely and never persisted or logged.
 - [ ] Every successful output is PAdES Baseline T.
@@ -657,5 +658,8 @@ No implementation agent starts before this design and the subsequent implementat
 - Apple What is new in SwiftUI: <https://developer.apple.com/videos/play/wwdc2026/269/>
 - Apple SwiftUI with AppKit: <https://developer.apple.com/videos/play/wwdc2026/272/>
 - Apple PDFView: <https://developer.apple.com/documentation/pdfkit/pdfview>
-- Apple Rosetta translation environment: <https://developer.apple.com/documentation/apple-silicon/about-the-rosetta-translation-environment>
+- Autogram v2.7.5 release: <https://github.com/slovensko-digital/autogram/releases/tag/v2.7.5>
+- Autogram native macOS ARM packaging: <https://github.com/slovensko-digital/autogram/pull/686>
+- I.CA SecureStore: <https://www.ica.cz/en/secure-store>
+- European Commission DSS: <https://ec.europa.eu/digital-building-blocks/sites/display/DIGITAL/Digital%2BSignature%2BService%2B-%2B%2BDSS>
 - Existing macOS CLI automation notes: `docs/macos-cli-automation.md`
