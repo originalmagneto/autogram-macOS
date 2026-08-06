@@ -12,6 +12,7 @@ struct AutogramSettingsView: View {
             Section("Signing") {
                 TextField("Preferred driver ID", text: $driverID)
                 TextField("Preferred certificate serial", text: $certificateSerial)
+                    .privacySensitive()
             }
 
             Section("Output") {

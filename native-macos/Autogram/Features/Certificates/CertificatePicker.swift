@@ -13,6 +13,7 @@ struct CertificatePicker: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            .privacySensitive()
             .tag(Optional(certificate.serialNumber))
         }
         .accessibilityIdentifier("Certificate Picker")

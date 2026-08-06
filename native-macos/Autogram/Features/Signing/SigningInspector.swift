@@ -50,6 +50,15 @@ struct SigningInspector: View {
                     }
                 }
             }
+
+            if isSigning {
+                Section("Signing progress") {
+                    ProgressView(value: Double(completedCount + failedCount), total: Double(workspace.items.count)) {
+                        Text("Signing documents")
+                    }
+                    .accessibilityValue("\(completedCount + failedCount) of \(workspace.items.count) documents complete")
+                }
+            }
         }
         .formStyle(.grouped)
         .inspectorColumnWidth(min: 260, ideal: 300)
@@ -88,6 +97,10 @@ struct SigningInspector: View {
 
     private var failedCount: Int {
         workspace.items.count { $0.status == .failed }
+    }
+
+    private var isSigning: Bool {
+        workspace.items.contains { $0.status == .signing }
     }
 
     private var summary: String {

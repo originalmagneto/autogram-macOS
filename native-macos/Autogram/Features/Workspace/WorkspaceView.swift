@@ -44,12 +44,14 @@ struct WorkspaceView: View {
                 Button("Add PDFs", systemImage: "plus") {
                     workspace.selectPDFs()
                 }
+                .help("Select PDF files to inspect and sign")
             }
             ToolbarItem {
                 Button("Remove PDF", systemImage: "trash") {
                     workspace.removeSelectedItem()
                 }
                 .disabled(workspace.selection == nil)
+                .help("Remove the selected PDF")
             }
             ToolbarItem(placement: .primaryAction) {
                 Button("Sign", systemImage: "signature") {
@@ -57,6 +59,7 @@ struct WorkspaceView: View {
                     isPINSheetPresented = true
                 }
                 .disabled(workspace.items.isEmpty || !credentialsAreConfigured)
+                .help("Sign the selected PDFs")
             }
         }
     }
