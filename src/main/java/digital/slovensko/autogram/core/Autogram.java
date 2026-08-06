@@ -12,6 +12,7 @@ import digital.slovensko.autogram.util.PDFUtils;
 import eu.europa.esig.dss.model.DSSException;
 import eu.europa.esig.dss.pdfa.PDFAStructureValidator;
 import eu.europa.esig.dss.spi.x509.tsp.TSPSource;
+import eu.europa.esig.dss.token.DSSPrivateKeyEntry;
 
 import java.io.File;
 import java.util.List;
@@ -293,6 +294,12 @@ public class Autogram {
 
     public List<TokenDriver> getAvailableDrivers() {
         return settings.getDriverDetector().getAvailableDrivers();
+    }
+
+    public List<DSSPrivateKeyEntry> getSigningKeys(TokenDriver driver) {
+        // Intel PKCS#11 cleanup crashes under Rosetta before the CLI process exits.
+        var token = driver.createToken(passwordManager, settings);
+        return token.getKeys();
     }
 
     public boolean isPlainXmlEnabled() {

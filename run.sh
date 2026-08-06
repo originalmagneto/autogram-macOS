@@ -6,8 +6,9 @@ export MAVEN_OPTS="--enable-native-access=ALL-UNNAMED"
 # Clean compile and copy dependencies (clean avoids stale class files)
 ./mvnw clean compile dependency:copy-dependencies -Psystem-jdk -DskipTests
 
-# Get absolute path to icon
-ICON_PATH="/Users/Magneto/CascadeProjects/autogram-macOS/src/main/resources/digital/slovensko/autogram/ui/gui/Autogram.png"
+# Get the repository path and absolute path to the icon
+REPO_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+ICON_PATH="${REPO_DIR}/src/main/resources/digital/slovensko/autogram/ui/gui/Autogram.png"
 
 # Run the application with all necessary JVM module access flags
 # Clean line endings and no trailing spaces after backslashes are critical

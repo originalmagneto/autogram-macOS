@@ -100,6 +100,63 @@ Notes:
 - This is a local ad-hoc signature, not Apple notarization.
 - For public distribution without warnings, use Apple Developer signing and notarization.
 
+## Finder Quick Action: CLI PDF Signing
+
+This repository includes a macOS Finder Quick Action that signs one or more selected PDF files through the Autogram CLI. It is an Automator Quick Action available from Finder's right-click menu. It opens macOS dialogs for the certificate store, signing certificate, and PIN, but it does not open the Autogram GUI or a Terminal window. This is not a macOS Shortcuts workflow.
+
+### Requirements
+
+- macOS with Finder and Automator.
+- A CLI-capable Autogram application, installed from a release package or built locally.
+- The required signing token or card, its PKCS#11 driver, and the PIN.
+- Network access to the configured qualified timestamp service when using PAdES Baseline T.
+- On Apple Silicon, Rosetta and an Intel Autogram build when the installed PKCS#11 driver is Intel-only.
+
+The Quick Action runs the signing process in the background. Certificate store selection, certificate selection, and PIN entry are intentionally shown as macOS dialogs. The original PDFs are never overwritten. The scripts are integration files and do not install the Autogram application or the token driver.
+
+The default Quick Action configuration is:
+
+- PAdES Baseline T for PDF files.
+- A timestamp request to `http://timestamp.sectigo.com/qualified`.
+- A new output beside each source file named `<name>_signed.pdf`. Existing outputs are preserved and numbered.
+
+### Install the scripts
+
+Clone the repository and make the macOS scripts executable:
+
+```sh
+git clone https://github.com/originalmagneto/autogram-macOS.git
+cd autogram-macOS
+chmod +x scripts/macos-automation/*.sh
+```
+
+On Apple Silicon, an Intel-only I.CA SecureStore PKCS#11 driver requires Rosetta and an Intel Autogram build. Place that application at `$HOME/Applications/Autogram Intel GUI.app`, or set `AUTOGRAM_INTEL_BIN` to the path of another Intel Autogram executable. The details and architecture checks are documented in [docs/macos-cli-automation.md](docs/macos-cli-automation.md).
+
+### Create the Finder Quick Action
+
+1. Open **Automator** and choose **New Document > Quick Action**. Do not create a macOS Shortcut for this integration.
+2. Set **Workflow receives current** to `files or folders` and **In** to `Finder`.
+3. Add the **Run Shell Script** action.
+4. Set **Shell** to `/bin/bash` and **Pass input** to `as arguments`.
+5. Use this script body, replacing the repository path with the location where you cloned it:
+
+```bash
+REPO_DIR="/path/to/autogram-macOS"
+"$REPO_DIR/scripts/macos-automation/autogram-quick-action.sh" "$@"
+```
+
+6. Save the Quick Action as `Sign PDFs Autogram`.
+
+Select one or more PDF files in Finder, right-click, open **Quick Actions**, and choose `Sign PDFs Autogram`. The original files are not overwritten. The signing process is CLI-based and the PIN is entered through a hidden macOS dialog. Only PDF files are processed; if the selection contains no PDF files, the action reports that there is nothing to sign.
+
+For manual CLI use, run:
+
+```sh
+scripts/macos-automation/autogram-cli-sign.sh --driver secure_store "/path/to/file.pdf"
+```
+
+The CLI also supports `--list-keys`, `--key`, `--pin-stdin`, `--pdf-level`, `--tsa-server`, and batch directory signing. Do not put a PIN in shell history or commit it to a script. For troubleshooting and the full verification checklist, see [docs/macos-cli-automation.md](docs/macos-cli-automation.md).
+
 ## Integration
 Swagger documentation for the HTTP API is available on [GitHub](https://generator3.swagger.io/index.html?url=https://raw.githubusercontent.com/slovensko-digital/autogram/main/src/main/resources/digital/slovensko/autogram/server/server.yml) or after launching the app at [http://localhost:37200/docs](http://localhost:37200/docs).
 
@@ -155,6 +212,7 @@ Resulting packages appear in `packaging/output/`.
 - [PORTING.md](PORTING.md)
 - [PLAN.md](PLAN.md)
 - [UPSTREAM_SYNC_PR_CHECKLIST.md](UPSTREAM_SYNC_PR_CHECKLIST.md)
+- [macOS CLI and Finder Quick Action](docs/macos-cli-automation.md)
 
 ## Authors and Sponsors
 Jakub Duras, Slovensko.Digital, CRYSTAL CONSULTING, s.r.o., Solver IT s.r.o., and other contributors.

@@ -1,12 +1,15 @@
 package digital.slovensko.autogram;
 
 import digital.slovensko.autogram.core.SigningJob;
+import digital.slovensko.autogram.core.UserSettings;
 import digital.slovensko.autogram.server.dto.Document;
 import digital.slovensko.autogram.server.dto.ServerSigningParameters;
 import digital.slovensko.autogram.server.dto.SignRequestBody;
 import digital.slovensko.autogram.server.errors.RequestValidationException;
 import eu.europa.esig.dss.enumerations.ASiCContainerType;
 import eu.europa.esig.dss.enumerations.SignatureLevel;
+import eu.europa.esig.dss.enumerations.SignatureForm;
+import eu.europa.esig.dss.spi.x509.tsp.CompositeTSPSource;
 
 import org.junit.jupiter.api.Test;
 
@@ -49,5 +52,23 @@ public class SigningJobTests {
         var signRequestBody = new SignRequestBody(new Document(content), ssParams, "application/xml;base64");
         assertDoesNotThrow(() ->
                 SigningJob.buildFromRequest(signRequestBody.getDocument(), signRequestBody.getParameters(null, true), null));
+    }
+
+    @Test
+    void treatsPadesBaselineTAsPdfSigningJob() {
+        var file = new java.io.File("src/test/resources/digital/slovensko/autogram/sample.pdf");
+        var job = SigningJob.buildFromFile(file, null, false, SignatureLevel.PAdES_BASELINE_T,
+                false, new CompositeTSPSource(), true);
+
+        assertEquals(SignatureForm.PAdES, job.getParameters().getSignatureType());
+        assertEquals(SignatureLevel.PAdES_BASELINE_T, job.getParameters().getLevel());
+    }
+
+    @Test
+    void treatsPadesBaselineTAsPadesInUserSettings() {
+        var settings = new UserSettings();
+        settings.setSignatureLevel(SignatureLevel.PAdES_BASELINE_T);
+
+        assertTrue(settings.shouldSignPDFAsPades());
     }
 }
