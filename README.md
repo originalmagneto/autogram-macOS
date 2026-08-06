@@ -18,6 +18,8 @@ You can trigger the application to run directly from a web browser by opening an
 
 Autogram can also be run from the command line (CLI mode). Detailed information about the switches is described in the help after running `autogram --help`, or `autogram-cli --help` on Windows.
 
+For scripted certificate selection, PIN input from standard input, PAdES Baseline T, and exit status handling, see [Headless CLI signing](docs/cli-headless-signing.md).
+
 ### Styling
 
 The application currently supports only one style - the state IDSK design. Additional styles are planned. However, styling already happens exclusively through cascading style sheets, see [idsk.css](https://github.com/slovensko-digital/autogram/blob/main/src/main/resources/digital/slovensko/autogram/ui/gui/idsk.css)

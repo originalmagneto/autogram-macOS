@@ -19,6 +19,8 @@ Vyvolať spustenie programu je možné priamo z webového prehliadača otvorení
 
 Autogram je možné spúšťať aj z príkazového riadku (CLI mód). Detailné informácie o prepínačoch sú popísané v nápovede po spustení `autogram --help`, resp. `autogram-cli --help` na Windows.
 
+Pre skriptovaný výber certifikátu, zadanie PIN-u cez štandardný vstup, PAdES Baseline T a návratové kódy pozri [CLI podpisovanie bez interakcie](docs/cli-headless-signing.md).
+
 ### Štýlovanie
 
 Aplikácia momentálne podporuje len jeden štýl - štátny IDSK dizajn. Ďalšie štýly sú plánované. Štýlovanie sa však už teraz deje výhradne cez kaskádové štýly, viď [idsk.css](https://github.com/slovensko-digital/autogram/blob/main/src/main/resources/digital/slovensko/autogram/ui/gui/idsk.css)
