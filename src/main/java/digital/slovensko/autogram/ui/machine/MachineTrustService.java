@@ -56,8 +56,9 @@ public final class MachineTrustService {
     public void initialize() {
         var executor = executorFactory.get();
         var deadline = nanoTime.getAsLong() + loadTimeout.toNanos();
+        Future<?> initialization = null;
         try {
-            Future<?> initialization = executor.submit(() -> initializer.accept(executor));
+            initialization = executor.submit(() -> initializer.accept(executor));
             waitForTrustedLists(initialization, deadline);
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
@@ -65,7 +66,7 @@ public final class MachineTrustService {
         } catch (ExecutionException | RuntimeException exception) {
             throw unavailable(exception);
         } finally {
-            closeExecutor(executor, deadline);
+            closeExecutor(executor, initialization, deadline);
         }
     }
 
@@ -88,7 +89,10 @@ public final class MachineTrustService {
         }
     }
 
-    private void closeExecutor(ExecutorService executor, long deadline) {
+    private void closeExecutor(ExecutorService executor, Future<?> initialization, long deadline) {
+        if (initialization != null && !initialization.isDone()) {
+            initialization.cancel(true);
+        }
         executor.shutdownNow();
         try {
             if (!executor.awaitTermination(remainingNanos(deadline), TimeUnit.NANOSECONDS)) {

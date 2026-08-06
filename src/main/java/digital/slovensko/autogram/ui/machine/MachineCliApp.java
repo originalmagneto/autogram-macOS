@@ -97,17 +97,17 @@ public final class MachineCliApp {
 
     private static int dispatchInspection(MachineEventWriter writer, MachineRequest request,
             MachineInspectionService inspectionService, Runnable trustInitializer) {
-        var files = requiredInspectionFiles(request.payload());
+        var inspection = requiredInspectionRequest(request.payload());
         writer.write("session.started", request.requestId(), null, new JsonObject());
         trustInitializer.run();
-        for (var file : files) {
+        for (var file : inspection.files()) {
             inspectFile(writer, request.requestId(), inspectionService, file);
         }
         return complete(writer, request.requestId(), new JsonObject());
     }
 
     private static void inspectFile(MachineEventWriter writer, String requestId, MachineInspectionService inspectionService,
-            InspectFile file) {
+            MachineFile file) {
         try {
             var source = java.nio.file.Path.of(file.source());
             writer.write("inspection.completed", requestId, file.id(), inspectionService.inspect(source));
@@ -140,12 +140,12 @@ public final class MachineCliApp {
         return payload.get(field).getAsString();
     }
 
-    private static List<InspectFile> requiredInspectionFiles(JsonObject payload) {
+    private static InspectRequest requiredInspectionRequest(JsonObject payload) {
         if (payload.size() != 1 || !payload.has("files") || !payload.get("files").isJsonArray()
                 || payload.getAsJsonArray("files").isEmpty()) {
             throw new MachineProtocolException("PROTOCOL_INVALID_REQUEST");
         }
-        var files = new ArrayList<InspectFile>();
+        var files = new ArrayList<MachineFile>();
         for (var element : payload.getAsJsonArray("files")) {
             if (!element.isJsonObject()) {
                 throw new MachineProtocolException("PROTOCOL_INVALID_REQUEST");
@@ -156,10 +156,17 @@ public final class MachineCliApp {
                     || !isNonBlankString(file.get("target"))) {
                 throw new MachineProtocolException("PROTOCOL_INVALID_REQUEST");
             }
-            files.add(new InspectFile(file.get("id").getAsString(), file.get("source").getAsString(),
-                    file.get("target").getAsString()));
+            var source = file.get("source").getAsString();
+            var target = file.get("target").getAsString();
+            try {
+                java.nio.file.Path.of(source);
+                java.nio.file.Path.of(target);
+            } catch (java.nio.file.InvalidPathException exception) {
+                throw new MachineProtocolException("PROTOCOL_INVALID_REQUEST", exception);
+            }
+            files.add(new MachineFile(file.get("id").getAsString(), source, target));
         }
-        return files;
+        return new InspectRequest(List.copyOf(files));
     }
 
     private static boolean isNonBlankString(JsonElement element) {
@@ -219,8 +226,5 @@ public final class MachineCliApp {
         } catch (JsonParseException exception) {
             return "unknown";
         }
-    }
-
-    private record InspectFile(String id, String source, String target) {
     }
 }

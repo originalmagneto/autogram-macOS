@@ -1,5 +1,6 @@
 package digital.slovensko.autogram.ui.machine;
 
+import digital.slovensko.autogram.core.UserSettings;
 import eu.europa.esig.dss.enumerations.Indication;
 import eu.europa.esig.dss.enumerations.SignatureLevel;
 import eu.europa.esig.dss.enumerations.SignatureQualification;
@@ -15,6 +16,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.concurrent.AbstractExecutorService;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -32,7 +34,9 @@ class MachineInspectionServiceTest {
     void dispatchesEachBatchEntryWithOpaqueIdAndRedactsSourceAndTargetPaths() throws Exception {
         var report = reportWithOneQualifiedTimestamp();
         var inspectedSources = new java.util.ArrayList<Path>();
+        var calls = new java.util.ArrayList<String>();
         var inspectionService = new MachineInspectionService(path -> {
+            calls.add("inspect:" + path.getFileName());
             inspectedSources.add(path);
             if (path.toString().contains("broken")) {
                 throw new IllegalArgumentException("unreadable source");
@@ -51,7 +55,10 @@ class MachineInspectionServiceTest {
 
         var code = MachineCliApp.start(commandLine("INSPECT"), new java.io.StringReader(input), new java.io.PrintWriter(stdout),
                 new java.io.PrintWriter(new java.io.StringWriter()), new MachineDriverService(), inspectionService,
-                () -> trustInitialized.set(true));
+                () -> {
+                    calls.add("trust");
+                    trustInitialized.set(true);
+                });
 
         var events = java.util.Arrays.stream(stdout.toString().strip().split("\\n"))
                 .map(com.google.gson.JsonParser::parseString)
@@ -67,6 +74,7 @@ class MachineInspectionServiceTest {
         assertEquals("opaque-2", events.get(2).get("fileId").getAsString());
         assertEquals("INSPECTION_FAILED", events.get(2).getAsJsonObject("payload").get("code").getAsString());
         assertEquals(List.of(Path.of(source), Path.of(brokenSource)), inspectedSources);
+        assertEquals(List.of("trust", "inspect:source.pdf", "inspect:broken.pdf"), calls);
         assertFalse(stdout.toString().contains(source));
         assertFalse(stdout.toString().contains(target));
         assertFalse(stdout.toString().contains(brokenSource));
@@ -145,6 +153,15 @@ class MachineInspectionServiceTest {
         assertFalse(trustInitialized.get());
         assertTrue(stdout.toString().contains("PROTOCOL_INVALID_REQUEST"));
         assertFalse(stdout.toString().contains(source));
+    }
+
+    @Test
+    void productionMachineSettingsUseTheHumanTrustedListConfiguration() {
+        var humanSettings = UserSettings.load();
+        var machineSettings = new MachineSettings();
+
+        assertEquals(humanSettings.getTrustedList(), machineSettings.getTrustedList());
+        assertFalse(machineSettings.getTrustedList().isEmpty());
     }
 
     @Test
@@ -260,6 +277,48 @@ class MachineInspectionServiceTest {
         assertEquals("TRUSTED_LIST_UNAVAILABLE", failure.getMessage());
         assertTrue(executor.isShutdown());
         assertEquals(0, executor.awaitedNanos);
+    }
+
+    @Test
+    void cancelsUnfinishedInitializationBeforeClosingExecutor() {
+        var executor = new RecordingExecutorService(false, true);
+        var now = new AtomicLong();
+        var trust = trust(
+                () -> executor,
+                ignored -> {
+                },
+                () -> false,
+                Duration.ofNanos(10),
+                nanos -> now.addAndGet(nanos),
+                now);
+
+        var failure = assertThrows(MachineProtocolException.class, trust::initialize);
+
+        assertEquals("TRUSTED_LIST_UNAVAILABLE", failure.getMessage());
+        assertTrue(executor.submittedTask.isCancelled());
+        assertTrue(executor.isShutdown());
+    }
+
+    @Test
+    void awaitsOnlyDeadlineTimeRemainingAfterSuccessfulTrustLoad() {
+        var executor = new RecordingExecutorService(true, true);
+        var initialized = new AtomicBoolean();
+        var now = new AtomicLong();
+        var trust = trust(
+                () -> executor,
+                ignored -> initialized.set(true),
+                () -> {
+                    now.addAndGet(4);
+                    return initialized.get();
+                },
+                Duration.ofNanos(10),
+                nanos -> {
+                },
+                now);
+
+        trust.initialize();
+
+        assertEquals(6, executor.awaitedNanos);
     }
 
     @Test
@@ -424,6 +483,7 @@ class MachineInspectionServiceTest {
         private final boolean terminates;
         private boolean shutdown;
         private long awaitedNanos = -1;
+        private Future<?> submittedTask;
 
         private RecordingExecutorService(boolean runTasks, boolean terminates) {
             this.runTasks = runTasks;
@@ -459,6 +519,9 @@ class MachineInspectionServiceTest {
 
         @Override
         public void execute(Runnable command) {
+            if (command instanceof Future<?> future) {
+                submittedTask = future;
+            }
             if (runTasks) {
                 command.run();
             }
