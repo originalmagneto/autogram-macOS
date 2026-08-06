@@ -67,6 +67,25 @@ class MachineRequestValidatorTest {
     }
 
     @Test
+    void rejectsCaseInsensitiveDuplicateTargetsBeforeTokenWork() throws Exception {
+        var source = pdf("source.pdf");
+        var duplicate = signRequest("PAdES_BASELINE_T", List.of(
+                new MachineFile("one", source.toString(), target("Signed.PDF").toString()),
+                new MachineFile("two", pdf("other.pdf").toString(), target("signed.pdf").toString())));
+
+        assertInvalid(duplicate);
+    }
+
+    @Test
+    void rejectsASymlinkedSourceBeforeAnyTokenWork() throws Exception {
+        var source = pdf("source.pdf");
+        var link = temporaryDirectory.resolve("source-link.pdf");
+        Files.createSymbolicLink(link, source);
+
+        assertInvalid(signRequest("PAdES_BASELINE_T", files(link, target("signed.pdf"))));
+    }
+
+    @Test
     void requiresQualifiedTimestampAndSupportedTsaUrl() throws Exception {
         var source = pdf("source.pdf");
         var timestampNotRequired = request(source, target("not-required.pdf"), false, List.of("https://tsa.example.test"));

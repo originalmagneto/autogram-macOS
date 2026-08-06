@@ -1,22 +1,36 @@
 package digital.slovensko.autogram.ui.machine;
 
 import com.google.gson.JsonParser;
+import digital.slovensko.autogram.core.PasswordManager;
 import digital.slovensko.autogram.core.SignedDocument;
+import digital.slovensko.autogram.drivers.TokenDriver;
+import eu.europa.esig.dss.enumerations.Indication;
+import eu.europa.esig.dss.enumerations.SignatureLevel;
 import eu.europa.esig.dss.model.InMemoryDocument;
+import eu.europa.esig.dss.simplereport.SimpleReport;
+import eu.europa.esig.dss.simplereport.jaxb.XmlTimestamp;
+import eu.europa.esig.dss.token.AbstractKeyStoreTokenConnection;
+import eu.europa.esig.dss.token.Pkcs12SignatureToken;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.math.BigInteger;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.security.KeyStore;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class MachineSigningServiceTest {
     @TempDir
@@ -121,18 +135,188 @@ class MachineSigningServiceTest {
     }
 
     @Test
-    void signingFailureNeverDeletesATargetCreatedAfterValidation() throws Exception {
+    void signingFailureNeverDeletesAReplacementOfTheOwnedTarget() throws Exception {
         var writer = new RecordingWriter();
         var target = target("late-collision.pdf");
         var service = new MachineSigningService(writer.writer(), request -> new FakeSession((file, completed) -> {
-            Files.writeString(Path.of(file.target()), "%PDF-1.7\nother process\n%%EOF");
+            Files.delete(target);
+            Files.writeString(target, "%PDF-1.7\nother process\n%%EOF");
             throw new IllegalStateException("late collision");
         }), path -> true);
 
         service.sign("request-1", request("1234".toCharArray(), file("one", "source.pdf", target.getFileName().toString())));
 
         assertEquals("%PDF-1.7\nother process\n%%EOF", Files.readString(target));
-        assertEquals("SIGNING_FAILED", writer.payloadCode(2));
+        assertEquals("OUTPUT_CLEANUP_FAILED", writer.payloadCode(2));
+    }
+
+    @Test
+    void signingFailureNeverDeletesASymlinkReplacementOfTheOwnedTarget() throws Exception {
+        var writer = new RecordingWriter();
+        var target = target("symlink-replacement.pdf");
+        var unrelated = Files.writeString(target("unrelated.pdf"), "%PDF-1.7\nunrelated\n%%EOF");
+        var service = new MachineSigningService(writer.writer(), request -> new FakeSession((file, completed) -> {
+            Files.delete(target);
+            Files.createSymbolicLink(target, unrelated);
+            throw new IllegalStateException("late symlink");
+        }), path -> true);
+
+        service.sign("request-1", request("1234".toCharArray(), file("one", "source.pdf", target.getFileName().toString())));
+
+        assertTrue(Files.isSymbolicLink(target));
+        assertEquals("%PDF-1.7\nunrelated\n%%EOF", Files.readString(unrelated));
+        assertEquals("OUTPUT_CLEANUP_FAILED", writer.payloadCode(2));
+    }
+
+    @Test
+    void signsAnOwnedSnapshotInsteadOfAPathReopenedAfterPreparation() throws Exception {
+        var writer = new RecordingWriter();
+        var source = Files.writeString(temporaryDirectory.resolve("source.pdf"), "%PDF-1.7\noriginal\n%%EOF");
+        var target = target("signed.pdf");
+        var sourceSeenBySigner = new AtomicReference<String>();
+        var sessionOpened = new AtomicReference<Boolean>(false);
+        var service = new MachineSigningService(writer.writer(), request -> new FakeSession((file, completed) -> {
+            sourceSeenBySigner.set(Files.readString(Path.of(file.source())));
+            Files.writeString(Path.of(file.target()), "%PDF-1.7\nsigned\n%%EOF");
+            completed.run();
+        }), path -> true, () -> {
+            try {
+                assertEquals("%PDF-1.7\noriginal\n%%EOF", Files.readString(source));
+                Files.writeString(source, "%PDF-1.7\nreplaced\n%%EOF", StandardOpenOption.TRUNCATE_EXISTING);
+            } catch (java.io.IOException exception) {
+                throw new IllegalStateException(exception);
+            }
+            sessionOpened.set(true);
+        });
+
+        service.sign("request-1", request("1234".toCharArray(),
+                new MachineFile("one", source.toRealPath().toString(), target.toString())));
+
+        assertTrue(sessionOpened.get());
+        assertEquals("%PDF-1.7\noriginal\n%%EOF", sourceSeenBySigner.get());
+        assertEquals("%PDF-1.7\nsigned\n%%EOF", Files.readString(target));
+    }
+
+    @Test
+    void validationFailurePreservesAReplacementAndReportsAnExplicitCleanupFailure() throws Exception {
+        var writer = new RecordingWriter();
+        var target = target("replaced.pdf");
+        var service = new MachineSigningService(writer.writer(), request -> new FakeSession((file, completed) -> {
+            Files.writeString(Path.of(file.target()), "%PDF-1.7\ninvalid\n%%EOF");
+            completed.run();
+        }), path -> {
+            Files.delete(target);
+            Files.writeString(target, "%PDF-1.7\nreplacement\n%%EOF");
+            return false;
+        });
+
+        service.sign("request-1", request("1234".toCharArray(), file("one", "source.pdf", target.getFileName().toString())));
+
+        assertEquals("%PDF-1.7\nreplacement\n%%EOF", Files.readString(target));
+        assertEquals("OUTPUT_CLEANUP_FAILED", writer.payloadCode(2));
+    }
+
+    @Test
+    void validationExceptionDeletesOnlyTheOwnedOutputAndReportsValidationFailure() throws Exception {
+        var writer = new RecordingWriter();
+        var target = target("validator-threw.pdf");
+        var service = new MachineSigningService(writer.writer(), request -> new FakeSession((file, completed) -> {
+            Files.writeString(Path.of(file.target()), "%PDF-1.7\nsigned\n%%EOF");
+            completed.run();
+        }), path -> {
+            throw new java.io.IOException("report unavailable");
+        });
+
+        service.sign("request-1", request("1234".toCharArray(), file("one", "source.pdf", target.getFileName().toString())));
+
+        assertFalse(Files.exists(target));
+        assertEquals("OUTPUT_VALIDATION_FAILED", writer.payloadCode(2));
+    }
+
+    @Test
+    void outputValidatorAcceptsOnlyANewFullyQualifiedBaselineTSignature() throws Exception {
+        var target = Files.writeString(target("validated.pdf"), "%PDF-1.7\nvalidated\n%%EOF");
+        var rejected = Files.writeString(target("rejected.pdf"), "%PDF-1.7\nrejected\n%%EOF");
+        var existing = qualifiedReport("existing");
+        var added = qualifiedReport("existing", "new");
+        var invalidNew = qualifiedReport("existing", "new");
+        when(invalidNew.isValid("new")).thenReturn(false);
+        var validator = new MachineSigningService.PdfOutputValidator(new MachineInspectionService(path ->
+                switch (path.getFileName().toString()) {
+                    case "before.pdf" -> existing;
+                    case "rejected.pdf" -> invalidNew;
+                    default -> added;
+                }));
+        var before = temporaryDirectory.resolve("before.pdf");
+
+        assertEquals(java.util.Set.of("existing"), validator.signatureIds(before));
+        assertTrue(validator.isValid(target, java.util.Set.of("existing")));
+        assertFalse(validator.isValid(rejected, java.util.Set.of("existing")));
+        assertFalse(validator.isValid(target, java.util.Set.of("existing", "new")));
+    }
+
+    @Test
+    void defaultSessionFactorySelectsExactlyOneSerialAndClosesOneToken() throws Exception {
+        var driver = new TestTokenDriver("test");
+        var request = request("1234".toCharArray(), file("one", "source.pdf", "signed.pdf"));
+        var serial = driver.serial();
+        request = new SignRequest("test", serial, request.pin(), request.signatureLevel(), request.timestamp(), request.files());
+        var factory = new MachineSigningService.DefaultSessionFactory(() -> List.of(driver), new MachineSettings(true),
+                PasswordManager::new);
+
+        try (var session = factory.apply(request)) {
+            assertTrue(driver.created);
+        }
+
+        assertEquals(1, driver.closeCount());
+    }
+
+    @Test
+    void defaultSessionFactoryRejectsAmbiguousSerialBeforeReturningASession() throws Exception {
+        var driver = new TestTokenDriver("test", true);
+        var request = request("1234".toCharArray(), file("one", "source.pdf", "signed.pdf"));
+        var ambiguousRequest = new SignRequest("test", driver.serial(), request.pin(), request.signatureLevel(),
+                request.timestamp(), request.files());
+        var factory = new MachineSigningService.DefaultSessionFactory(() -> List.of(driver), new MachineSettings(true),
+                PasswordManager::new);
+
+        var failure = assertThrows(MachineProtocolException.class, () -> factory.apply(ambiguousRequest));
+
+        assertEquals("CERTIFICATE_AMBIGUOUS", failure.getMessage());
+        assertEquals(1, driver.closeCount());
+    }
+
+    @Test
+    void failedPasswordManagerConstructionClosesAndZeroizesMachineSecretUi() {
+        var capturedUi = new AtomicReference<MachineSecretUI>();
+        var issuedSecret = new AtomicReference<char[]>();
+        var request = new SignRequest("test", "123", "1234".toCharArray(), "PAdES_BASELINE_T",
+                new QualifiedTimestampRequest(true, List.of("https://tsa.example.test")), List.of());
+
+        assertThrows(IllegalStateException.class, () -> MachineSigningService.DefaultSigningSession.open(
+                new TestTokenDriver("test"), request, new MachineSettings(true), (ui, settings) -> {
+                    capturedUi.set(ui);
+                    issuedSecret.set(ui.getKeystorePassword());
+                    throw new IllegalStateException("factory failure");
+                }));
+
+        assertTrue(capturedUi.get().isClosed());
+        assertTrue(Arrays.equals(new char[issuedSecret.get().length], issuedSecret.get()));
+    }
+
+    @Test
+    void signingJobUsesTheRequiredPadesBaselineTPolicy() throws Exception {
+        var source = Path.of(MachineSigningServiceTest.class
+                .getResource("/digital/slovensko/autogram/sample.pdf").getFile());
+        var responder = new MachineFileResponder(target("policy-signed.pdf"), ignored -> { });
+        var settings = new MachineSettings(true);
+        settings.setTsaServer("https://tsa.example.test");
+        settings.setTsaEnabled(true);
+
+        var job = MachineSigningService.DefaultSigningSession.signingJob(source, responder, settings);
+
+        assertEquals(SignatureLevel.PAdES_BASELINE_T, job.getParameters().getLevel());
+        assertEquals(eu.europa.esig.dss.enumerations.SignatureForm.PAdES, job.getParameters().getSignatureType());
     }
 
     private SignRequest request(char[] pin, MachineFile... files) {
@@ -147,6 +331,89 @@ class MachineSigningServiceTest {
 
     private Path target(String name) throws Exception {
         return temporaryDirectory.toRealPath().resolve(name);
+    }
+
+    private static SimpleReport qualifiedReport(String... ids) {
+        var report = mock(SimpleReport.class);
+        when(report.getSignatureIdList()).thenReturn(List.of(ids));
+        for (var id : ids) {
+            var timestamp = new XmlTimestamp();
+            timestamp.setId("ts-" + id);
+            when(report.getSignatureFormat(id)).thenReturn(SignatureLevel.PAdES_BASELINE_T);
+            when(report.isValid(id)).thenReturn(true);
+            when(report.getIndication(id)).thenReturn(Indication.TOTAL_PASSED);
+            when(report.getSignatureTimestamps(id)).thenReturn(List.of(timestamp));
+            when(report.isValid("ts-" + id)).thenReturn(true);
+            when(report.getTimestampQualification("ts-" + id)).thenReturn(
+                    eu.europa.esig.dss.enumerations.TimestampQualification.QTSA);
+        }
+        return report;
+    }
+
+    private static final class TestTokenDriver extends TokenDriver {
+        private final boolean duplicateKey;
+        private TestToken token;
+        private boolean created;
+
+        private TestTokenDriver(String shortname) {
+            this(shortname, false);
+        }
+
+        private TestTokenDriver(String shortname, boolean duplicateKey) {
+            super("Test token", Path.of("test-token"), shortname, "");
+            this.duplicateKey = duplicateKey;
+        }
+
+        @Override
+        public AbstractKeyStoreTokenConnection createToken(PasswordManager passwordManager,
+                digital.slovensko.autogram.core.SignatureTokenSettings settings) {
+            created = true;
+            try {
+                token = new TestToken(duplicateKey);
+                return token;
+            } catch (java.io.IOException exception) {
+                throw new IllegalStateException(exception);
+            }
+        }
+
+        private String serial() throws Exception {
+            if (token == null) {
+                var preview = new TestToken(duplicateKey);
+                try {
+                    return preview.getKeys().getFirst().getCertificate().getSerialNumber().toString();
+                } finally {
+                    preview.close();
+                }
+            }
+            return token.getKeys().getFirst().getCertificate().getSerialNumber().toString();
+        }
+
+        private int closeCount() {
+            return token == null ? 0 : token.closeCount;
+        }
+    }
+
+    private static final class TestToken extends Pkcs12SignatureToken {
+        private final boolean duplicateKey;
+        private int closeCount;
+
+        private TestToken(boolean duplicateKey) throws java.io.IOException {
+            super(MachineSigningServiceTest.class.getResource("/digital/slovensko/autogram/test.keystore").getFile(),
+                    new KeyStore.PasswordProtection(new char[0]));
+            this.duplicateKey = duplicateKey;
+        }
+
+        @Override
+        public List<eu.europa.esig.dss.token.DSSPrivateKeyEntry> getKeys() {
+            var keys = super.getKeys();
+            return duplicateKey ? List.of(keys.getFirst(), keys.getFirst()) : keys;
+        }
+
+        @Override
+        public void close() {
+            closeCount++;
+            super.close();
+        }
     }
 
     private static final class FakeSession implements MachineSigningService.SigningSession {
