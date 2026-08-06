@@ -1,0 +1,2 @@
+{"protocolVersion":1,"type":"session.started","sessionId":"session-1","emittedAt":"2026-08-06T00:00:00Z","fileId":null,"payload":{}}
+{"protocolVersion":1,"type":"session.completed","sessionId":"session-1","emittedAt":"2026-08-06T00:00:01Z","fileId":null,"payload":{}}

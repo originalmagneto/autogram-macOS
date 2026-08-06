@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Autogram Machine Protocol v1 Event",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocolVersion", "type", "sessionId", "emittedAt", "payload"],
+  "properties": {
+    "protocolVersion": {
+      "const": 1
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "session.started",
+        "driver.detected",
+        "certificates.available",
+        "inspection.completed",
+        "pin.required",
+        "file.signingStarted",
+        "file.progress",
+        "file.completed",
+        "file.failed",
+        "session.completed",
+        "session.failed"
+      ]
+    },
+    "sessionId": {
+      "type": "string"
+    },
+    "emittedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "fileId": {
+      "type": ["string", "null"]
+    },
+    "payload": {
+      "type": "object"
+    }
+  }
+}
