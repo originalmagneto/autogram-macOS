@@ -17,14 +17,12 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.math.BigInteger;
-import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.security.KeyStore;
 import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -125,7 +123,7 @@ class MachineSigningServiceTest {
     }
 
     @Test
-    void completionCallbackFailureDeletesOnlyTheReservedTarget() throws Exception {
+    void completionCallbackFailureLeavesThePrivateOwnerToCleanItsTarget() throws Exception {
         var target = target("callback-failed.pdf");
         var responder = new MachineFileResponder(target, ignored -> {
             throw new IllegalStateException("callback failure");
@@ -134,15 +132,14 @@ class MachineSigningServiceTest {
         assertThrows(MachineProtocolException.class,
                 () -> responder.onDocumentSigned(new SignedDocument(new InMemoryDocument("replacement".getBytes()), null)));
 
-        assertFalse(Files.exists(target));
+        assertTrue(Files.exists(target));
     }
 
     @Test
-    void signingFailureNeverDeletesAReplacementOfTheOwnedTarget() throws Exception {
+    void signingFailureNeverDeletesAConcurrentUserTarget() throws Exception {
         var writer = new RecordingWriter();
         var target = target("late-collision.pdf");
         var service = new MachineSigningService(writer.writer(), request -> new FakeSession((file, completed) -> {
-            Files.delete(target);
             Files.writeString(target, "%PDF-1.7\nother process\n%%EOF");
             throw new IllegalStateException("late collision");
         }), path -> true);
@@ -150,16 +147,15 @@ class MachineSigningServiceTest {
         service.sign("request-1", request("1234".toCharArray(), file("one", "source.pdf", target.getFileName().toString())));
 
         assertEquals("%PDF-1.7\nother process\n%%EOF", Files.readString(target));
-        assertEquals("OUTPUT_CLEANUP_FAILED", writer.payloadCode(2));
+        assertEquals("SIGNING_FAILED", writer.payloadCode(2));
     }
 
     @Test
-    void signingFailureNeverDeletesASymlinkReplacementOfTheOwnedTarget() throws Exception {
+    void signingFailureNeverDeletesAConcurrentUserSymlink() throws Exception {
         var writer = new RecordingWriter();
         var target = target("symlink-replacement.pdf");
         var unrelated = Files.writeString(target("unrelated.pdf"), "%PDF-1.7\nunrelated\n%%EOF");
         var service = new MachineSigningService(writer.writer(), request -> new FakeSession((file, completed) -> {
-            Files.delete(target);
             Files.createSymbolicLink(target, unrelated);
             throw new IllegalStateException("late symlink");
         }), path -> true);
@@ -168,7 +164,7 @@ class MachineSigningServiceTest {
 
         assertTrue(Files.isSymbolicLink(target));
         assertEquals("%PDF-1.7\nunrelated\n%%EOF", Files.readString(unrelated));
-        assertEquals("OUTPUT_CLEANUP_FAILED", writer.payloadCode(2));
+        assertEquals("SIGNING_FAILED", writer.payloadCode(2));
     }
 
     @Test
@@ -201,14 +197,72 @@ class MachineSigningServiceTest {
     }
 
     @Test
+    void publishesOnlyAfterRealPdfOutputValidationSucceeds() throws Exception {
+        var writer = new RecordingWriter();
+        var target = target("published-after-validation.pdf");
+        var targetSeenDuringSigning = new AtomicReference<Boolean>();
+        var inspection = new MachineInspectionService(path -> qualifiedReport(), content ->
+                new String(content, java.nio.charset.StandardCharsets.ISO_8859_1).contains("signed")
+                        ? qualifiedReport("new") : qualifiedReport());
+        var service = new MachineSigningService(writer.writer(), request -> new FakeSession((file, completed) -> {
+            targetSeenDuringSigning.set(Files.exists(target));
+            Files.writeString(Path.of(file.target()), "%PDF-1.7\nsigned\n%%EOF");
+            completed.run();
+        }), new MachineSigningService.PdfOutputValidator(inspection));
+
+        service.sign("request-1", request("1234".toCharArray(), file("one", "source.pdf", target.getFileName().toString())));
+
+        assertFalse(targetSeenDuringSigning.get());
+        assertEquals("%PDF-1.7\nsigned\n%%EOF", Files.readString(target));
+        assertEquals(List.of("session.started", "file.signingStarted", "file.completed", "session.completed"),
+                writer.eventTypes());
+    }
+
+    @Test
+    void stagedReplacementCannotChangeTheBytesPublishedAfterValidation() throws Exception {
+        var writer = new RecordingWriter();
+        var target = target("stable-publication.pdf");
+        var stagedOutput = new AtomicReference<Path>();
+        var service = new MachineSigningService(writer.writer(), request -> new FakeSession((file, completed) -> {
+            stagedOutput.set(Path.of(file.target()));
+            Files.writeString(stagedOutput.get(), "%PDF-1.7\nvalidated-A\n%%EOF");
+            completed.run();
+        }), path -> {
+            Files.writeString(stagedOutput.get(), "%PDF-1.7\nreplacement-B\n%%EOF");
+            return true;
+        });
+
+        service.sign("request-1", request("1234".toCharArray(), file("one", "source.pdf", target.getFileName().toString())));
+
+        assertEquals("%PDF-1.7\nvalidated-A\n%%EOF", Files.readString(target));
+    }
+
+    @Test
+    void validationFailureNeverDeletesAConcurrentUserTargetReplacement() throws Exception {
+        var writer = new RecordingWriter();
+        var target = target("concurrent-user-target.pdf");
+        var service = new MachineSigningService(writer.writer(), request -> new FakeSession((file, completed) -> {
+            Files.writeString(Path.of(file.target()), "%PDF-1.7\ninvalid\n%%EOF");
+            completed.run();
+        }), path -> {
+            Files.writeString(target, "%PDF-1.7\nuser-replacement\n%%EOF");
+            return false;
+        });
+
+        service.sign("request-1", request("1234".toCharArray(), file("one", "source.pdf", target.getFileName().toString())));
+
+        assertEquals("%PDF-1.7\nuser-replacement\n%%EOF", Files.readString(target));
+        assertEquals("OUTPUT_VALIDATION_FAILED", writer.payloadCode(2));
+    }
+
+    @Test
     void validationFailurePreservesAReplacementAndReportsAnExplicitCleanupFailure() throws Exception {
         var writer = new RecordingWriter();
         var target = target("replaced.pdf");
         var service = new MachineSigningService(writer.writer(), request -> new FakeSession((file, completed) -> {
             Files.writeString(Path.of(file.target()), "%PDF-1.7\ninvalid\n%%EOF");
             completed.run();
-        }), path -> {
-            Files.delete(target);
+        }), content -> {
             Files.writeString(target, "%PDF-1.7\nreplacement\n%%EOF");
             return false;
         });
@@ -216,7 +270,7 @@ class MachineSigningServiceTest {
         service.sign("request-1", request("1234".toCharArray(), file("one", "source.pdf", target.getFileName().toString())));
 
         assertEquals("%PDF-1.7\nreplacement\n%%EOF", Files.readString(target));
-        assertEquals("OUTPUT_CLEANUP_FAILED", writer.payloadCode(2));
+        assertEquals("OUTPUT_VALIDATION_FAILED", writer.payloadCode(2));
     }
 
     @Test
@@ -237,31 +291,91 @@ class MachineSigningServiceTest {
     }
 
     @Test
-    void deterministicReservationCollisionStopsBeforeTokenWorkAndCleansOnlyOwnedReservations() throws Exception {
+    void preparationCleanupFailureIsReportedBeforeTokenWork() throws Exception {
         var writer = new RecordingWriter();
-        var firstTarget = target("reserved-first.pdf");
-        var secondTarget = target("reserved-alias.pdf");
         var tokenOpened = new AtomicBoolean();
-        var reservations = new AtomicInteger();
         var service = new MachineSigningService(writer.writer(), request -> {
             tokenOpened.set(true);
-            throw new AssertionError("Token must not open after target reservation collision");
-        }, path -> true, () -> { }, path -> {
-            if (reservations.incrementAndGet() == 2) {
-                throw new FileAlreadyExistsException(path.toString());
+            throw new AssertionError("Token must not open after preparation cleanup failure");
+        }, content -> true, () -> { }, targetParent -> new MachineSigningService.StagingWorkspace() {
+            @Override
+            public Path createFile(String prefix, String suffix) throws java.io.IOException {
+                throw new java.io.IOException("identity capture failed");
             }
-            return MachineSigningService.OwnedTarget.reserve(path);
+
+            @Override
+            public Path newOutputPath(String prefix, String suffix) {
+                throw new AssertionError("staging output must not be allocated");
+            }
+
+            @Override
+            public boolean cleanup() {
+                return false;
+            }
         });
 
-        service.sign("request-1", request("1234".toCharArray(),
-                file("one", "source-one.pdf", firstTarget.getFileName().toString()),
-                file("two", "source-two.pdf", secondTarget.getFileName().toString())));
+        service.sign("request-1", request("1234".toCharArray(), file("one", "source.pdf", "target.pdf")));
 
         assertFalse(tokenOpened.get());
-        assertFalse(Files.exists(firstTarget));
-        assertFalse(Files.exists(secondTarget));
-        assertEquals(List.of("session.started", "file.signingStarted", "file.failed", "file.signingStarted",
-                "file.failed", "session.failed"), writer.eventTypes());
+        assertEquals(List.of("session.started", "file.signingStarted", "file.failed", "session.failed"),
+                writer.eventTypes());
+        assertEquals("OUTPUT_CLEANUP_FAILED", writer.payloadCode(2));
+    }
+
+    @Test
+    void sourceSetupFailureCleansThePrivateWorkspaceBeforeTokenWork() throws Exception {
+        var writer = new RecordingWriter();
+        var tokenOpened = new AtomicBoolean();
+        var service = new MachineSigningService(writer.writer(), request -> {
+            tokenOpened.set(true);
+            throw new AssertionError("Token must not open after source setup failure");
+        }, content -> true, () -> { }, targetParent -> {
+            var workspace = MachineSigningService.PrivateWorkspace.create(targetParent);
+            return new MachineSigningService.StagingWorkspace() {
+                @Override
+                public Path createFile(String prefix, String suffix) throws java.io.IOException {
+                    workspace.createFile(prefix, suffix);
+                    throw new java.io.IOException("identity capture failed");
+                }
+
+                @Override
+                public Path newOutputPath(String prefix, String suffix) throws java.io.IOException {
+                    return workspace.newOutputPath(prefix, suffix);
+                }
+
+                @Override
+                public boolean cleanup() {
+                    return workspace.cleanup();
+                }
+            };
+        });
+
+        service.sign("request-1", request("1234".toCharArray(), file("one", "source.pdf", "target.pdf")));
+
+        assertFalse(tokenOpened.get());
+        try (var entries = Files.list(temporaryDirectory.toRealPath())) {
+            assertFalse(entries.anyMatch(path -> path.getFileName().toString().startsWith(".autogram-machine-")));
+        }
+        assertEquals("SIGNING_UNAVAILABLE", writer.payloadCode(2));
+    }
+
+    @Test
+    void rejectsNonPdfSourceDuringSingleOpenPreparationBeforeTokenWork() throws Exception {
+        var writer = new RecordingWriter();
+        var source = Files.writeString(temporaryDirectory.resolve("not-pdf.pdf"), "not a PDF").toRealPath();
+        var target = target("not-pdf-signed.pdf");
+        var tokenOpened = new AtomicBoolean();
+        var service = new MachineSigningService(writer.writer(), request -> {
+            tokenOpened.set(true);
+            throw new AssertionError("Token must not open for a non-PDF source");
+        }, content -> true);
+
+        service.sign("request-1", request("1234".toCharArray(),
+                new MachineFile("one", source.toString(), target.toString())));
+
+        assertFalse(tokenOpened.get());
+        assertFalse(Files.exists(target));
+        assertEquals("SIGNING_UNAVAILABLE", writer.payloadCode(2));
     }
 
     @Test
@@ -272,18 +386,27 @@ class MachineSigningServiceTest {
         var added = qualifiedReport("existing", "new");
         var invalidNew = qualifiedReport("existing", "new");
         when(invalidNew.isValid("new")).thenReturn(false);
-        var validator = new MachineSigningService.PdfOutputValidator(new MachineInspectionService(path ->
-                switch (path.getFileName().toString()) {
-                    case "before.pdf" -> existing;
-                    case "rejected.pdf" -> invalidNew;
-                    default -> added;
-                }));
-        var before = temporaryDirectory.resolve("before.pdf");
+        var validator = new MachineSigningService.PdfOutputValidator(new MachineInspectionService(path -> existing,
+                content -> new String(content, java.nio.charset.StandardCharsets.ISO_8859_1).contains("before")
+                        ? existing : new String(content, java.nio.charset.StandardCharsets.ISO_8859_1).contains("rejected")
+                                ? invalidNew : added));
+        var before = "%PDF-1.7\nbefore\n%%EOF".getBytes(java.nio.charset.StandardCharsets.ISO_8859_1);
 
         assertEquals(java.util.Set.of("existing"), validator.signatureIds(before));
-        assertTrue(validator.isValid(target, java.util.Set.of("existing")));
-        assertFalse(validator.isValid(rejected, java.util.Set.of("existing")));
-        assertFalse(validator.isValid(target, java.util.Set.of("existing", "new")));
+        assertTrue(validator.isValid(Files.readAllBytes(target), java.util.Set.of("existing")));
+        assertFalse(validator.isValid(Files.readAllBytes(rejected), java.util.Set.of("existing")));
+        assertFalse(validator.isValid(Files.readAllBytes(target), java.util.Set.of("existing", "new")));
+    }
+
+    @Test
+    void outputValidatorRejectsSymlinkPaths() throws Exception {
+        var document = Files.writeString(target("regular.pdf"), "%PDF-1.7\nregular\n%%EOF");
+        var link = target("linked.pdf");
+        Files.createSymbolicLink(link, document);
+        var validator = new MachineSigningService.PdfOutputValidator(new MachineInspectionService(path -> qualifiedReport(),
+                content -> qualifiedReport("new")));
+
+        assertThrows(java.io.IOException.class, () -> validator.isValid(link, java.util.Set.of()));
     }
 
     @Test
@@ -329,6 +452,24 @@ class MachineSigningServiceTest {
                     capturedUi.set(ui);
                     issuedSecret.set(ui.getKeystorePassword());
                     throw new IllegalStateException("factory failure");
+                }));
+
+        assertTrue(capturedUi.get().isClosed());
+        assertTrue(Arrays.equals(new char[issuedSecret.get().length], issuedSecret.get()));
+    }
+
+    @Test
+    void errorDuringPasswordManagerConstructionStillZeroizesMachineSecretUi() {
+        var capturedUi = new AtomicReference<MachineSecretUI>();
+        var issuedSecret = new AtomicReference<char[]>();
+        var request = new SignRequest("test", "123", "1234".toCharArray(), "PAdES_BASELINE_T",
+                new QualifiedTimestampRequest(true, List.of("https://tsa.example.test")), List.of());
+
+        assertThrows(AssertionError.class, () -> MachineSigningService.DefaultSigningSession.open(
+                new TestTokenDriver("test"), request, new MachineSettings(true), (ui, settings) -> {
+                    capturedUi.set(ui);
+                    issuedSecret.set(ui.getKeystorePassword());
+                    throw new AssertionError("factory error");
                 }));
 
         assertTrue(capturedUi.get().isClosed());

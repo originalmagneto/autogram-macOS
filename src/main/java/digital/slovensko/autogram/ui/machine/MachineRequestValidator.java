@@ -5,19 +5,14 @@ import org.apache.commons.cli.CommandLine;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
-import java.nio.channels.FileChannel;
-import java.nio.file.StandardOpenOption;
-import java.nio.file.attribute.BasicFileAttributes;
-import java.nio.file.attribute.FileTime;
+import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Objects;
 import java.util.Set;
 
 public final class MachineRequestValidator {
@@ -76,15 +71,10 @@ public final class MachineRequestValidator {
             var source = canonicalSource(file.source());
             var target = canonicalTarget(file.target());
             if (source.equals(target) || Files.exists(target, LinkOption.NOFOLLOW_LINKS)
-                    || !targets.add(target.toString().toLowerCase(Locale.ROOT))
-                    || !isPdf(source)) {
+                    || !targets.add(normalizeTarget(target))) {
                 throw invalidRequest();
             }
-            try {
-                validated.add(new ValidatedMachineFile(file, source, target, MachineFileIdentity.capture(source)));
-            } catch (IOException exception) {
-                throw invalidRequest();
-            }
+            validated.add(new ValidatedMachineFile(file, source, target));
         }
         return List.copyOf(validated);
     }
@@ -130,14 +120,8 @@ public final class MachineRequestValidator {
         }
     }
 
-    private static boolean isPdf(Path source) {
-        try (var stream = java.nio.channels.Channels.newInputStream(
-                FileChannel.open(source, StandardOpenOption.READ, LinkOption.NOFOLLOW_LINKS))) {
-            var header = stream.readNBytes(5);
-            return "%PDF-".equals(new String(header, StandardCharsets.ISO_8859_1));
-        } catch (IOException exception) {
-            return false;
-        }
+    private static String normalizeTarget(Path target) {
+        return Normalizer.normalize(target.toString(), Normalizer.Form.NFC).toLowerCase(Locale.ROOT);
     }
 
     private static boolean isSupportedTsaUrl(String value) {
@@ -173,27 +157,5 @@ public final class MachineRequestValidator {
 record ValidatedSignRequest(SignRequest request, List<ValidatedMachineFile> files) {
 }
 
-record ValidatedMachineFile(MachineFile file, Path source, Path target, MachineFileIdentity sourceIdentity) {
-}
-
-record MachineFileIdentity(Object fileKey, long size, FileTime lastModifiedTime) {
-    static MachineFileIdentity capture(Path path) throws IOException {
-        var attributes = Files.readAttributes(path, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
-        if (!attributes.isRegularFile() || attributes.fileKey() == null) {
-            throw new IOException("File identity unavailable");
-        }
-        return new MachineFileIdentity(attributes.fileKey(), attributes.size(), attributes.lastModifiedTime());
-    }
-
-    void verify(Path path) throws IOException {
-        if (!equals(capture(path))) {
-            throw new IOException("File identity changed");
-        }
-    }
-
-    void verifySameFile(Path path) throws IOException {
-        if (!Objects.equals(fileKey, capture(path).fileKey())) {
-            throw new IOException("File identity changed");
-        }
-    }
+record ValidatedMachineFile(MachineFile file, Path source, Path target) {
 }

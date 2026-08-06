@@ -21,16 +21,11 @@ public final class MachineFileResponder extends Responder {
 
     @Override
     public void onDocumentSigned(SignedDocument signedDocument) {
-        MachineFileIdentity targetIdentity = null;
         try {
             Files.createFile(target);
-            targetIdentity = MachineFileIdentity.capture(target);
             signedDocument.getDocument().save(target.toString());
             completed.accept(target);
         } catch (IOException | RuntimeException exception) {
-            if (targetIdentity != null && !deleteTarget(targetIdentity)) {
-                throw new MachineProtocolException("OUTPUT_CLEANUP_FAILED", exception);
-            }
             throw new MachineProtocolException("OUTPUT_WRITE_FAILED", exception);
         }
     }
@@ -40,13 +35,4 @@ public final class MachineFileResponder extends Responder {
         throw new MachineProtocolException("SIGNING_FAILED", error);
     }
 
-    private boolean deleteTarget(MachineFileIdentity targetIdentity) {
-        try {
-            targetIdentity.verifySameFile(target);
-            Files.delete(target);
-            return true;
-        } catch (IOException exception) {
-            return false;
-        }
-    }
 }

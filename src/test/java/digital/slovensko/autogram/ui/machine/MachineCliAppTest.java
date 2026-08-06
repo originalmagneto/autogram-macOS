@@ -5,12 +5,14 @@ import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.Options;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.PrintWriter;
 import java.io.Reader;
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.KeyStore;
 import java.util.Arrays;
@@ -21,6 +23,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class MachineCliAppTest {
+    @TempDir
+    Path temporaryDirectory;
+
     @Test
     void rejectsUnsupportedProtocolVersionAsJsonEvent() throws Exception {
         var stdin = new StringReader("{\"protocolVersion\":2,\"requestId\":\"r\",\"operation\":\"CAPABILITIES\",\"payload\":{}}");
@@ -128,6 +133,41 @@ class MachineCliAppTest {
         var serialized = events.toString();
         assertFalse(serialized.contains("1234"));
         assertFalse(serialized.contains("/sensitive/driver-path"));
+    }
+
+    @Test
+    void dispatchesSuccessfulSignThroughHardwareFreeSigningServiceFactory() throws Exception {
+        var source = Files.writeString(temporaryDirectory.resolve("source.pdf"), "%PDF-1.7\nsource\n%%EOF").toRealPath();
+        var target = temporaryDirectory.toRealPath().resolve("signed.pdf");
+        var stdout = new StringWriter();
+        var input = "{\"protocolVersion\":1,\"requestId\":\"request-1\",\"operation\":\"SIGN\",\"payload\":{"
+                + "\"driver\":\"fake\",\"certificateSerial\":\"123\",\"pin\":\"1234\","
+                + "\"signatureLevel\":\"PAdES_BASELINE_T\",\"timestamp\":{\"required\":true,"
+                + "\"servers\":[\"https://tsa.example.test\"]},\"files\":[{\"id\":\"one\",\"source\":\""
+                + source + "\",\"target\":\"" + target + "\"}]}}";
+        var inspection = new MachineInspectionService(path -> { throw new AssertionError("not used"); });
+        var signingFactory = (MachineCliApp.SigningServiceFactory) (writer, ignoredInspection, ignoredTrust) ->
+                new MachineSigningService(writer, request -> new MachineSigningService.SigningSession() {
+                    @Override
+                    public void sign(MachineFile file, Runnable completed) throws Exception {
+                        Files.writeString(Path.of(file.target()), "%PDF-1.7\nsigned\n%%EOF");
+                        completed.run();
+                    }
+
+                    @Override
+                    public void close() {
+                    }
+                }, content -> true);
+
+        var code = MachineCliApp.start(commandLine("SIGN"), new StringReader(input), new PrintWriter(stdout),
+                new PrintWriter(new StringWriter()), new MachineDriverService(), inspection, () -> { }, signingFactory);
+
+        var events = Arrays.stream(stdout.toString().strip().split("\\n"))
+                .map(JsonParser::parseString).map(element -> element.getAsJsonObject()).toList();
+        assertEquals(0, code, stdout.toString());
+        assertEquals("%PDF-1.7\nsigned\n%%EOF", Files.readString(target));
+        assertEquals(List.of("session.started", "file.signingStarted", "file.completed", "session.completed"),
+                eventTypes(events));
     }
 
     private static CommandLine commandLine(String operation) throws Exception {

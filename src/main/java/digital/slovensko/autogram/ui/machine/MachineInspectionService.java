@@ -4,6 +4,7 @@ import com.google.gson.JsonNull;
 import com.google.gson.JsonObject;
 import digital.slovensko.autogram.core.SignatureValidator;
 import eu.europa.esig.dss.model.FileDocument;
+import eu.europa.esig.dss.model.InMemoryDocument;
 import eu.europa.esig.dss.pades.validation.PDFDocumentValidator;
 import eu.europa.esig.dss.simplereport.SimpleReport;
 
@@ -13,6 +14,7 @@ import java.util.Date;
 
 public final class MachineInspectionService {
     private final ReportReader reportReader;
+    private final ByteReportReader byteReportReader;
     private final TimestampQualificationEvaluator timestampQualificationEvaluator;
 
     public MachineInspectionService() {
@@ -20,12 +22,21 @@ public final class MachineInspectionService {
     }
 
     MachineInspectionService(ReportReader reportReader) {
+        this(reportReader, MachineInspectionService::readTrustedReport);
+    }
+
+    MachineInspectionService(ReportReader reportReader, ByteReportReader byteReportReader) {
         this.reportReader = reportReader;
+        this.byteReportReader = byteReportReader;
         timestampQualificationEvaluator = new TimestampQualificationEvaluator();
     }
 
     public JsonObject inspect(Path path) {
         return mapReport(reportReader.read(path));
+    }
+
+    public JsonObject inspect(byte[] content) {
+        return mapReport(byteReportReader.read(content));
     }
 
     static int readStructuralSignatureCount(Path path) {
@@ -34,6 +45,11 @@ public final class MachineInspectionService {
 
     private static SimpleReport readTrustedReport(Path path) {
         var validator = new PDFDocumentValidator(new FileDocument(path.toFile()));
+        return SignatureValidator.getInstance().validate(validator).getSimpleReport();
+    }
+
+    private static SimpleReport readTrustedReport(byte[] content) {
+        var validator = new PDFDocumentValidator(new InMemoryDocument(content));
         return SignatureValidator.getInstance().validate(validator).getSimpleReport();
     }
 
@@ -104,5 +120,10 @@ public final class MachineInspectionService {
     @FunctionalInterface
     interface ReportReader {
         SimpleReport read(Path path);
+    }
+
+    @FunctionalInterface
+    interface ByteReportReader {
+        SimpleReport read(byte[] content);
     }
 }

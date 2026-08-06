@@ -34,15 +34,12 @@ class MachineRequestValidatorTest {
     }
 
     @Test
-    void rejectsMissingNonPdfAndExistingTargetFiles() throws Exception {
+    void rejectsMissingAndExistingTargetFiles() throws Exception {
         var missing = signRequest("PAdES_BASELINE_T", files(temporaryDirectory.resolve("missing.pdf"), target("one.pdf")));
-        var text = Files.writeString(temporaryDirectory.resolve("text.pdf"), "not a PDF");
-        var nonPdf = signRequest("PAdES_BASELINE_T", files(text, target("two.pdf")));
         var existingTarget = Files.writeString(target("existing.pdf"), "%PDF-1.7\n%%EOF");
         var collision = signRequest("PAdES_BASELINE_T", files(pdf("source.pdf"), existingTarget));
 
         assertInvalid(missing);
-        assertInvalid(nonPdf);
         assertInvalid(collision);
     }
 
@@ -72,6 +69,18 @@ class MachineRequestValidatorTest {
         var duplicate = signRequest("PAdES_BASELINE_T", List.of(
                 new MachineFile("one", source.toString(), target("Signed.PDF").toString()),
                 new MachineFile("two", pdf("other.pdf").toString(), target("signed.pdf").toString())));
+
+        assertInvalid(duplicate);
+    }
+
+    @Test
+    void rejectsUnicodeEquivalentDuplicateTargetsBeforeTokenWork() throws Exception {
+        var source = pdf("source.pdf");
+        var composed = target("podpis-é.pdf");
+        var decomposed = target("podpis-e\u0301.pdf");
+        var duplicate = signRequest("PAdES_BASELINE_T", List.of(
+                new MachineFile("one", source.toString(), composed.toString()),
+                new MachineFile("two", pdf("other.pdf").toString(), decomposed.toString())));
 
         assertInvalid(duplicate);
     }

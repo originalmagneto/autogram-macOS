@@ -33,6 +33,13 @@ public final class MachineCliApp {
 
     static int start(CommandLine commandLine, Reader input, PrintWriter output, PrintWriter error,
             MachineDriverService driverService, MachineInspectionService inspectionService, Runnable trustInitializer) {
+        return start(commandLine, input, output, error, driverService, inspectionService, trustInitializer,
+                MachineSigningService::new);
+    }
+
+    static int start(CommandLine commandLine, Reader input, PrintWriter output, PrintWriter error,
+            MachineDriverService driverService, MachineInspectionService inspectionService, Runnable trustInitializer,
+            SigningServiceFactory signingServiceFactory) {
         var writer = new MachineEventWriter(output);
         try {
             MachineRequestValidator.validateCommandLine(commandLine);
@@ -50,7 +57,7 @@ public final class MachineCliApp {
         try {
             var request = new MachineProtocolCodec().decodeRequest(new StringReader(rawRequest));
             MachineRequestValidator.validate(commandLine, request);
-            return dispatch(writer, request, driverService, inspectionService, trustInitializer);
+            return dispatch(writer, request, driverService, inspectionService, trustInitializer, signingServiceFactory);
         } catch (MachineProtocolException exception) {
             return fail(writer, requestId(rawRequest), errorCode(exception, rawRequest));
         } catch (Exception exception) {
@@ -59,13 +66,13 @@ public final class MachineCliApp {
     }
 
     private static int dispatch(MachineEventWriter writer, MachineRequest request, MachineDriverService driverService,
-            MachineInspectionService inspectionService, Runnable trustInitializer) {
+            MachineInspectionService inspectionService, Runnable trustInitializer, SigningServiceFactory signingServiceFactory) {
         return switch (request.operation()) {
             case CAPABILITIES -> dispatchCapabilities(writer, request, driverService);
             case DRIVERS -> dispatchDrivers(writer, request, driverService);
             case CERTIFICATES -> dispatchCertificates(writer, request, driverService);
             case INSPECT -> dispatchInspection(writer, request, inspectionService, trustInitializer);
-            case SIGN -> dispatchSigning(writer, request, inspectionService, trustInitializer);
+            case SIGN -> dispatchSigning(writer, request, inspectionService, trustInitializer, signingServiceFactory);
         };
     }
 
@@ -108,11 +115,11 @@ public final class MachineCliApp {
     }
 
     private static int dispatchSigning(MachineEventWriter writer, MachineRequest request,
-            MachineInspectionService inspectionService, Runnable trustInitializer) {
+            MachineInspectionService inspectionService, Runnable trustInitializer, SigningServiceFactory signingServiceFactory) {
         var signRequest = requiredSignRequest(request.payload());
         try {
             MachineRequestValidator.validateSign(signRequest);
-            new MachineSigningService(writer, inspectionService, trustInitializer).sign(request.requestId(), signRequest);
+            signingServiceFactory.create(writer, inspectionService, trustInitializer).sign(request.requestId(), signRequest);
             return 0;
         } finally {
             Arrays.fill(signRequest.pin(), '\0');
@@ -196,7 +203,7 @@ public final class MachineCliApp {
             var files = requiredInspectionRequest(filesPayload(payload.get("files"))).files();
             return new SignRequest(payload.get("driver").getAsString(), payload.get("certificateSerial").getAsString(),
                     pin, payload.get("signatureLevel").getAsString(), timestamp, files);
-        } catch (RuntimeException exception) {
+        } catch (Throwable exception) {
             Arrays.fill(pin, '\0');
             throw exception;
         }
@@ -282,5 +289,11 @@ public final class MachineCliApp {
         } catch (JsonParseException exception) {
             return "unknown";
         }
+    }
+
+    @FunctionalInterface
+    interface SigningServiceFactory {
+        MachineSigningService create(MachineEventWriter writer, MachineInspectionService inspectionService,
+                Runnable trustInitializer);
     }
 }
