@@ -9,12 +9,14 @@ enum AppIdentity {
 
 @main
 struct AutogramApp: App {
+    @State private var workspace = WorkspaceModel.launchWorkspace()
+
     var body: some Scene {
         WindowGroup {
-            WorkspaceView()
+            WorkspaceView(workspace: workspace)
         }
         .commands {
-            AppCommands()
+            AppCommands(workspace: workspace)
         }
 
         Settings {

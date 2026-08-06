@@ -12,6 +12,17 @@ struct FakeSigningEngine: SigningEngine {
         self.script = script
     }
 
+    static func launchEngine(environment: [String: String] = ProcessInfo.processInfo.environment) -> FakeSigningEngine {
+        guard environment["AUTOGRAM_FAKE_ENGINE"] == "partial-failure" else {
+            return FakeSigningEngine()
+        }
+
+        return FakeSigningEngine(script: [
+            .completed("agreement"),
+            .failed("invoice")
+        ])
+    }
+
     func capabilities() async throws -> EngineCapabilities {
         EngineCapabilities(protocolVersion: 1, supportsQualifiedTimestamp: true)
     }
