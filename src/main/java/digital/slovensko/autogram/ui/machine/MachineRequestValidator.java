@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Set;
 
 public final class MachineRequestValidator {
@@ -186,6 +187,12 @@ record MachineFileIdentity(Object fileKey, long size, FileTime lastModifiedTime)
 
     void verify(Path path) throws IOException {
         if (!equals(capture(path))) {
+            throw new IOException("File identity changed");
+        }
+    }
+
+    void verifySameFile(Path path) throws IOException {
+        if (!Objects.equals(fileKey, capture(path).fileKey())) {
             throw new IOException("File identity changed");
         }
     }

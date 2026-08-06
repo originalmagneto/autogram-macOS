@@ -17,12 +17,15 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.math.BigInteger;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.security.KeyStore;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -231,6 +234,34 @@ class MachineSigningServiceTest {
 
         assertFalse(Files.exists(target));
         assertEquals("OUTPUT_VALIDATION_FAILED", writer.payloadCode(2));
+    }
+
+    @Test
+    void deterministicReservationCollisionStopsBeforeTokenWorkAndCleansOnlyOwnedReservations() throws Exception {
+        var writer = new RecordingWriter();
+        var firstTarget = target("reserved-first.pdf");
+        var secondTarget = target("reserved-alias.pdf");
+        var tokenOpened = new AtomicBoolean();
+        var reservations = new AtomicInteger();
+        var service = new MachineSigningService(writer.writer(), request -> {
+            tokenOpened.set(true);
+            throw new AssertionError("Token must not open after target reservation collision");
+        }, path -> true, () -> { }, path -> {
+            if (reservations.incrementAndGet() == 2) {
+                throw new FileAlreadyExistsException(path.toString());
+            }
+            return MachineSigningService.OwnedTarget.reserve(path);
+        });
+
+        service.sign("request-1", request("1234".toCharArray(),
+                file("one", "source-one.pdf", firstTarget.getFileName().toString()),
+                file("two", "source-two.pdf", secondTarget.getFileName().toString())));
+
+        assertFalse(tokenOpened.get());
+        assertFalse(Files.exists(firstTarget));
+        assertFalse(Files.exists(secondTarget));
+        assertEquals(List.of("session.started", "file.signingStarted", "file.failed", "file.signingStarted",
+                "file.failed", "session.failed"), writer.eventTypes());
     }
 
     @Test

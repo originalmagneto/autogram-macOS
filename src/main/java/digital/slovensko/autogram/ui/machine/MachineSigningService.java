@@ -35,6 +35,7 @@ public final class MachineSigningService {
     private final Function<SignRequest, SigningSession> sessionFactory;
     private final OutputValidator outputValidator;
     private final Runnable trustInitializer;
+    private final TargetReserver targetReserver;
 
     public MachineSigningService(MachineEventWriter writer, MachineInspectionService inspectionService,
             Runnable trustInitializer) {
@@ -48,15 +49,21 @@ public final class MachineSigningService {
 
     MachineSigningService(MachineEventWriter writer, Function<SignRequest, SigningSession> sessionFactory,
             OutputValidator outputValidator, Runnable trustInitializer) {
+        this(writer, sessionFactory, outputValidator, trustInitializer, OwnedTarget::reserve);
+    }
+
+    MachineSigningService(MachineEventWriter writer, Function<SignRequest, SigningSession> sessionFactory,
+            OutputValidator outputValidator, Runnable trustInitializer, TargetReserver targetReserver) {
         this.writer = Objects.requireNonNull(writer);
         this.sessionFactory = Objects.requireNonNull(sessionFactory);
         this.outputValidator = Objects.requireNonNull(outputValidator);
         this.trustInitializer = Objects.requireNonNull(trustInitializer);
+        this.targetReserver = Objects.requireNonNull(targetReserver);
     }
 
     public void sign(String requestId, SignRequest request) {
         writer.write("session.started", requestId, null, new JsonObject());
-        boolean sessionFailed = false;
+        String sessionFailureCode = null;
         List<PreparedFile> preparedFiles = List.of();
         int processedFiles = 0;
         try {
@@ -72,16 +79,18 @@ public final class MachineSigningService {
                 }
             }
         } catch (Exception exception) {
-            sessionFailed = true;
+            sessionFailureCode = "SIGNING_UNAVAILABLE";
             failUnprocessedFiles(requestId, request.files().subList(processedFiles, request.files().size()),
                     "SIGNING_UNAVAILABLE");
         } finally {
-            closePreparedFiles(preparedFiles);
+            if (!closePreparedFiles(preparedFiles)) {
+                sessionFailureCode = "OUTPUT_CLEANUP_FAILED";
+            }
             Arrays.fill(request.pin(), '\0');
         }
 
-        if (sessionFailed) {
-            writer.write("session.failed", requestId, null, failure("SIGNING_UNAVAILABLE"));
+        if (sessionFailureCode != null) {
+            writer.write("session.failed", requestId, null, failure(sessionFailureCode));
         } else {
             writer.write("session.completed", requestId, null, new JsonObject());
         }
@@ -92,12 +101,13 @@ public final class MachineSigningService {
         var prepared = new ArrayList<PreparedFile>();
         try {
             for (var file : files) {
-                prepared.add(PreparedFile.prepare(workspace, file));
+                prepared.add(PreparedFile.prepare(workspace, file, targetReserver));
             }
             return List.copyOf(prepared);
         } catch (IOException | RuntimeException exception) {
-            closePreparedFiles(prepared);
-            deleteWorkspace(workspace);
+            if (!closePreparedFiles(prepared) || !deleteWorkspace(workspace)) {
+                exception.addSuppressed(new IOException("Could not clean up machine signing workspace"));
+            }
             throw exception;
         }
     }
@@ -109,6 +119,7 @@ public final class MachineSigningService {
             var completed = new boolean[] { false };
             var previousSignatureIds = prepared.previousSignatureIds();
             session.sign(prepared.signingFile(), () -> completed[0] = true);
+            prepared.captureStagingIdentityIfPresent();
             if (!completed[0]) {
                 throw new MachineProtocolException("OUTPUT_VALIDATION_FAILED");
             }
@@ -159,23 +170,27 @@ public final class MachineSigningService {
         return payload;
     }
 
-    private static void closePreparedFiles(List<PreparedFile> preparedFiles) {
+    private static boolean closePreparedFiles(List<PreparedFile> preparedFiles) {
+        var cleaned = true;
         for (var prepared : preparedFiles) {
-            prepared.close();
+            cleaned &= prepared.closeAndDeleteOwnedArtifacts();
         }
         if (!preparedFiles.isEmpty()) {
-            deleteWorkspace(preparedFiles.getFirst().workspace());
+            cleaned &= deleteWorkspace(preparedFiles.getFirst().workspace());
         }
+        return cleaned;
     }
 
-    private static void deleteWorkspace(Path workspace) {
+    private static boolean deleteWorkspace(Path workspace) {
         try {
             Files.deleteIfExists(workspace);
+            return true;
         } catch (IOException ignored) {
+            return false;
         }
     }
 
-    private static final class PreparedFile implements AutoCloseable {
+    private static final class PreparedFile {
         private final Path workspace;
         private final MachineFile file;
         private final Path snapshot;
@@ -184,6 +199,7 @@ public final class MachineSigningService {
         private final MachineFileIdentity snapshotIdentity;
         private MachineFileIdentity stagingIdentity;
         private Set<String> previousSignatureIds;
+        private boolean targetDeleted;
         private boolean successful;
 
         private PreparedFile(Path workspace, MachineFile file, Path snapshot, Path staging, OwnedTarget target,
@@ -196,16 +212,21 @@ public final class MachineSigningService {
             this.snapshotIdentity = snapshotIdentity;
         }
 
-        private static PreparedFile prepare(Path workspace, ValidatedMachineFile validated) throws IOException {
+        private static PreparedFile prepare(Path workspace, ValidatedMachineFile validated, TargetReserver targetReserver)
+                throws IOException {
             var file = validated.file();
             var snapshot = Files.createTempFile(workspace, "source-", ".pdf");
             try {
                 copySourceSnapshot(validated.source(), validated.sourceIdentity(), snapshot);
                 var staging = workspace.resolve("staging-" + snapshot.getFileName());
-                var target = OwnedTarget.reserve(validated.target());
+                var target = targetReserver.reserve(validated.target());
                 return new PreparedFile(workspace, file, snapshot, staging, target, MachineFileIdentity.capture(snapshot));
             } catch (IOException | RuntimeException exception) {
-                Files.deleteIfExists(snapshot);
+                try {
+                    deleteOwned(snapshot, MachineFileIdentity.capture(snapshot));
+                } catch (IOException cleanupException) {
+                    exception.addSuppressed(cleanupException);
+                }
                 throw exception;
             }
         }
@@ -262,55 +283,74 @@ public final class MachineSigningService {
             target.copyFrom(staging);
         }
 
-        private boolean validateOwnedTarget(OutputValidation validation, Set<String> previousSignatureIds) throws Exception {
-            target.verifyCurrentPath();
-            var valid = validation.isValid(target.path(), previousSignatureIds);
-            target.verifyCurrentPath();
-            return valid;
-        }
-
         private void markSuccessful() throws IOException {
             target.verifyCurrentPath();
             successful = true;
         }
 
         private boolean cleanupFailedOutput() {
-            try {
-                target.deleteOwned();
-                deleteOwned(staging, stagingIdentity);
-                return true;
-            } catch (IOException exception) {
-                return false;
+            var cleaned = deleteStagingIfOwned();
+            if (!targetDeleted && !target.deleteOwned()) {
+                cleaned = false;
+            } else {
+                targetDeleted = true;
             }
+            return cleaned;
         }
 
         private void captureStagingIdentity() throws IOException {
             stagingIdentity = MachineFileIdentity.capture(staging);
         }
 
+        private void captureStagingIdentityIfPresent() throws IOException {
+            if (Files.exists(staging, LinkOption.NOFOLLOW_LINKS)) {
+                captureStagingIdentity();
+            }
+        }
+
         private static void deleteOwned(Path path, MachineFileIdentity identity) throws IOException {
             if (identity == null) {
                 return;
             }
-            identity.verify(path);
+            identity.verifySameFile(path);
             Files.delete(path);
         }
 
-        @Override
-        public void close() {
-            if (!successful) {
-                cleanupFailedOutput();
+        private boolean deleteStagingIfOwned() {
+            if (stagingIdentity == null) {
+                return !Files.exists(staging, LinkOption.NOFOLLOW_LINKS);
             }
-            target.close();
             try {
                 deleteOwned(staging, stagingIdentity);
-                deleteOwned(snapshot, snapshotIdentity);
-            } catch (IOException ignored) {
+                stagingIdentity = null;
+                return true;
+            } catch (IOException exception) {
+                return false;
             }
+        }
+
+        private boolean closeAndDeleteOwnedArtifacts() {
+            var cleaned = true;
+            if (!successful) {
+                cleaned &= cleanupFailedOutput();
+            } else {
+                cleaned &= deleteStagingIfOwned();
+            }
+            try {
+                deleteOwned(snapshot, snapshotIdentity);
+            } catch (IOException exception) {
+                cleaned = false;
+            }
+            try {
+                target.close();
+            } catch (IOException exception) {
+                cleaned = false;
+            }
+            return cleaned;
         }
     }
 
-    private static final class OwnedTarget implements AutoCloseable {
+    static final class OwnedTarget {
         private final Path path;
         private final FileChannel channel;
         private final Object fileKey;
@@ -321,7 +361,7 @@ public final class MachineSigningService {
             this.fileKey = fileKey;
         }
 
-        private static OwnedTarget reserve(Path path) throws IOException {
+        static OwnedTarget reserve(Path path) throws IOException {
             var channel = FileChannel.open(path, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE,
                     LinkOption.NOFOLLOW_LINKS);
             MachineFileIdentity reservedIdentity = null;
@@ -333,12 +373,17 @@ public final class MachineSigningService {
                 reservedIdentity = MachineFileIdentity.capture(path);
                 return new OwnedTarget(path, channel, attributes.fileKey());
             } catch (IOException | RuntimeException exception) {
-                channel.close();
+                try {
+                    channel.close();
+                } catch (IOException closeException) {
+                    exception.addSuppressed(closeException);
+                }
                 if (reservedIdentity != null) {
                     try {
                         reservedIdentity.verify(path);
                         Files.delete(path);
-                    } catch (IOException ignored) {
+                    } catch (IOException cleanupException) {
+                        exception.addSuppressed(cleanupException);
                     }
                 }
                 throw exception;
@@ -367,9 +412,14 @@ public final class MachineSigningService {
             }
         }
 
-        private void deleteOwned() throws IOException {
-            verifyCurrentPath();
-            Files.delete(path);
+        private boolean deleteOwned() {
+            try {
+                verifyCurrentPath();
+                Files.delete(path);
+                return true;
+            } catch (IOException exception) {
+                return false;
+            }
         }
 
         private static BasicFileAttributes attributes(Path path) throws IOException {
@@ -387,18 +437,9 @@ public final class MachineSigningService {
             }
         }
 
-        @Override
-        public void close() {
-            try {
-                channel.close();
-            } catch (IOException ignored) {
-            }
+        private void close() throws IOException {
+            channel.close();
         }
-    }
-
-    @FunctionalInterface
-    private interface OutputValidation {
-        boolean isValid(Path path, Set<String> previousSignatureIds);
     }
 
     interface SigningSession extends AutoCloseable {
@@ -419,6 +460,11 @@ public final class MachineSigningService {
         default boolean isValid(Path target, Set<String> previousSignatureIds) throws Exception {
             return isValid(target);
         }
+    }
+
+    @FunctionalInterface
+    interface TargetReserver {
+        OwnedTarget reserve(Path path) throws IOException;
     }
 
     static final class DefaultSessionFactory implements Function<SignRequest, SigningSession> {

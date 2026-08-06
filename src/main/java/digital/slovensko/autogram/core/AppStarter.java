@@ -9,6 +9,7 @@ import org.apache.commons.cli.*;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
+import java.util.function.Function;
 
 public class AppStarter {
     private static final Options options = new Options().addOptionGroup(new OptionGroup().addOption(new Option(null,
@@ -58,15 +59,13 @@ public class AppStarter {
             } else if (cmd.hasOption("u")) {
                 printUsage();
             } else if (cmd.hasOption("c")) {
-                var exitCode = cmd.hasOption("machine-readable")
-                        ? MachineCliApp.start(cmd,
+                var exitCode = dispatchCli(cmd, CliApp::start, machineCommandLine -> MachineCliApp.start(machineCommandLine,
                                 new InputStreamReader(System.in, StandardCharsets.UTF_8),
                                 new PrintWriter(System.out, true, StandardCharsets.UTF_8),
-                                new PrintWriter(System.err, true, StandardCharsets.UTF_8))
-                        : CliApp.start(cmd);
+                                new PrintWriter(System.err, true, StandardCharsets.UTF_8)));
                 System.out.flush();
                 System.err.flush();
-                if (isIntelProcess())
+                if (requiresIntelCliCleanup(cmd))
                     terminateCliProcess(exitCode);
                 else
                     System.exit(exitCode);
@@ -81,6 +80,15 @@ public class AppStarter {
 
     static CommandLine parse(String[] args) throws ParseException {
         return new DefaultParser().parse(options, args);
+    }
+
+    static int dispatchCli(CommandLine commandLine, Function<CommandLine, Integer> humanCli,
+            Function<CommandLine, Integer> machineCli) {
+        return commandLine.hasOption("machine-readable") ? machineCli.apply(commandLine) : humanCli.apply(commandLine);
+    }
+
+    static boolean requiresIntelCliCleanup(CommandLine commandLine) {
+        return !commandLine.hasOption("machine-readable") && isIntelProcess();
     }
 
     private static void terminateCliProcess(int exitCode) {
