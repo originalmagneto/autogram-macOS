@@ -3,9 +3,11 @@ import SwiftUI
 
 struct SigningInspector: View {
     let workspace: WorkspaceModel
+    @Binding var isPINSheetPresented: Bool
+    let configuredDriverID: String
+    let configuredCertificateSerial: String
     @State private var certificateSerial: String?
     @State private var pin = ""
-    @State private var isPINSheetPresented = false
 
     var body: some View {
         Form {
@@ -21,6 +23,15 @@ struct SigningInspector: View {
                         selectedSerial: $certificateSerial
                     ) {
                         isPINSheetPresented = true
+                    }
+                }
+            } else if !credentialsAreConfigured {
+                Section("Certificate") {
+                    Label("Signing configuration needed", systemImage: "gearshape")
+                    Text("Choose a driver and certificate in Settings before signing.")
+                        .foregroundStyle(.secondary)
+                    SettingsLink {
+                        Text("Open Settings")
                     }
                 }
             }
@@ -44,9 +55,31 @@ struct SigningInspector: View {
         .inspectorColumnWidth(min: 260, ideal: 300)
         .sheet(isPresented: $isPINSheetPresented) {
             PINSheet(pin: $pin) { secret in
-                _ = secret.consumeBytes()
+                guard let signingCredentials else { return }
+                Task {
+                    await workspace.sign(
+                        driverID: signingCredentials.driverID,
+                        certificateSerial: signingCredentials.certificateSerial,
+                        pin: secret
+                    )
+                }
             }
         }
+    }
+
+    private var credentialsAreConfigured: Bool {
+        !configuredDriverID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !configuredCertificateSerial.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var signingCredentials: (driverID: String, certificateSerial: String)? {
+        if !workspace.credentialCertificates.isEmpty {
+            guard let certificateSerial else { return nil }
+            return ("fixture-driver", certificateSerial)
+        }
+
+        guard credentialsAreConfigured else { return nil }
+        return (configuredDriverID, configuredCertificateSerial)
     }
 
     private var completedCount: Int {

@@ -39,8 +39,7 @@ struct AppLaunchDependencies {
 
     static func make(environment: [String: String] = ProcessInfo.processInfo.environment) -> AppLaunchDependencies {
         #if DEBUG
-        if environment["XCTestConfigurationFilePath"] != nil,
-           let fixtureMode = environment["AUTOGRAM_FAKE_ENGINE"],
+        if let fixtureMode = environment["AUTOGRAM_FAKE_ENGINE"],
            ["partial-failure", "credential-flow"].contains(fixtureMode) {
             return AppLaunchDependencies(engine: FakeSigningEngine.launchEngine(environment: environment), fixtureMode: fixtureMode)
         }

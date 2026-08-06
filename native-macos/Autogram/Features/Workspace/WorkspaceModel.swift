@@ -120,15 +120,20 @@ final class WorkspaceModel {
         removeItems(atOffsets: IndexSet(integer: index))
     }
 
-    func sign() async {
-        guard !items.isEmpty, let coordinator else { return }
+    func sign(driverID: String, certificateSerial: String, pin: Secret) async {
+        guard !items.isEmpty,
+              !driverID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              !certificateSerial.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              let coordinator else {
+            return
+        }
 
         let descriptors = items.map(\.descriptor)
         let request = SigningRequest(
             sessionID: UUID(),
-            driverID: "workspace",
-            certificateSerial: "workspace",
-            pin: Secret(""),
+            driverID: driverID,
+            certificateSerial: certificateSerial,
+            pin: pin,
             files: descriptors.map { SigningFile(id: $0.id, sourceURL: $0.sourceURL) }
         )
 

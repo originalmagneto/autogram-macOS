@@ -33,18 +33,19 @@ import Testing
     #expect(try fixture.finalizedOutput().starts(with: Data("%PDF-".utf8)))
 }
 
-@Test func fakeEngineRequiresAnExplicitDebugUITestLaunchFlag() {
-    let production = AppLaunchDependencies.make(environment: ["AUTOGRAM_FAKE_ENGINE": "partial-failure"])
+@Test func fakeEngineRequiresAnExplicitSupportedDebugLaunchFlag() {
+    let production = AppLaunchDependencies.make(environment: [:])
     #expect(production.fixtureMode == nil)
     #expect(production.engine is AutogramCLIEngine)
 
+    let unsupported = AppLaunchDependencies.make(environment: ["AUTOGRAM_FAKE_ENGINE": "unsupported"])
+    #expect(unsupported.fixtureMode == nil)
+    #expect(unsupported.engine is AutogramCLIEngine)
+
     #if DEBUG
-    let uiTest = AppLaunchDependencies.make(environment: [
-        "XCTestConfigurationFilePath": "fixture.xctestconfiguration",
-        "AUTOGRAM_FAKE_ENGINE": "partial-failure"
-    ])
-    #expect(uiTest.fixtureMode == "partial-failure")
-    #expect(uiTest.engine is FakeSigningEngine)
+    let fixture = AppLaunchDependencies.make(environment: ["AUTOGRAM_FAKE_ENGINE": "partial-failure"])
+    #expect(fixture.fixtureMode == "partial-failure")
+    #expect(fixture.engine is FakeSigningEngine)
     #endif
 }
 

@@ -2,7 +2,10 @@ import SwiftUI
 
 struct WorkspaceView: View {
     let workspace: WorkspaceModel
+    @AppStorage("preferences.driverID") private var driverID = ""
+    @AppStorage("preferences.certificateSerial") private var certificateSerial = ""
     @State private var inspectorPresented = true
+    @State private var isPINSheetPresented = false
 
     var body: some View {
         Group {
@@ -24,7 +27,12 @@ struct WorkspaceView: View {
                 }
                 .navigationSplitViewStyle(.balanced)
                 .inspector(isPresented: $inspectorPresented) {
-                    SigningInspector(workspace: workspace)
+                    SigningInspector(
+                        workspace: workspace,
+                        isPINSheetPresented: $isPINSheetPresented,
+                        configuredDriverID: driverID,
+                        configuredCertificateSerial: certificateSerial
+                    )
                 }
             }
         }
@@ -45,9 +53,10 @@ struct WorkspaceView: View {
             }
             ToolbarItem(placement: .primaryAction) {
                 Button("Sign", systemImage: "signature") {
-                    Task { await workspace.sign() }
+                    inspectorPresented = true
+                    isPINSheetPresented = true
                 }
-                .disabled(workspace.items.isEmpty)
+                .disabled(workspace.items.isEmpty || !credentialsAreConfigured)
             }
         }
     }
@@ -55,5 +64,10 @@ struct WorkspaceView: View {
     private var selectedItem: PDFItem? {
         guard let selection = workspace.selection else { return workspace.items.first }
         return workspace.items.first { $0.id == selection }
+    }
+
+    private var credentialsAreConfigured: Bool {
+        !driverID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !certificateSerial.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 }
