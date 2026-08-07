@@ -90,4 +90,3 @@ jobs:
             build/native/Autogram-native-preview.dmg
             build/native/Autogram-native-preview.dmg.sha256
           if-no-files-found: error
-
