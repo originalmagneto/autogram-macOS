@@ -12,7 +12,9 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.security.KeyStore;
+import java.math.BigInteger;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -20,6 +22,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class MachineDriverServiceTest {
     private final MachineProtocolCodec codec = new MachineProtocolCodec();
@@ -62,13 +66,31 @@ class MachineDriverServiceTest {
 
         assertFalse(json.contains("1234"));
         assertTrue(Arrays.equals(new char[pin.length], pin));
-        var certificate = com.google.gson.JsonParser.parseString(json).getAsJsonObject()
-                .getAsJsonObject("payload").getAsJsonArray("certificates").get(0).getAsJsonObject();
-        assertTrue(certificate.has("serial"));
-        assertTrue(certificate.has("commonName"));
+        var payload = com.google.gson.JsonParser.parseString(json).getAsJsonObject().getAsJsonObject("payload");
+        assertTrue(payload.has("tokenKey"));
+        assertTrue(payload.getAsJsonArray("certificates").isEmpty());
+    }
+
+    @Test
+    void certificateDiscoveryUsesOpaqueKeysAndExcludesInvalidCertificates() {
+        var valid = key("100", "CN=Jane Doe,O=Example", "CN=Qualified Issuer,O=QTSP", true);
+        var expired = key("200", "CN=Jane Doe,O=Example", "CN=Qualified Issuer,O=QTSP", false);
+
+        var payload = MachineDriverService.discoveryPayload("secure_store", "I.CA SecureStore",
+                List.of(valid, expired), new Date());
+
+        assertTrue(payload.get("tokenKey").getAsString().startsWith("v1:"));
+        assertFalse(payload.toString().contains("CN=Jane Doe"));
+        var certificates = payload.getAsJsonArray("certificates");
+        assertEquals(1, certificates.size());
+        var certificate = certificates.get(0).getAsJsonObject();
+        assertEquals("100", certificate.get("serial").getAsString());
+        assertEquals("Jane Doe", certificate.get("commonName").getAsString());
+        assertEquals("Qualified Issuer", certificate.get("issuer").getAsString());
+        assertTrue(certificate.get("certificateKey").getAsString().startsWith("v1:"));
+        assertTrue(certificate.get("holderKey").getAsString().startsWith("v1:"));
         assertTrue(certificate.has("validFrom"));
         assertTrue(certificate.has("validUntil"));
-        assertTrue(certificate.has("expired"));
     }
 
     @Test
@@ -135,6 +157,25 @@ class MachineDriverServiceTest {
 
     private static FakeTokenDriver fakeDriver() {
         return new FakeTokenDriver("Fake", Path.of("fake"), "fake", "");
+    }
+
+    private static eu.europa.esig.dss.token.DSSPrivateKeyEntry key(String serial, String subject,
+            String issuer, boolean valid) {
+        var entry = mock(eu.europa.esig.dss.token.DSSPrivateKeyEntry.class);
+        var certificate = mock(eu.europa.esig.dss.model.x509.CertificateToken.class);
+        var subjectPrincipal = mock(eu.europa.esig.dss.model.x509.X500PrincipalHelper.class);
+        var issuerPrincipal = mock(eu.europa.esig.dss.model.x509.X500PrincipalHelper.class);
+        when(entry.getCertificate()).thenReturn(certificate);
+        when(certificate.getSerialNumber()).thenReturn(new BigInteger(serial));
+        when(certificate.getEncoded()).thenReturn((serial + subject).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        when(certificate.getSubject()).thenReturn(subjectPrincipal);
+        when(subjectPrincipal.getRFC2253()).thenReturn(subject);
+        when(certificate.getIssuer()).thenReturn(issuerPrincipal);
+        when(issuerPrincipal.getRFC2253()).thenReturn(issuer);
+        when(certificate.getNotBefore()).thenReturn(new Date(0));
+        when(certificate.getNotAfter()).thenReturn(new Date(Long.MAX_VALUE));
+        when(certificate.isValidOn(org.mockito.ArgumentMatchers.any(Date.class))).thenReturn(valid);
+        return entry;
     }
 
     private static List<String> strings(JsonArray values) {
