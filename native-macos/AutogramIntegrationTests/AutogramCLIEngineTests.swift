@@ -49,6 +49,18 @@ import Testing
     #endif
 }
 
+@Test func signingHelperEnvironmentKeepsRequiredDirectoriesWithoutForwardingSecrets() {
+    let environment = ProcessConfiguration.signingHelperEnvironment(from: [
+        "HOME": "/Users/example",
+        "TMPDIR": "/private/tmp/example",
+        "AUTOGRAM_PRIVATE_TEST_VALUE": "must-not-be-forwarded"
+    ])
+
+    #expect(environment["HOME"] == "/Users/example")
+    #expect(environment["TMPDIR"] == "/private/tmp/example")
+    #expect(environment["AUTOGRAM_PRIVATE_TEST_VALUE"] == nil)
+}
+
 private struct SigningMachineFixture {
     let directoryURL: URL
     let executableURL: URL

@@ -242,7 +242,8 @@ private extension ProcessConfiguration {
     static var production: ProcessConfiguration {
         ProcessConfiguration(
             executableURL: Bundle.main.bundleURL.appending(path: "Contents/Helpers/AutogramCLI-arm64"),
-            timeout: .seconds(90)
+            timeout: .seconds(90),
+            environment: ProcessConfiguration.signingHelperEnvironment()
         )
     }
 }
