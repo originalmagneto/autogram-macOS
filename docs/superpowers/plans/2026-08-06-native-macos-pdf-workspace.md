@@ -414,7 +414,7 @@ Commit: `feat(mac): build native PDF workspace`
 - Test: `native-macos/AutogramUITests/CredentialFlowTests.swift`
 
 **Interfaces:**
-- Produces: persisted driver ID, persisted public certificate serial, output policy, and non-persisted `Secret` PIN.
+- Produces: automatically discovered signing drivers and certificates, persisted output policy, and a non-persisted `Secret` PIN.
 
 - [ ] **Step 1: Write failing persistence tests**
 
@@ -429,11 +429,11 @@ Commit: `feat(mac): build native PDF workspace`
 
 - [ ] **Step 3: Implement native sheets and Settings scene**
 
-Use `SecureField`, disable submission when empty, clear the binding on dismissal and task completion, and store only driver ID and certificate serial in `AppStorage`. Include output naming, destination behavior, and post-signing Finder behavior. Do not expose signature level or timestamp disabling controls. Resolve machine `messageKey` values through the string catalog and use the safe fallback only when a key is unavailable.
+Use `SecureField`, disable submission when empty, and clear the binding on dismissal and task completion. Discover supported drivers automatically, select the only available driver without prompting, and show a native choice only when multiple supported drivers are available. Discover certificates after PIN entry, select the only available certificate automatically, and show a native choice only when multiple certificates are available. Do not expose driver IDs or certificate serials as user settings and do not persist the PIN. Include output naming, destination behavior, and post-signing Finder behavior. Do not expose signature level or timestamp disabling controls. Resolve machine `messageKey` values through the string catalog and use the safe fallback only when a key is unavailable.
 
 - [ ] **Step 4: Add diagnostics without personal data**
 
-Show Autogram helper version, ARM64 validation status, middleware version, protocol version, and redacted status. Exclude full paths, signer names, certificate serials, and PIN state. For I.CA failures, state that SecureStore 8.3.1 or newer is required and link to the official download page.
+Show live Autogram helper status, ARM64 validation status, detected middleware using friendly names, protocol version, and redacted status. Exclude full paths, signer names, certificate serials, driver IDs, and PIN state. Show the I.CA SecureStore download link only when I.CA middleware is not detected or fails validation. Never present a static installation warning when compatible middleware is available.
 
 - [ ] **Step 5: Run tests and commit**
 

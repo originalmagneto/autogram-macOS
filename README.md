@@ -112,7 +112,7 @@ This repository includes a macOS Finder Quick Action that signs one or more sele
 - A CLI-capable Autogram application, installed from a release package or built locally.
 - The required signing token or card, its PKCS#11 driver, and the PIN.
 - Network access to the configured qualified timestamp service when using PAdES Baseline T.
-- On Apple Silicon, Rosetta and an Intel Autogram build when the installed PKCS#11 driver is Intel-only.
+- An Apple silicon compatible PKCS#11 driver. I.CA users need SecureStore 8.3.1 or later.
 
 The Quick Action runs the signing process in the background. Certificate store selection, certificate selection, and PIN entry are intentionally shown as macOS dialogs. The original PDFs are never overwritten. The scripts are integration files and do not install the Autogram application or the token driver.
 
@@ -132,7 +132,7 @@ cd autogram-macOS
 chmod +x scripts/macos-automation/*.sh
 ```
 
-On Apple Silicon, an Intel-only I.CA SecureStore PKCS#11 driver requires Rosetta and an Intel Autogram build. Place that application at `$HOME/Applications/Autogram Intel GUI.app`, or set `AUTOGRAM_INTEL_BIN` to the path of another Intel Autogram executable. The details and architecture checks are documented in [docs/macos-cli-automation.md](docs/macos-cli-automation.md).
+Intel-only PKCS#11 drivers are not supported by the Apple silicon workflow. Update the token middleware before installation. The architecture checks are documented in [docs/macos-cli-automation.md](docs/macos-cli-automation.md).
 
 ### Create the Finder Quick Action
 
