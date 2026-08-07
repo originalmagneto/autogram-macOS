@@ -27,13 +27,41 @@ struct SigningDriver: Sendable, Equatable, Identifiable {
 struct SigningCertificate: Sendable, Equatable, Identifiable {
     let serialNumber: String
     let displayName: String
+    let issuer: String
+    let validFrom: Date
+    let validUntil: Date
+    let certificateKey: String
+    let holderKey: String
 
     var id: String {
-        serialNumber
+        certificateKey.isEmpty ? serialNumber : certificateKey
     }
 
     init(serialNumber: String, displayName: String) {
         self.serialNumber = serialNumber
         self.displayName = displayName
+        issuer = ""
+        validFrom = .distantPast
+        validUntil = .distantFuture
+        certificateKey = ""
+        holderKey = ""
+    }
+
+    init(
+        serialNumber: String,
+        displayName: String,
+        issuer: String,
+        validFrom: Date,
+        validUntil: Date,
+        certificateKey: String,
+        holderKey: String
+    ) {
+        self.serialNumber = serialNumber
+        self.displayName = displayName
+        self.issuer = issuer
+        self.validFrom = validFrom
+        self.validUntil = validUntil
+        self.certificateKey = certificateKey
+        self.holderKey = holderKey
     }
 }

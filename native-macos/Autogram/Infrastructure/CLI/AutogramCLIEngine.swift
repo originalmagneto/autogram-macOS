@@ -57,6 +57,10 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
     }
 
     func certificates(driverID: String, pin: Secret?) async throws -> [SigningCertificate] {
+        try await certificateDiscovery(driverID: driverID, pin: pin).certificates
+    }
+
+    func certificateDiscovery(driverID: String, pin: Secret?) async throws -> CertificateDiscovery {
         let request = MachineRequest(
             protocolVersion: 1,
             requestID: UUID().uuidString,
@@ -65,12 +69,34 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
         )
         let events = try await run(SecureMachineRequest(envelope: request, pin: pin))
         let payload = try payload(for: .certificatesAvailable, in: events)
-        return (array(in: payload["certificates"]) ?? []).compactMap { certificate in
-            guard let serial = string(in: certificate["serial"]), let name = string(in: certificate["commonName"]) else {
+        guard let tokenKey = string(in: payload["tokenKey"]),
+              let providerName = string(in: payload["providerName"]) else {
+            throw SigningFailure.engine("The signing helper returned incomplete certificate discovery metadata.")
+        }
+        let certificates: [SigningCertificate] = (array(in: payload["certificates"]) ?? []).compactMap { certificate in
+            guard let serial = string(in: certificate["serial"]),
+                  let name = string(in: certificate["commonName"]),
+                  let issuer = string(in: certificate["issuer"]),
+                  let validFrom = date(in: certificate["validFrom"]),
+                  let validUntil = date(in: certificate["validUntil"]),
+                  let certificateKey = string(in: certificate["certificateKey"]),
+                  let holderKey = string(in: certificate["holderKey"]) else {
                 return nil
             }
-            return SigningCertificate(serialNumber: serial, displayName: name)
+            return SigningCertificate(
+                serialNumber: serial,
+                displayName: name,
+                issuer: issuer,
+                validFrom: validFrom,
+                validUntil: validUntil,
+                certificateKey: certificateKey,
+                holderKey: holderKey
+            )
         }
+        return CertificateDiscovery(
+            token: SigningToken(tokenKey: tokenKey, providerName: providerName),
+            certificates: certificates
+        )
     }
 
     func inspect(files: [PDFItemDescriptor]) async throws -> [PDFInspection] {

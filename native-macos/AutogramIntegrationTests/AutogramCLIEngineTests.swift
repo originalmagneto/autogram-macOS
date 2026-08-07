@@ -80,6 +80,27 @@ import Testing
     #expect(signature.hasQualifiedTimestamp == true)
 }
 
+@Test func certificateDiscoveryMapsTheMachinePayload() async throws {
+    let fixture = try CertificateDiscoveryMachineFixture()
+    defer { try? fixture.remove() }
+
+    let discovery = try await AutogramCLIEngine(configuration: fixture.configuration()).certificateDiscovery(
+        driverID: "driver-1",
+        pin: Secret("1234")
+    )
+
+    #expect(discovery.token.tokenKey == "v1:token")
+    #expect(discovery.token.providerName == "Qualified Provider")
+    let certificate = try #require(discovery.certificates.first)
+    #expect(certificate.serialNumber == "transient-serial")
+    #expect(certificate.displayName == "Jane Doe")
+    #expect(certificate.issuer == "Qualified Issuer")
+    #expect(certificate.validFrom == ISO8601DateFormatter().date(from: "2025-01-01T00:00:00Z"))
+    #expect(certificate.validUntil == ISO8601DateFormatter().date(from: "2027-01-01T00:00:00Z"))
+    #expect(certificate.certificateKey == "v1:certificate")
+    #expect(certificate.holderKey == "v1:holder")
+}
+
 @Test func fakeEngineRequiresAnExplicitSupportedDebugLaunchFlag() {
     let production = AppLaunchDependencies.make(environment: [:])
     #expect(production.fixtureMode == nil)
@@ -176,6 +197,36 @@ private struct InspectionMachineFixture {
         printf '{"protocolVersion":1,"type":"session.started","sessionId":"%s","emittedAt":"2026-08-07T10:15:00Z","fileId":null,"payload":{}}\\n' "$session_id"
         printf '{"protocolVersion":1,"type":"inspection.completed","sessionId":"%s","emittedAt":"2026-08-07T10:15:31Z","fileId":"agreement","payload":{"signatures":[{"id":"signature-1","format":"PAdES_BASELINE_T","signerDisplayName":"Ada Lovelace","signerCertificateQualification":"QES","signingTime":"2026-08-07T10:15:30Z","valid":true,"indication":"TOTAL_PASSED","qualifiedTimestampValid":true,"timestamps":[]}]}}\\n' "$session_id"
         printf '{"protocolVersion":1,"type":"session.completed","sessionId":"%s","emittedAt":"2026-08-07T10:15:32Z","fileId":null,"payload":{}}\\n' "$session_id"
+        """
+        try script.write(to: executableURL, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: executableURL.path)
+    }
+
+    func configuration() -> ProcessConfiguration {
+        ProcessConfiguration(executableURL: executableURL)
+    }
+
+    func remove() throws {
+        try FileManager.default.removeItem(at: directoryURL)
+    }
+}
+
+private struct CertificateDiscoveryMachineFixture {
+    let directoryURL: URL
+    let executableURL: URL
+
+    init() throws {
+        directoryURL = FileManager.default.temporaryDirectory
+            .appending(path: "AutogramCertificateDiscoveryTests-\(UUID().uuidString)", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+        executableURL = directoryURL.appending(path: "machine-helper")
+        let script = """
+        #!/bin/sh
+        request=$(cat)
+        session_id=$(printf '%s' "$request" | sed -n 's/.*"requestId":"\\([^"]*\\)".*/\\1/p')
+        printf '{"protocolVersion":1,"type":"session.started","sessionId":"%s","emittedAt":"2026-08-07T10:15:00Z","fileId":null,"payload":{}}\\n' "$session_id"
+        printf '{"protocolVersion":1,"type":"certificates.available","sessionId":"%s","emittedAt":"2026-08-07T10:15:01Z","fileId":null,"payload":{"tokenKey":"v1:token","providerName":"Qualified Provider","certificates":[{"serial":"transient-serial","commonName":"Jane Doe","issuer":"Qualified Issuer","validFrom":"2025-01-01T00:00:00Z","validUntil":"2027-01-01T00:00:00Z","certificateKey":"v1:certificate","holderKey":"v1:holder"}]}}\\n' "$session_id"
+        printf '{"protocolVersion":1,"type":"session.completed","sessionId":"%s","emittedAt":"2026-08-07T10:15:02Z","fileId":null,"payload":{}}\\n' "$session_id"
         """
         try script.write(to: executableURL, atomically: true, encoding: .utf8)
         try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: executableURL.path)

@@ -40,8 +40,25 @@ struct FakeSigningEngine: SigningEngine {
     }
 
     func certificates(driverID: String, pin: Secret?) async throws -> [SigningCertificate] {
+        try await certificateDiscovery(driverID: driverID, pin: pin).certificates
+    }
+
+    func certificateDiscovery(driverID: String, pin: Secret?) async throws -> CertificateDiscovery {
         _ = pin?.consumeBytes()
-        return credentialFlow ? [SigningCertificate(serialNumber: "TEST-CERTIFICATE-1", displayName: "Test Certificate")] : []
+        return CertificateDiscovery(
+            token: SigningToken(tokenKey: "test-token-key", providerName: "Test Signing Token"),
+            certificates: credentialFlow ? [
+                SigningCertificate(
+                    serialNumber: "TEST-CERTIFICATE-1",
+                    displayName: "Test Certificate",
+                    issuer: "Test Issuer",
+                    validFrom: .distantPast,
+                    validUntil: .distantFuture,
+                    certificateKey: "test-certificate-key",
+                    holderKey: "test-holder-key"
+                )
+            ] : []
+        )
     }
 
     func inspect(files: [PDFItemDescriptor]) async throws -> [PDFInspection] {
