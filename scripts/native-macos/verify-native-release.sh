@@ -9,6 +9,7 @@ check_signature=false
 check_notarization=false
 mountpoint=""
 mounted=false
+attached_with_diskutil=false
 mach_o_count=0
 
 usage() {
@@ -23,7 +24,11 @@ fail() {
 
 cleanup() {
     if [[ "${mounted}" == true ]]; then
-        hdiutil detach "${mountpoint}" -quiet || true
+        if [[ "${attached_with_diskutil}" == true ]]; then
+            diskutil unmount "${mountpoint}" >/dev/null 2>&1 || true
+        else
+            hdiutil detach "${mountpoint}" -quiet || true
+        fi
     fi
     if [[ -n "${mountpoint}" ]]; then
         rmdir "${mountpoint}" 2>/dev/null || true
@@ -53,14 +58,19 @@ while [[ $# -gt 0 ]]; do
     shift
 done
 
-command -v hdiutil >/dev/null 2>&1 || fail "hdiutil is required to verify a DMG"
 command -v file >/dev/null 2>&1 || fail "file is required to inspect Mach-O files"
 command -v plutil >/dev/null 2>&1 || fail "plutil is required to validate plist files"
 command -v python3 >/dev/null 2>&1 || fail "python3 is required to validate the capabilities response"
 [[ -f "${dmg_path}" ]] || fail "DMG is missing: ${dmg_path}"
 
 mountpoint="$(mktemp -d "${TMPDIR:-/tmp}/autogram-native-verify.XXXXXX")"
-hdiutil attach -readonly -nobrowse -noverify -mountpoint "${mountpoint}" "${dmg_path}" >/dev/null
+if command -v diskutil >/dev/null 2>&1 && diskutil image attach --help >/dev/null 2>&1; then
+    diskutil image attach --readOnly --nobrowse --mountPoint "${mountpoint}" "${dmg_path}" >/dev/null
+    attached_with_diskutil=true
+else
+    command -v hdiutil >/dev/null 2>&1 || fail "diskutil image attach or hdiutil is required to verify a DMG"
+    hdiutil attach -readonly -nobrowse -noverify -mountpoint "${mountpoint}" "${dmg_path}" >/dev/null
+fi
 mounted=true
 
 app_bundle="${mountpoint}/Autogram.app"
@@ -140,7 +150,7 @@ import os
 import sys
 
 print(json.dumps({
-    "dmg": os.path.abspath(sys.argv[1]),
+    "dmg": os.path.basename(sys.argv[1]),
     "status": "passed",
     "minimumMacOS": sys.argv[2],
     "machOFiles": int(sys.argv[3]),
