@@ -1,12 +1,12 @@
 # Native macOS PDF Signing Workspace Design
 
-Status: Approved in design review on 2026-08-06, revised for ARM64-only runtime on 2026-08-06
+Status: Approved in design review on 2026-08-06, revised for ARM64-only runtime on 2026-08-06, extended for signature inspection, ASiC-E, token defaults, and timestamp-source settings on 2026-08-07
 
 ## Summary
 
 Autogram will gain a native macOS application for signing one or more PDF files without opening JavaFX or Terminal. The application will use SwiftUI, AppKit, and PDFKit for the user experience while retaining the existing Autogram Java CLI as the cryptographic signing engine.
 
-The first release is intentionally limited to PDF signing. XML, eForms, XAdES, CAdES, and full feature parity with the existing JavaFX application are deferred.
+The initial workspace implementation is PDF-focused. The approved product extension in `2026-08-07-signature-inspection-token-defaults-and-timestamp-sources.md` adds existing-signature inspection and further signing for supported ASiC-E containers. General XML, eForms, and unrestricted XAdES or CAdES workflows outside supported ASiC-E remain deferred.
 
 ## Product Decisions
 
@@ -40,7 +40,7 @@ The first release is intentionally limited to PDF signing. XML, eForms, XAdES, C
 ## Non-Goals for the First Release
 
 - XML and Slovak eForms signing.
-- XAdES and CAdES workflows.
+- General XAdES and CAdES workflows outside supported ASiC-E containers.
 - Signature placement or visible signature artwork.
 - PDF editing or annotation.
 - macOS 26 or Intel Mac compatibility.
@@ -219,7 +219,7 @@ It must not contain marketing cards or duplicate navigation.
 
 ### Certificate and PIN
 
-The application remembers only a stable public certificate identifier and the selected driver. It never persists the PIN.
+The application remembers only privacy-preserving token identity and public certificate matching metadata. Defaults are stored separately for each known token. It never persists the PIN. Exact selection and renewal rules are defined in `2026-08-07-signature-inspection-token-defaults-and-timestamp-sources.md`.
 
 The normal flow is:
 
@@ -250,11 +250,12 @@ A failure for one file does not cancel later files. The final summary groups suc
 
 The native Settings scene contains:
 
-- preferred signing driver,
-- preferred certificate identifier,
+- detected and remembered tokens,
+- a friendly default certificate for each token,
 - output naming policy,
 - destination policy,
 - behavior after successful signing,
+- qualified timestamp source and custom provider management,
 - detected driver architectures,
 - helper runtime status,
 - redacted diagnostics.
@@ -416,7 +417,7 @@ Setting a TSA URL is not sufficient proof that a timestamp is qualified. The sig
 
 Timestamp qualification is distinct from signer-certificate qualification. The UI and diagnostics must not describe one as proof of the other.
 
-The first release ships with an application-managed list of supported qualified timestamp services. Custom TSA editing is not exposed in the normal Settings UI. The Java engine manages trusted-list retrieval, caching, freshness checks, and validation. It must fail closed when the trusted-list state is too stale to support the qualification result. Changes to the supported-service list require a tested application update.
+The application ships with the three timestamp configurations used by the existing Autogram application: ordered Sectigo then Belgium fallback, Sectigo only, and Belgium only. Settings also supports custom ordered TSA URLs with optional credentials stored only in macOS Keychain. The Java engine manages trusted-list retrieval, caching, freshness checks, and validation. It must fail closed when the trusted-list state is too stale to support the qualification result or when a custom service does not produce a validated `QTSA` timestamp. Detailed source, authentication, and failure rules are defined in `2026-08-07-signature-inspection-token-defaults-and-timestamp-sources.md`.
 
 ## Output Policy
 
@@ -545,7 +546,9 @@ The baseline used Liberica JDK 25.0.4 with JavaFX and `./mvnw test -Psystem-jdk`
 - Correct PIN and rejected PIN.
 - Card removal during signing.
 - One PDF and multiple PDFs.
-- Existing signatures.
+- Existing signatures in PDF and supported ASiC-E containers.
+- Per-token certificate defaults and safe certificate renewal matching.
+- Predefined TSA selection, ordered fallback, and an authenticated custom TSA.
 - Unavailable TSA and invalid timestamp response.
 - Local files and supported cloud-storage files.
 - Finder Quick Action invocation.
