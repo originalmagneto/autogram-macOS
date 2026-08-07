@@ -38,6 +38,50 @@ import Foundation
     #expect(await coordinator.state == .failed(expected))
 }
 
+@Test @MainActor func incompleteInspectionNeverEnablesOrCallsSigning() async {
+    let engine = IncompleteInspectionEngine()
+    let coordinator = SigningCoordinator(engine: engine)
+    let files = PDFItemDescriptor.fixtures(ids: ["a", "b"])
+    let expected = SigningFailure.engine("Document inspection did not produce a signable result for every requested file.")
+
+    await #expect(throws: expected) {
+        try await coordinator.inspect(files)
+    }
+    await #expect(throws: SigningFailure.invalidTransition) {
+        try await coordinator.beginSigning(request: SigningRequest.fixture(ids: ["a", "b"]))
+    }
+    #expect(await coordinator.state == .failed(expected))
+    #expect(engine.signCallCount == 0)
+}
+
+private final class IncompleteInspectionEngine: SigningEngine, @unchecked Sendable {
+    private let lock = NSLock()
+    private var storedSignCallCount = 0
+
+    var signCallCount: Int {
+        lock.withLock { storedSignCallCount }
+    }
+
+    func capabilities() async throws -> EngineCapabilities {
+        EngineCapabilities(protocolVersion: 1, supportsQualifiedTimestamp: true)
+    }
+
+    func drivers() async throws -> [SigningDriver] { [] }
+
+    func certificates(driverID: String, pin: Secret?) async throws -> [SigningCertificate] { [] }
+
+    func inspect(files: [PDFItemDescriptor]) async throws -> [PDFInspection] {
+        [PDFInspection(files: [InspectedPDF(id: "a", isSignable: true)])]
+    }
+
+    func sign(request: SigningRequest) -> AsyncThrowingStream<SigningEvent, Error> {
+        lock.withLock { storedSignCallCount += 1 }
+        return AsyncThrowingStream { $0.finish() }
+    }
+
+    func cancel() async {}
+}
+
 private struct FailureSigningEngine: SigningEngine {
     let failure: SigningFailure
 

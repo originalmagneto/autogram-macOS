@@ -3,6 +3,7 @@ actor SigningCoordinator {
     private let workspace: WorkspaceModel?
 
     private(set) var state: SessionState = .idle
+    private var signableInspectionIDs: Set<String> = []
 
     init(engine: any SigningEngine, workspace: WorkspaceModel? = nil) {
         self.engine = engine
@@ -15,9 +16,14 @@ actor SigningCoordinator {
         state = .inspectingFiles
         do {
             let inspections = try await engine.inspect(files: files)
-            state = .awaitingPIN
+            guard hasCompletedSignableInspection(for: files, in: inspections) else {
+                throw SigningFailure.engine("Document inspection did not produce a signable result for every requested file.")
+            }
+
             await updateWorkspace(inspections, for: files)
             await updateWorkspace(files.map(\.id), to: .inspected)
+            signableInspectionIDs = Set(files.map(\.id))
+            state = .awaitingPIN
         } catch {
             state = .failed(asSigningFailure(error))
             await updateWorkspaceInspectionFailure(for: files.map(\.id))
@@ -26,7 +32,12 @@ actor SigningCoordinator {
     }
 
     func beginSigning(request: SigningRequest) async throws {
-        guard state == .awaitingPIN else { throw SigningFailure.invalidTransition }
+        let requestedFileIDs = Set(request.files.map(\.id))
+        guard state == .awaitingPIN,
+              !requestedFileIDs.isEmpty,
+              requestedFileIDs.isSubset(of: signableInspectionIDs) else {
+            throw SigningFailure.invalidTransition
+        }
 
         state = .signing(progress: BatchProgress(total: request.files.count))
         var succeeded = 0
@@ -97,5 +108,16 @@ actor SigningCoordinator {
 
     private func asSigningFailure(_ error: Error) -> SigningFailure {
         (error as? SigningFailure) ?? .engine("Signing engine failed")
+    }
+
+    private func hasCompletedSignableInspection(
+        for files: [PDFItemDescriptor],
+        in inspections: [PDFInspection]
+    ) -> Bool {
+        let resultsByID = Dictionary(
+            inspections.flatMap(\.files).map { ($0.id, $0) },
+            uniquingKeysWith: { _, latest in latest }
+        )
+        return files.allSatisfy { resultsByID[$0.id]?.isSignable == true }
     }
 }

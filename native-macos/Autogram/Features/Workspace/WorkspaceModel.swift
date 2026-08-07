@@ -17,6 +17,7 @@ final class WorkspaceModel {
     private let engine: any SigningEngine
     @ObservationIgnored private var coordinator: SigningCoordinator?
     @ObservationIgnored private var pendingSigningPIN: Secret?
+    @ObservationIgnored private var inspectionRequestGeneration = 0
 
     init(
         engine: any SigningEngine = FakeSigningEngine.launchEngine(),
@@ -65,13 +66,16 @@ final class WorkspaceModel {
         let descriptors = items.map(\.descriptor)
         guard !descriptors.isEmpty else { return }
 
-        items = items.map { $0.updatingInspection(to: .pending) }
+        inspectionRequestGeneration += 1
+        let requestGeneration = inspectionRequestGeneration
+        updateInspection(for: descriptors.map(\.id), to: .pending)
 
         do {
             let inspections = try await engine.inspect(files: descriptors)
-            applyInspectionResults(inspections, for: descriptors)
+            applyInspectionResults(inspections, for: descriptors, requestGeneration: requestGeneration)
         } catch {
-            items = items.map { $0.updatingInspection(to: .failed) }
+            guard requestGeneration == inspectionRequestGeneration else { return }
+            updateInspection(for: descriptors.map(\.id), to: .failed)
         }
     }
 
@@ -186,12 +190,26 @@ final class WorkspaceModel {
         }
     }
 
-    func applyInspectionResults(_ inspections: [PDFInspection], for descriptors: [PDFItemDescriptor]) {
+    func applyInspectionResults(
+        _ inspections: [PDFInspection],
+        for descriptors: [PDFItemDescriptor],
+        requestGeneration: Int? = nil
+    ) {
+        if let requestGeneration {
+            guard requestGeneration == inspectionRequestGeneration else { return }
+        } else {
+            inspectionRequestGeneration += 1
+        }
+
+        let requestedIDs = Set(descriptors.map(\.id))
         let results = Dictionary(
-            inspections.flatMap(\.files).map { ($0.id, $0) },
+            inspections.flatMap(\.files)
+                .filter { requestedIDs.contains($0.id) }
+                .map { ($0.id, $0) },
             uniquingKeysWith: { _, latest in latest }
         )
         items = items.map { item in
+            guard requestedIDs.contains(item.descriptor.id) else { return item }
             guard let result = results[item.descriptor.id], result.isSignable else {
                 return item.updatingInspection(to: .failed)
             }
@@ -200,9 +218,13 @@ final class WorkspaceModel {
     }
 
     func markInspectionFailed(for fileIDs: [String]) {
-        let failedIDs = Set(fileIDs)
+        updateInspection(for: fileIDs, to: .failed)
+    }
+
+    private func updateInspection(for fileIDs: [String], to inspection: PDFItemInspection) {
+        let inspectedIDs = Set(fileIDs)
         items = items.map { item in
-            failedIDs.contains(item.descriptor.id) ? item.updatingInspection(to: .failed) : item
+            inspectedIDs.contains(item.descriptor.id) ? item.updatingInspection(to: inspection) : item
         }
     }
 
