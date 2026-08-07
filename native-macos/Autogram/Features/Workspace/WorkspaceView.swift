@@ -37,6 +37,7 @@ struct WorkspaceView: View {
         }
         .task {
             await workspace.refreshSigningEnvironment()
+            await workspace.refreshInspections()
         }
         .toolbar {
             ToolbarItem {
@@ -57,7 +58,7 @@ struct WorkspaceView: View {
                     inspectorPresented = true
                     isPINSheetPresented = true
                 }
-                .disabled(workspace.items.isEmpty || selectedDriver == nil)
+                .disabled(!workspace.canStartSigning || selectedDriver == nil)
                 .help("Sign the selected PDFs")
             }
         }

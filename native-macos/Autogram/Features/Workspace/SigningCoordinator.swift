@@ -14,11 +14,13 @@ actor SigningCoordinator {
 
         state = .inspectingFiles
         do {
-            _ = try await engine.inspect(files: files)
+            let inspections = try await engine.inspect(files: files)
             state = .awaitingPIN
+            await updateWorkspace(inspections, for: files)
             await updateWorkspace(files.map(\.id), to: .inspected)
         } catch {
             state = .failed(asSigningFailure(error))
+            await updateWorkspaceInspectionFailure(for: files.map(\.id))
             throw error
         }
     }
@@ -81,6 +83,16 @@ actor SigningCoordinator {
         for fileID in fileIDs {
             await workspace.updateStatus(for: fileID, to: status)
         }
+    }
+
+    private func updateWorkspace(_ inspections: [PDFInspection], for files: [PDFItemDescriptor]) async {
+        guard let workspace else { return }
+        await workspace.applyInspectionResults(inspections, for: files)
+    }
+
+    private func updateWorkspaceInspectionFailure(for fileIDs: [String]) async {
+        guard let workspace else { return }
+        await workspace.markInspectionFailed(for: fileIDs)
     }
 
     private func asSigningFailure(_ error: Error) -> SigningFailure {

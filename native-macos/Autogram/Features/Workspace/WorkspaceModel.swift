@@ -57,6 +57,24 @@ final class WorkspaceModel {
         tokenPresenceIsKnown ? connectedDrivers : availableDrivers
     }
 
+    var canStartSigning: Bool {
+        !items.isEmpty && items.allSatisfy { $0.inspection.isComplete }
+    }
+
+    func refreshInspections() async {
+        let descriptors = items.map(\.descriptor)
+        guard !descriptors.isEmpty else { return }
+
+        items = items.map { $0.updatingInspection(to: .pending) }
+
+        do {
+            let inspections = try await engine.inspect(files: descriptors)
+            applyInspectionResults(inspections, for: descriptors)
+        } catch {
+            items = items.map { $0.updatingInspection(to: .failed) }
+        }
+    }
+
     func refreshSigningEnvironment() async {
         isLoadingSigningEnvironment = true
         credentialError = nil
@@ -168,6 +186,26 @@ final class WorkspaceModel {
         }
     }
 
+    func applyInspectionResults(_ inspections: [PDFInspection], for descriptors: [PDFItemDescriptor]) {
+        let results = Dictionary(
+            inspections.flatMap(\.files).map { ($0.id, $0) },
+            uniquingKeysWith: { _, latest in latest }
+        )
+        items = items.map { item in
+            guard let result = results[item.descriptor.id], result.isSignable else {
+                return item.updatingInspection(to: .failed)
+            }
+            return item.updatingInspection(to: .completed(result))
+        }
+    }
+
+    func markInspectionFailed(for fileIDs: [String]) {
+        let failedIDs = Set(fileIDs)
+        items = items.map { item in
+            failedIDs.contains(item.descriptor.id) ? item.updatingInspection(to: .failed) : item
+        }
+    }
+
     func selectPDFs() {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.pdf]
@@ -205,6 +243,9 @@ final class WorkspaceModel {
         items.append(contentsOf: newItems)
         if selection == nil {
             selection = newItems.first?.id
+        }
+        if !newItems.isEmpty {
+            Task { await refreshInspections() }
         }
         return !newItems.isEmpty
     }

@@ -86,8 +86,14 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
         )
         let events = try await run(request)
         return [PDFInspection(files: files.map { file in
-            let inspected = events.contains { $0.type == .inspectionCompleted && $0.fileID == file.id }
-            return InspectedPDF(id: file.id, isSignable: inspected)
+            guard let event = events.last(where: { $0.type == .inspectionCompleted && $0.fileID == file.id }) else {
+                return InspectedPDF(id: file.id, isSignable: false)
+            }
+            return InspectedPDF(
+                id: file.id,
+                isSignable: true,
+                signatures: signatures(in: event.payload["signatures"])
+            )
         })]
     }
 
@@ -242,6 +248,29 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
         return values.compactMap { string(in: $0) }
     }
 
+    private func signatures(in value: JSONValue?) -> [ExistingPDFSignature] {
+        (array(in: value) ?? []).compactMap { signature in
+            guard let id = string(in: signature["id"]) else { return nil }
+            let indication = string(in: signature["indication"])
+            let validationState: SignatureValidationState
+            if indication?.uppercased().contains("INDETERMINATE") == true {
+                validationState = .indeterminate
+            } else if bool(in: signature["valid"]) == true {
+                validationState = .valid
+            } else {
+                validationState = .invalid
+            }
+            return ExistingPDFSignature(
+                id: id,
+                signerDisplayName: string(in: signature["signerDisplayName"]),
+                validationState: validationState,
+                signingTime: date(in: signature["signingTime"]),
+                format: string(in: signature["format"]),
+                hasQualifiedTimestamp: bool(in: signature["qualifiedTimestampValid"]) == true
+            )
+        }
+    }
+
     private func string(in value: JSONValue?) -> String? {
         guard case .string(let value)? = value else { return nil }
         return value
@@ -250,6 +279,11 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
     private func bool(in value: JSONValue?) -> Bool? {
         guard case .bool(let value)? = value else { return nil }
         return value
+    }
+
+    private func date(in value: JSONValue?) -> Date? {
+        guard let value = string(in: value) else { return nil }
+        return ISO8601DateFormatter().date(from: value)
     }
 }
 

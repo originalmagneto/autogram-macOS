@@ -73,7 +73,7 @@ enum MachineEventType: String, Codable, Sendable, Equatable {
 
     var requiresFileID: Bool {
         switch self {
-        case .fileSigningStarted, .fileProgress, .fileCompleted, .fileFailed: true
+        case .inspectionCompleted, .fileSigningStarted, .fileProgress, .fileCompleted, .fileFailed: true
         default: false
         }
     }

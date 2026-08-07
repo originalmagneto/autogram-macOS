@@ -18,15 +18,42 @@ struct PDFItem: Sendable, Equatable, Identifiable {
     let id: UUID
     let descriptor: PDFItemDescriptor
     let status: PDFItemStatus
+    let inspection: PDFItemInspection
 
-    init(id: UUID = UUID(), descriptor: PDFItemDescriptor, status: PDFItemStatus = .pending) {
+    init(
+        id: UUID = UUID(),
+        descriptor: PDFItemDescriptor,
+        status: PDFItemStatus = .pending,
+        inspection: PDFItemInspection = .pending
+    ) {
         self.id = id
         self.descriptor = descriptor
         self.status = status
+        self.inspection = inspection
     }
 
     func updatingStatus(to status: PDFItemStatus) -> PDFItem {
-        PDFItem(id: id, descriptor: descriptor, status: status)
+        PDFItem(id: id, descriptor: descriptor, status: status, inspection: inspection)
+    }
+
+    func updatingInspection(to inspection: PDFItemInspection) -> PDFItem {
+        PDFItem(id: id, descriptor: descriptor, status: status, inspection: inspection)
+    }
+}
+
+enum PDFItemInspection: Sendable, Equatable {
+    case pending
+    case completed(InspectedPDF)
+    case failed
+
+    var signatures: [ExistingPDFSignature] {
+        guard case .completed(let inspection) = self else { return [] }
+        return inspection.signatures
+    }
+
+    var isComplete: Bool {
+        if case .completed = self { return true }
+        return false
     }
 }
 

@@ -60,6 +60,26 @@ import Testing
     ])
 }
 
+@Test func inspectionMapsExistingSignatureDetailsFromTheMachinePayload() async throws {
+    let fixture = try InspectionMachineFixture()
+    defer { try? fixture.remove() }
+
+    let source = fixture.directoryURL.appending(path: "agreement.pdf")
+    try Data("%PDF-1.7\nsource\n%%EOF\n".utf8).write(to: source)
+    let engine = AutogramCLIEngine(configuration: fixture.configuration())
+
+    let inspections = try await engine.inspect(files: [
+        PDFItemDescriptor(id: "agreement", sourceURL: source)
+    ])
+
+    let signature = try #require(inspections.first?.files.first?.signatures.first)
+    #expect(signature.signerDisplayName == "Ada Lovelace")
+    #expect(signature.validationState == .valid)
+    #expect(signature.signingTime == ISO8601DateFormatter().date(from: "2026-08-07T10:15:30Z"))
+    #expect(signature.format == "PAdES_BASELINE_T")
+    #expect(signature.hasQualifiedTimestamp == true)
+}
+
 @Test func fakeEngineRequiresAnExplicitSupportedDebugLaunchFlag() {
     let production = AppLaunchDependencies.make(environment: [:])
     #expect(production.fixtureMode == nil)
@@ -133,6 +153,36 @@ private struct SigningMachineFixture {
 
     func finalizedOutput() throws -> Data {
         try Data(contentsOf: directoryURL.appending(path: "agreement_signed.pdf"))
+    }
+
+    func remove() throws {
+        try FileManager.default.removeItem(at: directoryURL)
+    }
+}
+
+private struct InspectionMachineFixture {
+    let directoryURL: URL
+    let executableURL: URL
+
+    init() throws {
+        directoryURL = FileManager.default.temporaryDirectory
+            .appending(path: "AutogramCLIEngineInspectionTests-\(UUID().uuidString)", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+        executableURL = directoryURL.appending(path: "machine-helper")
+        let script = """
+        #!/bin/sh
+        request=$(cat)
+        session_id=$(printf '%s' "$request" | sed -n 's/.*"requestId":"\\([^"]*\\)".*/\\1/p')
+        printf '{"protocolVersion":1,"type":"session.started","sessionId":"%s","emittedAt":"2026-08-07T10:15:00Z","fileId":null,"payload":{}}\\n' "$session_id"
+        printf '{"protocolVersion":1,"type":"inspection.completed","sessionId":"%s","emittedAt":"2026-08-07T10:15:31Z","fileId":"agreement","payload":{"signatures":[{"id":"signature-1","format":"PAdES_BASELINE_T","signerDisplayName":"Ada Lovelace","signerCertificateQualification":"QES","signingTime":"2026-08-07T10:15:30Z","valid":true,"indication":"TOTAL_PASSED","qualifiedTimestampValid":true,"timestamps":[]}]}}\\n' "$session_id"
+        printf '{"protocolVersion":1,"type":"session.completed","sessionId":"%s","emittedAt":"2026-08-07T10:15:32Z","fileId":null,"payload":{}}\\n' "$session_id"
+        """
+        try script.write(to: executableURL, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: executableURL.path)
+    }
+
+    func configuration() -> ProcessConfiguration {
+        ProcessConfiguration(executableURL: executableURL)
     }
 
     func remove() throws {
