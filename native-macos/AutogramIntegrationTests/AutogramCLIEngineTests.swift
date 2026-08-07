@@ -33,6 +33,33 @@ import Testing
     #expect(try fixture.finalizedOutput().starts(with: Data("%PDF-".utf8)))
 }
 
+@Test func fileFailureCodeBecomesAnActionableSigningFailure() async throws {
+    let fixture = try SigningMachineFixture(failureCode: "TIMESTAMP_FAILED")
+    defer { try? fixture.remove() }
+
+    let source = fixture.directoryURL.appending(path: "agreement.pdf")
+    try Data("%PDF-1.7\nsource\n%%EOF\n".utf8).write(to: source)
+    let engine = AutogramCLIEngine(configuration: fixture.configuration())
+    let request = SigningRequest(
+        sessionID: UUID(uuidString: "00000000-0000-0000-0000-000000000001")!,
+        driverID: "token-1",
+        certificateSerial: "certificate-1",
+        pin: Secret("1234"),
+        files: [SigningFile(id: "agreement", sourceURL: source)]
+    )
+
+    var events: [SigningEvent] = []
+    for try await event in engine.sign(request: request) {
+        events.append(event)
+    }
+
+    #expect(events == [
+        .started,
+        .fileSigning("agreement"),
+        .failed("agreement", .engine("A qualified timestamp could not be obtained. [TIMESTAMP_FAILED]"))
+    ])
+}
+
 @Test func fakeEngineRequiresAnExplicitSupportedDebugLaunchFlag() {
     let production = AppLaunchDependencies.make(environment: [:])
     #expect(production.fixtureMode == nil)
@@ -65,19 +92,28 @@ private struct SigningMachineFixture {
     let directoryURL: URL
     let executableURL: URL
 
-    init() throws {
+    init(failureCode: String? = nil) throws {
         directoryURL = FileManager.default.temporaryDirectory
             .appending(path: "AutogramCLIEngineTests-\(UUID().uuidString)", directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
         executableURL = directoryURL.appending(path: "machine-helper")
+        let result = if let failureCode {
+            """
+            printf '%s\\n' '{"protocolVersion":1,"type":"file.failed","sessionId":"00000000-0000-0000-0000-000000000001","emittedAt":"2026-08-06T00:00:02Z","fileId":"agreement","payload":{"code":"\(failureCode)"}}'
+            """
+        } else {
+            """
+            printf '%%PDF-1.7\\n%%%%EOF\\n' > "$AUTOGRAM_TEST_DIRECTORY/agreement_signed.pdf"
+            printf '%s\\n' '{"protocolVersion":1,"type":"file.completed","sessionId":"00000000-0000-0000-0000-000000000001","emittedAt":"2026-08-06T00:00:02Z","fileId":"agreement","payload":{}}'
+            """
+        }
         let script = """
         #!/bin/sh
         input="$AUTOGRAM_TEST_DIRECTORY/request.json"
         cat > "$input"
-        printf '%%PDF-1.7\\n%%%%EOF\\n' > "$AUTOGRAM_TEST_DIRECTORY/agreement_signed.pdf"
         printf '%s\\n' '{"protocolVersion":1,"type":"session.started","sessionId":"00000000-0000-0000-0000-000000000001","emittedAt":"2026-08-06T00:00:00.123456Z","fileId":null,"payload":{}}'
         printf '%s\\n' '{"protocolVersion":1,"type":"file.signingStarted","sessionId":"00000000-0000-0000-0000-000000000001","emittedAt":"2026-08-06T00:00:01Z","fileId":"agreement","payload":{}}'
-        printf '%s\\n' '{"protocolVersion":1,"type":"file.completed","sessionId":"00000000-0000-0000-0000-000000000001","emittedAt":"2026-08-06T00:00:02Z","fileId":"agreement","payload":{}}'
+        \(result)
         printf '%s\\n' '{"protocolVersion":1,"type":"session.completed","sessionId":"00000000-0000-0000-0000-000000000001","emittedAt":"2026-08-06T00:00:03Z","fileId":null,"payload":{}}'
         """
         try script.write(to: executableURL, atomically: true, encoding: .utf8)

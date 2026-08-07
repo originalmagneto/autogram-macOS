@@ -3,6 +3,7 @@ package digital.slovensko.autogram.ui.machine;
 import com.google.gson.JsonParser;
 import digital.slovensko.autogram.core.PasswordManager;
 import digital.slovensko.autogram.core.SignedDocument;
+import digital.slovensko.autogram.core.errors.PINIncorrectException;
 import digital.slovensko.autogram.drivers.TokenDriver;
 import eu.europa.esig.dss.enumerations.Indication;
 import eu.europa.esig.dss.enumerations.SignatureLevel;
@@ -113,6 +114,18 @@ class MachineSigningServiceTest {
         assertTrue(Arrays.equals(new char[pin.length], pin));
         assertFalse(writer.serialized().contains("/private/card"));
         assertFalse(writer.serialized().contains("1234"));
+    }
+
+    @Test
+    void reportsNestedIncorrectPinAsAStableFailureCode() throws Exception {
+        var writer = new RecordingWriter();
+        var service = new MachineSigningService(writer.writer(), request -> {
+            throw new IllegalStateException(new PINIncorrectException());
+        }, path -> true);
+
+        service.sign("request-1", request("1234".toCharArray(), file("one", "one.pdf", "one-signed.pdf")));
+
+        assertEquals("PIN_INCORRECT", writer.payloadCode(2));
     }
 
     @Test

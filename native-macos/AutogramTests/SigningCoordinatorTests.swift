@@ -27,6 +27,42 @@ import Foundation
     #expect(summary.failed == 1)
 }
 
+@Test @MainActor func completeFailurePreservesTheEngineReason() async throws {
+    let expected = SigningFailure.engine("A qualified timestamp could not be obtained. [TIMESTAMP_FAILED]")
+    let coordinator = SigningCoordinator(engine: FailureSigningEngine(failure: expected))
+
+    try await coordinator.inspect(PDFItemDescriptor.fixtures(ids: ["a"]))
+    await #expect(throws: expected) {
+        try await coordinator.beginSigning(request: SigningRequest.fixture(ids: ["a"]))
+    }
+    #expect(await coordinator.state == .failed(expected))
+}
+
+private struct FailureSigningEngine: SigningEngine {
+    let failure: SigningFailure
+
+    func capabilities() async throws -> EngineCapabilities {
+        EngineCapabilities(protocolVersion: 1, supportsQualifiedTimestamp: true)
+    }
+
+    func drivers() async throws -> [SigningDriver] { [] }
+
+    func certificates(driverID: String, pin: Secret?) async throws -> [SigningCertificate] { [] }
+
+    func inspect(files: [PDFItemDescriptor]) async throws -> [PDFInspection] {
+        [PDFInspection(files: files.map { InspectedPDF(id: $0.id, isSignable: true) })]
+    }
+
+    func sign(request: SigningRequest) -> AsyncThrowingStream<SigningEvent, Error> {
+        AsyncThrowingStream { continuation in
+            continuation.yield(.failed(request.files[0].id, failure))
+            continuation.finish()
+        }
+    }
+
+    func cancel() async {}
+}
+
 private extension PDFItemDescriptor {
     static func fixtures(ids: [String]) -> [PDFItemDescriptor] {
         ids.map { PDFItemDescriptor(id: $0, sourceURL: URL(fileURLWithPath: "/tmp/\($0).pdf")) }

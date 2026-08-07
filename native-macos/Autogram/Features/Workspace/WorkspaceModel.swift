@@ -251,7 +251,7 @@ final class WorkspaceModel {
             try await coordinator.inspect(descriptors)
             try await coordinator.beginSigning(request: request)
         } catch {
-            credentialError = "Signing could not be completed."
+            credentialError = error.localizedDescription
             for item in items {
                 updateStatus(for: item.descriptor.id, to: .failed)
             }

@@ -135,7 +135,10 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
                                 continuation.yield(.failed(fileID, .fileFailed(fileID)))
                             }
                         case .fileFailed:
-                            if let fileID = event.fileID { continuation.yield(.failed(fileID, .fileFailed(fileID))) }
+                            if let fileID = event.fileID {
+                                let code = string(in: event.payload["code"]) ?? "SIGNING_FAILED"
+                                continuation.yield(.failed(fileID, .engine(Self.fileFailureMessage(code: code))))
+                            }
                         default:
                             break
                         }
@@ -213,6 +216,15 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
             "source": .string(sourceURL.standardizedFileURL.path),
             "target": .string(targetURL.standardizedFileURL.path)
         ])
+    }
+
+    private static func fileFailureMessage(code: String) -> String {
+        switch code {
+        case "TIMESTAMP_FAILED":
+            "A qualified timestamp could not be obtained. [TIMESTAMP_FAILED]"
+        default:
+            "Signing failed. [\(code)]"
+        }
     }
 
     private func object(in value: JSONValue?) -> [String: JSONValue]? {

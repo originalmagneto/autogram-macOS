@@ -7,6 +7,7 @@ import digital.slovensko.autogram.core.PasswordManager;
 import digital.slovensko.autogram.core.SigningJob;
 import digital.slovensko.autogram.core.SigningKey;
 import digital.slovensko.autogram.core.SigningParameters;
+import digital.slovensko.autogram.core.errors.PINIncorrectException;
 import digital.slovensko.autogram.drivers.TokenDriver;
 import digital.slovensko.autogram.ui.cli.CliKeySelector;
 import eu.europa.esig.dss.enumerations.MimeTypeEnum;
@@ -168,12 +169,17 @@ public final class MachineSigningService {
     }
 
     private static String failureCode(Throwable exception, String fallback) {
-        if (exception instanceof MachineProtocolException protocolException) {
-            return switch (protocolException.getMessage()) {
-                case "OUTPUT_CLEANUP_FAILED", "OUTPUT_VALIDATION_FAILED", "OUTPUT_PUBLISH_UNSUPPORTED",
-                        "OUTPUT_TARGET_EXISTS", "MACHINE_PLATFORM_UNSUPPORTED" -> protocolException.getMessage();
-                default -> fallback;
-            };
+        for (var cause = exception; cause != null && cause.getCause() != cause; cause = cause.getCause()) {
+            if (cause instanceof PINIncorrectException || "CKR_PIN_INCORRECT".equals(cause.getMessage())) {
+                return "PIN_INCORRECT";
+            }
+            if (cause instanceof MachineProtocolException protocolException) {
+                return switch (protocolException.getMessage()) {
+                    case "OUTPUT_CLEANUP_FAILED", "OUTPUT_VALIDATION_FAILED", "OUTPUT_PUBLISH_UNSUPPORTED",
+                            "OUTPUT_TARGET_EXISTS", "MACHINE_PLATFORM_UNSUPPORTED" -> protocolException.getMessage();
+                    default -> fallback;
+                };
+            }
         }
         return fallback;
     }

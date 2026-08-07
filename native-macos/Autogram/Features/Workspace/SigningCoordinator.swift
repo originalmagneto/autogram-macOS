@@ -29,6 +29,7 @@ actor SigningCoordinator {
         state = .signing(progress: BatchProgress(total: request.files.count))
         var succeeded = 0
         var failed = 0
+        var firstFailure: SigningFailure?
 
         do {
             for try await event in engine.sign(request: request) {
@@ -41,8 +42,9 @@ actor SigningCoordinator {
                     succeeded += 1
                     await updateWorkspace([fileID], to: .completed)
                     state = .signing(progress: BatchProgress(total: request.files.count, completed: succeeded, failed: failed))
-                case .failed(let fileID, _):
+                case .failed(let fileID, let failure):
                     failed += 1
+                    firstFailure = firstFailure ?? failure
                     await updateWorkspace([fileID], to: .failed)
                     state = .signing(progress: BatchProgress(total: request.files.count, completed: succeeded, failed: failed))
                 case .cancelled:
@@ -61,7 +63,9 @@ actor SigningCoordinator {
         } else if succeeded > 0 {
             state = .partiallyCompleted(summary)
         } else {
-            state = .failed(.fileFailed(request.files.first?.id ?? ""))
+            let failure = firstFailure ?? .fileFailed(request.files.first?.id ?? "")
+            state = .failed(failure)
+            throw failure
         }
     }
 
