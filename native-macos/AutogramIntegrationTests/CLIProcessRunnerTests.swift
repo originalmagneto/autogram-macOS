@@ -60,6 +60,23 @@ import Testing
     #expect(clock.now - started < .seconds(3))
 }
 
+@Test func terminalEventFinishesEvenWhenNativeCleanupWouldHang() async throws {
+    let helper = try FakeMachineHelper(behavior: .terminalThenWaits)
+    defer { try? helper.remove() }
+    let runner = CLIProcessRunner()
+    let stream = await runner.run(
+        request: .capabilities(requestID: "terminal-1"),
+        configuration: helper.configuration(timeout: .seconds(5))
+    )
+
+    var events: [MachineEvent] = []
+    for try await event in stream {
+        events.append(event)
+    }
+
+    #expect(events.map(\.type) == [.sessionCompleted])
+}
+
 @Test func nonZeroExitReturnsRedactedTypedFailure() async throws {
     let helper = try FakeMachineHelper(behavior: .exitsWithError)
     defer { try? helper.remove() }

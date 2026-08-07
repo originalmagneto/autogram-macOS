@@ -66,7 +66,7 @@ public class AppStarter {
                 System.out.flush();
                 System.err.flush();
                 if (cmd.hasOption("machine-readable")) {
-                    System.exit(exitCode);
+                    terminateCliProcess(exitCode);
                 } else if (requiresIntelCliCleanup(cmd))
                     terminateCliProcess(exitCode);
                 else
@@ -94,8 +94,8 @@ public class AppStarter {
     }
 
     private static void terminateCliProcess(int exitCode) {
-        // The Intel jpackage launcher aborts in native cleanup after SunPKCS11 is loaded.
-        // CLI output and files are flushed before terminating the short-lived process.
+        // Some PKCS#11 runtimes hang or abort during native process cleanup.
+        // CLI output and files are flushed before terminating this short-lived process.
         try {
             new ProcessBuilder("/bin/kill", "-KILL", Long.toString(ProcessHandle.current().pid())).start();
             while (true)

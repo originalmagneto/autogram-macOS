@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 
 enum CLIProcessFailure: Error, Sendable, Equatable, LocalizedError {
     case launchFailed
@@ -31,6 +32,7 @@ actor CLIProcessRunner {
         var terminationStatus: Int32?
         var stdoutFinished = false
         var stderrFinished = false
+        var terminalEventReceived = false
         var requestedFailure: CLIProcessFailure?
         var timeoutTask: Task<Void, Never>?
     }
@@ -177,9 +179,19 @@ actor CLIProcessRunner {
         guard var activeRun, activeRun.id == runID else { return }
         do {
             let events = try activeRun.stdoutBuffer.append(data)
+            let receivedTerminalEvent = events.contains {
+                $0.type == .sessionCompleted || $0.type == .sessionFailed
+            }
+            if receivedTerminalEvent {
+                activeRun.terminalEventReceived = true
+                activeRun.timeoutTask?.cancel()
+            }
             self.activeRun = activeRun
             for event in events {
                 activeRun.continuation.yield(event)
+            }
+            if receivedTerminalEvent, activeRun.process.isRunning {
+                kill(activeRun.process.processIdentifier, SIGKILL)
             }
         } catch {
             self.activeRun = activeRun
@@ -240,7 +252,7 @@ actor CLIProcessRunner {
 
     private func interruptIfNeeded(runID: UUID) {
         guard let activeRun, activeRun.id == runID, activeRun.process.isRunning else { return }
-        activeRun.process.interrupt()
+        kill(activeRun.process.processIdentifier, SIGKILL)
     }
 
     private func finishIfReady(runID: UUID) {
@@ -252,7 +264,9 @@ actor CLIProcessRunner {
             return
         }
 
-        if let failure = activeRun.requestedFailure {
+        if activeRun.terminalEventReceived {
+            finish(runID: runID, throwing: nil)
+        } else if let failure = activeRun.requestedFailure {
             finish(runID: runID, throwing: failure)
         } else if activeRun.terminationStatus != 0 {
             finish(runID: runID, throwing: .helperExited)

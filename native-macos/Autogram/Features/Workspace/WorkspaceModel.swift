@@ -112,7 +112,7 @@ final class WorkspaceModel {
             )
         } catch {
             isLoadingCertificates = false
-            credentialError = "Certificates could not be loaded. Check your PIN and try again."
+            credentialError = error.localizedDescription
             clearPendingSigningPIN()
             return .failed
         }

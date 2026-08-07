@@ -6,6 +6,7 @@ struct FakeMachineHelper {
         case splitEvent
         case captureInput
         case waits
+        case terminalThenWaits
         case exitsWithError
     }
 
@@ -35,6 +36,11 @@ struct FakeMachineHelper {
             ;;
         waits)
             trap 'exit 0' TERM INT
+            while :; do sleep 1; done
+            ;;
+        terminalThenWaits)
+            cat > /dev/null
+            printf '%s\n' '{"protocolVersion":1,"type":"session.completed","sessionId":"terminal-1","emittedAt":"2026-08-06T00:00:00Z","fileId":null,"payload":{}}'
             while :; do sleep 1; done
             ;;
         exitsWithError)

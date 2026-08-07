@@ -184,8 +184,11 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
             }
             events.append(event)
         }
-        if events.contains(where: { $0.type == .sessionFailed }) {
-            throw SigningFailure.engine("The signing helper rejected the request.")
+        if let failure = events.last(where: { $0.type == .sessionFailed }) {
+            let code = string(in: failure.payload["code"]) ?? "INTERNAL_ERROR"
+            let fallback = string(in: failure.payload["fallbackMessage"])
+                ?? "The signing helper rejected the request."
+            throw SigningFailure.engine("\(fallback) [\(code)]")
         }
         return events
     }

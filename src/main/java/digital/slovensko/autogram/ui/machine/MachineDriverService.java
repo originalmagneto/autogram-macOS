@@ -5,8 +5,10 @@ import com.google.gson.JsonObject;
 import digital.slovensko.autogram.core.DefaultDriverDetector;
 import digital.slovensko.autogram.core.DriverDetector;
 import digital.slovensko.autogram.core.PasswordManager;
+import digital.slovensko.autogram.core.errors.AutogramException;
 import digital.slovensko.autogram.drivers.TokenDriver;
 import digital.slovensko.autogram.ui.cli.CliKeySelector;
+import eu.europa.esig.dss.model.DSSException;
 
 import java.time.Instant;
 import java.util.Arrays;
@@ -84,6 +86,8 @@ public final class MachineDriverService {
             }
         } catch (MachineProtocolException exception) {
             throw exception;
+        } catch (DSSException exception) {
+            throw AutogramException.createFromDSSException(exception);
         } catch (Exception exception) {
             throw new MachineProtocolException("DRIVER_UNAVAILABLE", exception);
         }

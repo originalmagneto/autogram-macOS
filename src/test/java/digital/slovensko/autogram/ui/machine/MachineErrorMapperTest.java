@@ -1,6 +1,7 @@
 package digital.slovensko.autogram.ui.machine;
 
 import org.junit.jupiter.api.Test;
+import digital.slovensko.autogram.core.errors.PINIncorrectException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -19,5 +20,14 @@ class MachineErrorMapperTest {
 
         assertEquals("INTERNAL_ERROR", mapped.code());
         assertEquals(70, mapper.exitCode(new RuntimeException("sensitive failure")));
+    }
+
+    @Test
+    void mapsIncorrectPinToStableSafeError() {
+        var mapped = mapper.map(new PINIncorrectException());
+
+        assertEquals("PIN_INCORRECT", mapped.code());
+        assertEquals("The supplied PIN was not accepted.", mapped.fallbackMessage());
+        assertEquals(64, mapper.exitCode(new PINIncorrectException()));
     }
 }

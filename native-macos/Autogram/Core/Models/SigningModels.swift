@@ -86,6 +86,19 @@ enum SigningFailure: Error, Sendable, Equatable {
     case fileFailed(String)
 }
 
+extension SigningFailure: LocalizedError {
+    var errorDescription: String? {
+        switch self {
+        case .invalidTransition:
+            "The signing workflow entered an invalid state."
+        case .engine(let message):
+            message
+        case .fileFailed:
+            "A PDF could not be signed."
+        }
+    }
+}
+
 final class Secret: @unchecked Sendable {
     private let lock = NSLock()
     private var bytes: [UInt8]
