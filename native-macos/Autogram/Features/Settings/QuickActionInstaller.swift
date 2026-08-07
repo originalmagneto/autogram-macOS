@@ -3,6 +3,13 @@ import Foundation
 
 struct QuickActionInstaller {
     static let workflowName = "Sign PDFs with Autogram.workflow"
+    static let legacyCLIWorkflowName = "Sign PDFs Autogram.workflow"
+
+    enum Status {
+        case nativeInstalled
+        case legacyCLIInstalled
+        case notInstalled
+    }
 
     private let fileManager: FileManager
     private let servicesURL: URL
@@ -14,7 +21,21 @@ struct QuickActionInstaller {
     }
 
     var isInstalled: Bool {
-        fileManager.fileExists(atPath: installedWorkflowURL.path)
+        status == .nativeInstalled
+    }
+
+    var status: Status {
+        if fileManager.fileExists(atPath: installedWorkflowURL.path) {
+            return .nativeInstalled
+        }
+        if fileManager.fileExists(atPath: legacyWorkflowURL.path) {
+            return .legacyCLIInstalled
+        }
+        return .notInstalled
+    }
+
+    var hasLegacyCLIWorkflow: Bool {
+        fileManager.fileExists(atPath: legacyWorkflowURL.path)
     }
 
     func install() throws {
@@ -35,6 +56,10 @@ struct QuickActionInstaller {
 
     private var installedWorkflowURL: URL {
         servicesURL.appending(path: Self.workflowName, directoryHint: .isDirectory)
+    }
+
+    private var legacyWorkflowURL: URL {
+        servicesURL.appending(path: Self.legacyCLIWorkflowName, directoryHint: .isDirectory)
     }
 
     private func bundledWorkflowURL() throws -> URL {

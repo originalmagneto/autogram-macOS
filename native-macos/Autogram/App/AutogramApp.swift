@@ -37,7 +37,7 @@ struct AutogramApp: App {
         }
 
         Settings {
-            AutogramSettingsView()
+            AutogramSettingsView(workspace: workspace)
         }
     }
 }

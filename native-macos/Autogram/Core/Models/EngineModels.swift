@@ -13,10 +13,12 @@ struct EngineCapabilities: Sendable, Equatable {
 struct SigningDriver: Sendable, Equatable, Identifiable {
     let id: String
     let displayName: String
+    let middlewareVersion: String?
 
-    init(id: String, displayName: String) {
+    init(id: String, displayName: String, middlewareVersion: String? = nil) {
         self.id = id
         self.displayName = displayName
+        self.middlewareVersion = middlewareVersion
     }
 }
 

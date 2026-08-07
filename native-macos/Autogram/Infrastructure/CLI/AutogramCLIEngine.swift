@@ -23,6 +23,9 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
     func capabilities() async throws -> EngineCapabilities {
         let events = try await run(.capabilities(requestID: UUID().uuidString))
         let payload = try completedPayload(from: events)
+        guard let protocolVersion = events.first?.protocolVersion else {
+            throw SigningFailure.engine("The signing helper returned no capability response.")
+        }
         let signatureLevels = strings(in: payload["signatureLevels"])
         let timestampPolicy = object(in: payload["timestampPolicy"])
         guard signatureLevels.contains("PAdES_BASELINE_T"),
@@ -30,7 +33,7 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
               timestampPolicy?["qualified"] == .bool(true) else {
             throw SigningFailure.engine("The signing helper does not require qualified timestamps.")
         }
-        return EngineCapabilities(protocolVersion: 1, supportsQualifiedTimestamp: true)
+        return EngineCapabilities(protocolVersion: protocolVersion, supportsQualifiedTimestamp: true)
     }
 
     func drivers() async throws -> [SigningDriver] {
@@ -40,11 +43,11 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
         return try candidates.compactMap { candidate in
             guard let id = string(in: candidate["id"]), let name = string(in: candidate["name"]),
                   let path = string(in: candidate["path"]) else { return nil }
-            _ = try driverResolver.resolve(
+            let resolved = try driverResolver.resolve(
                 helperURL: configuration.executableURL,
                 driver: DriverCandidate(url: URL(fileURLWithPath: path))
             )
-            return SigningDriver(id: id, displayName: name)
+            return SigningDriver(id: id, displayName: name, middlewareVersion: resolved.middlewareVersion)
         }
     }
 
