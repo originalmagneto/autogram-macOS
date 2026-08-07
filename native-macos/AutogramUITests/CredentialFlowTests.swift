@@ -2,15 +2,15 @@ import XCTest
 
 final class CredentialFlowTests: XCTestCase {
     @MainActor
-    func testCertificateSelectionPresentsSecurePINSheet() throws {
+    func testDiscoveredCredentialSignsAfterPINEntry() throws {
         let app = XCUIApplication()
         app.launchEnvironment["AUTOGRAM_FAKE_ENGINE"] = "credential-flow"
         app.launch()
 
-        let certificate = app.staticTexts["Test Certificate"]
-        XCTAssertTrue(certificate.waitForExistence(timeout: 3))
-        certificate.click()
-        app.buttons["Use Certificate"].click()
+        let signButton = app.buttons["Sign"]
+        XCTAssertTrue(signButton.waitForExistence(timeout: 3))
+        XCTAssertTrue(signButton.isEnabled)
+        signButton.click()
 
         let pinField = app.secureTextFields["PIN"]
         XCTAssertTrue(pinField.waitForExistence(timeout: 3))
@@ -18,5 +18,8 @@ final class CredentialFlowTests: XCTestCase {
         pinField.click()
         pinField.typeText("test-pin")
         XCTAssertTrue(app.buttons["Sign with PIN"].isEnabled)
+        app.buttons["Sign with PIN"].click()
+
+        XCTAssertTrue(app.staticTexts["Signed"].waitForExistence(timeout: 3))
     }
 }

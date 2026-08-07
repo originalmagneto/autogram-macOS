@@ -2,8 +2,6 @@ import SwiftUI
 
 struct WorkspaceView: View {
     let workspace: WorkspaceModel
-    @AppStorage("preferences.driverID") private var driverID = ""
-    @AppStorage("preferences.certificateSerial") private var certificateSerial = ""
     @State private var inspectorPresented = true
     @State private var isPINSheetPresented = false
 
@@ -29,15 +27,16 @@ struct WorkspaceView: View {
                 .inspector(isPresented: $inspectorPresented) {
                     SigningInspector(
                         workspace: workspace,
-                        isPINSheetPresented: $isPINSheetPresented,
-                        configuredDriverID: driverID,
-                        configuredCertificateSerial: certificateSerial
+                        isPINSheetPresented: $isPINSheetPresented
                     )
                 }
             }
         }
         .dropDestination(for: URL.self) { urls, _ in
             workspace.addPDFs(urls)
+        }
+        .task {
+            await workspace.refreshSigningEnvironment()
         }
         .toolbar {
             ToolbarItem {
@@ -58,7 +57,7 @@ struct WorkspaceView: View {
                     inspectorPresented = true
                     isPINSheetPresented = true
                 }
-                .disabled(workspace.items.isEmpty || !credentialsAreConfigured)
+                .disabled(workspace.items.isEmpty || selectedDriver == nil)
                 .help("Sign the selected PDFs")
             }
         }
@@ -69,8 +68,7 @@ struct WorkspaceView: View {
         return workspace.items.first { $0.id == selection }
     }
 
-    private var credentialsAreConfigured: Bool {
-        !driverID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            && !certificateSerial.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    private var selectedDriver: SigningDriver? {
+        workspace.availableDrivers.first { $0.id == workspace.selectedDriverID }
     }
 }

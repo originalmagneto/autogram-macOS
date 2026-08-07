@@ -4,10 +4,8 @@ import SwiftUI
 struct SigningInspector: View {
     let workspace: WorkspaceModel
     @Binding var isPINSheetPresented: Bool
-    let configuredDriverID: String
-    let configuredCertificateSerial: String
-    @State private var certificateSerial: String?
     @State private var pin = ""
+    @State private var isCertificatePickerPresented = false
 
     var body: some View {
         Form {
@@ -16,23 +14,28 @@ struct SigningInspector: View {
                 LabeledContent("Timestamp", value: "Qualified")
             }
 
-            if !workspace.credentialCertificates.isEmpty {
-                Section("Certificate") {
-                    CertificatePicker(
-                        certificates: workspace.credentialCertificates,
-                        selectedSerial: $certificateSerial
-                    ) {
-                        isPINSheetPresented = true
+            Section("Driver") {
+                if workspace.isLoadingSigningEnvironment {
+                    ProgressView("Discovering signing drivers")
+                } else if workspace.availableDrivers.count > 1 {
+                    Picker("Driver", selection: Binding(
+                        get: { workspace.selectedDriverID },
+                        set: { workspace.selectDriver(id: $0) }
+                    )) {
+                        Text("Choose a driver").tag(Optional<String>.none)
+                        ForEach(workspace.availableDrivers) { driver in
+                            Text(driver.displayName).tag(Optional(driver.id))
+                        }
                     }
+                } else if let driver = selectedDriver {
+                    LabeledContent("Driver", value: driver.displayName)
+                } else {
+                    Label("No compatible signing driver detected", systemImage: "exclamationmark.triangle")
                 }
-            } else if !credentialsAreConfigured {
-                Section("Certificate") {
-                    Label("Signing configuration needed", systemImage: "gearshape")
-                    Text("Choose a driver and certificate in Settings before signing.")
+
+                if let credentialError = workspace.credentialError {
+                    Text(credentialError)
                         .foregroundStyle(.secondary)
-                    SettingsLink {
-                        Text("Open Settings")
-                    }
                 }
             }
 
@@ -63,32 +66,33 @@ struct SigningInspector: View {
         .formStyle(.grouped)
         .inspectorColumnWidth(min: 260, ideal: 300)
         .sheet(isPresented: $isPINSheetPresented) {
-            PINSheet(pin: $pin) { secret in
-                guard let signingCredentials else { return }
+            PINSheet(pin: $pin) { submission in
                 Task {
-                    await workspace.sign(
-                        driverID: signingCredentials.driverID,
-                        certificateSerial: signingCredentials.certificateSerial,
-                        pin: secret
-                    )
+                    let resolution = await workspace.resolveCertificates(using: submission)
+                    isCertificatePickerPresented = resolution == .certificateSelectionRequired
                 }
+            } onCancel: {
+                workspace.cancelCredentialFlow()
             }
         }
-    }
-
-    private var credentialsAreConfigured: Bool {
-        !configuredDriverID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            && !configuredCertificateSerial.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-
-    private var signingCredentials: (driverID: String, certificateSerial: String)? {
-        if !workspace.credentialCertificates.isEmpty {
-            guard let certificateSerial else { return nil }
-            return ("fixture-driver", certificateSerial)
+        .sheet(isPresented: $isCertificatePickerPresented, onDismiss: {
+            workspace.cancelCredentialFlow()
+        }) {
+            CertificatePicker(certificates: workspace.discoveredCertificates) { certificate in
+                workspace.startSigning(with: certificate)
+                isCertificatePickerPresented = false
+            } onCancel: {
+                isCertificatePickerPresented = false
+                workspace.cancelCredentialFlow()
+            }
         }
+        .onDisappear {
+            workspace.cancelCredentialFlow()
+        }
+    }
 
-        guard credentialsAreConfigured else { return nil }
-        return (configuredDriverID, configuredCertificateSerial)
+    private var selectedDriver: SigningDriver? {
+        workspace.availableDrivers.first { $0.id == workspace.selectedDriverID }
     }
 
     private var completedCount: Int {

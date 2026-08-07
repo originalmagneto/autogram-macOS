@@ -7,12 +7,20 @@ enum FakeSigningEvent: Sendable, Equatable {
 
 struct FakeSigningEngine: SigningEngine {
     let script: [FakeSigningEvent]
+    let credentialFlow: Bool
 
-    init(script: [FakeSigningEvent] = []) {
+    init(script: [FakeSigningEvent] = [], credentialFlow: Bool = false) {
         self.script = script
+        self.credentialFlow = credentialFlow
     }
 
     static func launchEngine(environment: [String: String] = ProcessInfo.processInfo.environment) -> FakeSigningEngine {
+        if environment["AUTOGRAM_FAKE_ENGINE"] == "credential-flow" {
+            return FakeSigningEngine(
+                script: [.completed("credential-flow")],
+                credentialFlow: true
+            )
+        }
         guard environment["AUTOGRAM_FAKE_ENGINE"] == "partial-failure" else {
             return FakeSigningEngine()
         }
@@ -28,11 +36,12 @@ struct FakeSigningEngine: SigningEngine {
     }
 
     func drivers() async throws -> [SigningDriver] {
-        []
+        credentialFlow ? [SigningDriver(id: "test-token", displayName: "Test Signing Token")] : []
     }
 
     func certificates(driverID: String, pin: Secret?) async throws -> [SigningCertificate] {
-        []
+        _ = pin?.consumeBytes()
+        return credentialFlow ? [SigningCertificate(serialNumber: "TEST-CERTIFICATE-1", displayName: "Test Certificate")] : []
     }
 
     func inspect(files: [PDFItemDescriptor]) async throws -> [PDFInspection] {

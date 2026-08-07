@@ -7,18 +7,23 @@ import UniformTypeIdentifiers
 final class WorkspaceModel {
     private(set) var items: [PDFItem] = []
     var selection: PDFItem.ID?
-    let credentialCertificates: [SigningCertificate]
+    private(set) var availableDrivers: [SigningDriver] = []
+    private(set) var selectedDriverID: String?
+    private(set) var discoveredCertificates: [SigningCertificate] = []
+    private(set) var signingEnvironment: EngineCapabilities?
+    private(set) var isLoadingSigningEnvironment = false
+    private(set) var isLoadingCertificates = false
+    private(set) var credentialError: String?
     private let engine: any SigningEngine
     @ObservationIgnored private var coordinator: SigningCoordinator?
+    @ObservationIgnored private var pendingSigningPIN: Secret?
 
     init(
         engine: any SigningEngine = FakeSigningEngine.launchEngine(),
-        items: [PDFItem] = [],
-        credentialCertificates: [SigningCertificate] = []
+        items: [PDFItem] = []
     ) {
         self.engine = engine
         self.items = items
-        self.credentialCertificates = credentialCertificates
         self.selection = items.first?.id
         self.coordinator = SigningCoordinator(engine: engine, workspace: self)
     }
@@ -37,15 +42,103 @@ final class WorkspaceModel {
         } else {
             items = []
         }
-        let credentialCertificates: [SigningCertificate]
-        if fixtureMode == "credential-flow" {
-            credentialCertificates = [
-                SigningCertificate(serialNumber: "TEST-CERTIFICATE-1", displayName: "Test Certificate")
-            ]
-        } else {
-            credentialCertificates = []
+        return WorkspaceModel(engine: engine, items: items)
+    }
+
+    func refreshSigningEnvironment() async {
+        isLoadingSigningEnvironment = true
+        credentialError = nil
+        discoveredCertificates = []
+
+        defer { isLoadingSigningEnvironment = false }
+
+        do {
+            signingEnvironment = try await engine.capabilities()
+            availableDrivers = try await engine.drivers()
+            if availableDrivers.count == 1 {
+                selectedDriverID = availableDrivers[0].id
+            } else if !availableDrivers.contains(where: { $0.id == selectedDriverID }) {
+                selectedDriverID = nil
+            }
+        } catch {
+            signingEnvironment = nil
+            availableDrivers = []
+            selectedDriverID = nil
+            credentialError = "Signing credentials could not be discovered."
         }
-        return WorkspaceModel(engine: engine, items: items, credentialCertificates: credentialCertificates)
+    }
+
+    func selectDriver(id: String?) {
+        guard let id, availableDrivers.contains(where: { $0.id == id }) else {
+            selectedDriverID = nil
+            credentialError = nil
+            cancelCredentialFlow()
+            return
+        }
+
+        guard selectedDriverID != id else { return }
+        selectedDriverID = id
+        credentialError = nil
+        cancelCredentialFlow()
+    }
+
+    func resolveCertificates(using submission: PINSubmission) async -> CertificateResolution {
+        cancelCredentialFlow()
+        credentialError = nil
+        guard let selectedDriverID else {
+            credentialError = "Choose a signing driver before continuing."
+            return .failed
+        }
+
+        isLoadingCertificates = true
+        pendingSigningPIN = submission.signingPIN
+
+        do {
+            discoveredCertificates = try await engine.certificates(
+                driverID: selectedDriverID,
+                pin: submission.certificatePIN
+            )
+        } catch {
+            isLoadingCertificates = false
+            credentialError = "Certificates could not be loaded. Check your PIN and try again."
+            clearPendingSigningPIN()
+            return .failed
+        }
+
+        isLoadingCertificates = false
+        guard !discoveredCertificates.isEmpty else {
+            credentialError = "No signing certificates were found for the selected driver."
+            clearPendingSigningPIN()
+            return .failed
+        }
+
+        if let certificate = discoveredCertificates.only {
+            startSigning(with: certificate)
+            return .signingStarted
+        }
+        return .certificateSelectionRequired
+    }
+
+    func startSigning(with certificate: SigningCertificate) {
+        guard let driverID = selectedDriverID, let signingPIN = pendingSigningPIN else {
+            credentialError = "Signing credentials are no longer available. Enter your PIN again."
+            return
+        }
+
+        clearPendingSigningPIN()
+        Task { [weak self] in
+            await self?.sign(
+                driverID: driverID,
+                certificateSerial: certificate.serialNumber,
+                pin: signingPIN
+            )
+        }
+    }
+
+    func cancelCredentialFlow() {
+        discoveredCertificates = []
+        isLoadingCertificates = false
+        clearPendingSigningPIN()
     }
 
     func setItems(_ items: [PDFItem]) {
@@ -125,7 +218,7 @@ final class WorkspaceModel {
         removeItems(atOffsets: IndexSet(integer: index))
     }
 
-    func sign(driverID: String, certificateSerial: String, pin: Secret) async {
+    private func sign(driverID: String, certificateSerial: String, pin: Secret) async {
         guard !items.isEmpty,
               !driverID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
               !certificateSerial.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
@@ -146,9 +239,26 @@ final class WorkspaceModel {
             try await coordinator.inspect(descriptors)
             try await coordinator.beginSigning(request: request)
         } catch {
+            credentialError = "Signing could not be completed."
             for item in items {
                 updateStatus(for: item.descriptor.id, to: .failed)
             }
         }
+    }
+
+    private func clearPendingSigningPIN() {
+        pendingSigningPIN = nil
+    }
+}
+
+enum CertificateResolution: Sendable, Equatable {
+    case certificateSelectionRequired
+    case signingStarted
+    case failed
+}
+
+private extension Array {
+    var only: Element? {
+        count == 1 ? first : nil
     }
 }
