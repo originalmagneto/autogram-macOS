@@ -31,6 +31,10 @@ public abstract class TokenDriver {
         return path.toFile().exists();
     }
 
+    public Boolean tokenPresent() {
+        return null;
+    }
+
 
     public abstract AbstractKeyStoreTokenConnection createToken(PasswordManager pm, SignatureTokenSettings settings);
 

@@ -14,11 +14,13 @@ struct SigningDriver: Sendable, Equatable, Identifiable {
     let id: String
     let displayName: String
     let middlewareVersion: String?
+    let tokenPresent: Bool?
 
-    init(id: String, displayName: String, middlewareVersion: String? = nil) {
+    init(id: String, displayName: String, middlewareVersion: String? = nil, tokenPresent: Bool? = nil) {
         self.id = id
         self.displayName = displayName
         self.middlewareVersion = middlewareVersion
+        self.tokenPresent = tokenPresent
     }
 }
 

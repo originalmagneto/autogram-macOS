@@ -45,6 +45,18 @@ final class WorkspaceModel {
         return WorkspaceModel(engine: engine, items: items)
     }
 
+    var connectedDrivers: [SigningDriver] {
+        availableDrivers.filter { $0.tokenPresent == true }
+    }
+
+    var tokenPresenceIsKnown: Bool {
+        availableDrivers.contains { $0.tokenPresent != nil }
+    }
+
+    var selectableDrivers: [SigningDriver] {
+        tokenPresenceIsKnown ? connectedDrivers : availableDrivers
+    }
+
     func refreshSigningEnvironment() async {
         isLoadingSigningEnvironment = true
         credentialError = nil
@@ -55,9 +67,9 @@ final class WorkspaceModel {
         do {
             signingEnvironment = try await engine.capabilities()
             availableDrivers = try await engine.drivers()
-            if availableDrivers.count == 1 {
-                selectedDriverID = availableDrivers[0].id
-            } else if !availableDrivers.contains(where: { $0.id == selectedDriverID }) {
+            if selectableDrivers.count == 1 {
+                selectedDriverID = selectableDrivers[0].id
+            } else if !selectableDrivers.contains(where: { $0.id == selectedDriverID }) {
                 selectedDriverID = nil
             }
         } catch {
@@ -69,7 +81,7 @@ final class WorkspaceModel {
     }
 
     func selectDriver(id: String?) {
-        guard let id, availableDrivers.contains(where: { $0.id == id }) else {
+        guard let id, selectableDrivers.contains(where: { $0.id == id }) else {
             selectedDriverID = nil
             credentialError = nil
             cancelCredentialFlow()

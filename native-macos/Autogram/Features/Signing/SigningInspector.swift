@@ -17,18 +17,20 @@ struct SigningInspector: View {
             Section("Driver") {
                 if workspace.isLoadingSigningEnvironment {
                     ProgressView("Discovering signing drivers")
-                } else if workspace.availableDrivers.count > 1 {
+                } else if workspace.selectableDrivers.count > 1 {
                     Picker("Driver", selection: Binding(
                         get: { workspace.selectedDriverID },
                         set: { workspace.selectDriver(id: $0) }
                     )) {
                         Text("Choose a driver").tag(Optional<String>.none)
-                        ForEach(workspace.availableDrivers) { driver in
+                        ForEach(workspace.selectableDrivers) { driver in
                             Text(driver.displayName).tag(Optional(driver.id))
                         }
                     }
                 } else if let driver = selectedDriver {
                     LabeledContent("Driver", value: driver.displayName)
+                } else if !workspace.availableDrivers.isEmpty, workspace.tokenPresenceIsKnown {
+                    Label("No connected signing card detected", systemImage: "exclamationmark.triangle")
                 } else {
                     Label("No compatible signing driver detected", systemImage: "exclamationmark.triangle")
                 }
@@ -92,7 +94,7 @@ struct SigningInspector: View {
     }
 
     private var selectedDriver: SigningDriver? {
-        workspace.availableDrivers.first { $0.id == workspace.selectedDriverID }
+        workspace.selectableDrivers.first { $0.id == workspace.selectedDriverID }
     }
 
     private var completedCount: Int {

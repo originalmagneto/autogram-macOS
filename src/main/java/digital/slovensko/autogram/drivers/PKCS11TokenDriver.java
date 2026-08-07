@@ -16,4 +16,9 @@ public class PKCS11TokenDriver extends TokenDriver {
     public AbstractKeyStoreTokenConnection createToken(PasswordManager pm, SignatureTokenSettings settings) {
         return new NativePkcs11SignatureToken(getPath().toString(), pm, settings, settings.getDriverSlotIndex(getShortname()));
     }
+
+    @Override
+    public Boolean tokenPresent() {
+        return PKCS11TokenPresenceProbe.tokenPresent(getPath()).orElse(null);
+    }
 }

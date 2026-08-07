@@ -47,7 +47,12 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
                 helperURL: configuration.executableURL,
                 driver: DriverCandidate(url: URL(fileURLWithPath: path))
             )
-            return SigningDriver(id: id, displayName: name, middlewareVersion: resolved.middlewareVersion)
+            return SigningDriver(
+                id: id,
+                displayName: name,
+                middlewareVersion: resolved.middlewareVersion,
+                tokenPresent: bool(in: candidate["tokenPresent"])
+            )
         }
     }
 
@@ -224,6 +229,11 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
 
     private func string(in value: JSONValue?) -> String? {
         guard case .string(let value)? = value else { return nil }
+        return value
+    }
+
+    private func bool(in value: JSONValue?) -> Bool? {
+        guard case .bool(let value)? = value else { return nil }
         return value
     }
 }

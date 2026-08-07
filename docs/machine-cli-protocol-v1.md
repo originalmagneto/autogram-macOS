@@ -43,6 +43,8 @@ Operation payloads are:
 
 Sources and targets in `INSPECT` and `SIGN` must be absolute normalized paths. Signing never overwrites an original or an existing target.
 
+`driver.detected` returns installed middleware entries. Each entry includes `tokenPresent`: `true` when the PKCS#11 library reports a connected token, `false` when it reports none, or `null` when presence cannot be safely probed. Clients may use only `true` entries for automatic card selection and must retain a compatibility fallback for all-unknown legacy responses.
+
 ## Event envelope
 
 Standard output contains one JSON object per line. Every event has this envelope:

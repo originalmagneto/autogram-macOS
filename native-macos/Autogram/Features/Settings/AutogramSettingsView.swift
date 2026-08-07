@@ -108,7 +108,8 @@ struct AutogramSettingsView: View {
                 "ARM64 validation",
                 value: workspace.availableDrivers.isEmpty ? "No middleware detected" : "Validated for detected middleware"
             )
-            LabeledContent("Middleware", value: middlewareDescription)
+            LabeledContent("Installed middleware", value: middlewareDescription)
+            LabeledContent("Connected signing card", value: connectedCardDescription)
             LabeledContent("Protocol version", value: String(capabilities.protocolVersion))
             if secureStoreDetected {
                 Text("I.CA SecureStore detected and ARM64 validated.")
@@ -130,6 +131,14 @@ struct AutogramSettingsView: View {
     private var middlewareDescription: String {
         let names = workspace.availableDrivers.map(friendlyDriverName)
         return names.isEmpty ? "No middleware detected" : names.joined(separator: ", ")
+    }
+
+    private var connectedCardDescription: String {
+        let names = workspace.connectedDrivers.map(friendlyDriverName)
+        if !names.isEmpty {
+            return names.joined(separator: ", ")
+        }
+        return workspace.tokenPresenceIsKnown ? "No connected signing card" : "Card presence unavailable"
     }
 
     private var secureStoreDetected: Bool {

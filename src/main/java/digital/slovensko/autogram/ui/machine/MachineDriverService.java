@@ -95,6 +95,12 @@ public final class MachineDriverService {
         payload.addProperty("name", driver.getName());
         payload.addProperty("path", driver.getPath().toString());
         payload.addProperty("installed", driver.isInstalled());
+        var tokenPresent = driver.tokenPresent();
+        if (tokenPresent == null) {
+            payload.add("tokenPresent", com.google.gson.JsonNull.INSTANCE);
+        } else {
+            payload.addProperty("tokenPresent", tokenPresent);
+        }
         return payload;
     }
 

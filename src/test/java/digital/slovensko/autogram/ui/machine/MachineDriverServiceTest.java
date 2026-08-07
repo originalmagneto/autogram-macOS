@@ -48,6 +48,8 @@ class MachineDriverServiceTest {
         assertEquals("Test driver", listed.get("name").getAsString());
         assertEquals("fake-driver", listed.get("path").getAsString());
         assertFalse(listed.get("installed").getAsBoolean());
+        assertTrue(listed.has("tokenPresent"));
+        assertTrue(listed.get("tokenPresent").isJsonNull());
     }
 
     @Test
