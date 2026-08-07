@@ -39,7 +39,7 @@ enum MachineProtocolDecoder {
         guard let sessionID = object["sessionId"] as? String, !sessionID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw ProtocolFailure.missingSessionID
         }
-        guard let emittedAt = object["emittedAt"] as? String, ISO8601DateFormatter().date(from: emittedAt) != nil else {
+        guard let emittedAt = object["emittedAt"] as? String, isValidTimestamp(emittedAt) else {
             throw ProtocolFailure.malformedPayload
         }
         let fileID = object["fileId"] as? String
@@ -52,5 +52,14 @@ enum MachineProtocolDecoder {
             throw ProtocolFailure.malformedPayload
         }
         return event
+    }
+
+    private static func isValidTimestamp(_ value: String) -> Bool {
+        let formatter = ISO8601DateFormatter()
+        if formatter.date(from: value) != nil {
+            return true
+        }
+        formatter.formatOptions.insert(.withFractionalSeconds)
+        return formatter.date(from: value) != nil
     }
 }

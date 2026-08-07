@@ -76,7 +76,7 @@ final class WorkspaceModel {
             signingEnvironment = nil
             availableDrivers = []
             selectedDriverID = nil
-            credentialError = "Signing credentials could not be discovered."
+            credentialError = error.localizedDescription
         }
     }
 
