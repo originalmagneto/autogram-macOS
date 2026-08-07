@@ -4,7 +4,9 @@ This directory contains the native macOS SwiftUI workspace for Autogram. It uses
 
 ## Development status
 
-The workspace is under active development. It supports PDF intake, preview, signing configuration, certificate selection, PIN entry, output handling, and the qualified timestamp signing flow. Finder Quick Action installation belongs to the next plan and is not complete in this workspace.
+The workspace is under active development. It supports PDF intake, preview, signing configuration, certificate selection, PIN entry, output handling, the qualified timestamp signing flow, and explicit Finder Quick Action installation. The Quick Action accepts one or more selected PDFs through native Finder open-document events.
+
+For requirements, DMG installation, Finder setup, privacy, and troubleshooting, see the [native macOS preview installation guide](../docs/native-macos-installation.md).
 
 ## Requirements
 

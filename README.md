@@ -21,6 +21,8 @@ The redesign therefore focuses on the places where users make legal or operation
 
 More detailed rollout notes live in [PLAN.md](PLAN.md) and upstream sync guidance in [PORTING.md](PORTING.md).
 
+The Apple silicon native macOS preview, including its Finder Quick Action, is documented in the [native macOS preview installation guide](docs/native-macos-installation.md).
+
 ## Redesign Scope
 - Welcome screen and file intake, including clearer drag-and-drop guidance.
 - Signing and verification screen, with stronger state hierarchy and denser summary blocks.
