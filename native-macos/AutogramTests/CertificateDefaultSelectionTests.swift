@@ -33,6 +33,11 @@ import Testing
         now: now
     ) == .selected(renewal))
     #expect(CertificateDefaultSelector.select(
+        from: CertificateDiscovery(token: token, certificates: [notYetValidCertificate(key: "exact", holder: "holder-a"), renewal, other]),
+        remembered: remembered,
+        now: now
+    ) == .pickerRequired)
+    #expect(CertificateDefaultSelector.select(
         from: CertificateDiscovery(token: token, certificates: [renewal, certificate(key: "renewal-2", holder: "holder-a")]),
         remembered: remembered,
         now: now
@@ -85,6 +90,18 @@ private func expiredCertificate(key: String, holder: String) -> SigningCertifica
         issuer: "Qualified Issuer",
         validFrom: ISO8601DateFormatter().date(from: "2024-01-01T00:00:00Z")!,
         validUntil: ISO8601DateFormatter().date(from: "2025-01-01T00:00:00Z")!,
+        certificateKey: key,
+        holderKey: holder
+    )
+}
+
+private func notYetValidCertificate(key: String, holder: String) -> SigningCertificate {
+    SigningCertificate(
+        serialNumber: "transient-serial",
+        displayName: "Jane Doe",
+        issuer: "Qualified Issuer",
+        validFrom: ISO8601DateFormatter().date(from: "2027-01-01T00:00:00Z")!,
+        validUntil: ISO8601DateFormatter().date(from: "2028-01-01T00:00:00Z")!,
         certificateKey: key,
         holderKey: holder
     )

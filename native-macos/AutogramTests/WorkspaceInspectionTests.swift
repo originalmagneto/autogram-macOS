@@ -61,6 +61,10 @@ private actor ControlledInspectionEngine: SigningEngine {
 
     func certificates(driverID: String, pin: Secret?) async throws -> [SigningCertificate] { [] }
 
+    func certificateDiscovery(driverID: String, pin: Secret?) async throws -> CertificateDiscovery {
+        CertificateDiscovery(token: SigningToken(tokenKey: "test-token", providerName: "Test Token"), certificates: [])
+    }
+
     func inspect(files: [PDFItemDescriptor]) async throws -> [PDFInspection] {
         try await withCheckedThrowingContinuation { continuation in
             requests.append(PendingRequest(files: files, continuation: continuation))
@@ -114,6 +118,10 @@ private struct InspectionEngine: SigningEngine {
     func drivers() async throws -> [SigningDriver] { [] }
 
     func certificates(driverID: String, pin: Secret?) async throws -> [SigningCertificate] { [] }
+
+    func certificateDiscovery(driverID: String, pin: Secret?) async throws -> CertificateDiscovery {
+        CertificateDiscovery(token: SigningToken(tokenKey: "test-token", providerName: "Test Token"), certificates: [])
+    }
 
     func inspect(files: [PDFItemDescriptor]) async throws -> [PDFInspection] {
         [PDFInspection(files: [

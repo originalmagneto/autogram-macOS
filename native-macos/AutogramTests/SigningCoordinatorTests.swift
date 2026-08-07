@@ -70,6 +70,10 @@ private final class IncompleteInspectionEngine: SigningEngine, @unchecked Sendab
 
     func certificates(driverID: String, pin: Secret?) async throws -> [SigningCertificate] { [] }
 
+    func certificateDiscovery(driverID: String, pin: Secret?) async throws -> CertificateDiscovery {
+        CertificateDiscovery(token: SigningToken(tokenKey: "test-token", providerName: "Test Token"), certificates: [])
+    }
+
     func inspect(files: [PDFItemDescriptor]) async throws -> [PDFInspection] {
         [PDFInspection(files: [InspectedPDF(id: "a", isSignable: true)])]
     }
@@ -92,6 +96,10 @@ private struct FailureSigningEngine: SigningEngine {
     func drivers() async throws -> [SigningDriver] { [] }
 
     func certificates(driverID: String, pin: Secret?) async throws -> [SigningCertificate] { [] }
+
+    func certificateDiscovery(driverID: String, pin: Secret?) async throws -> CertificateDiscovery {
+        CertificateDiscovery(token: SigningToken(tokenKey: "test-token", providerName: "Test Token"), certificates: [])
+    }
 
     func inspect(files: [PDFItemDescriptor]) async throws -> [PDFInspection] {
         [PDFInspection(files: files.map { InspectedPDF(id: $0.id, isSignable: true) })]

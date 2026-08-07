@@ -7,12 +7,3 @@ protocol SigningEngine: Sendable {
     func sign(request: SigningRequest) -> AsyncThrowingStream<SigningEvent, Error>
     func cancel() async
 }
-
-extension SigningEngine {
-    func certificateDiscovery(driverID: String, pin: Secret?) async throws -> CertificateDiscovery {
-        CertificateDiscovery(
-            token: SigningToken(tokenKey: "", providerName: ""),
-            certificates: try await certificates(driverID: driverID, pin: pin)
-        )
-    }
-}

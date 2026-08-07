@@ -35,8 +35,13 @@ enum CertificateDefaultSelector {
         let remembered = remembered?.tokenKey == discovery.token.tokenKey ? remembered : nil
 
         if let remembered,
-           let exact = eligible.first(where: { $0.certificateKey == remembered.certificateKey }) {
-            return .selected(exact)
+           let exact = discovery.certificates.first(where: { $0.certificateKey == remembered.certificateKey }) {
+            if exact.validFrom <= now && now <= exact.validUntil {
+                return .selected(exact)
+            }
+            if exact.validUntil >= now {
+                return .pickerRequired
+            }
         }
 
         if let remembered, !remembered.holderKey.isEmpty {
