@@ -119,7 +119,9 @@ public final class MachineDriverService {
                 .sorted()
                 .toList();
         var payload = new JsonObject();
-        payload.addProperty("tokenKey", opaqueKey("token", providerId, String.join("\u0000", holderIdentities)));
+        payload.addProperty("tokenKey", holderIdentities.isEmpty()
+                ? opaqueKey("token", providerId)
+                : opaqueKey("token", providerId, String.join("\u0000", holderIdentities)));
         payload.addProperty("providerName", providerName);
         var certificates = new JsonArray();
         eligible.forEach(key -> certificates.add(certificatePayload(key)));

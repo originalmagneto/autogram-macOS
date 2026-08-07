@@ -67,7 +67,8 @@ class MachineDriverServiceTest {
         assertFalse(json.contains("1234"));
         assertTrue(Arrays.equals(new char[pin.length], pin));
         var payload = com.google.gson.JsonParser.parseString(json).getAsJsonObject().getAsJsonObject("payload");
-        assertTrue(payload.has("tokenKey"));
+        assertEquals("v1:cc3f647e3735ace0a5bc4f20aa653718b5784259aac931f1340b0fb18615e0d5",
+                payload.get("tokenKey").getAsString());
         assertTrue(payload.getAsJsonArray("certificates").isEmpty());
     }
 
