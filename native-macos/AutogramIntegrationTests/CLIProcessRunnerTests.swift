@@ -21,6 +21,7 @@ import Testing
     defer { try? helper.remove() }
     let runner = CLIProcessRunner()
     let pin = "test-pin-value"
+    let timestampPassword = "timestamp-password-value"
     let request = SecureMachineRequest(
         envelope: MachineRequest(
             protocolVersion: 1,
@@ -28,7 +29,8 @@ import Testing
             operation: .certificates,
             payload: ["driver": .string("driver-1")]
         ),
-        pin: Secret(pin)
+        pin: Secret(pin),
+        timestampAuthentication: .basic(username: "timestamp-user", password: Secret(timestampPassword))
     )
 
     let stream = await runner.run(request: request, configuration: helper.configuration())
@@ -37,6 +39,9 @@ import Testing
     #expect(!(try helper.contents(of: "arguments")).contains(pin))
     #expect(!(try helper.contents(of: "environment")).contains(pin))
     #expect((try helper.contents(of: "standard-input")).contains(pin))
+    #expect(!(try helper.contents(of: "arguments")).contains(timestampPassword))
+    #expect(!(try helper.contents(of: "environment")).contains(timestampPassword))
+    #expect((try helper.contents(of: "standard-input")).contains(timestampPassword))
 }
 
 @Test func timeoutTerminatesTheHelperAndFinishesTheStream() async throws {

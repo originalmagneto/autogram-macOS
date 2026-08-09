@@ -56,7 +56,8 @@ public final class MachineRequestValidator {
         if (timestamp == null || !timestamp.required()) {
             throw new MachineProtocolException("TIMESTAMP_REQUIRED");
         }
-        if (timestamp.servers() == null || timestamp.servers().stream().noneMatch(MachineRequestValidator::isSupportedTsaUrl)) {
+        if (timestamp.servers() == null || timestamp.servers().isEmpty()
+                || timestamp.servers().stream().anyMatch(server -> !isSupportedTsaUrl(server))) {
             throw new MachineProtocolException("TSA_REQUIRED");
         }
     }

@@ -1,20 +1,55 @@
 import Foundation
 
 enum MachineRequestEncoder {
-    static func encode(_ request: MachineRequest, pin: [UInt8]? = nil) -> Data {
-        var payload = request.payload
-        if let pin {
-            payload["pin"] = .string(String(decoding: pin, as: UTF8.self))
+    static func encode(_ request: MachineRequest) -> Data {
+        encode(SecureMachineRequest(envelope: request))
+    }
+
+    static func encode(_ request: SecureMachineRequest) -> Data {
+        var pinBytes = request.pin?.consumeBytes() ?? []
+        defer { pinBytes.zeroize() }
+        var authenticationBytes: [UInt8] = []
+        defer { authenticationBytes.zeroize() }
+
+        var payload = request.envelope.payload
+        if !pinBytes.isEmpty {
+            payload["pin"] = .string(String(decoding: pinBytes, as: UTF8.self))
+        }
+        if let authentication = request.timestampAuthentication {
+            let encodedAuthentication: [String: JSONValue]
+            switch authentication {
+            case .basic(let username, let password):
+                authenticationBytes = password.consumeBytes() ?? []
+                encodedAuthentication = [
+                    "type": .string("basic"),
+                    "username": .string(username),
+                    "password": .string(String(decoding: authenticationBytes, as: UTF8.self))
+                ]
+            case .bearer(let token):
+                authenticationBytes = token.consumeBytes() ?? []
+                encodedAuthentication = [
+                    "type": .string("bearer"),
+                    "token": .string(String(decoding: authenticationBytes, as: UTF8.self))
+                ]
+            }
+            var timestamp = object(in: payload["timestamp"]) ?? [:]
+            timestamp["authentication"] = .object(encodedAuthentication)
+            payload["timestamp"] = .object(timestamp)
         }
         let envelope = MachineRequest(
-            protocolVersion: request.protocolVersion,
-            requestID: request.requestID,
-            operation: request.operation,
+            protocolVersion: request.envelope.protocolVersion,
+            requestID: request.envelope.requestID,
+            operation: request.envelope.operation,
             payload: payload
         )
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.withoutEscapingSlashes]
         return (try? encoder.encode(envelope)) ?? Data()
+    }
+
+    private static func object(in value: JSONValue?) -> [String: JSONValue]? {
+        guard case .object(let object)? = value else { return nil }
+        return object
     }
 }
 

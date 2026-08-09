@@ -177,6 +177,39 @@ class MachineCliAppTest {
                 eventTypes(events));
     }
 
+    @Test
+    void acceptsOptionalTimestampAuthenticationWithoutRejectingTheSignRequest() throws Exception {
+        var source = Files.writeString(temporaryDirectory.resolve("authenticated-source.pdf"), "%PDF-1.7\nsource\n%%EOF")
+                .toRealPath();
+        var target = temporaryDirectory.toRealPath().resolve("authenticated-signed.pdf");
+        var stdout = new StringWriter();
+        var input = "{\"protocolVersion\":1,\"requestId\":\"request-1\",\"operation\":\"SIGN\",\"payload\":{"
+                + "\"driver\":\"fake\",\"certificateSerial\":\"123\",\"pin\":\"1234\","
+                + "\"signatureLevel\":\"PAdES_BASELINE_T\",\"timestamp\":{\"required\":true,"
+                + "\"servers\":[\"https://tsa.example.test\"],\"authentication\":{\"type\":\"basic\","
+                + "\"username\":\"timestamp-user\",\"password\":\"timestamp-password\"}},\"files\":[{\"id\":\"one\",\"source\":\""
+                + source + "\",\"target\":\"" + target + "\"}]}}";
+        var inspection = new MachineInspectionService(path -> { throw new AssertionError("not used"); }, content ->
+                new String(content).contains("signed") ? qualifiedReport("new") : qualifiedReport());
+        var signingFactory = (MachineCliApp.SigningServiceFactory) (writer, ignoredInspection, ignoredTrust) ->
+                new MachineSigningService(writer, request -> new MachineSigningService.SigningSession() {
+                    @Override
+                    public void sign(MachineSigningService.SigningInput input, Runnable completed) throws Exception {
+                        input.writeSignedContent("%PDF-1.7\nsigned\n%%EOF".getBytes());
+                        completed.run();
+                    }
+
+                    @Override
+                    public void close() {
+                    }
+                }, new MachineSigningService.PdfOutputValidator(ignoredInspection), ignoredTrust);
+
+        var code = MachineCliApp.start(commandLine("SIGN"), new StringReader(input), new PrintWriter(stdout),
+                new PrintWriter(new StringWriter()), new MachineDriverService(), inspection, () -> { }, signingFactory);
+
+        assertEquals(0, code, stdout.toString());
+    }
+
     private static SimpleReport qualifiedReport(String... ids) {
         var report = mock(SimpleReport.class);
         when(report.getSignatureIdList()).thenReturn(List.of(ids));

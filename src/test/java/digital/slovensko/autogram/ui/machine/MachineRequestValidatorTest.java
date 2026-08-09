@@ -99,9 +99,12 @@ class MachineRequestValidatorTest {
         var source = pdf("source.pdf");
         var timestampNotRequired = request(source, target("not-required.pdf"), false, List.of("https://tsa.example.test"));
         var unsupportedTsa = request(source, target("unsupported.pdf"), true, List.of("file:///tsa"));
+        var mixedTsaList = request(source, target("mixed.pdf"), true,
+                List.of("https://tsa.example.test", "file:///not-a-timestamp-service"));
 
         assertEquals("TIMESTAMP_REQUIRED", failureCode(timestampNotRequired));
         assertEquals("TSA_REQUIRED", failureCode(unsupportedTsa));
+        assertEquals("TSA_REQUIRED", failureCode(mixedTsaList));
     }
 
     private SignRequest request(Path source, Path target, boolean required, List<String> servers) {

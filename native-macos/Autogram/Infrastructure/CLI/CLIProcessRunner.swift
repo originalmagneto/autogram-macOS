@@ -114,22 +114,15 @@ actor CLIProcessRunner {
         )
         startReaders(for: id, stdout: stdout.fileHandleForReading, stderr: stderr.fileHandleForReading)
 
-        var pinBytes: [UInt8] = []
-        var didConsumePIN = false
+        var encodedRequest = Data()
         defer {
-            if !didConsumePIN {
-                pinBytes = request.pin?.consumeBytes() ?? []
-            }
-            for index in pinBytes.indices {
-                pinBytes[index] = 0
-            }
+            encodedRequest.resetBytes(in: encodedRequest.startIndex..<encodedRequest.endIndex)
+            request.discardSecrets()
         }
 
         do {
             try process.run()
-            pinBytes = request.pin?.consumeBytes() ?? []
-            didConsumePIN = true
-            let encodedRequest = MachineRequestEncoder.encode(request.envelope, pin: pinBytes.isEmpty ? nil : pinBytes)
+            encodedRequest = MachineRequestEncoder.encode(request)
             stdin.fileHandleForWriting.write(encodedRequest)
             stdin.fileHandleForWriting.write(Data([10]))
             try stdin.fileHandleForWriting.close()

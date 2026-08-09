@@ -202,13 +202,17 @@ public final class MachineCliApp {
             throw new MachineProtocolException("PROTOCOL_INVALID_REQUEST");
         }
         var pin = payload.get("pin").getAsString().toCharArray();
+        QualifiedTimestampRequest timestamp = null;
         try {
-            var timestamp = requiredTimestamp(payload.getAsJsonObject("timestamp"));
+            timestamp = requiredTimestamp(payload.getAsJsonObject("timestamp"));
             var files = requiredInspectionRequest(filesPayload(payload.get("files"))).files();
             return new SignRequest(payload.get("driver").getAsString(), payload.get("certificateSerial").getAsString(),
                     pin, payload.get("signatureLevel").getAsString(), timestamp, files);
         } catch (Throwable exception) {
             Arrays.fill(pin, '\0');
+            if (timestamp != null) {
+                timestamp.clearAuthentication();
+            }
             throw exception;
         }
     }
@@ -220,7 +224,7 @@ public final class MachineCliApp {
     }
 
     private static QualifiedTimestampRequest requiredTimestamp(JsonObject timestamp) {
-        if (timestamp.size() != 2 || !timestamp.has("required") || !timestamp.has("servers")
+        if ((timestamp.size() != 2 && timestamp.size() != 3) || !timestamp.has("required") || !timestamp.has("servers")
                 || !timestamp.get("required").isJsonPrimitive()
                 || !timestamp.getAsJsonPrimitive("required").isBoolean()
                 || !timestamp.get("servers").isJsonArray()) {
@@ -233,7 +237,36 @@ public final class MachineCliApp {
             }
             servers.add(server.getAsString());
         }
-        return new QualifiedTimestampRequest(timestamp.get("required").getAsBoolean(), List.copyOf(servers));
+        var authentication = timestamp.has("authentication")
+                ? requiredTimestampAuthentication(timestamp.get("authentication")) : null;
+        return new QualifiedTimestampRequest(timestamp.get("required").getAsBoolean(), List.copyOf(servers), authentication);
+    }
+
+    private static TimestampAuthentication requiredTimestampAuthentication(JsonElement value) {
+        if (value == null || !value.isJsonObject()) {
+            throw new MachineProtocolException("PROTOCOL_INVALID_REQUEST");
+        }
+        var authentication = value.getAsJsonObject();
+        if (!isNonBlankString(authentication.get("type"))) {
+            throw new MachineProtocolException("PROTOCOL_INVALID_REQUEST");
+        }
+        return switch (authentication.get("type").getAsString()) {
+            case "basic" -> {
+                if (authentication.size() != 3 || !isNonBlankString(authentication.get("username"))
+                        || !isNonBlankString(authentication.get("password"))) {
+                    throw new MachineProtocolException("PROTOCOL_INVALID_REQUEST");
+                }
+                yield new TimestampAuthentication("basic", authentication.get("username").getAsString(),
+                        authentication.get("password").getAsString().toCharArray());
+            }
+            case "bearer" -> {
+                if (authentication.size() != 2 || !isNonBlankString(authentication.get("token"))) {
+                    throw new MachineProtocolException("PROTOCOL_INVALID_REQUEST");
+                }
+                yield new TimestampAuthentication("bearer", null, authentication.get("token").getAsString().toCharArray());
+            }
+            default -> throw new MachineProtocolException("PROTOCOL_INVALID_REQUEST");
+        };
     }
 
     private static boolean isNonBlankString(JsonElement element) {

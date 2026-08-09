@@ -339,6 +339,10 @@ public class UserSettings implements PasswordManagerSettings, SignatureTokenSett
     }
 
     public void setTsaServer(String value) {
+        setTsaServer(value, new TimestampDataLoader());
+    }
+
+    public void setTsaServer(String value, TimestampDataLoader timestampDataLoader) {
         if (value == null || value.isEmpty()) {
             tspSource = null;
             return;
@@ -346,7 +350,6 @@ public class UserSettings implements PasswordManagerSettings, SignatureTokenSett
 
         tsaServer = value;
         tspSource = new CompositeTSPSource();
-        var timestampDataLoader = new TimestampDataLoader();
         var tspSources = new LinkedHashMap<String, TSPSource>();
         for (var tsaServer : tsaServer.split(","))
             tspSources.put(tsaServer, new OnlineTSPSource(tsaServer, timestampDataLoader));

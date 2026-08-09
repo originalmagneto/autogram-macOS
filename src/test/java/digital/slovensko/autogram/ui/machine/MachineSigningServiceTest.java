@@ -494,6 +494,26 @@ class MachineSigningServiceTest {
         assertEquals(eu.europa.esig.dss.enumerations.SignatureForm.PAdES, job.getParameters().getSignatureType());
     }
 
+    @Test
+    void configuresBasicTimestampAuthenticationForOnlyTheRequestedHostsAndClearsTheReceivedSecret() {
+        var receivedSecret = "timestamp-password".toCharArray();
+        var request = new QualifiedTimestampRequest(true,
+                List.of("https://first.tsa.example.test", "https://second.tsa.example.test:8443"),
+                new TimestampAuthentication("basic", "timestamp-user", receivedSecret));
+
+        var dataLoader = MachineSigningService.MachineTimestampDataLoader.create(request);
+        request.clearAuthentication();
+
+        assertEquals(2, dataLoader.getAuthenticationMap().size());
+        assertTrue(dataLoader.getAuthenticationMap().keySet().stream()
+                .allMatch(host -> host.getHost().endsWith(".tsa.example.test")));
+        assertTrue(Arrays.equals(new char[receivedSecret.length], receivedSecret));
+
+        dataLoader.clearAuthentication();
+        assertTrue(dataLoader.getAuthenticationMap().values().stream()
+                .allMatch(credentials -> Arrays.equals(new char[credentials.getPassword().length], credentials.getPassword())));
+    }
+
     private SignRequest request(char[] pin, MachineFile... files) {
         return new SignRequest("fake", "123", pin, "PAdES_BASELINE_T",
                 new QualifiedTimestampRequest(true, List.of("https://tsa.example.test")), List.of(files));

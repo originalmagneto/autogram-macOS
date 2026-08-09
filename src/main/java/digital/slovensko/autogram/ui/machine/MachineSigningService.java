@@ -14,6 +14,11 @@ import eu.europa.esig.dss.enumerations.MimeTypeEnum;
 import eu.europa.esig.dss.model.InMemoryDocument;
 import eu.europa.esig.dss.token.AbstractKeyStoreTokenConnection;
 import eu.europa.esig.dss.token.DSSPrivateKeyEntry;
+import eu.europa.esig.dss.service.http.commons.HostConnection;
+import eu.europa.esig.dss.service.http.commons.TimestampDataLoader;
+import eu.europa.esig.dss.service.http.commons.UserCredentials;
+import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
+import org.apache.hc.core5.http.message.BasicHeader;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -22,12 +27,15 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.net.URI;
 import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.Map;
+import java.util.LinkedHashMap;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 
@@ -389,13 +397,21 @@ public final class MachineSigningService {
 
         @Override
         public SigningSession apply(SignRequest request) {
-            settings.setTsaServer(String.join(",", request.timestamp().servers()));
-            settings.setTsaEnabled(true);
-            var driver = driverDetector.getAvailableDrivers().stream()
-                    .filter(candidate -> candidate.getShortname().equals(request.driver()))
-                    .findFirst()
-                    .orElseThrow(() -> new MachineProtocolException("DRIVER_NOT_FOUND"));
-            return DefaultSigningSession.open(driver, request, settings, passwordManagerFactory);
+            var timestampDataLoader = MachineTimestampDataLoader.create(request.timestamp());
+            try {
+                settings.setTsaServer(String.join(",", request.timestamp().servers()), timestampDataLoader);
+                settings.setTsaEnabled(true);
+                var driver = driverDetector.getAvailableDrivers().stream()
+                        .filter(candidate -> candidate.getShortname().equals(request.driver()))
+                        .findFirst()
+                        .orElseThrow(() -> new MachineProtocolException("DRIVER_NOT_FOUND"));
+                return DefaultSigningSession.open(driver, request, settings, passwordManagerFactory, timestampDataLoader);
+            } catch (Throwable exception) {
+                timestampDataLoader.clearAuthentication();
+                throw exception;
+            } finally {
+                request.timestamp().clearAuthentication();
+            }
         }
     }
 
@@ -405,18 +421,27 @@ public final class MachineSigningService {
         private final AbstractKeyStoreTokenConnection token;
         private final SigningKey key;
         private final MachineSettings settings;
+        private final MachineTimestampDataLoader timestampDataLoader;
 
         private DefaultSigningSession(MachineSecretUI secretUi, PasswordManager passwordManager,
-                AbstractKeyStoreTokenConnection token, SigningKey key, MachineSettings settings) {
+                AbstractKeyStoreTokenConnection token, SigningKey key, MachineSettings settings,
+                MachineTimestampDataLoader timestampDataLoader) {
             this.secretUi = secretUi;
             this.passwordManager = passwordManager;
             this.token = token;
             this.key = key;
             this.settings = settings;
+            this.timestampDataLoader = timestampDataLoader;
         }
 
         static DefaultSigningSession open(TokenDriver driver, SignRequest request, MachineSettings settings,
                 BiFunction<MachineSecretUI, MachineSettings, PasswordManager> passwordManagerFactory) {
+            return open(driver, request, settings, passwordManagerFactory, new MachineTimestampDataLoader());
+        }
+
+        static DefaultSigningSession open(TokenDriver driver, SignRequest request, MachineSettings settings,
+                BiFunction<MachineSecretUI, MachineSettings, PasswordManager> passwordManagerFactory,
+                MachineTimestampDataLoader timestampDataLoader) {
             var secretUi = new MachineSecretUI(request.pin());
             PasswordManager passwordManager = null;
             AbstractKeyStoreTokenConnection token = null;
@@ -424,7 +449,8 @@ public final class MachineSigningService {
                 passwordManager = passwordManagerFactory.apply(secretUi, settings);
                 token = driver.createToken(passwordManager, settings);
                 var key = selectedKey(token.getKeys(), request.certificateSerial());
-                return new DefaultSigningSession(secretUi, passwordManager, token, new SigningKey(token, key), settings);
+                return new DefaultSigningSession(secretUi, passwordManager, token, new SigningKey(token, key), settings,
+                        timestampDataLoader);
             } catch (Throwable exception) {
                 try {
                     if (token != null) {
@@ -437,6 +463,7 @@ public final class MachineSigningService {
                         }
                     } finally {
                         secretUi.close();
+                        timestampDataLoader.clearAuthentication();
                     }
                 }
                 throw exception;
@@ -465,7 +492,11 @@ public final class MachineSigningService {
                 try {
                     passwordManager.reset();
                 } finally {
-                    secretUi.close();
+                    try {
+                        secretUi.close();
+                    } finally {
+                        timestampDataLoader.clearAuthentication();
+                    }
                 }
             }
         }
@@ -476,6 +507,58 @@ public final class MachineSigningService {
                 throw new MachineProtocolException(matches.isEmpty() ? "CERTIFICATE_NOT_FOUND" : "CERTIFICATE_AMBIGUOUS");
             }
             return matches.getFirst();
+        }
+    }
+
+    static final class MachineTimestampDataLoader extends TimestampDataLoader {
+        private final Map<String, char[]> bearerTokens = new LinkedHashMap<>();
+        private final List<char[]> configuredSecrets = new ArrayList<>();
+
+        static MachineTimestampDataLoader create(QualifiedTimestampRequest request) {
+            var dataLoader = new MachineTimestampDataLoader();
+            var authentication = request.authentication();
+            if (authentication == null) {
+                return dataLoader;
+            }
+            for (var server : request.servers()) {
+                var endpoint = URI.create(server);
+                if ("basic".equals(authentication.type())) {
+                    var password = authentication.secret().clone();
+                    dataLoader.configuredSecrets.add(password);
+                    dataLoader.addAuthentication(new HostConnection(endpoint.getScheme(), endpoint.getHost(), endpoint.getPort(),
+                            null, null), new UserCredentials(authentication.username(), password));
+                } else {
+                    var token = authentication.secret().clone();
+                    dataLoader.configuredSecrets.add(token);
+                    dataLoader.bearerTokens.put(hostKey(endpoint), token);
+                }
+            }
+            return dataLoader;
+        }
+
+        @Override
+        protected synchronized HttpClientBuilder getHttpClientBuilder(String url) {
+            var builder = super.getHttpClientBuilder(url);
+            var token = bearerTokens.get(hostKey(URI.create(url)));
+            if (token != null) {
+                builder.setDefaultHeaders(List.of(new BasicHeader("Authorization", "Bearer " + String.valueOf(token))));
+            }
+            return builder;
+        }
+
+        void clearAuthentication() {
+            for (var secret : configuredSecrets) {
+                Arrays.fill(secret, '\0');
+            }
+            configuredSecrets.clear();
+            bearerTokens.clear();
+        }
+
+        private static String hostKey(URI endpoint) {
+            var port = endpoint.getPort() == -1 ? ("https".equalsIgnoreCase(endpoint.getScheme()) ? 443 : 80)
+                    : endpoint.getPort();
+            return endpoint.getScheme().toLowerCase(java.util.Locale.ROOT) + "://"
+                    + endpoint.getHost().toLowerCase(java.util.Locale.ROOT) + ":" + port;
         }
     }
 
@@ -564,5 +647,20 @@ record SignRequest(
         List<MachineFile> files) {
 }
 
-record QualifiedTimestampRequest(boolean required, List<String> servers) {
+record QualifiedTimestampRequest(boolean required, List<String> servers, TimestampAuthentication authentication) {
+    QualifiedTimestampRequest(boolean required, List<String> servers) {
+        this(required, servers, null);
+    }
+
+    void clearAuthentication() {
+        if (authentication != null) {
+            authentication.clear();
+        }
+    }
+}
+
+record TimestampAuthentication(String type, String username, char[] secret) {
+    void clear() {
+        Arrays.fill(secret, '\0');
+    }
 }

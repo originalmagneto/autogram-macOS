@@ -6,6 +6,7 @@ struct AutogramSettingsView: View {
     @AppStorage("preferences.destinationBehavior") private var destinationBehaviorRaw = DestinationBehavior.besideSource.rawValue
     @AppStorage("preferences.revealInFinderAfterSigning") private var revealInFinderAfterSigning = true
     private let quickActionInstaller = QuickActionInstaller()
+    private let timestampSourceStore = TimestampSourcePreferencesStore()
     @State private var quickActionStatus = QuickActionInstaller().status
     @State private var hasLegacyCLIQuickAction = QuickActionInstaller().hasLegacyCLIWorkflow
     @State private var quickActionError: String?
@@ -13,6 +14,9 @@ struct AutogramSettingsView: View {
     @State private var isDefaultChangePINPresented = false
     @State private var isDefaultCertificatePickerPresented = false
     @State private var tokenChangingDefault: RememberedSigningToken?
+    @State private var timestampConfiguration = TimestampSourcePreferencesStore().load()
+    @State private var timestampSecret = ""
+    @State private var timestampSourceError: String?
 
     var body: some View {
         Form {
@@ -30,6 +34,64 @@ struct AutogramSettingsView: View {
             Section("Signing requirements") {
                 LabeledContent("Profile", value: "PAdES Baseline T")
                 LabeledContent("Timestamp", value: "Qualified timestamp required")
+            }
+
+            Section("Qualified timestamp source") {
+                Picker("Timestamp Source", selection: Binding(
+                    get: { timestampConfiguration.source },
+                    set: { source in
+                        timestampConfiguration.source = source
+                        if source != .custom {
+                            saveTimestampConfiguration()
+                        }
+                    }
+                )) {
+                    ForEach(TimestampSource.allCases) { source in
+                        Text(source.displayName).tag(source)
+                    }
+                }
+
+                if timestampConfiguration.source == .custom {
+                    TextField("Provider name", text: customProvider.displayName)
+                    TextEditor(text: customProviderURLs)
+                        .font(.body)
+                        .frame(minHeight: 72)
+                        .overlay(alignment: .topLeading) {
+                            if customProviderURLs.wrappedValue.isEmpty {
+                                Text("One timestamp URL per line, in fallback order")
+                                    .foregroundStyle(.tertiary)
+                                    .padding(.top, 8)
+                                    .padding(.leading, 5)
+                                    .allowsHitTesting(false)
+                            }
+                        }
+                    Picker("Authentication", selection: customProviderAuthenticationKind) {
+                        Text("None").tag(TimestampAuthenticationKind.none)
+                        Text("Basic").tag(TimestampAuthenticationKind.basic)
+                        Text("Bearer token").tag(TimestampAuthenticationKind.bearer)
+                    }
+                    if customProviderAuthenticationKind.wrappedValue == .basic {
+                        TextField("Username", text: customProviderUsername)
+                    }
+                    if customProviderAuthenticationKind.wrappedValue != .none {
+                        SecureField(customProviderAuthenticationKind.wrappedValue == .basic ? "Password" : "Bearer token",
+                                    text: $timestampSecret)
+                    }
+                    HStack {
+                        Button("Save Custom Provider") {
+                            saveTimestampConfiguration()
+                        }
+                        if customProviderAuthenticationKind.wrappedValue != .none {
+                            Button("Remove Credential", role: .destructive) {
+                                removeTimestampCredential()
+                            }
+                        }
+                    }
+                    if let timestampSourceError {
+                        Text(timestampSourceError)
+                            .foregroundStyle(.red)
+                    }
+                }
             }
 
             Section("Remembered signing cards") {
@@ -69,6 +131,7 @@ struct AutogramSettingsView: View {
         .onAppear {
             quickActionStatus = quickActionInstaller.status
             hasLegacyCLIQuickAction = quickActionInstaller.hasLegacyCLIWorkflow
+            timestampConfiguration = timestampSourceStore.load()
             Task { @MainActor in
                 await workspace.refreshSigningEnvironment()
             }
@@ -177,6 +240,98 @@ struct AutogramSettingsView: View {
             return "No default certificate"
         }
         return "Default: \(certificateDefault.commonName), \(certificateDefault.issuer), expires \(certificateDefault.validUntil.formatted(date: .abbreviated, time: .omitted))"
+    }
+
+    private var customProvider: Binding<CustomTimestampProviderConfiguration> {
+        Binding(
+            get: { timestampConfiguration.customProvider ?? CustomTimestampProviderConfiguration() },
+            set: { timestampConfiguration.customProvider = $0 }
+        )
+    }
+
+    private var customProviderURLs: Binding<String> {
+        Binding(
+            get: { customProvider.wrappedValue.urls.joined(separator: "\n") },
+            set: { value in
+                var provider = customProvider.wrappedValue
+                provider.urls = value.components(separatedBy: .newlines)
+                    .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                    .filter { !$0.isEmpty }
+                customProvider.wrappedValue = provider
+            }
+        )
+    }
+
+    private var customProviderAuthenticationKind: Binding<TimestampAuthenticationKind> {
+        Binding(
+            get: { customProvider.wrappedValue.authentication.kind },
+            set: { value in
+                var provider = customProvider.wrappedValue
+                provider.authentication.kind = value
+                if value != .basic {
+                    provider.authentication.username = nil
+                }
+                customProvider.wrappedValue = provider
+            }
+        )
+    }
+
+    private var customProviderUsername: Binding<String> {
+        Binding(
+            get: { customProvider.wrappedValue.authentication.username ?? "" },
+            set: { value in
+                var provider = customProvider.wrappedValue
+                provider.authentication.username = value
+                customProvider.wrappedValue = provider
+            }
+        )
+    }
+
+    private func saveTimestampConfiguration() {
+        if timestampConfiguration.source == .custom {
+            let provider = customProvider.wrappedValue
+            guard !provider.urls.isEmpty else {
+                timestampSourceError = "Add at least one timestamp URL."
+                return
+            }
+            if provider.authentication.kind == .basic,
+               (provider.authentication.username?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true) {
+                timestampSourceError = "Add a Basic authentication username."
+                return
+            }
+            if provider.authentication.kind != .none, timestampSecret.isEmpty {
+                do {
+                    if try timestampSourceStore.credential(for: provider) == nil {
+                        timestampSourceError = "Add a timestamp credential."
+                        return
+                    }
+                } catch {
+                    timestampSourceError = "The timestamp credential could not be read from Keychain."
+                    return
+                }
+            }
+            do {
+                if !timestampSecret.isEmpty {
+                    try timestampSourceStore.replaceCredential(Secret(timestampSecret), for: provider)
+                    timestampSecret = ""
+                }
+            } catch {
+                timestampSourceError = "The timestamp credential could not be saved in Keychain."
+                return
+            }
+        }
+        timestampSourceStore.save(timestampConfiguration)
+        timestampSourceError = nil
+    }
+
+    private func removeTimestampCredential() {
+        do {
+            try timestampSourceStore.replaceCredential(nil, for: customProvider.wrappedValue)
+            timestampSecret = ""
+            timestampSourceError = nil
+        } catch {
+            timestampSourceError = "The timestamp credential could not be removed from Keychain."
+        }
     }
 
     @ViewBuilder

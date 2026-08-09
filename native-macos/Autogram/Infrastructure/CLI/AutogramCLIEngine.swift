@@ -5,6 +5,7 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
     private let configuration: ProcessConfiguration
     private let driverResolver: DriverResolver
     private let outputService: OutputService
+    private let timestampSourceProvider: any TimestampSourceProviding
     private let lock = NSLock()
     private var reservations: [String: OutputReservation] = [:]
 
@@ -12,12 +13,14 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
         configuration: ProcessConfiguration = .production,
         runner: CLIProcessRunner = .init(),
         driverResolver: DriverResolver = .init(),
-        outputService: OutputService = .init()
+        outputService: OutputService = .init(),
+        timestampSourceProvider: any TimestampSourceProviding = TimestampSourcePreferencesStore()
     ) {
         self.configuration = configuration
         self.runner = runner
         self.driverResolver = driverResolver
         self.outputService = outputService
+        self.timestampSourceProvider = timestampSourceProvider
     }
 
     func capabilities() async throws -> EngineCapabilities {
@@ -127,6 +130,7 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
         AsyncThrowingStream { continuation in
             Task {
                 do {
+                    let timestamp = try qualifiedTimestampRequest()
                     let files = try request.files.map { file in
                         let reservation = try reservation(for: file.id, sourceURL: file.sourceURL)
                         try FileManager.default.removeItem(at: reservation.temporaryURL)
@@ -142,15 +146,16 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
                             "signatureLevel": .string("PAdES_BASELINE_T"),
                             "timestamp": .object([
                                 "required": .bool(true),
-                                "servers": .array([
-                                    .string("http://timestamp.sectigo.com/qualified"),
-                                    .string("http://tsa.belgium.be/connect")
-                                ])
+                                "servers": .array(timestamp.endpoints.map(JSONValue.string))
                             ]),
                             "files": .array(files)
                         ]
                     )
-                    let events = try await run(SecureMachineRequest(envelope: machineRequest, pin: request.pin))
+                    let events = try await run(SecureMachineRequest(
+                        envelope: machineRequest,
+                        pin: request.pin,
+                        timestampAuthentication: timestamp.authentication
+                    ))
                     var completed = Set<String>()
                     continuation.yield(.started)
                     for event in events {
@@ -248,6 +253,38 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
             "source": .string(sourceURL.standardizedFileURL.path),
             "target": .string(targetURL.standardizedFileURL.path)
         ])
+    }
+
+    private func qualifiedTimestampRequest() throws -> (endpoints: [String], authentication: TimestampAuthenticationSecret?) {
+        let configuration = timestampSourceProvider.load()
+        let endpoints = configuration.endpoints
+        guard !endpoints.isEmpty else {
+            throw SigningFailure.engine("Configure at least one custom timestamp URL before signing.")
+        }
+        guard configuration.source == .custom, let provider = configuration.customProvider else {
+            return (endpoints, nil)
+        }
+        let secret: Secret?
+        do {
+            secret = try timestampSourceProvider.credential(for: provider)
+        } catch {
+            throw SigningFailure.engine("The custom timestamp credential could not be read from Keychain.")
+        }
+        switch provider.authentication.kind {
+        case .none:
+            return (endpoints, nil)
+        case .basic:
+            guard let username = provider.authentication.username?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !username.isEmpty, let secret else {
+                throw SigningFailure.engine("Configure custom timestamp Basic authentication before signing.")
+            }
+            return (endpoints, .basic(username: username, password: secret))
+        case .bearer:
+            guard let secret else {
+                throw SigningFailure.engine("Configure a custom timestamp bearer token before signing.")
+            }
+            return (endpoints, .bearer(token: secret))
+        }
     }
 
     private static func fileFailureMessage(code: String) -> String {

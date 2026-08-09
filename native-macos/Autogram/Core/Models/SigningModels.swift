@@ -125,10 +125,25 @@ final class Secret: @unchecked Sendable {
         return consumed
     }
 
+    func discard() {
+        lock.lock()
+        defer { lock.unlock() }
+        zeroize()
+    }
+
     private func zeroize() {
         for index in bytes.indices {
             bytes[index] = 0
         }
         bytes.removeAll(keepingCapacity: false)
+    }
+}
+
+extension Array where Element == UInt8 {
+    mutating func zeroize() {
+        for index in indices {
+            self[index] = 0
+        }
+        removeAll(keepingCapacity: false)
     }
 }

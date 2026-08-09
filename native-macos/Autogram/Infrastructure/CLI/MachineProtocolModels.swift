@@ -51,10 +51,33 @@ struct MachineRequest: Codable, Sendable, Equatable {
 struct SecureMachineRequest: Sendable {
     let envelope: MachineRequest
     let pin: Secret?
+    let timestampAuthentication: TimestampAuthenticationSecret?
 
-    init(envelope: MachineRequest, pin: Secret? = nil) {
+    init(
+        envelope: MachineRequest,
+        pin: Secret? = nil,
+        timestampAuthentication: TimestampAuthenticationSecret? = nil
+    ) {
         self.envelope = envelope
         self.pin = pin
+        self.timestampAuthentication = timestampAuthentication
+    }
+
+    func discardSecrets() {
+        pin?.discard()
+        timestampAuthentication?.discard()
+    }
+}
+
+enum TimestampAuthenticationSecret: @unchecked Sendable {
+    case basic(username: String, password: Secret)
+    case bearer(token: Secret)
+
+    func discard() {
+        switch self {
+        case .basic(_, let password): password.discard()
+        case .bearer(let token): token.discard()
+        }
     }
 }
 

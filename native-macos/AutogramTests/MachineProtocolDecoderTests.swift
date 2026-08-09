@@ -38,3 +38,25 @@ import Testing
     let fixtureObject = try JSONSerialization.jsonObject(with: fixture) as? NSDictionary
     #expect(encodedObject == fixtureObject)
 }
+
+@Test func automaticTimestampSourceOrdersSectigoBeforeBelgium() {
+    #expect(TimestampSource.automatic.endpoints == [
+        "http://timestamp.sectigo.com/qualified",
+        "http://tsa.belgium.be/connect"
+    ])
+}
+
+@Test func secureRequestEncodesTimestampCredentialsOnlyInStandardInputPayload() throws {
+    let request = SecureMachineRequest(
+        envelope: .capabilities(requestID: "request-1"),
+        timestampAuthentication: .basic(username: "timestamp-user", password: Secret("timestamp-password"))
+    )
+
+    let encoded = MachineRequestEncoder.encode(request)
+    let payload = try #require((JSONSerialization.jsonObject(with: encoded) as? [String: Any])?["payload"] as? [String: Any])
+    let timestamp = try #require(payload["timestamp"] as? [String: Any])
+    let authentication = try #require(timestamp["authentication"] as? [String: Any])
+    #expect(authentication["type"] as? String == "basic")
+    #expect(authentication["username"] as? String == "timestamp-user")
+    #expect(authentication["password"] as? String == "timestamp-password")
+}
