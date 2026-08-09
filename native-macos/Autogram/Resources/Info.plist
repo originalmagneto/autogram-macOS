@@ -22,6 +22,18 @@
                 <string>com.adobe.pdf</string>
             </array>
         </dict>
+        <dict>
+            <key>CFBundleTypeExtensions</key>
+            <array>
+                <string>asice</string>
+            </array>
+            <key>CFBundleTypeName</key>
+            <string>ASiC-E Container</string>
+            <key>CFBundleTypeRole</key>
+            <string>Viewer</string>
+            <key>LSHandlerRank</key>
+            <string>Alternate</string>
+        </dict>
     </array>
 </dict>
 </plist>
