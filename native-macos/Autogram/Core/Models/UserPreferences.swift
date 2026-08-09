@@ -7,15 +7,13 @@ struct UserPreferences: Codable, Sendable, Equatable {
     var outputPolicy: OutputPolicy
     var destinationBehavior: DestinationBehavior
     var revealInFinderAfterSigning: Bool
-    var timestampSource: TimestampSourceConfiguration
 
     static let fixture = UserPreferences(
         driverID: "fixture-driver",
         certificateSerial: "fixture-certificate",
         outputPolicy: .signedSuffix,
         destinationBehavior: .besideSource,
-        revealInFinderAfterSigning: true,
-        timestampSource: .automatic
+        revealInFinderAfterSigning: true
     )
 }
 
