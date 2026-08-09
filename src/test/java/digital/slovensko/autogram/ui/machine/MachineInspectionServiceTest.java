@@ -7,6 +7,7 @@ import eu.europa.esig.dss.enumerations.SignatureQualification;
 import eu.europa.esig.dss.enumerations.TimestampQualification;
 import eu.europa.esig.dss.simplereport.SimpleReport;
 import eu.europa.esig.dss.simplereport.jaxb.XmlTimestamp;
+import eu.europa.esig.dss.spi.validation.CommonCertificateVerifier;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Path;
@@ -33,6 +34,26 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 class MachineInspectionServiceTest {
+    @Test
+    void inspectsAsicDocumentsAndSignatureCoverage() {
+        var source = Path.of(MachineInspectionServiceTest.class
+                .getResource("/digital/slovensko/autogram/sample_pdf_xades.asice").getFile());
+
+        var payload = MachineInspectionService.withValidatorReportReader(validator -> {
+            validator.setCertificateVerifier(new CommonCertificateVerifier());
+            return validator.validateDocument().getSimpleReport();
+        }).inspect(source);
+
+        var documents = payload.getAsJsonArray("documents");
+        var signatures = payload.getAsJsonArray("signatures");
+        assertEquals(List.of("sample.pdf"), documents.asList().stream()
+                .map(document -> document.getAsJsonObject().get("name").getAsString())
+                .toList());
+        assertEquals(1, signatures.size());
+        assertEquals(List.of("sample.pdf"), signatures.get(0).getAsJsonObject().getAsJsonArray("documents").asList()
+                .stream().map(document -> document.getAsString()).toList());
+    }
+
     @Test
     void dispatchesEachBatchEntryWithOpaqueIdAndRedactsSourceAndTargetPaths() throws Exception {
         var report = reportWithOneQualifiedTimestamp();
