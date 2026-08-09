@@ -2,9 +2,23 @@ import SwiftUI
 
 struct CertificatePicker: View {
     let certificates: [SigningCertificate]
-    let onSelect: (SigningCertificate) -> Void
+    let showsRememberAsDefaultToggle: Bool
+    let onSelect: (SigningCertificate, Bool) -> Void
     let onCancel: () -> Void
     @State private var selectedCertificate: SigningCertificate?
+    @State private var rememberAsDefault = false
+
+    init(
+        certificates: [SigningCertificate],
+        showsRememberAsDefaultToggle: Bool = true,
+        onSelect: @escaping (SigningCertificate, Bool) -> Void,
+        onCancel: @escaping () -> Void
+    ) {
+        self.certificates = certificates
+        self.showsRememberAsDefaultToggle = showsRememberAsDefaultToggle
+        self.onSelect = onSelect
+        self.onCancel = onCancel
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -15,7 +29,7 @@ struct CertificatePicker: View {
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(certificate.displayName)
-                            Text(redactedSerialDetail(for: certificate))
+                            Text(certificateDetail(for: certificate))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -33,6 +47,10 @@ struct CertificatePicker: View {
             .accessibilityIdentifier("Certificate Picker")
             .frame(minHeight: 120)
 
+            if showsRememberAsDefaultToggle {
+                Toggle("Remember as default for this signing card", isOn: $rememberAsDefault)
+            }
+
             HStack {
                 Button("Cancel", role: .cancel) {
                     onCancel()
@@ -40,7 +58,7 @@ struct CertificatePicker: View {
                 Spacer()
                 Button("Use Certificate") {
                     guard let selectedCertificate else { return }
-                    onSelect(selectedCertificate)
+                    onSelect(selectedCertificate, rememberAsDefault)
                 }
                 .accessibilityIdentifier("Use Certificate")
                 .disabled(selectedCertificate == nil)
@@ -50,8 +68,8 @@ struct CertificatePicker: View {
         .frame(minWidth: 360, minHeight: 240)
     }
 
-    private func redactedSerialDetail(for certificate: SigningCertificate) -> String {
-        let suffix = certificate.serialNumber.suffix(4)
-        return suffix.isEmpty ? "Serial available" : "Serial ending in \(suffix)"
+    private func certificateDetail(for certificate: SigningCertificate) -> String {
+        let issuer = certificate.issuer.isEmpty ? "Certificate available" : certificate.issuer
+        return "\(issuer), expires \(certificate.validUntil.formatted(date: .abbreviated, time: .omitted))"
     }
 }

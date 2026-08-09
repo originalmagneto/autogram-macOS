@@ -10,21 +10,27 @@ final class WorkspaceModel {
     private(set) var availableDrivers: [SigningDriver] = []
     private(set) var selectedDriverID: String?
     private(set) var discoveredCertificates: [SigningCertificate] = []
+    private(set) var rememberedTokens: [RememberedSigningToken] = []
     private(set) var signingEnvironment: EngineCapabilities?
     private(set) var isLoadingSigningEnvironment = false
     private(set) var isLoadingCertificates = false
     private(set) var credentialError: String?
     private let engine: any SigningEngine
+    private let certificateDefaultStore: any CertificateDefaultStoring
     @ObservationIgnored private var coordinator: SigningCoordinator?
     @ObservationIgnored private var pendingSigningPIN: Secret?
+    @ObservationIgnored private var discoveredToken: SigningToken?
     @ObservationIgnored private var inspectionRequestGeneration = 0
 
     init(
         engine: any SigningEngine = FakeSigningEngine.launchEngine(),
-        items: [PDFItem] = []
+        items: [PDFItem] = [],
+        certificateDefaultStore: any CertificateDefaultStoring = UserDefaultsCertificateDefaultStore()
     ) {
         self.engine = engine
         self.items = items
+        self.certificateDefaultStore = certificateDefaultStore
+        rememberedTokens = certificateDefaultStore.rememberedTokens
         self.selection = items.first?.id
         self.coordinator = SigningCoordinator(engine: engine, workspace: self)
     }
@@ -128,10 +134,14 @@ final class WorkspaceModel {
         pendingSigningPIN = submission.signingPIN
 
         do {
-            discoveredCertificates = try await engine.certificates(
+            let discovery = try await engine.certificateDiscovery(
                 driverID: selectedDriverID,
                 pin: submission.certificatePIN
             )
+            discoveredToken = discovery.token
+            certificateDefaultStore.remember(discovery.token)
+            refreshRememberedTokens()
+            discoveredCertificates = discovery.certificates
         } catch {
             isLoadingCertificates = false
             credentialError = error.localizedDescription
@@ -146,11 +156,88 @@ final class WorkspaceModel {
             return .failed
         }
 
-        if let certificate = discoveredCertificates.only {
+        guard let discoveredToken else {
+            credentialError = "The signing helper returned incomplete certificate discovery metadata."
+            clearPendingSigningPIN()
+            return .failed
+        }
+
+        switch CertificateDefaultSelector.select(
+            from: CertificateDiscovery(token: discoveredToken, certificates: discoveredCertificates),
+            remembered: certificateDefaultStore.default(for: discoveredToken.tokenKey),
+            now: .now
+        ) {
+        case .selected(let certificate):
             startSigning(with: certificate)
             return .signingStarted
+        case .pickerRequired:
+            return .certificateSelectionRequired
         }
-        return .certificateSelectionRequired
+    }
+
+    func selectCertificateForSigning(_ certificate: SigningCertificate, rememberAsDefault: Bool) {
+        if rememberAsDefault, let discoveredToken {
+            certificateDefaultStore.saveDefault(for: discoveredToken, certificate: certificate)
+            refreshRememberedTokens()
+        }
+        startSigning(with: certificate)
+    }
+
+    func resolveCertificatesForDefaultChange(
+        using submission: PINSubmission,
+        expectedTokenKey: String
+    ) async -> CertificateDefaultChangeResolution {
+        cancelCredentialFlow()
+        credentialError = nil
+        guard let selectedDriverID else {
+            credentialError = "Choose a signing driver before continuing."
+            return .failed
+        }
+
+        isLoadingCertificates = true
+        defer { isLoadingCertificates = false }
+
+        do {
+            let discovery = try await engine.certificateDiscovery(
+                driverID: selectedDriverID,
+                pin: submission.certificatePIN
+            )
+            discoveredToken = discovery.token
+            certificateDefaultStore.remember(discovery.token)
+            refreshRememberedTokens()
+            guard discovery.token.tokenKey == expectedTokenKey else {
+                credentialError = "Connect the selected signing token before changing its default."
+                return .failed
+            }
+            guard !discovery.certificates.isEmpty else {
+                credentialError = "No signing certificates were found for the selected driver."
+                return .failed
+            }
+            discoveredCertificates = discovery.certificates
+            return .certificateSelectionRequired
+        } catch {
+            credentialError = error.localizedDescription
+            return .failed
+        }
+    }
+
+    func saveDefault(for certificate: SigningCertificate) {
+        guard let discoveredToken else {
+            credentialError = "Certificate discovery is no longer available. Unlock the signing card again."
+            return
+        }
+        certificateDefaultStore.saveDefault(for: discoveredToken, certificate: certificate)
+        refreshRememberedTokens()
+    }
+
+    func clearDefault(for tokenKey: String) {
+        certificateDefaultStore.clearDefault(for: tokenKey)
+        refreshRememberedTokens()
+    }
+
+    func forgetToken(for tokenKey: String) {
+        certificateDefaultStore.forgetToken(for: tokenKey)
+        refreshRememberedTokens()
     }
 
     func startSigning(with certificate: SigningCertificate) {
@@ -171,6 +258,7 @@ final class WorkspaceModel {
 
     func cancelCredentialFlow() {
         discoveredCertificates = []
+        discoveredToken = nil
         isLoadingCertificates = false
         clearPendingSigningPIN()
     }
@@ -324,6 +412,10 @@ final class WorkspaceModel {
     private func clearPendingSigningPIN() {
         pendingSigningPIN = nil
     }
+
+    private func refreshRememberedTokens() {
+        rememberedTokens = certificateDefaultStore.rememberedTokens
+    }
 }
 
 enum CertificateResolution: Sendable, Equatable {
@@ -332,8 +424,7 @@ enum CertificateResolution: Sendable, Equatable {
     case failed
 }
 
-private extension Array {
-    var only: Element? {
-        count == 1 ? first : nil
-    }
+enum CertificateDefaultChangeResolution: Sendable, Equatable {
+    case certificateSelectionRequired
+    case failed
 }

@@ -69,6 +69,51 @@ import Testing
     #expect(!persistedText.contains("CN=Jane Doe"))
 }
 
+@Test func clearingDefaultRetainsTheRememberedTokenUntilItIsForgotten() throws {
+    let suiteName = "CertificateDefaultSelectionTests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let store = UserDefaultsCertificateDefaultStore(defaults: defaults)
+    let selected = certificate(key: "exact", holder: "holder-a")
+
+    store.saveDefault(for: token, certificate: selected)
+    store.clearDefault(for: token.tokenKey)
+
+    #expect(store.rememberedTokens == [
+        RememberedSigningToken(tokenKey: token.tokenKey, providerName: token.providerName, certificateDefault: nil)
+    ])
+
+    store.forgetToken(for: token.tokenKey)
+
+    #expect(store.rememberedTokens.isEmpty)
+}
+
+@Test @MainActor func workspaceAutomaticallyStartsSigningWithAnExactRememberedDefault() async {
+    let defaultToken = SigningToken(tokenKey: "workspace-auto-selection", providerName: "Test Provider")
+    let selected = certificate(key: "selected", holder: "holder-a")
+    let alternative = certificate(key: "alternative", holder: "holder-b")
+    let suiteName = "CertificateDefaultSelectionTests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let store = UserDefaultsCertificateDefaultStore(defaults: defaults)
+    store.saveDefault(for: defaultToken, certificate: selected)
+
+    let workspace = WorkspaceModel(
+        engine: CertificateDiscoveryEngine(
+            discovery: CertificateDiscovery(token: defaultToken, certificates: [selected, alternative])
+        ),
+        certificateDefaultStore: store
+    )
+    await workspace.refreshSigningEnvironment()
+
+    let resolution = await workspace.resolveCertificates(using: PINSubmission(
+        certificatePIN: Secret("1234"),
+        signingPIN: Secret("1234")
+    ))
+
+    #expect(resolution == .signingStarted)
+}
+
 private let token = SigningToken(tokenKey: "v1:token", providerName: "Qualified Provider")
 
 private func certificate(key: String, holder: String) -> SigningCertificate {
@@ -105,4 +150,32 @@ private func notYetValidCertificate(key: String, holder: String) -> SigningCerti
         certificateKey: key,
         holderKey: holder
     )
+}
+
+private struct CertificateDiscoveryEngine: SigningEngine {
+    let discovery: CertificateDiscovery
+
+    func capabilities() async throws -> EngineCapabilities {
+        EngineCapabilities(protocolVersion: 1, supportsQualifiedTimestamp: true)
+    }
+
+    func drivers() async throws -> [SigningDriver] {
+        [SigningDriver(id: "test-driver", displayName: "Test Driver", tokenPresent: true)]
+    }
+
+    func certificates(driverID: String, pin: Secret?) async throws -> [SigningCertificate] {
+        throw SigningFailure.engine("Certificate discovery must be used for default selection.")
+    }
+
+    func certificateDiscovery(driverID: String, pin: Secret?) async throws -> CertificateDiscovery {
+        discovery
+    }
+
+    func inspect(files: [PDFItemDescriptor]) async throws -> [PDFInspection] { [] }
+
+    func sign(request: SigningRequest) -> AsyncThrowingStream<SigningEvent, Error> {
+        AsyncThrowingStream { $0.finish() }
+    }
+
+    func cancel() async {}
 }

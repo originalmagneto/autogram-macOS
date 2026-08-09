@@ -20,6 +20,27 @@ struct RememberedCertificateDefault: Codable, Sendable, Equatable {
     let validUntil: Date
 }
 
+struct RememberedSigningToken: Codable, Sendable, Equatable, Identifiable {
+    let tokenKey: String
+    let providerName: String
+    var certificateDefault: RememberedCertificateDefault?
+    private let storageVersion: Int
+
+    var id: String { tokenKey }
+
+    init(
+        tokenKey: String,
+        providerName: String,
+        certificateDefault: RememberedCertificateDefault?,
+        storageVersion: Int = 1
+    ) {
+        self.tokenKey = tokenKey
+        self.providerName = providerName
+        self.certificateDefault = certificateDefault
+        self.storageVersion = storageVersion
+    }
+}
+
 enum CertificateSelection: Sendable, Equatable {
     case selected(SigningCertificate)
     case pickerRequired
@@ -60,8 +81,11 @@ enum CertificateDefaultSelector {
 
 protocol CertificateDefaultStoring: Sendable {
     func `default`(for tokenKey: String) -> RememberedCertificateDefault?
+    var rememberedTokens: [RememberedSigningToken] { get }
+    func remember(_ token: SigningToken)
     func saveDefault(for token: SigningToken, certificate: SigningCertificate)
     func clearDefault(for tokenKey: String)
+    func forgetToken(for tokenKey: String)
 }
 
 final class UserDefaultsCertificateDefaultStore: CertificateDefaultStoring, @unchecked Sendable {
@@ -75,7 +99,29 @@ final class UserDefaultsCertificateDefaultStore: CertificateDefaultStoring, @unc
     }
 
     func `default`(for tokenKey: String) -> RememberedCertificateDefault? {
-        lock.withLock { savedDefaults()[tokenKey] }
+        lock.withLock { savedTokens()[tokenKey]?.certificateDefault }
+    }
+
+    var rememberedTokens: [RememberedSigningToken] {
+        lock.withLock {
+            savedTokens().values.sorted {
+                let providerOrder = $0.providerName.localizedCaseInsensitiveCompare($1.providerName)
+                return providerOrder == .orderedSame ? $0.tokenKey < $1.tokenKey : providerOrder == .orderedAscending
+            }
+        }
+    }
+
+    func remember(_ token: SigningToken) {
+        lock.withLock {
+            var tokensByKey = savedTokens()
+            let existingDefault = tokensByKey[token.tokenKey]?.certificateDefault
+            tokensByKey[token.tokenKey] = RememberedSigningToken(
+                tokenKey: token.tokenKey,
+                providerName: token.providerName,
+                certificateDefault: existingDefault
+            )
+            save(tokensByKey)
+        }
     }
 
     func saveDefault(for token: SigningToken, certificate: SigningCertificate) {
@@ -89,26 +135,52 @@ final class UserDefaultsCertificateDefaultStore: CertificateDefaultStoring, @unc
             validUntil: certificate.validUntil
         )
         lock.withLock {
-            var defaultsByToken = savedDefaults()
-            defaultsByToken[token.tokenKey] = remembered
-            save(defaultsByToken)
+            var tokensByKey = savedTokens()
+            tokensByKey[token.tokenKey] = RememberedSigningToken(
+                tokenKey: token.tokenKey,
+                providerName: token.providerName,
+                certificateDefault: remembered
+            )
+            save(tokensByKey)
         }
     }
 
     func clearDefault(for tokenKey: String) {
         lock.withLock {
-            var defaultsByToken = savedDefaults()
-            defaultsByToken.removeValue(forKey: tokenKey)
-            save(defaultsByToken)
+            var tokensByKey = savedTokens()
+            guard var remembered = tokensByKey[tokenKey] else { return }
+            remembered.certificateDefault = nil
+            tokensByKey[tokenKey] = remembered
+            save(tokensByKey)
         }
     }
 
-    private func savedDefaults() -> [String: RememberedCertificateDefault] {
-        guard let data = defaults.data(forKey: Self.storageKey) else { return [:] }
-        return (try? JSONDecoder().decode([String: RememberedCertificateDefault].self, from: data)) ?? [:]
+    func forgetToken(for tokenKey: String) {
+        lock.withLock {
+            var tokensByKey = savedTokens()
+            tokensByKey.removeValue(forKey: tokenKey)
+            save(tokensByKey)
+        }
     }
 
-    private func save(_ defaultsByToken: [String: RememberedCertificateDefault]) {
-        defaults.set(try? JSONEncoder().encode(defaultsByToken), forKey: Self.storageKey)
+    private func savedTokens() -> [String: RememberedSigningToken] {
+        guard let data = defaults.data(forKey: Self.storageKey) else { return [:] }
+        if let tokens = try? JSONDecoder().decode([String: RememberedSigningToken].self, from: data) {
+            return tokens
+        }
+        guard let legacyDefaults = try? JSONDecoder().decode([String: RememberedCertificateDefault].self, from: data) else {
+            return [:]
+        }
+        return legacyDefaults.mapValues {
+            RememberedSigningToken(
+                tokenKey: $0.tokenKey,
+                providerName: $0.providerName,
+                certificateDefault: $0
+            )
+        }
+    }
+
+    private func save(_ tokensByKey: [String: RememberedSigningToken]) {
+        defaults.set(try? JSONEncoder().encode(tokensByKey), forKey: Self.storageKey)
     }
 }

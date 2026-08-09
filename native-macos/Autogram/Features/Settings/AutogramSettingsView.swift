@@ -9,6 +9,10 @@ struct AutogramSettingsView: View {
     @State private var quickActionStatus = QuickActionInstaller().status
     @State private var hasLegacyCLIQuickAction = QuickActionInstaller().hasLegacyCLIWorkflow
     @State private var quickActionError: String?
+    @State private var defaultChangePIN = ""
+    @State private var isDefaultChangePINPresented = false
+    @State private var isDefaultCertificatePickerPresented = false
+    @State private var tokenChangingDefault: RememberedSigningToken?
 
     var body: some View {
         Form {
@@ -26,6 +30,10 @@ struct AutogramSettingsView: View {
             Section("Signing requirements") {
                 LabeledContent("Profile", value: "PAdES Baseline T")
                 LabeledContent("Timestamp", value: "Qualified timestamp required")
+            }
+
+            Section("Remembered signing cards") {
+                signingCardControls
             }
 
             Section("Finder") {
@@ -73,6 +81,39 @@ struct AutogramSettingsView: View {
         } message: {
             Text(quickActionError ?? "")
         }
+        .sheet(isPresented: $isDefaultChangePINPresented) {
+            PINSheet(
+                pin: $defaultChangePIN,
+                title: "Unlock signing card",
+                submitTitle: "Continue"
+            ) { submission in
+                guard let token = tokenChangingDefault else { return }
+                Task {
+                    let resolution = await workspace.resolveCertificatesForDefaultChange(
+                        using: submission,
+                        expectedTokenKey: token.tokenKey
+                    )
+                    isDefaultCertificatePickerPresented = resolution == .certificateSelectionRequired
+                }
+            } onCancel: {
+                workspace.cancelCredentialFlow()
+            }
+        }
+        .sheet(isPresented: $isDefaultCertificatePickerPresented, onDismiss: {
+            workspace.cancelCredentialFlow()
+            tokenChangingDefault = nil
+        }) {
+            CertificatePicker(
+                certificates: workspace.discoveredCertificates,
+                showsRememberAsDefaultToggle: false
+            ) { certificate, _ in
+                workspace.saveDefault(for: certificate)
+                isDefaultCertificatePickerPresented = false
+            } onCancel: {
+                isDefaultCertificatePickerPresented = false
+                workspace.cancelCredentialFlow()
+            }
+        }
     }
 
     private func updateQuickAction(_ action: () throws -> Void) {
@@ -83,6 +124,59 @@ struct AutogramSettingsView: View {
         } catch {
             quickActionError = error.localizedDescription
         }
+    }
+
+    @ViewBuilder
+    private var signingCardControls: some View {
+        if workspace.selectableDrivers.count > 1 {
+            Picker("Signing card", selection: Binding(
+                get: { workspace.selectedDriverID },
+                set: { workspace.selectDriver(id: $0) }
+            )) {
+                Text("Choose a signing card").tag(Optional<String>.none)
+                ForEach(workspace.selectableDrivers) { driver in
+                    Text(driver.displayName).tag(Optional(driver.id))
+                }
+            }
+        } else if let driver = workspace.selectableDrivers.first {
+            LabeledContent("Signing card", value: driver.displayName)
+        }
+
+        if workspace.rememberedTokens.isEmpty {
+            Text("Signing cards are remembered after you unlock them.")
+                .foregroundStyle(.secondary)
+        } else {
+            ForEach(workspace.rememberedTokens) { token in
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(token.providerName)
+                    Text(defaultDetail(for: token))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    HStack {
+                        Button("Change Default") {
+                            tokenChangingDefault = token
+                            isDefaultChangePINPresented = true
+                        }
+                        Button("Clear Default") {
+                            workspace.clearDefault(for: token.tokenKey)
+                        }
+                        .disabled(token.certificateDefault == nil)
+                        Button("Forget Token", role: .destructive) {
+                            workspace.forgetToken(for: token.tokenKey)
+                        }
+                    }
+                }
+                .padding(.vertical, 4)
+            }
+        }
+    }
+
+    private func defaultDetail(for token: RememberedSigningToken) -> String {
+        guard let certificateDefault = token.certificateDefault else {
+            return "No default certificate"
+        }
+        return "Default: \(certificateDefault.commonName), \(certificateDefault.issuer), expires \(certificateDefault.validUntil.formatted(date: .abbreviated, time: .omitted))"
     }
 
     @ViewBuilder

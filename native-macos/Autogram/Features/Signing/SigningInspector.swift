@@ -80,8 +80,8 @@ struct SigningInspector: View {
         .sheet(isPresented: $isCertificatePickerPresented, onDismiss: {
             workspace.cancelCredentialFlow()
         }) {
-            CertificatePicker(certificates: workspace.discoveredCertificates) { certificate in
-                workspace.startSigning(with: certificate)
+            CertificatePicker(certificates: workspace.discoveredCertificates) { certificate, rememberAsDefault in
+                workspace.selectCertificateForSigning(certificate, rememberAsDefault: rememberAsDefault)
                 isCertificatePickerPresented = false
             } onCancel: {
                 isCertificatePickerPresented = false
