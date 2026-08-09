@@ -6,6 +6,7 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
     private let driverResolver: DriverResolver
     private let outputService: OutputService
     private let timestampSourceProvider: any TimestampSourceProviding
+    private let helperOperationGate = CLIHelperOperationGate()
     private let lock = NSLock()
     private var reservations: [String: OutputReservation] = [:]
 
@@ -129,78 +130,91 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
 
     func sign(request: SigningRequest) -> AsyncThrowingStream<SigningEvent, Error> {
         AsyncThrowingStream { continuation in
-            Task {
+            let task = Task {
                 do {
-                    let timestamp = try qualifiedTimestampRequest()
-                    let files = try request.files.map { file in
-                        let reservation = try reservation(for: file.id, sourceURL: file.sourceURL)
-                        try FileManager.default.removeItem(at: reservation.temporaryURL)
-                        return machineFile(id: file.id, sourceURL: file.sourceURL, targetURL: reservation.finalURL)
-                    }
-                    let machineRequest = MachineRequest(
-                        protocolVersion: 1,
-                        requestID: request.sessionID.uuidString,
-                        operation: .sign,
-                        payload: [
-                            "driver": .string(request.driverID),
-                            "certificateSerial": .string(request.certificateSerial),
-                            "signatureLevel": .string("PAdES_BASELINE_T"),
-                            "timestamp": .object([
-                                "required": .bool(true),
-                                "servers": .array(timestamp.endpoints.map(JSONValue.string))
-                            ]),
-                            "files": .array(files)
-                        ]
-                    )
-                    let secureRequest = SecureMachineRequest(
-                        envelope: machineRequest,
-                        pin: request.pin,
-                        timestampAuthentication: timestamp.authentication
-                    )
-                    let stream = await runner.run(request: secureRequest, configuration: configuration)
-                    var machineEvents: [MachineEvent] = []
-                    var completedFileIDs: [String] = []
-                    continuation.yield(.started)
-                    for try await event in stream {
-                        guard event.sessionID == machineRequest.requestID else {
-                            throw SigningFailure.engine("The signing helper returned an invalid session.")
-                        }
-                        machineEvents.append(event)
-                        switch event.type {
-                        case .fileProgress:
-                            guard let phase = string(in: event.payload["phase"]),
-                                  let activity = SigningActivityPhase(machinePhase: phase) else {
-                                continue
+                    try await helperOperationGate.withPermit {
+                        try await withTaskCancellationHandler {
+                            let timestamp = try qualifiedTimestampRequest()
+                            let files = try request.files.map { file in
+                                let reservation = try reservation(for: file.id, sourceURL: file.sourceURL)
+                                try FileManager.default.removeItem(at: reservation.temporaryURL)
+                                return machineFile(id: file.id, sourceURL: file.sourceURL, targetURL: reservation.temporaryURL)
                             }
-                            continuation.yield(.activity(activity))
-                        case .fileSigningStarted:
-                            if let fileID = event.fileID { continuation.yield(.fileSigning(fileID)) }
-                        case .fileCompleted:
-                            guard let fileID = event.fileID else { continue }
-                            completedFileIDs.append(fileID)
-                        case .fileFailed:
-                            if let fileID = event.fileID {
-                                let code = string(in: event.payload["code"]) ?? "SIGNING_FAILED"
-                                continuation.yield(.failed(fileID, .engine(Self.fileFailureMessage(code: code))))
+                            let machineRequest = MachineRequest(
+                                protocolVersion: 1,
+                                requestID: request.sessionID.uuidString,
+                                operation: .sign,
+                                payload: [
+                                    "driver": .string(request.driverID),
+                                    "certificateSerial": .string(request.certificateSerial),
+                                    "signatureLevel": .string("PAdES_BASELINE_T"),
+                                    "timestamp": .object([
+                                        "required": .bool(true),
+                                        "servers": .array(timestamp.endpoints.map(JSONValue.string))
+                                    ]),
+                                    "files": .array(files)
+                                ]
+                            )
+                            let secureRequest = SecureMachineRequest(
+                                envelope: machineRequest,
+                                pin: request.pin,
+                                timestampAuthentication: timestamp.authentication
+                            )
+                            let stream = await runner.run(request: secureRequest, configuration: configuration)
+                            var machineEvents: [MachineEvent] = []
+                            var completedFileIDs: [String] = []
+                            continuation.yield(.started)
+                            for try await event in stream {
+                                guard event.sessionID == machineRequest.requestID else {
+                                    throw SigningFailure.engine("The signing helper returned an invalid session.")
+                                }
+                                machineEvents.append(event)
+                                switch event.type {
+                                case .fileProgress:
+                                    guard let phase = string(in: event.payload["phase"]),
+                                          let activity = SigningActivityPhase(machinePhase: phase) else {
+                                        continue
+                                    }
+                                    continuation.yield(.activity(activity))
+                                case .fileSigningStarted:
+                                    if let fileID = event.fileID { continuation.yield(.fileSigning(fileID)) }
+                                case .fileCompleted:
+                                    guard let fileID = event.fileID else { continue }
+                                    completedFileIDs.append(fileID)
+                                case .fileFailed:
+                                    if let fileID = event.fileID {
+                                        let code = string(in: event.payload["code"]) ?? "SIGNING_FAILED"
+                                        continuation.yield(.failed(fileID, .engine(Self.fileFailureMessage(code: code))))
+                                    }
+                                default:
+                                    break
+                                }
                             }
-                        default:
-                            break
+                            do {
+                                try validateTerminalEvent(in: machineEvents)
+                            } catch {
+                                discardTemporaryOutputs(for: request.files.map(\.id))
+                                throw error
+                            }
+                            for fileID in completedFileIDs {
+                                do {
+                                    try finalizeOutput(for: fileID)
+                                    continuation.yield(.completed(fileID))
+                                } catch {
+                                    continuation.yield(.failed(fileID, .fileFailed(fileID)))
+                                }
+                            }
+                            continuation.finish()
+                        } onCancel: {
+                            Task { await self.runner.cancel() }
                         }
                     }
-                    try validateTerminalEvent(in: machineEvents)
-                    for fileID in completedFileIDs {
-                        do {
-                            try finalizeOutput(for: fileID)
-                            continuation.yield(.completed(fileID))
-                        } catch {
-                            continuation.yield(.failed(fileID, .fileFailed(fileID)))
-                        }
-                    }
-                    continuation.finish()
                 } catch {
+                    discardTemporaryOutputs(for: request.files.map(\.id))
                     continuation.finish(throwing: error)
                 }
             }
+            continuation.onTermination = { _ in task.cancel() }
         }
     }
 
@@ -222,8 +236,16 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
         let reservation = reservations.removeValue(forKey: fileID)
         lock.unlock()
         guard let reservation else { throw OutputServiceError.unableToFinalize }
-        try FileManager.default.moveItem(at: reservation.finalURL, to: reservation.temporaryURL)
         try outputService.finalize(reservation)
+    }
+
+    private func discardTemporaryOutputs(for fileIDs: [String]) {
+        lock.lock()
+        let outputReservations = fileIDs.compactMap { reservations.removeValue(forKey: $0) }
+        lock.unlock()
+        for reservation in outputReservations {
+            try? FileManager.default.removeItem(at: reservation.temporaryURL)
+        }
     }
 
     private func run(_ request: MachineRequest) async throws -> [MachineEvent] {
@@ -231,16 +253,22 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
     }
 
     private func run(_ request: SecureMachineRequest) async throws -> [MachineEvent] {
-        let stream = await runner.run(request: request, configuration: configuration)
-        var events: [MachineEvent] = []
-        for try await event in stream {
-            guard event.sessionID == request.envelope.requestID else {
-                throw SigningFailure.engine("The signing helper returned an invalid session.")
+        try await helperOperationGate.withPermit {
+            try await withTaskCancellationHandler {
+                let stream = await runner.run(request: request, configuration: configuration)
+                var events: [MachineEvent] = []
+                for try await event in stream {
+                    guard event.sessionID == request.envelope.requestID else {
+                        throw SigningFailure.engine("The signing helper returned an invalid session.")
+                    }
+                    events.append(event)
+                }
+                try validateTerminalEvent(in: events)
+                return events
+            } onCancel: {
+                Task { await self.runner.cancel() }
             }
-            events.append(event)
         }
-        try validateTerminalEvent(in: events)
-        return events
     }
 
     private func validateTerminalEvent(in events: [MachineEvent]) throws {
@@ -372,6 +400,53 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
     private func date(in value: JSONValue?) -> Date? {
         guard let value = string(in: value) else { return nil }
         return ISO8601DateFormatter().date(from: value)
+    }
+}
+
+private actor CLIHelperOperationGate {
+    private var isHeld = false
+    private var waitingIDs: [UUID] = []
+    private var waiters: [UUID: CheckedContinuation<Void, Error>] = [:]
+
+    func withPermit<T>(_ operation: () async throws -> T) async throws -> T {
+        try await acquire()
+        defer { release() }
+        try Task.checkCancellation()
+        return try await operation()
+    }
+
+    private func acquire() async throws {
+        try Task.checkCancellation()
+        guard isHeld else {
+            isHeld = true
+            return
+        }
+
+        let id = UUID()
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                waiters[id] = continuation
+                waitingIDs.append(id)
+            }
+        } onCancel: {
+            Task { await self.cancelWaiter(id) }
+        }
+    }
+
+    private func release() {
+        while !waitingIDs.isEmpty {
+            let id = waitingIDs.removeFirst()
+            guard let continuation = waiters.removeValue(forKey: id) else { continue }
+            continuation.resume()
+            return
+        }
+        isHeld = false
+    }
+
+    private func cancelWaiter(_ id: UUID) {
+        guard let continuation = waiters.removeValue(forKey: id) else { return }
+        waitingIDs.removeAll { $0 == id }
+        continuation.resume(throwing: CancellationError())
     }
 }
 
