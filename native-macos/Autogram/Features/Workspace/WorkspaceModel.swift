@@ -15,6 +15,7 @@ final class WorkspaceModel {
     private(set) var isLoadingSigningEnvironment = false
     private(set) var isLoadingCertificates = false
     private(set) var credentialError: String?
+    private(set) var signingError: String?
     private let engine: any SigningEngine
     private let certificateDefaultStore: any CertificateDefaultStoring
     @ObservationIgnored private var coordinator: SigningCoordinator?
@@ -125,6 +126,7 @@ final class WorkspaceModel {
     func resolveCertificates(using submission: PINSubmission) async -> CertificateResolution {
         cancelCredentialFlow()
         credentialError = nil
+        signingError = nil
         guard let selectedDriverID else {
             credentialError = "Choose a signing driver before continuing."
             return .failed
@@ -189,6 +191,7 @@ final class WorkspaceModel {
     ) async -> CertificateDefaultChangeResolution {
         cancelCredentialFlow()
         credentialError = nil
+        signingError = nil
         guard let selectedDriverID else {
             credentialError = "Choose a signing driver before continuing."
             return .failed
@@ -247,6 +250,7 @@ final class WorkspaceModel {
         }
 
         clearPendingSigningPIN()
+        signingError = nil
         Task { [weak self] in
             await self?.sign(
                 driverID: driverID,
@@ -389,6 +393,8 @@ final class WorkspaceModel {
             return
         }
 
+        signingError = nil
+
         let descriptors = items.map(\.descriptor)
         let request = SigningRequest(
             sessionID: UUID(),
@@ -402,7 +408,7 @@ final class WorkspaceModel {
             try await coordinator.inspect(descriptors)
             try await coordinator.beginSigning(request: request)
         } catch {
-            credentialError = error.localizedDescription
+            signingError = error.localizedDescription
             for item in items {
                 updateStatus(for: item.descriptor.id, to: .failed)
             }

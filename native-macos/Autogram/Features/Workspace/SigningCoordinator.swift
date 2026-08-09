@@ -66,8 +66,9 @@ actor SigningCoordinator {
                 }
             }
         } catch {
-            state = .failed(asSigningFailure(error))
-            return
+            let failure = asSigningFailure(error)
+            state = .failed(failure)
+            throw failure
         }
 
         let summary = BatchSummary(succeeded: succeeded, failed: failed)

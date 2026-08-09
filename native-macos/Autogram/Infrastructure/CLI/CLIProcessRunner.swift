@@ -4,17 +4,19 @@ import Darwin
 enum CLIProcessFailure: Error, Sendable, Equatable, LocalizedError {
     case launchFailed
     case malformedOutput
-    case helperExited
+    case helperExited(status: Int32, diagnostic: String?)
     case timedOut
     case cancelled
 
     var errorDescription: String? {
         switch self {
-        case .launchFailed: "The signing helper could not be started."
-        case .malformedOutput: "The signing helper returned invalid machine output."
-        case .helperExited: "The signing helper did not complete successfully."
-        case .timedOut: "The signing helper did not finish in time."
-        case .cancelled: "The signing operation was cancelled."
+        case .launchFailed: return "The signing helper could not be started."
+        case .malformedOutput: return "The signing helper returned invalid machine output."
+        case .helperExited(let status, let diagnostic):
+            let reason = "The signing helper exited unexpectedly. [HELPER_EXIT_\(status)]"
+            return diagnostic.map { "\(reason) \($0)" } ?? reason
+        case .timedOut: return "The signing helper did not finish in time."
+        case .cancelled: return "The signing operation was cancelled."
         }
     }
 }
@@ -262,7 +264,13 @@ actor CLIProcessRunner {
         } else if let failure = activeRun.requestedFailure {
             finish(runID: runID, throwing: failure)
         } else if activeRun.terminationStatus != 0 {
-            finish(runID: runID, throwing: .helperExited)
+            finish(
+                runID: runID,
+                throwing: .helperExited(
+                    status: activeRun.terminationStatus ?? 0,
+                    diagnostic: Self.sanitizedDiagnostic(from: activeRun.capturedStderr)
+                )
+            )
         } else {
             finish(runID: runID, throwing: nil)
         }
@@ -279,5 +287,19 @@ actor CLIProcessRunner {
         } else {
             activeRun.continuation.finish()
         }
+    }
+
+    private static func sanitizedDiagnostic(from stderr: Data) -> String? {
+        guard let text = String(data: stderr, encoding: .utf8) else { return nil }
+
+        return text
+            .split(whereSeparator: { $0.isWhitespace })
+            .first { token in
+                guard token.first == "[", token.last == "]" else { return false }
+                return token.dropFirst().dropLast().allSatisfy {
+                    $0.isUppercase || $0.isNumber || $0 == "_"
+                }
+            }
+            .map(String.init)
     }
 }

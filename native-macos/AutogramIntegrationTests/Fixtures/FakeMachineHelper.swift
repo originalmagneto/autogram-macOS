@@ -8,6 +8,7 @@ struct FakeMachineHelper {
         case waits
         case terminalThenWaits
         case exitsWithError
+        case exitsWithDiagnostic
     }
 
     let directoryURL: URL
@@ -46,6 +47,11 @@ struct FakeMachineHelper {
         exitsWithError)
             cat > /dev/null
             printf '%s\\n' 'test-helper-sensitive-stderr' >&2
+            exit 70
+            ;;
+        exitsWithDiagnostic)
+            cat > /dev/null
+            printf '%s\\n' 'Timestamp service unavailable [TIMESTAMP_UNAVAILABLE] for /private/var/tmp/source.pdf' >&2
             exit 70
             ;;
         esac

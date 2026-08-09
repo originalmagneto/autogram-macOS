@@ -95,7 +95,36 @@ import Testing
         for try await _ in stream {}
         Issue.record("Expected the helper failure to finish with an error")
     } catch let failure as CLIProcessFailure {
-        #expect(failure == .helperExited)
+        guard case .helperExited(let status, let diagnostic) = failure else {
+            Issue.record("Expected a helper exit failure")
+            return
+        }
+        #expect(status == 70)
+        #expect(diagnostic == nil)
         #expect(!failure.localizedDescription.contains("test-helper-sensitive-stderr"))
+    }
+}
+
+@Test func abnormalHelperExitUsesSafeClassifiedReason() async throws {
+    let helper = try FakeMachineHelper(behavior: .exitsWithDiagnostic)
+    defer { try? helper.remove() }
+    let runner = CLIProcessRunner()
+    let stream = await runner.run(
+        request: .capabilities(requestID: "diagnostic-failure-1"),
+        configuration: helper.configuration()
+    )
+
+    do {
+        for try await _ in stream {}
+        Issue.record("Expected the helper failure to finish with an error")
+    } catch let failure as CLIProcessFailure {
+        guard case .helperExited(_, let diagnostic) = failure else {
+            Issue.record("Expected a helper exit failure")
+            return
+        }
+        #expect(diagnostic == "[TIMESTAMP_UNAVAILABLE]")
+        #expect(failure.localizedDescription.contains("[HELPER_EXIT_70]"))
+        #expect(failure.localizedDescription.contains("[TIMESTAMP_UNAVAILABLE]"))
+        #expect(!failure.localizedDescription.contains("/private/var/tmp/source.pdf"))
     }
 }
