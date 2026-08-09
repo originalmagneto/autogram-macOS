@@ -84,7 +84,7 @@ public final class MachineSigningService {
         var requestPin = request != null ? request.pin() : null;
         try {
             var validatedRequest = MachineRequestValidator.validateSign(request);
-            preparedFiles = prepare(validatedRequest.files());
+            preparedFiles = prepare(requestId, validatedRequest.files());
             for (var prepared : preparedFiles) {
                 prepared.setPreviousSignatureIds(signatureIds(prepared.sourceContent()));
             }
@@ -116,10 +116,11 @@ public final class MachineSigningService {
         return sessionFailureCode;
     }
 
-    private List<PreparedFile> prepare(List<ValidatedMachineFile> files) {
+    private List<PreparedFile> prepare(String requestId, List<ValidatedMachineFile> files) {
         var prepared = new ArrayList<PreparedFile>();
         try {
             for (var file : files) {
+                progress(requestId, file.file(), "preparing");
                 prepared.add(PreparedFile.prepare(file, fileSystem));
             }
             return List.copyOf(prepared);
@@ -137,14 +138,17 @@ public final class MachineSigningService {
         try {
             var completed = new boolean[] { false };
             var previousSignatureIds = prepared.previousSignatureIds();
+            progress(requestId, file, "signing");
             session.sign(prepared.signingInput(), () -> completed[0] = true);
             if (!completed[0]) {
                 throw new MachineProtocolException("OUTPUT_VALIDATION_FAILED");
             }
+            progress(requestId, file, "validating");
             var signedContent = prepared.readSignedContent();
             if (!validOutput(signedContent, previousSignatureIds)) {
                 throw new MachineProtocolException("OUTPUT_VALIDATION_FAILED");
             }
+            progress(requestId, file, "saving");
             prepared.publish();
             writer.write("file.completed", requestId, file.id(), new JsonObject());
         } catch (Throwable exception) {
@@ -154,6 +158,12 @@ public final class MachineSigningService {
             }
             writer.write("file.failed", requestId, file.id(), failure(code));
         }
+    }
+
+    private void progress(String requestId, MachineFile file, String phase) {
+        var payload = new JsonObject();
+        payload.addProperty("phase", phase);
+        writer.write("file.progress", requestId, file.id(), payload);
     }
 
     private void failUnprocessedFiles(String requestId, List<MachineFile> files, String code) {

@@ -29,7 +29,15 @@ import Testing
     #expect(payload["signatureLevel"] as? String == "PAdES_BASELINE_T")
     #expect((payload["timestamp"] as? [String: Any])?["required"] as? Bool == true)
     #expect((payload["files"] as? [[String: Any]])?.map { $0["id"] as? String } == ["agreement"])
-    #expect(events == [.started, .fileSigning("agreement"), .completed("agreement")])
+    #expect(events == [
+        .started,
+        .fileSigning("agreement"),
+        .activity(.preparingSignatures),
+        .activity(.signingDocuments),
+        .activity(.validatingSignedDocuments),
+        .activity(.savingSignedDocuments),
+        .completed("agreement")
+    ])
     #expect(try fixture.finalizedOutput().starts(with: Data("%PDF-".utf8)))
 }
 
@@ -56,6 +64,8 @@ import Testing
     #expect(events == [
         .started,
         .fileSigning("agreement"),
+        .activity(.preparingSignatures),
+        .activity(.signingDocuments),
         .failed("agreement", .engine("A qualified timestamp could not be obtained. [TIMESTAMP_FAILED]"))
     ])
 }
@@ -145,6 +155,8 @@ private struct SigningMachineFixture {
         } else {
             """
             printf '%%PDF-1.7\\n%%%%EOF\\n' > "$AUTOGRAM_TEST_DIRECTORY/agreement_signed.pdf"
+            printf '%s\\n' '{"protocolVersion":1,"type":"file.progress","sessionId":"00000000-0000-0000-0000-000000000001","emittedAt":"2026-08-06T00:00:02Z","fileId":"agreement","payload":{"phase":"validating"}}'
+            printf '%s\\n' '{"protocolVersion":1,"type":"file.progress","sessionId":"00000000-0000-0000-0000-000000000001","emittedAt":"2026-08-06T00:00:02Z","fileId":"agreement","payload":{"phase":"saving"}}'
             printf '%s\\n' '{"protocolVersion":1,"type":"file.completed","sessionId":"00000000-0000-0000-0000-000000000001","emittedAt":"2026-08-06T00:00:02Z","fileId":"agreement","payload":{}}'
             """
         }
@@ -154,6 +166,9 @@ private struct SigningMachineFixture {
         cat > "$input"
         printf '%s\\n' '{"protocolVersion":1,"type":"session.started","sessionId":"00000000-0000-0000-0000-000000000001","emittedAt":"2026-08-06T00:00:00.123456Z","fileId":null,"payload":{}}'
         printf '%s\\n' '{"protocolVersion":1,"type":"file.signingStarted","sessionId":"00000000-0000-0000-0000-000000000001","emittedAt":"2026-08-06T00:00:01Z","fileId":"agreement","payload":{}}'
+        printf '%s\\n' '{"protocolVersion":1,"type":"file.progress","sessionId":"00000000-0000-0000-0000-000000000001","emittedAt":"2026-08-06T00:00:01Z","fileId":"agreement","payload":{"phase":"preparing"}}'
+        printf '%s\\n' '{"protocolVersion":1,"type":"file.progress","sessionId":"00000000-0000-0000-0000-000000000001","emittedAt":"2026-08-06T00:00:01Z","fileId":"agreement","payload":{"phase":"signing"}}'
+        printf '%s\\n' '{"protocolVersion":1,"type":"file.progress","sessionId":"00000000-0000-0000-0000-000000000001","emittedAt":"2026-08-06T00:00:01Z","fileId":"agreement","payload":{"phase":"future-phase"}}'
         \(result)
         printf '%s\\n' '{"protocolVersion":1,"type":"session.completed","sessionId":"00000000-0000-0000-0000-000000000001","emittedAt":"2026-08-06T00:00:03Z","fileId":null,"payload":{}}'
         """

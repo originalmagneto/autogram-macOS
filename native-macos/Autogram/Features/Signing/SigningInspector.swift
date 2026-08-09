@@ -56,12 +56,16 @@ struct SigningInspector: View {
                 }
             }
 
-            if isSigning {
+            if let phase = workspace.signingActivityPhase {
                 Section("Signing progress") {
-                    ProgressView(value: Double(completedCount + failedCount), total: Double(workspace.items.count)) {
-                        Text("Signing documents")
+                    ProgressView(phase.label)
+
+                    if completedCount > 0 || failedCount > 0 {
+                        ProgressView(value: Double(completedCount + failedCount), total: Double(workspace.items.count)) {
+                            Text("Signing documents")
+                        }
+                        .accessibilityValue("\(completedCount + failedCount) of \(workspace.items.count) documents complete")
                     }
-                    .accessibilityValue("\(completedCount + failedCount) of \(workspace.items.count) documents complete")
                 }
             }
         }
@@ -103,10 +107,6 @@ struct SigningInspector: View {
 
     private var failedCount: Int {
         workspace.items.count { $0.status == .failed }
-    }
-
-    private var isSigning: Bool {
-        workspace.items.contains { $0.status == .signing }
     }
 
     private var summary: String {

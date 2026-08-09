@@ -46,6 +46,8 @@ PIN values, TSA credentials, certificate private data, and unredacted document p
 
 SwiftUI owns presentation state only. Java Autogram and DSS continue to own signing, timestamping, preservation of prior signatures, and post-signing validation. Machine progress events provide phase identifiers. Swift maps those identifiers to user-facing text and does not infer cryptographic success from elapsed time.
 
+The bundled CLI launcher must set `java.awt.headless=true`. A direct inspection of the supplied signed PDF reproduced an AWT application-registration crash without this property and completed with both signatures when the property was present. Machine CLI work must never initialize a graphical Java application.
+
 ## Acceptance Evidence
 
 - A coordinator failure test proves an engine failure is thrown and retained.

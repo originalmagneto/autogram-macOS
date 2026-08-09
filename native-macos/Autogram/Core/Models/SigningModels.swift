@@ -50,6 +50,50 @@ enum SessionState: Sendable, Equatable {
     case cancelled
 }
 
+enum SigningActivityPhase: Sendable, Equatable {
+    case inspectingDocuments
+    case readingSigningCard
+    case loadingCertificates
+    case preparingSignatures
+    case signingDocuments
+    case validatingSignedDocuments
+    case savingSignedDocuments
+
+    var label: String {
+        switch self {
+        case .inspectingDocuments:
+            "Inspecting documents"
+        case .readingSigningCard:
+            "Reading the signing card"
+        case .loadingCertificates:
+            "Loading certificates"
+        case .preparingSignatures:
+            "Preparing signatures"
+        case .signingDocuments:
+            "Signing documents and requesting a qualified timestamp"
+        case .validatingSignedDocuments:
+            "Validating signed documents"
+        case .savingSignedDocuments:
+            "Saving signed documents"
+        }
+    }
+
+    init?(machinePhase: String) {
+        switch machinePhase {
+        case "preparing":
+            self = .preparingSignatures
+        case "signing":
+            self = .signingDocuments
+        case "validating":
+            self = .validatingSignedDocuments
+        case "saving":
+            self = .savingSignedDocuments
+        default:
+            return nil
+        }
+    }
+}
+
 struct BatchProgress: Sendable, Equatable {
     let total: Int
     let completed: Int
@@ -74,6 +118,7 @@ struct BatchSummary: Sendable, Equatable {
 
 enum SigningEvent: Sendable, Equatable {
     case started
+    case activity(SigningActivityPhase)
     case fileSigning(String)
     case completed(String)
     case failed(String, SigningFailure)

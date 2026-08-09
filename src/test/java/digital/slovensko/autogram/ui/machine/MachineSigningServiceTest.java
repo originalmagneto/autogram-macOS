@@ -53,7 +53,7 @@ class MachineSigningServiceTest {
 
         assertTrue(Arrays.equals(new char[pin.length], pin));
         assertEquals(List.of("session.started", "file.signingStarted", "file.completed", "session.failed"),
-                writer.eventTypes());
+                writer.lifecycleEventTypes());
         assertEquals("OUTPUT_CLEANUP_FAILED", writer.payloadCode(3));
         assertFalse(writer.serialized().contains("unchecked cleanup detail"));
     }
@@ -75,10 +75,23 @@ class MachineSigningServiceTest {
                 file("good", "good.pdf", "good-signed.pdf")));
 
         assertEquals(List.of("session.started", "file.signingStarted", "file.failed", "file.signingStarted",
-                "file.completed", "session.completed"), writer.eventTypes());
+                "file.completed", "session.completed"), writer.lifecycleEventTypes());
         assertTrue(session.closed);
         assertTrue(Arrays.equals(new char[pin.length], pin));
         assertFalse(writer.serialized().contains("sensitive failure"));
+    }
+
+    @Test
+    void emitsProgressAtMachineSigningBoundaries() throws Exception {
+        var writer = new RecordingWriter();
+        var service = new MachineSigningService(writer.writer(), request -> new FakeSession((file, completed) -> {
+            file.writeSignedContent("%PDF-1.7\nsigned\n%%EOF".getBytes());
+            completed.run();
+        }), path -> true);
+
+        service.sign("request-1", request("1234".toCharArray(), file("one", "source.pdf", "signed.pdf")));
+
+        assertEquals(List.of("preparing", "signing", "validating", "saving"), writer.progressPhases());
     }
 
     @Test
@@ -95,7 +108,7 @@ class MachineSigningServiceTest {
         assertFalse(Files.exists(target));
         assertEquals("OUTPUT_VALIDATION_FAILED", writer.payloadCode(2));
         assertEquals(List.of("session.started", "file.signingStarted", "file.failed", "session.completed"),
-                writer.eventTypes());
+                writer.lifecycleEventTypes());
     }
 
     @Test
@@ -110,7 +123,7 @@ class MachineSigningServiceTest {
                 file("two", "two.pdf", "two-signed.pdf")));
 
         assertEquals(List.of("session.started", "file.signingStarted", "file.failed", "file.signingStarted",
-                "file.failed", "session.failed"), writer.eventTypes());
+                "file.failed", "session.failed"), writer.lifecycleEventTypes());
         assertTrue(Arrays.equals(new char[pin.length], pin));
         assertFalse(writer.serialized().contains("/private/card"));
         assertFalse(writer.serialized().contains("1234"));
@@ -139,7 +152,7 @@ class MachineSigningServiceTest {
         service.sign("request-1", request("1234".toCharArray(), file("one", "source.pdf", "signed.pdf")));
 
         assertEquals(List.of("session.started", "file.signingStarted", "file.completed", "session.failed"),
-                writer.eventTypes());
+                writer.lifecycleEventTypes());
     }
 
     @Test
@@ -245,7 +258,7 @@ class MachineSigningServiceTest {
         assertFalse(targetSeenDuringSigning.get());
         assertEquals("%PDF-1.7\nsigned\n%%EOF", Files.readString(target));
         assertEquals(List.of("session.started", "file.signingStarted", "file.completed", "session.completed"),
-                writer.eventTypes());
+                writer.lifecycleEventTypes());
     }
 
     @Test
@@ -325,7 +338,7 @@ class MachineSigningServiceTest {
 
         assertFalse(tokenOpened.get());
         assertEquals(List.of("session.started", "file.signingStarted", "file.failed", "session.failed"),
-                writer.eventTypes());
+                writer.lifecycleEventTypes());
         assertEquals("OUTPUT_CLEANUP_FAILED", writer.payloadCode(2));
     }
 
@@ -753,12 +766,22 @@ class MachineSigningServiceTest {
             return new MachineEventWriter(new PrintWriter(output));
         }
 
-        private List<String> eventTypes() {
-            return events().stream().map(event -> event.get("type").getAsString()).toList();
+        private List<String> lifecycleEventTypes() {
+            return events().stream()
+                    .filter(event -> !"file.progress".equals(event.get("type").getAsString()))
+                    .map(event -> event.get("type").getAsString()).toList();
+        }
+
+        private List<String> progressPhases() {
+            return events().stream()
+                    .filter(event -> "file.progress".equals(event.get("type").getAsString()))
+                    .map(event -> event.getAsJsonObject("payload").get("phase").getAsString()).toList();
         }
 
         private String payloadCode(int eventIndex) {
-            return events().get(eventIndex).getAsJsonObject("payload").get("code").getAsString();
+            return events().stream()
+                    .filter(event -> !"file.progress".equals(event.get("type").getAsString()))
+                    .toList().get(eventIndex).getAsJsonObject("payload").get("code").getAsString();
         }
 
         private String serialized() {

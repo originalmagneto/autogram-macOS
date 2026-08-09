@@ -152,15 +152,27 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
                             "files": .array(files)
                         ]
                     )
-                    let events = try await run(SecureMachineRequest(
+                    let secureRequest = SecureMachineRequest(
                         envelope: machineRequest,
                         pin: request.pin,
                         timestampAuthentication: timestamp.authentication
-                    ))
+                    )
+                    let stream = await runner.run(request: secureRequest, configuration: configuration)
+                    var machineEvents: [MachineEvent] = []
                     var completed = Set<String>()
                     continuation.yield(.started)
-                    for event in events {
+                    for try await event in stream {
+                        guard event.sessionID == machineRequest.requestID else {
+                            throw SigningFailure.engine("The signing helper returned an invalid session.")
+                        }
+                        machineEvents.append(event)
                         switch event.type {
+                        case .fileProgress:
+                            guard let phase = string(in: event.payload["phase"]),
+                                  let activity = SigningActivityPhase(machinePhase: phase) else {
+                                continue
+                            }
+                            continuation.yield(.activity(activity))
                         case .fileSigningStarted:
                             if let fileID = event.fileID { continuation.yield(.fileSigning(fileID)) }
                         case .fileCompleted:
@@ -181,7 +193,7 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
                             break
                         }
                     }
-                    _ = try completedPayload(from: events)
+                    try validateTerminalEvent(in: machineEvents)
                     continuation.finish()
                 } catch {
                     continuation.finish(throwing: error)
@@ -225,13 +237,18 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
             }
             events.append(event)
         }
+        try validateTerminalEvent(in: events)
+        return events
+    }
+
+    private func validateTerminalEvent(in events: [MachineEvent]) throws {
         if let failure = events.last(where: { $0.type == .sessionFailed }) {
             let code = string(in: failure.payload["code"]) ?? "INTERNAL_ERROR"
             let fallback = string(in: failure.payload["fallbackMessage"])
                 ?? "The signing helper rejected the request."
             throw SigningFailure.engine("\(fallback) [\(code)]")
         }
-        return events
+        _ = try completedPayload(from: events)
     }
 
     private func completedPayload(from events: [MachineEvent]) throws -> [String: JSONValue] {

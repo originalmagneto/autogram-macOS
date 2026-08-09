@@ -14,6 +14,7 @@ actor SigningCoordinator {
         guard state == .idle else { throw SigningFailure.invalidTransition }
 
         state = .inspectingFiles
+        await updateWorkspaceActivity(.inspectingDocuments)
         do {
             let inspections = try await engine.inspect(files: files)
             guard hasCompletedSignableInspection(for: files, in: inspections) else {
@@ -24,9 +25,11 @@ actor SigningCoordinator {
             await updateWorkspace(files.map(\.id), to: .inspected)
             signableInspectionIDs = Set(files.map(\.id))
             state = .awaitingPIN
+            await updateWorkspaceActivity(nil)
         } catch {
             state = .failed(asSigningFailure(error))
             await updateWorkspaceInspectionFailure(for: files.map(\.id))
+            await updateWorkspaceActivity(nil)
             throw error
         }
     }
@@ -40,6 +43,7 @@ actor SigningCoordinator {
         }
 
         state = .signing(progress: BatchProgress(total: request.files.count))
+        await updateWorkspaceActivity(.preparingSignatures)
         var succeeded = 0
         var failed = 0
         var firstFailure: SigningFailure?
@@ -49,6 +53,8 @@ actor SigningCoordinator {
                 switch event {
                 case .started:
                     break
+                case .activity(let phase):
+                    await updateWorkspaceActivity(phase)
                 case .fileSigning(let fileID):
                     await updateWorkspace([fileID], to: .signing)
                 case .completed(let fileID):
@@ -62,12 +68,14 @@ actor SigningCoordinator {
                     state = .signing(progress: BatchProgress(total: request.files.count, completed: succeeded, failed: failed))
                 case .cancelled:
                     state = .cancelled
+                    await updateWorkspaceActivity(nil)
                     return
                 }
             }
         } catch {
             let failure = asSigningFailure(error)
             state = .failed(failure)
+            await updateWorkspaceActivity(nil)
             throw failure
         }
 
@@ -79,8 +87,10 @@ actor SigningCoordinator {
         } else {
             let failure = firstFailure ?? .fileFailed(request.files.first?.id ?? "")
             state = .failed(failure)
+            await updateWorkspaceActivity(nil)
             throw failure
         }
+        await updateWorkspaceActivity(nil)
     }
 
     func cancel() async throws {
@@ -88,6 +98,7 @@ actor SigningCoordinator {
 
         await engine.cancel()
         state = .cancelled
+        await updateWorkspaceActivity(nil)
     }
 
     private func updateWorkspace(_ fileIDs: [String], to status: PDFItemStatus) async {
@@ -105,6 +116,11 @@ actor SigningCoordinator {
     private func updateWorkspaceInspectionFailure(for fileIDs: [String]) async {
         guard let workspace else { return }
         await workspace.markInspectionFailed(for: fileIDs)
+    }
+
+    private func updateWorkspaceActivity(_ phase: SigningActivityPhase?) async {
+        guard let workspace else { return }
+        await workspace.setSigningActivityPhase(phase)
     }
 
     private func asSigningFailure(_ error: Error) -> SigningFailure {

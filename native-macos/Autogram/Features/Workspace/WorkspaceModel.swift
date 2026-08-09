@@ -16,6 +16,7 @@ final class WorkspaceModel {
     private(set) var isLoadingCertificates = false
     private(set) var credentialError: String?
     private(set) var signingError: String?
+    private(set) var signingActivityPhase: SigningActivityPhase?
     private let engine: any SigningEngine
     private let certificateDefaultStore: any CertificateDefaultStoring
     @ObservationIgnored private var coordinator: SigningCoordinator?
@@ -75,23 +76,32 @@ final class WorkspaceModel {
 
         inspectionRequestGeneration += 1
         let requestGeneration = inspectionRequestGeneration
+        signingActivityPhase = .inspectingDocuments
         updateInspection(for: descriptors.map(\.id), to: .pending)
 
         do {
             let inspections = try await engine.inspect(files: descriptors)
             applyInspectionResults(inspections, for: descriptors, requestGeneration: requestGeneration)
+            signingActivityPhase = nil
         } catch {
             guard requestGeneration == inspectionRequestGeneration else { return }
             updateInspection(for: descriptors.map(\.id), to: .failed)
+            signingActivityPhase = nil
         }
     }
 
     func refreshSigningEnvironment() async {
         isLoadingSigningEnvironment = true
+        signingActivityPhase = .readingSigningCard
         credentialError = nil
         discoveredCertificates = []
 
-        defer { isLoadingSigningEnvironment = false }
+        defer {
+            isLoadingSigningEnvironment = false
+            if signingActivityPhase == .readingSigningCard {
+                signingActivityPhase = nil
+            }
+        }
 
         do {
             signingEnvironment = try await engine.capabilities()
@@ -133,6 +143,7 @@ final class WorkspaceModel {
         }
 
         isLoadingCertificates = true
+        signingActivityPhase = .loadingCertificates
         pendingSigningPIN = submission.signingPIN
 
         do {
@@ -146,12 +157,14 @@ final class WorkspaceModel {
             discoveredCertificates = discovery.certificates
         } catch {
             isLoadingCertificates = false
+            signingActivityPhase = nil
             credentialError = error.localizedDescription
             clearPendingSigningPIN()
             return .failed
         }
 
         isLoadingCertificates = false
+        signingActivityPhase = nil
         guard !discoveredCertificates.isEmpty else {
             credentialError = "No signing certificates were found for the selected driver."
             clearPendingSigningPIN()
@@ -198,7 +211,13 @@ final class WorkspaceModel {
         }
 
         isLoadingCertificates = true
-        defer { isLoadingCertificates = false }
+        signingActivityPhase = .loadingCertificates
+        defer {
+            isLoadingCertificates = false
+            if signingActivityPhase == .loadingCertificates {
+                signingActivityPhase = nil
+            }
+        }
 
         do {
             let discovery = try await engine.certificateDiscovery(
@@ -251,6 +270,7 @@ final class WorkspaceModel {
 
         clearPendingSigningPIN()
         signingError = nil
+        signingActivityPhase = .preparingSignatures
         Task { [weak self] in
             await self?.sign(
                 driverID: driverID,
@@ -265,6 +285,9 @@ final class WorkspaceModel {
         discoveredToken = nil
         isLoadingCertificates = false
         clearPendingSigningPIN()
+        if signingActivityPhase == .loadingCertificates {
+            signingActivityPhase = nil
+        }
     }
 
     func setItems(_ items: [PDFItem]) {
@@ -311,6 +334,10 @@ final class WorkspaceModel {
 
     func markInspectionFailed(for fileIDs: [String]) {
         updateInspection(for: fileIDs, to: .failed)
+    }
+
+    func setSigningActivityPhase(_ phase: SigningActivityPhase?) {
+        signingActivityPhase = phase
     }
 
     private func updateInspection(for fileIDs: [String], to inspection: PDFItemInspection) {
@@ -409,6 +436,7 @@ final class WorkspaceModel {
             try await coordinator.beginSigning(request: request)
         } catch {
             signingError = error.localizedDescription
+            signingActivityPhase = nil
             for item in items {
                 updateStatus(for: item.descriptor.id, to: .failed)
             }

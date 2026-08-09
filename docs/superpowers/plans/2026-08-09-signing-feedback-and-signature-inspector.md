@@ -28,6 +28,8 @@
 - `native-macos/Autogram/Features/Workspace/WorkspaceModel.swift`: observable phase and inline failure state.
 - `native-macos/Autogram/Infrastructure/CLI/CLIProcessRunner.swift`: helper termination classification.
 - `native-macos/Autogram/Infrastructure/CLI/AutogramCLIEngine.swift`: machine progress event mapping.
+- `scripts/native-macos/autogram-cli-launcher.c`: headless Java helper launch.
+- `src/main/java/digital/slovensko/autogram/ui/machine/MachineSigningService.java`: truthful machine progress phase events.
 - `native-macos/Autogram/Features/Workspace/PDFDetailView.swift`: document preview only.
 - `native-macos/Autogram/Features/Signing/SigningInspector.swift`: activity, failure, and signature history presentation.
 - `native-macos/AutogramTests/SigningCoordinatorTests.swift`: exact coordinator failure proof.
@@ -91,34 +93,44 @@ Expected: both proofs pass.
 
 **Files:**
 - Modify: `native-macos/Autogram/Core/Models/SigningModels.swift`
+- Modify: `native-macos/Autogram/Features/Workspace/SigningCoordinator.swift`
 - Modify: `native-macos/Autogram/Features/Workspace/WorkspaceModel.swift`
 - Modify: `native-macos/Autogram/Infrastructure/CLI/AutogramCLIEngine.swift`
 - Modify: `native-macos/Autogram/Features/Signing/SigningInspector.swift`
+- Modify: `scripts/native-macos/autogram-cli-launcher.c`
+- Modify: `src/main/java/digital/slovensko/autogram/ui/machine/MachineSigningService.java`
+- Test: `native-macos/AutogramIntegrationTests/AutogramCLIEngineTests.swift`
+- Test: `src/test/java/digital/slovensko/autogram/ui/machine/MachineSigningServiceTest.java`
 
 **Interfaces:**
 - Produces: `SigningActivityPhase?` on `WorkspaceModel`.
 - Consumes: existing model state before helper events and machine `file.progress` phase values after helper launch.
 
-- [ ] **Step 1: Add the smallest user-facing phase model**
+- [ ] **Step 1: Keep the machine CLI headless**
+
+Add `-Djava.awt.headless=true` to the bundled C launcher's Java arguments. This exact property is required by the reproduced macOS 27 AWT crash. Rebuild and repeat the read-only inspection of the supplied signed PDF. It must emit `inspection.completed` and `session.completed` without a Java crash report.
+
+- [ ] **Step 2: Add the smallest user-facing phase model**
 
 Define an enum whose cases map to the approved phase labels. Do not add timing estimates or synthetic percentages.
 
-- [ ] **Step 2: Set phase state at existing workflow boundaries**
+- [ ] **Step 3: Set phase state at existing workflow boundaries**
 
 Set phases when inspection starts, certificate discovery starts, signing preparation starts, and signing finishes. Clear the phase on completion, cancellation, or failure.
 
-- [ ] **Step 3: Map existing `file.progress` phase payloads when present**
+- [ ] **Step 4: Emit and map truthful `file.progress` phases**
 
-Decode only known safe phase identifiers. Ignore unknown phase values so protocol evolution cannot break signing.
+Emit `preparing`, `signing`, `validating`, and `saving` at the existing machine signing boundaries. Change the signing path in `AutogramCLIEngine` to consume the runner stream directly instead of waiting for the collecting `run` helper, otherwise no progress event can reach SwiftUI while work is active. Decode only known safe phase identifiers. Ignore unknown phase values so protocol evolution cannot break signing. The user-facing signing label states that signing includes requesting the required qualified timestamp because DSS performs both inside the same call.
 
-- [ ] **Step 4: Present native progress in the inspector**
+- [ ] **Step 5: Present native progress in the inspector**
 
 Use an indeterminate `ProgressView` for the active phase and retain the existing determinate batch progress only when completed-file counts are available. Keep progress inline and nonmodal.
 
-- [ ] **Step 5: Build the native app**
+- [ ] **Step 6: Build the native app and run the existing machine signing service tests**
 
 ```bash
 xcodebuild -project native-macos/Autogram.xcodeproj -scheme Autogram -destination 'platform=macOS,arch=arm64' build
+./mvnw -q -Dtest=MachineSigningServiceTest test
 ```
 
 Expected: build succeeds without new warnings in changed files.
