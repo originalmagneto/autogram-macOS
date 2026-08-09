@@ -109,7 +109,6 @@ public final class MachineCliApp {
             MachineInspectionService inspectionService, Runnable trustInitializer) {
         var inspection = requiredInspectionRequest(request.payload());
         writer.write("session.started", request.requestId(), null, new JsonObject());
-        trustInitializer.run();
         for (var file : inspection.files()) {
             inspectFile(writer, request.requestId(), inspectionService, file);
         }

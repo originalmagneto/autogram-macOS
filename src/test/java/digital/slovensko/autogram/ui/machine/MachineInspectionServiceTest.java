@@ -89,7 +89,7 @@ class MachineInspectionServiceTest {
                 .map(element -> element.getAsJsonObject())
                 .toList();
         assertEquals(0, code);
-        assertTrue(trustInitialized.get());
+        assertFalse(trustInitialized.get());
         assertEquals(List.of("session.started", "inspection.completed", "file.failed", "session.completed"),
                 events.stream().map(event -> event.get("type").getAsString()).toList());
         assertEquals("opaque-1", events.get(1).get("fileId").getAsString());
@@ -98,7 +98,7 @@ class MachineInspectionServiceTest {
         assertEquals("opaque-2", events.get(2).get("fileId").getAsString());
         assertEquals("INSPECTION_FAILED", events.get(2).getAsJsonObject("payload").get("code").getAsString());
         assertEquals(List.of(Path.of(source), Path.of(brokenSource)), inspectedSources);
-        assertEquals(List.of("trust", "inspect:source.pdf", "inspect:broken.pdf"), calls);
+        assertEquals(List.of("inspect:source.pdf", "inspect:broken.pdf"), calls);
         assertFalse(stdout.toString().contains(source));
         assertFalse(stdout.toString().contains(target));
         assertFalse(stdout.toString().contains(brokenSource));
@@ -106,7 +106,7 @@ class MachineInspectionServiceTest {
     }
 
     @Test
-    void reportsTrustedListFailureWithoutInspectingTheFile() throws Exception {
+    void inspectsWithoutInitializingTrustedLists() throws Exception {
         var inspectionCalled = new AtomicBoolean();
         var inspectionService = new MachineInspectionService(path -> {
             inspectionCalled.set(true);
@@ -123,11 +123,10 @@ class MachineInspectionServiceTest {
                 .map(com.google.gson.JsonParser::parseString)
                 .map(element -> element.getAsJsonObject())
                 .toList();
-        assertEquals(69, code);
-        assertFalse(inspectionCalled.get());
-        assertEquals(List.of("session.started", "session.failed"),
+        assertEquals(0, code);
+        assertTrue(inspectionCalled.get());
+        assertEquals(List.of("session.started", "inspection.completed", "session.completed"),
                 events.stream().map(event -> event.get("type").getAsString()).toList());
-        assertEquals("TRUSTED_LIST_UNAVAILABLE", events.get(1).getAsJsonObject("payload").get("code").getAsString());
     }
 
     @Test
@@ -159,6 +158,25 @@ class MachineInspectionServiceTest {
         var signatures = MachineInspectionService.readStructuralSignatureCount(sample);
 
         assertTrue(signatures > 0);
+    }
+
+    @Test
+    void returnsLocalCryptographicMetadataForSampleSignedPdf() {
+        var sample = Path.of(MachineInspectionServiceTest.class
+                .getResource("/digital/slovensko/autogram/sample_signed.pdf").getFile());
+
+        var signature = new MachineInspectionService().inspect(sample).getAsJsonArray("signatures").get(0).getAsJsonObject();
+
+        assertTrue(signature.has("id"));
+        assertTrue(signature.has("format"));
+        assertTrue(signature.has("signerDisplayName"));
+        assertTrue(signature.has("signingTime"));
+        assertEquals(signature.get("valid").getAsBoolean(), signature.get("cryptographicIntegrity").getAsBoolean());
+        assertEquals("INDETERMINATE", signature.get("indication").isJsonNull()
+                ? null : signature.get("indication").getAsString());
+        assertFalse(signature.get("qualifiedTimestampValid").getAsBoolean());
+        assertTrue(signature.get("signerCertificateQualification").isJsonNull());
+        assertTrue(signature.get("timestamps").isJsonArray());
     }
 
     @Test

@@ -121,7 +121,7 @@ import Testing
 
     let signature = try #require(inspections.first?.files.first?.signatures.first)
     #expect(signature.signerDisplayName == "Ada Lovelace")
-    #expect(signature.validationState == .valid)
+    #expect(signature.validationState == .indeterminate)
     #expect(signature.signingTime == ISO8601DateFormatter().date(from: "2026-08-07T10:15:30Z"))
     #expect(signature.format == "PAdES_BASELINE_T")
     #expect(signature.hasQualifiedTimestamp == true)
@@ -261,7 +261,7 @@ private struct InspectionMachineFixture {
         request=$(cat)
         session_id=$(printf '%s' "$request" | sed -n 's/.*"requestId":"\\([^"]*\\)".*/\\1/p')
         printf '{"protocolVersion":1,"type":"session.started","sessionId":"%s","emittedAt":"2026-08-07T10:15:00Z","fileId":null,"payload":{}}\\n' "$session_id"
-        printf '{"protocolVersion":1,"type":"inspection.completed","sessionId":"%s","emittedAt":"2026-08-07T10:15:31Z","fileId":"agreement","payload":{"signatures":[{"id":"signature-1","format":"PAdES_BASELINE_T","signerDisplayName":"Ada Lovelace","signerCertificateQualification":"QES","signingTime":"2026-08-07T10:15:30Z","valid":true,"indication":"TOTAL_PASSED","qualifiedTimestampValid":true,"timestamps":[]}]}}\\n' "$session_id"
+        printf '{"protocolVersion":1,"type":"inspection.completed","sessionId":"%s","emittedAt":"2026-08-07T10:15:31Z","fileId":"agreement","payload":{"signatures":[{"id":"signature-1","format":"PAdES_BASELINE_T","signerDisplayName":"Ada Lovelace","signerCertificateQualification":null,"signingTime":"2026-08-07T10:15:30Z","valid":true,"cryptographicIntegrity":true,"indication":"INDETERMINATE","qualifiedTimestampValid":false,"timestamps":[{"id":"timestamp-1","valid":true,"cryptographicIntegrity":true,"qualification":null}]}]}}\\n' "$session_id"
         printf '{"protocolVersion":1,"type":"session.completed","sessionId":"%s","emittedAt":"2026-08-07T10:15:32Z","fileId":null,"payload":{}}\\n' "$session_id"
         """
         try script.write(to: executableURL, atomically: true, encoding: .utf8)

@@ -415,6 +415,7 @@ final class WorkspaceModel {
 
     private func sign(driverID: String, certificateSerial: String, pin: Secret) async {
         guard !items.isEmpty,
+              items.allSatisfy({ $0.inspection.isComplete }),
               !driverID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
               !certificateSerial.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
               let coordinator else {
@@ -433,7 +434,7 @@ final class WorkspaceModel {
         )
 
         do {
-            try await coordinator.inspect(descriptors)
+            try await coordinator.seedCompletedInspection(for: descriptors)
             try await coordinator.beginSigning(request: request)
         } catch {
             signingError = error.localizedDescription

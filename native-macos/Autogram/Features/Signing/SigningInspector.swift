@@ -180,10 +180,10 @@ private struct SignatureDisclosureRow: View {
 
             LabeledContent("Format", value: friendlyFormat)
             if signature.hasQualifiedTimestamp {
-                Label("Qualified timestamp", systemImage: "clock.badge.checkmark")
+                Label("Timestamp included", systemImage: "clock.badge.checkmark")
                     .foregroundStyle(.secondary)
             } else {
-                Label("No qualified timestamp", systemImage: "clock.badge.xmark")
+                Label("No timestamp", systemImage: "clock.badge.xmark")
                     .foregroundStyle(.orange)
             }
 

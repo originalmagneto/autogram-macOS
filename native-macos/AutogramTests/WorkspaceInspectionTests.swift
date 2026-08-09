@@ -44,6 +44,26 @@ import Testing
     #expect(workspace.items[1].inspection.signatures.first?.signerDisplayName == "New result")
 }
 
+@Test @MainActor func signingAfterCompletedInspectionDoesNotInspectDocumentsAgain() async {
+    let descriptor = PDFItemDescriptor(id: "document", sourceURL: URL(fileURLWithPath: "/tmp/document.pdf"))
+    let engine = CountingWorkspaceSigningEngine()
+    let workspace = WorkspaceModel(engine: engine, items: [PDFItem(descriptor: descriptor)])
+
+    await workspace.refreshInspections()
+    #expect(workspace.canStartSigning)
+
+    await workspace.refreshSigningEnvironment()
+    let resolution = await workspace.resolveCertificates(using: PINSubmission(
+        certificatePIN: Secret("1234"),
+        signingPIN: Secret("5678")
+    ))
+    await engine.waitForSigning()
+
+    #expect(resolution == .signingStarted)
+    #expect(engine.inspectCallCount == 1)
+    #expect(workspace.items[0].inspection.isComplete)
+}
+
 private actor ControlledInspectionEngine: SigningEngine {
     private struct PendingRequest {
         let files: [PDFItemDescriptor]
@@ -149,4 +169,77 @@ private struct InspectionEngine: SigningEngine {
     }
 
     func cancel() async {}
+}
+
+private final class CountingWorkspaceSigningEngine: SigningEngine, @unchecked Sendable {
+    private let lock = NSLock()
+    private var storedInspectCallCount = 0
+    private var signingStarted = false
+    private var signingWaiters: [CheckedContinuation<Void, Never>] = []
+
+    var inspectCallCount: Int {
+        lock.withLock { storedInspectCallCount }
+    }
+
+    func capabilities() async throws -> EngineCapabilities {
+        EngineCapabilities(protocolVersion: 1, supportsQualifiedTimestamp: true)
+    }
+
+    func drivers() async throws -> [SigningDriver] {
+        [SigningDriver(id: "test-driver", displayName: "Test Driver")]
+    }
+
+    func certificates(driverID: String, pin: Secret?) async throws -> [SigningCertificate] {
+        try await certificateDiscovery(driverID: driverID, pin: pin).certificates
+    }
+
+    func certificateDiscovery(driverID: String, pin: Secret?) async throws -> CertificateDiscovery {
+        CertificateDiscovery(
+            token: SigningToken(tokenKey: "test-token", providerName: "Test Token"),
+            certificates: [SigningCertificate(
+                serialNumber: "test-certificate",
+                displayName: "Test Certificate",
+                issuer: "Test Issuer",
+                validFrom: .distantPast,
+                validUntil: .distantFuture,
+                certificateKey: "test-certificate-key",
+                holderKey: "test-holder-key"
+            )]
+        )
+    }
+
+    func inspect(files: [PDFItemDescriptor]) async throws -> [PDFInspection] {
+        lock.withLock { storedInspectCallCount += 1 }
+        return [PDFInspection(files: files.map { InspectedPDF(id: $0.id, isSignable: true) })]
+    }
+
+    func sign(request: SigningRequest) -> AsyncThrowingStream<SigningEvent, Error> {
+        let waiters = lock.withLock { () -> [CheckedContinuation<Void, Never>] in
+            signingStarted = true
+            let waiters = signingWaiters
+            signingWaiters.removeAll()
+            return waiters
+        }
+        waiters.forEach { $0.resume() }
+        return AsyncThrowingStream { continuation in
+            for file in request.files {
+                continuation.yield(.completed(file.id))
+            }
+            continuation.finish()
+        }
+    }
+
+    func cancel() async {}
+
+    func waitForSigning() async {
+        await withCheckedContinuation { continuation in
+            lock.withLock {
+                if signingStarted {
+                    continuation.resume()
+                } else {
+                    signingWaiters.append(continuation)
+                }
+            }
+        }
+    }
 }

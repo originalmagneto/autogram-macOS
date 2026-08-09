@@ -377,7 +377,10 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
                 validationState: validationState,
                 signingTime: date(in: signature["signingTime"]),
                 format: string(in: signature["format"]),
-                hasQualifiedTimestamp: bool(in: signature["qualifiedTimestampValid"]) == true,
+                hasQualifiedTimestamp: bool(in: signature["qualifiedTimestampValid"]) == true
+                    || (array(in: signature["timestamps"]) ?? []).contains {
+                        bool(in: $0["cryptographicIntegrity"]) == true
+                    },
                 documents: strings(in: signature["documents"])
             )
         }

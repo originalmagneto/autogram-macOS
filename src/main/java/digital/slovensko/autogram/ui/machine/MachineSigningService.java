@@ -88,7 +88,6 @@ public final class MachineSigningService {
             for (var prepared : preparedFiles) {
                 prepared.setPreviousSignatureIds(signatureIds(prepared.sourceContent()));
             }
-            trustInitializer.run();
             try (var session = sessionFactory.apply(request)) {
                 for (; processedFiles < preparedFiles.size(); processedFiles++) {
                     signFile(requestId, session, preparedFiles.get(processedFiles));
@@ -653,11 +652,8 @@ public final class MachineSigningService {
                     .filter(signature -> !previousSignatureIds.contains(string(signature, "id"))).toList();
             return added.size() == 1
                     && isQualifiedBaselineT(string(added.getFirst(), "format"))
-                    && added.getFirst().has("valid")
-                    && added.getFirst().get("valid").getAsBoolean()
-                    && "TOTAL_PASSED".equals(string(added.getFirst(), "indication"))
-                    && added.getFirst().has("qualifiedTimestampValid")
-                    && added.getFirst().get("qualifiedTimestampValid").getAsBoolean();
+                    && hasCryptographicIntegrity(added.getFirst())
+                    && hasCryptographicallyValidTimestamp(added.getFirst());
         }
 
         @Override
@@ -682,6 +678,25 @@ public final class MachineSigningService {
         private static boolean isQualifiedBaselineT(String format) {
             return "PAdES_BASELINE_T".equals(format) || "XAdES_BASELINE_T".equals(format)
                     || "CAdES_BASELINE_T".equals(format);
+        }
+
+        private static boolean hasCryptographicIntegrity(JsonObject value) {
+            return booleanField(value, "cryptographicIntegrity", "valid");
+        }
+
+        private static boolean hasCryptographicallyValidTimestamp(JsonObject signature) {
+            if (!signature.has("timestamps") || !signature.get("timestamps").isJsonArray()) {
+                return false;
+            }
+            return signature.getAsJsonArray("timestamps").asList().stream()
+                    .map(value -> value.getAsJsonObject())
+                    .anyMatch(PdfOutputValidator::hasCryptographicIntegrity);
+        }
+
+        private static boolean booleanField(JsonObject value, String preferredField, String fallbackField) {
+            var field = value.has(preferredField) ? value.get(preferredField) : value.get(fallbackField);
+            return field != null && field.isJsonPrimitive() && field.getAsJsonPrimitive().isBoolean()
+                    && field.getAsBoolean();
         }
 
         private static String string(JsonObject value, String field) {

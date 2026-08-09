@@ -95,6 +95,20 @@ class MachineSigningServiceTest {
     }
 
     @Test
+    void signsWithoutInitializingTrustedListsForLocalOutputValidation() throws Exception {
+        var writer = new RecordingWriter();
+        var service = new MachineSigningService(writer.writer(), request -> new FakeSession((file, completed) -> {
+            file.writeSignedContent("%PDF-1.7\nsigned\n%%EOF".getBytes());
+            completed.run();
+        }), content -> true, () -> { throw new MachineProtocolException("TRUSTED_LIST_UNAVAILABLE"); });
+
+        service.sign("request-1", request("1234".toCharArray(), file("one", "source.pdf", "signed.pdf")));
+
+        assertEquals(List.of("session.started", "file.signingStarted", "file.completed", "session.completed"),
+                writer.lifecycleEventTypes());
+    }
+
+    @Test
     void deletesInvalidOutputBeforeReportingOutputValidationFailure() throws Exception {
         var writer = new RecordingWriter();
         var target = target("invalid-signed.pdf");
@@ -217,11 +231,7 @@ class MachineSigningServiceTest {
         var target = target("signed.pdf");
         var sourceSeenBySigner = new AtomicReference<String>();
         var sessionOpened = new AtomicReference<Boolean>(false);
-        var service = new MachineSigningService(writer.writer(), request -> new FakeSession((file, completed) -> {
-            sourceSeenBySigner.set(new String(file.sourceContent()));
-            file.writeSignedContent("%PDF-1.7\nsigned\n%%EOF".getBytes());
-            completed.run();
-        }), path -> true, () -> {
+        var service = new MachineSigningService(writer.writer(), request -> {
             try {
                 assertEquals("%PDF-1.7\noriginal\n%%EOF", Files.readString(source));
                 Files.writeString(source, "%PDF-1.7\nreplaced\n%%EOF", StandardOpenOption.TRUNCATE_EXISTING);
@@ -229,7 +239,12 @@ class MachineSigningServiceTest {
                 throw new IllegalStateException(exception);
             }
             sessionOpened.set(true);
-        });
+            return new FakeSession((file, completed) -> {
+                sourceSeenBySigner.set(new String(file.sourceContent()));
+                file.writeSignedContent("%PDF-1.7\nsigned\n%%EOF".getBytes());
+                completed.run();
+            });
+        }, path -> true);
 
         service.sign("request-1", request("1234".toCharArray(),
                 new MachineFile("one", source.toRealPath().toString(), target.toString())));
@@ -414,6 +429,15 @@ class MachineSigningServiceTest {
     }
 
     @Test
+    void outputValidatorAcceptsANewBaselineTSignatureWhenTimestampQualificationIsUnavailable() {
+        var validator = new MachineSigningService.PdfOutputValidator(new MachineInspectionService(path -> qualifiedReport(),
+                content -> locallyValidTimestampReport("existing", "new")));
+        var output = "%PDF-1.7\nvalidated\n%%EOF".getBytes(java.nio.charset.StandardCharsets.ISO_8859_1);
+
+        assertTrue(validator.isValid(output, java.util.Set.of("existing")));
+    }
+
+    @Test
     void outputValidatorRejectsSymlinkPaths() throws Exception {
         var document = Files.writeString(target("regular.pdf"), "%PDF-1.7\nregular\n%%EOF");
         var link = target("linked.pdf");
@@ -570,6 +594,21 @@ class MachineSigningServiceTest {
             when(report.isValid("ts-" + id)).thenReturn(true);
             when(report.getTimestampQualification("ts-" + id)).thenReturn(
                     eu.europa.esig.dss.enumerations.TimestampQualification.QTSA);
+        }
+        return report;
+    }
+
+    private static SimpleReport locallyValidTimestampReport(String... ids) {
+        var report = mock(SimpleReport.class);
+        when(report.getSignatureIdList()).thenReturn(List.of(ids));
+        for (var id : ids) {
+            var timestamp = new XmlTimestamp();
+            timestamp.setId("ts-" + id);
+            when(report.getSignatureFormat(id)).thenReturn(SignatureLevel.PAdES_BASELINE_T);
+            when(report.isValid(id)).thenReturn(true);
+            when(report.getIndication(id)).thenReturn(Indication.TOTAL_PASSED);
+            when(report.getSignatureTimestamps(id)).thenReturn(List.of(timestamp));
+            when(report.isValid("ts-" + id)).thenReturn(true);
         }
         return report;
     }

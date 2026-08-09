@@ -34,6 +34,14 @@ actor SigningCoordinator {
         }
     }
 
+    func seedCompletedInspection(for files: [PDFItemDescriptor]) async throws {
+        guard state == .idle, !files.isEmpty else { throw SigningFailure.invalidTransition }
+
+        signableInspectionIDs = Set(files.map(\.id))
+        state = .awaitingPIN
+        await updateWorkspace(files.map(\.id), to: .inspected)
+    }
+
     func beginSigning(request: SigningRequest) async throws {
         let requestedFileIDs = Set(request.files.map(\.id))
         guard state == .awaitingPIN,

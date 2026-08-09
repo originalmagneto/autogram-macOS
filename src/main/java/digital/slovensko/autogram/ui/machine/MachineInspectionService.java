@@ -12,6 +12,9 @@ import eu.europa.esig.dss.model.DSSDocument;
 import eu.europa.esig.dss.model.FileDocument;
 import eu.europa.esig.dss.model.InMemoryDocument;
 import eu.europa.esig.dss.simplereport.SimpleReport;
+import eu.europa.esig.dss.spi.signature.AdvancedSignature;
+import eu.europa.esig.dss.spi.validation.CommonCertificateVerifier;
+import eu.europa.esig.dss.spi.x509.tsp.TimestampToken;
 import eu.europa.esig.dss.validation.SignedDocumentValidator;
 
 import java.nio.file.Path;
@@ -34,7 +37,7 @@ public final class MachineInspectionService {
         byteReportReader = null;
         timestampQualificationEvaluator = new TimestampQualificationEvaluator();
         genericPathInspection = true;
-        validatorReportReader = MachineInspectionService::readTrustedReport;
+        validatorReportReader = null;
     }
 
     MachineInspectionService(ReportReader reportReader) {
@@ -63,6 +66,9 @@ public final class MachineInspectionService {
 
     public JsonObject inspect(Path path) {
         if (genericPathInspection) {
+            if (validatorReportReader == null) {
+                return inspectStructurally(new FileDocument(path.toFile()));
+            }
             return mapAsicInspection(readTrustedInspection(path));
         }
         return mapReport(reportReader.read(path));
@@ -70,6 +76,9 @@ public final class MachineInspectionService {
 
     public JsonObject inspect(byte[] content) {
         if (genericPathInspection) {
+            if (validatorReportReader == null) {
+                return inspectStructurally(new InMemoryDocument(content));
+            }
             return mapReport(validatorReportReader.read(documentValidator(new InMemoryDocument(content))));
         }
         return mapReport(byteReportReader.read(content));
@@ -97,6 +106,86 @@ public final class MachineInspectionService {
             coverage.put(signatureId, documentNames(validator.getOriginalDocuments(signatureId)));
         }
         return new AsicInspection(report, documents, coverage);
+    }
+
+    private JsonObject inspectStructurally(DSSDocument document) {
+        var validator = documentValidator(document);
+        var signatures = validator.getSignatures().stream().map(MachineInspectionService::readStructuralSignature).toList();
+        var payload = new JsonObject();
+        var signaturePayloads = new com.google.gson.JsonArray();
+        for (var signature : signatures) {
+            signaturePayloads.add(mapStructuralSignature(signature));
+        }
+        payload.add("signatures", signaturePayloads);
+        if (isAsic(validator)) {
+            var documents = new com.google.gson.JsonArray();
+            for (var name : asicDocuments(document, validator)) {
+                var item = new JsonObject();
+                item.addProperty("name", name);
+                documents.add(item);
+            }
+            payload.add("documents", documents);
+        }
+        return payload;
+    }
+
+    private static StructuralSignature readStructuralSignature(AdvancedSignature signature) {
+        boolean cryptographicIntegrity = false;
+        try {
+            signature.initBaselineRequirementsChecker(new CommonCertificateVerifier());
+            signature.checkSignatureIntegrity();
+            var verification = signature.getSignatureCryptographicVerification();
+            cryptographicIntegrity = verification != null && verification.isSignatureValid();
+        } catch (RuntimeException exception) {
+            cryptographicIntegrity = false;
+        }
+        var certificate = signature.getSigningCertificateToken();
+        var signerDisplayName = certificate == null ? null : DSSUtils.parseCN(certificate.getSubject().getRFC2253());
+        var timestamps = signature.getSignatureTimestamps().stream()
+                .map(MachineInspectionService::readStructuralTimestamp).toList();
+        return new StructuralSignature(signature.getId(), signature.getDataFoundUpToLevel(), signerDisplayName,
+                signature.getSigningTime(), cryptographicIntegrity, timestamps);
+    }
+
+    private static StructuralTimestamp readStructuralTimestamp(TimestampToken timestamp) {
+        return new StructuralTimestamp(timestamp.getDSSIdAsString(), timestamp.getGenerationTime(),
+                timestamp.getIssuerX500Principal() == null ? null : timestamp.getIssuerX500Principal().getName(),
+                hasCryptographicIntegrity(timestamp));
+    }
+
+    private static boolean hasCryptographicIntegrity(TimestampToken timestamp) {
+        try {
+            return timestamp.isMessageImprintDataIntact()
+                    && timestamp.getCertificateSource().getCertificates().stream().anyMatch(timestamp::isSignedBy);
+        } catch (RuntimeException exception) {
+            return false;
+        }
+    }
+
+    private static JsonObject mapStructuralSignature(StructuralSignature source) {
+        var signature = new JsonObject();
+        addString(signature, "id", source.id());
+        addEnum(signature, "format", source.format());
+        addString(signature, "signerDisplayName", source.signerDisplayName());
+        signature.add("signerCertificateQualification", JsonNull.INSTANCE);
+        addDate(signature, "signingTime", source.signingTime());
+        signature.addProperty("valid", source.cryptographicIntegrity());
+        signature.addProperty("cryptographicIntegrity", source.cryptographicIntegrity());
+        signature.addProperty("indication", "INDETERMINATE");
+        signature.addProperty("qualifiedTimestampValid", false);
+        var timestamps = new com.google.gson.JsonArray();
+        for (var timestamp : source.timestamps()) {
+            var item = new JsonObject();
+            addString(item, "id", timestamp.id());
+            addDate(item, "productionTime", timestamp.productionTime());
+            addString(item, "producer", timestamp.producer());
+            item.addProperty("valid", timestamp.cryptographicIntegrity());
+            item.addProperty("cryptographicIntegrity", timestamp.cryptographicIntegrity());
+            item.add("qualification", JsonNull.INSTANCE);
+            timestamps.add(item);
+        }
+        signature.add("timestamps", timestamps);
+        return signature;
     }
 
     private static SignedDocumentValidator documentValidator(DSSDocument document) {
@@ -229,5 +318,12 @@ public final class MachineInspectionService {
     }
 
     private record AsicInspection(SimpleReport report, List<String> documents, Map<String, List<String>> coverage) {
+    }
+
+    private record StructuralSignature(String id, Enum<?> format, String signerDisplayName, Date signingTime,
+            boolean cryptographicIntegrity, List<StructuralTimestamp> timestamps) {
+    }
+
+    private record StructuralTimestamp(String id, Date productionTime, String producer, boolean cryptographicIntegrity) {
     }
 }
