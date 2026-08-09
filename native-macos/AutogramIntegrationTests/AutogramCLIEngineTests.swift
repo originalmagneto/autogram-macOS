@@ -104,6 +104,7 @@ import Testing
         .activity(.savingSignedDocuments)
     ])
     #expect(failure as? SigningFailure == .engine("The signing helper rejected the request. [SIGNING_UNAVAILABLE]"))
+    #expect(!fixture.finalizedOutputExists())
 }
 
 @Test func inspectionMapsExistingSignatureDetailsFromTheMachinePayload() async throws {
@@ -190,7 +191,8 @@ private struct SigningMachineFixture {
             """
         } else {
             """
-            printf '%%PDF-1.7\\n%%%%EOF\\n' > "$AUTOGRAM_TEST_DIRECTORY/agreement_signed.pdf"
+            target=$(/usr/bin/plutil -extract payload.files.0.target raw -o - "$input")
+            printf '%%PDF-1.7\\n%%%%EOF\\n' > "$target"
             printf '%s\\n' '{"protocolVersion":1,"type":"file.progress","sessionId":"00000000-0000-0000-0000-000000000001","emittedAt":"2026-08-06T00:00:02Z","fileId":"agreement","payload":{"phase":"validating"}}'
             printf '%s\\n' '{"protocolVersion":1,"type":"file.progress","sessionId":"00000000-0000-0000-0000-000000000001","emittedAt":"2026-08-06T00:00:02Z","fileId":"agreement","payload":{"phase":"saving"}}'
             printf '%s\\n' '{"protocolVersion":1,"type":"file.completed","sessionId":"00000000-0000-0000-0000-000000000001","emittedAt":"2026-08-06T00:00:02Z","fileId":"agreement","payload":{}}'
@@ -234,6 +236,10 @@ private struct SigningMachineFixture {
 
     func finalizedOutput() throws -> Data {
         try Data(contentsOf: directoryURL.appending(path: "agreement_signed.pdf"))
+    }
+
+    func finalizedOutputExists() -> Bool {
+        FileManager.default.fileExists(atPath: directoryURL.appending(path: "agreement_signed.pdf").path)
     }
 
     func remove() throws {

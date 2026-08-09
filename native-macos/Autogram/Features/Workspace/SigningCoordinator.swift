@@ -124,7 +124,13 @@ actor SigningCoordinator {
     }
 
     private func asSigningFailure(_ error: Error) -> SigningFailure {
-        (error as? SigningFailure) ?? .engine("Signing engine failed")
+        if let failure = error as? SigningFailure {
+            return failure
+        }
+        if let failure = error as? CLIProcessFailure {
+            return .engine(failure.localizedDescription)
+        }
+        return .engine("Signing engine failed")
     }
 
     private func hasCompletedSignableInspection(

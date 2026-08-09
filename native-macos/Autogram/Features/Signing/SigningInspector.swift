@@ -45,6 +45,13 @@ struct SigningInspector: View {
                 signatureInspection
             }
 
+            if let signingError = workspace.signingError {
+                Section("Signing error") {
+                    Label(signingError, systemImage: "exclamationmark.triangle")
+                        .foregroundStyle(.red)
+                }
+            }
+
             if completedCount > 0 || failedCount > 0 {
                 Section("Results") {
                     Text(summary)

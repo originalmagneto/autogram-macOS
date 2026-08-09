@@ -67,7 +67,7 @@ final class WorkspaceModel {
     }
 
     var canStartSigning: Bool {
-        !items.isEmpty && items.allSatisfy { $0.inspection.isComplete }
+        !items.isEmpty && signingActivityPhase == nil && items.allSatisfy { $0.inspection.isComplete }
     }
 
     func refreshInspections() async {
@@ -271,6 +271,7 @@ final class WorkspaceModel {
         clearPendingSigningPIN()
         signingError = nil
         signingActivityPhase = .preparingSignatures
+        coordinator = SigningCoordinator(engine: engine, workspace: self)
         Task { [weak self] in
             await self?.sign(
                 driverID: driverID,
