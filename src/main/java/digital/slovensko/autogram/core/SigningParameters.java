@@ -147,6 +147,20 @@ public class SigningParameters {
                 EFormUtils.getFsFormIdFromFilename(document.getName()), checkPDFACompliance, 640, document, tspSource, plainXmlEnabled);
     }
 
+    public static SigningParameters buildForExistingASiC(DSSDocument document, SignatureLevel level,
+            boolean checkPDFACompliance, boolean signAsEn319132, TSPSource tspSource) throws AutogramException {
+        if (document == null)
+            throw new SigningParametersException("Dokument je prázdny", "Dokument poskytnutý na podpis je prázdny");
+        if (!AutogramMimeType.isAsice(document.getMimeType()))
+            throw new SigningParametersException(WRONG_MIME_TYPE);
+        if (level != SignatureLevel.XAdES_BASELINE_T && level != SignatureLevel.CAdES_BASELINE_T)
+            throw new SigningParametersException("Nesprávny typ podpisu", "Existujúci ASiC vyžaduje XAdES alebo CAdES Baseline T");
+
+        return new SigningParameters(level, DigestAlgorithm.SHA256, ASiCContainerType.ASiC_E,
+                SignaturePackaging.ENVELOPING, signAsEn319132, null, null, null,
+                new EFormAttributes(null, null, null, null, null, null, false), checkPDFACompliance, 640, tspSource);
+    }
+
         public ASiCWithXAdESSignatureParameters getASiCWithXAdESSignatureParameters() {
         var parameters = new ASiCWithXAdESSignatureParameters();
 

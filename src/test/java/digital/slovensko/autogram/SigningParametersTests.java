@@ -229,6 +229,19 @@ public class SigningParametersTests {
     }
 
     @Test
+    void testExistingAsicParametersDoNotRequireOneOriginalDocument() {
+        var document = new InMemoryDocument(new byte[] { 1 }, "multiple.asice", MimeTypeEnum.ASICE);
+
+        var xades = SigningParameters.buildForExistingASiC(document, SignatureLevel.XAdES_BASELINE_T,
+                false, false, tspSource);
+        var cades = SigningParameters.buildForExistingASiC(document, SignatureLevel.CAdES_BASELINE_T,
+                false, false, tspSource);
+
+        Assertions.assertEquals(SignatureLevel.XAdES_BASELINE_T, xades.getLevel());
+        Assertions.assertEquals(SignatureLevel.CAdES_BASELINE_T, cades.getLevel());
+    }
+
+    @Test
     void testInvalidTransformation() throws IOException {
         var generalAgendaXml = this.getClass().getResourceAsStream("general_agenda.xml").readAllBytes();
         var document = new InMemoryDocument(generalAgendaXml, "doc.xml", MimeTypeEnum.XML);

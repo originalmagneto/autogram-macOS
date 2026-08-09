@@ -14,6 +14,7 @@ import digital.slovensko.autogram.util.DSSUtils;
 import eu.europa.esig.dss.asic.cades.validation.ASiCContainerWithCAdESValidator;
 import eu.europa.esig.dss.asic.xades.validation.ASiCContainerWithXAdESValidator;
 import eu.europa.esig.dss.enumerations.MimeTypeEnum;
+import eu.europa.esig.dss.enumerations.SignatureLevel;
 import eu.europa.esig.dss.model.InMemoryDocument;
 import eu.europa.esig.dss.token.AbstractKeyStoreTokenConnection;
 import eu.europa.esig.dss.token.DSSPrivateKeyEntry;
@@ -503,10 +504,12 @@ public final class MachineSigningService {
             if (document.getMimeType().equals(MimeTypeEnum.ASICE)) {
                 var validator = DSSUtils.createDocumentValidator(document);
                 if (validator instanceof ASiCContainerWithXAdESValidator) {
-                    return SigningParameters.buildForASiCWithXAdES(document, false, false, settings.getTspSource(), true);
+                    return SigningParameters.buildForExistingASiC(document, SignatureLevel.XAdES_BASELINE_T,
+                            false, false, settings.getTspSource());
                 }
                 if (validator instanceof ASiCContainerWithCAdESValidator) {
-                    return SigningParameters.buildForASiCWithCAdES(document, false, false, settings.getTspSource(), true);
+                    return SigningParameters.buildForExistingASiC(document, SignatureLevel.CAdES_BASELINE_T,
+                            false, false, settings.getTspSource());
                 }
                 throw new IOException("Unsupported ASiC signature format");
             }
