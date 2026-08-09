@@ -127,4 +127,23 @@ import Testing
         #expect(failure.localizedDescription.contains("[TIMESTAMP_UNAVAILABLE]"))
         #expect(!failure.localizedDescription.contains("/private/var/tmp/source.pdf"))
     }
+
+    let sensitiveHelper = try FakeMachineHelper(behavior: .exitsWithSensitiveToken)
+    defer { try? sensitiveHelper.remove() }
+    let sensitiveStream = await runner.run(
+        request: .capabilities(requestID: "sensitive-diagnostic-failure-1"),
+        configuration: sensitiveHelper.configuration()
+    )
+
+    do {
+        for try await _ in sensitiveStream {}
+        Issue.record("Expected the helper failure to finish with an error")
+    } catch let failure as CLIProcessFailure {
+        guard case .helperExited(_, let diagnostic) = failure else {
+            Issue.record("Expected a helper exit failure")
+            return
+        }
+        #expect(diagnostic == nil)
+        #expect(!failure.localizedDescription.contains("[PIN_1234]"))
+    }
 }

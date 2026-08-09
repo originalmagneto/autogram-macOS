@@ -22,6 +22,8 @@ enum CLIProcessFailure: Error, Sendable, Equatable, LocalizedError {
 }
 
 actor CLIProcessRunner {
+    private static let safeDiagnosticCodes: Set<String> = ["[TIMESTAMP_UNAVAILABLE]"]
+
     private struct ActiveRun {
         let id: UUID
         let process: Process
@@ -294,12 +296,7 @@ actor CLIProcessRunner {
 
         return text
             .split(whereSeparator: { $0.isWhitespace })
-            .first { token in
-                guard token.first == "[", token.last == "]" else { return false }
-                return token.dropFirst().dropLast().allSatisfy {
-                    $0.isUppercase || $0.isNumber || $0 == "_"
-                }
-            }
+            .first(where: { safeDiagnosticCodes.contains(String($0)) })
             .map(String.init)
     }
 }
