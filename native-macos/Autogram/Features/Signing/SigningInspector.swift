@@ -106,7 +106,7 @@ struct SigningInspector: View {
     }
 
     private var selectedItem: PDFItem? {
-        guard let selection = workspace.selection else { return workspace.items.first }
+        guard let selection = workspace.selection else { return nil }
         return workspace.items.first { $0.id == selection }
     }
 
