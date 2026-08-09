@@ -10,6 +10,9 @@ import digital.slovensko.autogram.core.SigningParameters;
 import digital.slovensko.autogram.core.errors.PINIncorrectException;
 import digital.slovensko.autogram.drivers.TokenDriver;
 import digital.slovensko.autogram.ui.cli.CliKeySelector;
+import digital.slovensko.autogram.util.DSSUtils;
+import eu.europa.esig.dss.asic.cades.validation.ASiCContainerWithCAdESValidator;
+import eu.europa.esig.dss.asic.xades.validation.ASiCContainerWithXAdESValidator;
 import eu.europa.esig.dss.enumerations.MimeTypeEnum;
 import eu.europa.esig.dss.model.InMemoryDocument;
 import eu.europa.esig.dss.token.AbstractKeyStoreTokenConnection;
@@ -249,8 +252,8 @@ public final class MachineSigningService {
             try {
                 source = fileSystem.openSource(validated.source());
                 var sourceContent = source.readAll();
-                if (!hasPdfHeader(sourceContent)) {
-                    throw new IOException("Source is not a PDF");
+                if (!isSupportedSource(file.source(), sourceContent)) {
+                    throw new IOException("Source is not a supported document");
                 }
                 workspace = fileSystem.createWorkspace(validated.target().getParent());
                 var staging = workspace.createStagingFile();
@@ -342,6 +345,16 @@ public final class MachineSigningService {
 
     private static boolean hasPdfHeader(byte[] content) {
         return content.length >= 5 && "%PDF-".equals(new String(content, 0, 5, StandardCharsets.ISO_8859_1));
+    }
+
+    private static boolean isSupportedSource(String source, byte[] content) {
+        return hasPdfHeader(content) || isAsic(source, content);
+    }
+
+    private static boolean isAsic(String name, byte[] content) {
+        return name.toLowerCase(java.util.Locale.ROOT).endsWith(".asice")
+                && content.length >= 4 && content[0] == 'P' && content[1] == 'K'
+                && content[2] == 3 && content[3] == 4;
     }
 
     private static byte[] readAll(FileChannel input) throws IOException {
@@ -479,9 +492,25 @@ public final class MachineSigningService {
 
         static SigningJob signingJob(byte[] source, String name, MachineFileResponder responder, MachineSettings settings)
                 throws Exception {
-            var document = new InMemoryDocument(source, Path.of(name).getFileName().toString(), MimeTypeEnum.PDF);
-            var parameters = SigningParameters.buildForPDF(document, false, false, settings.getTspSource());
+            var filename = Path.of(name).getFileName().toString();
+            var document = new InMemoryDocument(source, filename,
+                    isAsic(filename, source) ? MimeTypeEnum.ASICE : MimeTypeEnum.PDF);
+            var parameters = signingParameters(document, settings);
             return SigningJob.buildFromRequest(document, parameters, responder);
+        }
+
+        private static SigningParameters signingParameters(InMemoryDocument document, MachineSettings settings) throws Exception {
+            if (document.getMimeType().equals(MimeTypeEnum.ASICE)) {
+                var validator = DSSUtils.createDocumentValidator(document);
+                if (validator instanceof ASiCContainerWithXAdESValidator) {
+                    return SigningParameters.buildForASiCWithXAdES(document, false, false, settings.getTspSource(), true);
+                }
+                if (validator instanceof ASiCContainerWithCAdESValidator) {
+                    return SigningParameters.buildForASiCWithCAdES(document, false, false, settings.getTspSource(), true);
+                }
+                throw new IOException("Unsupported ASiC signature format");
+            }
+            return SigningParameters.buildForPDF(document, false, false, settings.getTspSource());
         }
 
         @Override
@@ -598,14 +627,19 @@ public final class MachineSigningService {
 
         @Override
         public boolean isValid(byte[] content, Set<String> previousSignatureIds) {
-            if (!hasPdfHeaderAndEof(content)) {
+            if (!hasPdfHeaderAndEof(content) && !isAsic("output.asice", content)) {
                 return false;
             }
             var signatures = inspectionService.inspect(content).getAsJsonArray("signatures");
+            var signatureIds = signatures.asList().stream().map(value -> value.getAsJsonObject())
+                    .map(signature -> string(signature, "id")).collect(java.util.stream.Collectors.toSet());
+            if (!signatureIds.containsAll(previousSignatureIds)) {
+                return false;
+            }
             var added = signatures.asList().stream().map(value -> value.getAsJsonObject())
                     .filter(signature -> !previousSignatureIds.contains(string(signature, "id"))).toList();
             return added.size() == 1
-                    && "PAdES_BASELINE_T".equals(string(added.getFirst(), "format"))
+                    && isQualifiedBaselineT(string(added.getFirst(), "format"))
                     && added.getFirst().has("valid")
                     && added.getFirst().get("valid").getAsBoolean()
                     && "TOTAL_PASSED".equals(string(added.getFirst(), "indication"))
@@ -630,6 +664,11 @@ public final class MachineSigningService {
             }
             var content = new String(bytes, StandardCharsets.ISO_8859_1);
             return content.stripTrailing().endsWith("%%EOF");
+        }
+
+        private static boolean isQualifiedBaselineT(String format) {
+            return "PAdES_BASELINE_T".equals(format) || "XAdES_BASELINE_T".equals(format)
+                    || "CAdES_BASELINE_T".equals(format);
         }
 
         private static String string(JsonObject value, String field) {

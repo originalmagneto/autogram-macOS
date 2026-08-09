@@ -30,7 +30,7 @@ struct OutputService {
 
     func finalize(_ reservation: OutputReservation) throws {
         guard !pathExists(reservation.finalURL) else { throw OutputServiceError.finalOutputAlreadyExists }
-        try validator.validate(at: reservation.temporaryURL)
+        try validator.validate(at: reservation.temporaryURL, fileExtension: reservation.finalURL.pathExtension)
         guard moveWithoutReplacing(reservation.temporaryURL, to: reservation.finalURL) else {
             if pathExists(reservation.finalURL) { throw OutputServiceError.finalOutputAlreadyExists }
             throw OutputServiceError.unableToFinalize
@@ -48,7 +48,7 @@ struct OutputService {
         var number = 1
         while true {
             let suffix = number == 1 ? "_signed" : "_signed (\(number))"
-            let candidate = directory.appending(path: stem + suffix).appendingPathExtension("pdf")
+            let candidate = directory.appending(path: stem + suffix).appendingPathExtension(source.pathExtension)
             if !pathExists(candidate) { return candidate }
             number += 1
         }

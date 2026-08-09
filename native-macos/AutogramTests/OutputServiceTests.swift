@@ -47,8 +47,26 @@ import Testing
     }
 }
 
+@Test func asiceOutputKeepsContainerExtensionAndFinalizes() throws {
+    try withTemporaryDirectory { directory in
+        let source = directory.appending(path: "case.asice")
+        try validASiC().write(to: source)
+
+        let reservation = try OutputService().reserve(for: source)
+        try validASiC().write(to: reservation.temporaryURL)
+        try OutputService().finalize(reservation)
+
+        #expect(reservation.finalURL.lastPathComponent == "case_signed.asice")
+        #expect(try Data(contentsOf: reservation.finalURL) == validASiC())
+    }
+}
+
 private func validPDF() -> Data {
     Data("%PDF-1.7\\n%%EOF\\n".utf8)
+}
+
+private func validASiC() -> Data {
+    Data([0x50, 0x4B, 0x03, 0x04])
 }
 
 private func withTemporaryDirectory(_ body: (URL) throws -> Void) throws {

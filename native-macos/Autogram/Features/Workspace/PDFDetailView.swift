@@ -6,7 +6,11 @@ struct PDFDetailView: View {
     var body: some View {
         if let item {
             VStack(spacing: 0) {
-                PDFPreviewView(url: item.descriptor.sourceURL)
+                if item.descriptor.isPDF {
+                    PDFPreviewView(url: item.descriptor.sourceURL)
+                } else {
+                    ASiCContentsView(inspection: item.inspection)
+                }
                 ExistingSignaturesView(inspection: item.inspection)
             }
             .navigationTitle(item.descriptor.redactedDisplayName)
@@ -49,6 +53,10 @@ private struct ExistingSignaturesView: View {
                                 .foregroundStyle(.secondary)
                             Text(signature.hasQualifiedTimestamp ? "Qualified timestamp" : "No qualified timestamp")
                                 .foregroundStyle(.secondary)
+                            if !signature.documents.isEmpty {
+                                Text("Covers: \(signature.documents.joined(separator: ", "))")
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     }
                 }
@@ -71,5 +79,23 @@ private struct ExistingSignaturesView: View {
         case .invalid: .red
         case .indeterminate: .orange
         }
+    }
+}
+
+private struct ASiCContentsView: View {
+    let inspection: PDFItemInspection
+
+    var body: some View {
+        GroupBox("ASiC-E Contents") {
+            if case .completed(let document) = inspection {
+                ForEach(document.documents, id: \.self) { name in
+                    Label(name, systemImage: "doc")
+                }
+            } else {
+                Text("Inspecting container contents…")
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding()
     }
 }

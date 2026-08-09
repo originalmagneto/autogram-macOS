@@ -12,11 +12,13 @@ struct InspectedPDF: Sendable, Equatable, Identifiable {
     let id: String
     let isSignable: Bool
     let signatures: [ExistingPDFSignature]
+    let documents: [String]
 
-    init(id: String, isSignable: Bool, signatures: [ExistingPDFSignature] = []) {
+    init(id: String, isSignable: Bool, signatures: [ExistingPDFSignature] = [], documents: [String] = []) {
         self.id = id
         self.isSignable = isSignable
         self.signatures = signatures
+        self.documents = documents
     }
 }
 
@@ -27,6 +29,7 @@ struct ExistingPDFSignature: Sendable, Equatable, Identifiable {
     let signingTime: Date?
     let format: String?
     let hasQualifiedTimestamp: Bool
+    let documents: [String]
 
     init(
         id: String,
@@ -34,7 +37,8 @@ struct ExistingPDFSignature: Sendable, Equatable, Identifiable {
         validationState: SignatureValidationState,
         signingTime: Date?,
         format: String?,
-        hasQualifiedTimestamp: Bool
+        hasQualifiedTimestamp: Bool,
+        documents: [String] = []
     ) {
         self.id = id
         self.signerDisplayName = signerDisplayName
@@ -42,6 +46,7 @@ struct ExistingPDFSignature: Sendable, Equatable, Identifiable {
         self.signingTime = signingTime
         self.format = format
         self.hasQualifiedTimestamp = hasQualifiedTimestamp
+        self.documents = documents
     }
 }
 

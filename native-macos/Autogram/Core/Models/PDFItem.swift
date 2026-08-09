@@ -8,6 +8,10 @@ struct PDFItemDescriptor: Sendable, Equatable, Identifiable {
         sourceURL.lastPathComponent
     }
 
+    var isPDF: Bool {
+        sourceURL.pathExtension.lowercased() == "pdf"
+    }
+
     init(id: String, sourceURL: URL) {
         self.id = id
         self.sourceURL = sourceURL

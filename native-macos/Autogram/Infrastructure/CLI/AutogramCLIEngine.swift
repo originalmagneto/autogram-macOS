@@ -121,7 +121,8 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
             return InspectedPDF(
                 id: file.id,
                 isSignable: true,
-                signatures: signatures(in: event.payload["signatures"])
+                signatures: signatures(in: event.payload["signatures"]),
+                documents: documents(in: event.payload["documents"])
             )
         })]
     }
@@ -329,9 +330,14 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
                 validationState: validationState,
                 signingTime: date(in: signature["signingTime"]),
                 format: string(in: signature["format"]),
-                hasQualifiedTimestamp: bool(in: signature["qualifiedTimestampValid"]) == true
+                hasQualifiedTimestamp: bool(in: signature["qualifiedTimestampValid"]) == true,
+                documents: strings(in: signature["documents"])
             )
         }
+    }
+
+    private func documents(in value: JSONValue?) -> [String] {
+        (array(in: value) ?? []).compactMap { string(in: $0["name"]) }
     }
 
     private func string(in value: JSONValue?) -> String? {

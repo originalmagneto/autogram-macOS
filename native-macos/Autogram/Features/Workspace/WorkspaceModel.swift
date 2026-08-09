@@ -318,7 +318,7 @@ final class WorkspaceModel {
 
     func selectPDFs() {
         let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.pdf]
+        panel.allowedContentTypes = [.pdf, UTType(filenameExtension: "asice")!]
         panel.allowsMultipleSelection = true
         panel.canChooseDirectories = false
         panel.canChooseFiles = true
@@ -339,7 +339,7 @@ final class WorkspaceModel {
         let validURLs = urls.filter { url in
             let standardizedURL = url.resolvingSymlinksInPath().standardizedFileURL
             guard standardizedURL.isFileURL,
-                  (try? standardizedURL.resourceValues(forKeys: [.contentTypeKey]).contentType?.conforms(to: .pdf)) == true,
+                  ["pdf", "asice"].contains(standardizedURL.pathExtension.lowercased()),
                   !existingURLs.contains(standardizedURL),
                   acceptedURLs.insert(standardizedURL).inserted else {
                 return false

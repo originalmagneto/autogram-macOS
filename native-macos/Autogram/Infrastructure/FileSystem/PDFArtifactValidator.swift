@@ -5,8 +5,14 @@ enum PDFArtifactValidationError: Error {
 }
 
 struct PDFArtifactValidator {
-    func validate(at url: URL) throws {
+    func validate(at url: URL, fileExtension: String = "pdf") throws {
         let data = try Data(contentsOf: url)
+        if fileExtension.lowercased() == "asice" {
+            guard data.starts(with: Data([0x50, 0x4B, 0x03, 0x04])) else {
+                throw PDFArtifactValidationError.invalidPDF
+            }
+            return
+        }
         guard data.starts(with: Data("%PDF-".utf8)) else {
             throw PDFArtifactValidationError.invalidPDF
         }

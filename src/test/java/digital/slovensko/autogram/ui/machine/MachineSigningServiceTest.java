@@ -495,6 +495,22 @@ class MachineSigningServiceTest {
     }
 
     @Test
+    void signingJobUsesTheExistingAsicXadesFormatAndQualifiedTimestampPolicy() throws Exception {
+        var source = Path.of(MachineSigningServiceTest.class
+                .getResource("/digital/slovensko/autogram/sample_pdf_xades.asice").getFile());
+        var responder = new MachineFileResponder(new MemoryRetainedFile(), () -> { });
+        var settings = new MachineSettings(true);
+        settings.setTsaServer("https://tsa.example.test");
+        settings.setTsaEnabled(true);
+
+        var job = MachineSigningService.DefaultSigningSession.signingJob(Files.readAllBytes(source), source.toString(),
+                responder, settings);
+
+        assertEquals(SignatureLevel.XAdES_BASELINE_T, job.getParameters().getLevel());
+        assertEquals(eu.europa.esig.dss.enumerations.SignatureForm.XAdES, job.getParameters().getSignatureType());
+    }
+
+    @Test
     void configuresBasicTimestampAuthenticationForOnlyTheRequestedHostsAndClearsTheReceivedSecret() {
         var receivedSecret = "timestamp-password".toCharArray();
         var request = new QualifiedTimestampRequest(true,
