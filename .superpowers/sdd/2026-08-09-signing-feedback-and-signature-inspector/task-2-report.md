@@ -28,3 +28,20 @@ The change does not add synthetic timing or percentages. The inspector uses inde
 ## Remaining Risk
 
 Run `./mvnw -q -Dtest=MachineSigningServiceTest test` again with a complete JDK 25 installation to execute the focused Java regression suite.
+
+## Fix Round 1
+
+### Changes
+
+- Deferred output finalization and `SigningEvent.completed` emission until `session.completed` passes terminal validation.
+- Added a native regression for `file.completed` followed by `session.failed`; it proves the stream exposes the terminal failure without a completed-file event.
+- Changed the BellSoft JDK cache architecture from `amd64-full` to `aarch64-full`.
+- Removed only the corrupt generated JDK cache before the authoritative ARM64 cache download.
+
+### Validation
+
+- Red proof: the focused native integration target ran 13 tests and failed exactly one regression before the fix. The failure showed the premature `.completed("agreement")` event.
+- Green proof: the same Xcode beta integration target ran 13 tests with 0 failures after the fix.
+- ARM64 proof: the downloaded BellSoft JDK 25 cache contains ARM64 `java` and `javac`; the Surefire report records Java 25.0.4, `os.arch=aarch64`, and 28 `MachineSigningServiceTest` tests with 0 failures, 0 errors, and 0 skipped.
+
+The previous JDK validation risk is resolved.

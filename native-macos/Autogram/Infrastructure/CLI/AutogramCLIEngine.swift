@@ -159,7 +159,7 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
                     )
                     let stream = await runner.run(request: secureRequest, configuration: configuration)
                     var machineEvents: [MachineEvent] = []
-                    var completed = Set<String>()
+                    var completedFileIDs: [String] = []
                     continuation.yield(.started)
                     for try await event in stream {
                         guard event.sessionID == machineRequest.requestID else {
@@ -177,13 +177,7 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
                             if let fileID = event.fileID { continuation.yield(.fileSigning(fileID)) }
                         case .fileCompleted:
                             guard let fileID = event.fileID else { continue }
-                            do {
-                                try finalizeOutput(for: fileID)
-                                completed.insert(fileID)
-                                continuation.yield(.completed(fileID))
-                            } catch {
-                                continuation.yield(.failed(fileID, .fileFailed(fileID)))
-                            }
+                            completedFileIDs.append(fileID)
                         case .fileFailed:
                             if let fileID = event.fileID {
                                 let code = string(in: event.payload["code"]) ?? "SIGNING_FAILED"
@@ -194,6 +188,14 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
                         }
                     }
                     try validateTerminalEvent(in: machineEvents)
+                    for fileID in completedFileIDs {
+                        do {
+                            try finalizeOutput(for: fileID)
+                            continuation.yield(.completed(fileID))
+                        } catch {
+                            continuation.yield(.failed(fileID, .fileFailed(fileID)))
+                        }
+                    }
                     continuation.finish()
                 } catch {
                     continuation.finish(throwing: error)

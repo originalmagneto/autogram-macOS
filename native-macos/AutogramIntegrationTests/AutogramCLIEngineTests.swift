@@ -70,6 +70,42 @@ import Testing
     ])
 }
 
+@Test func terminalFailureAfterFileCompletionDoesNotFinalizeOrReportCompletion() async throws {
+    let fixture = try SigningMachineFixture(terminalFailureCode: "SIGNING_UNAVAILABLE")
+    defer { try? fixture.remove() }
+
+    let source = fixture.directoryURL.appending(path: "agreement.pdf")
+    try Data("%PDF-1.7\nsource\n%%EOF\n".utf8).write(to: source)
+    let engine = AutogramCLIEngine(configuration: fixture.configuration())
+    let request = SigningRequest(
+        sessionID: UUID(uuidString: "00000000-0000-0000-0000-000000000001")!,
+        driverID: "token-1",
+        certificateSerial: "certificate-1",
+        pin: Secret("1234"),
+        files: [SigningFile(id: "agreement", sourceURL: source)]
+    )
+
+    var events: [SigningEvent] = []
+    var failure: Error?
+    do {
+        for try await event in engine.sign(request: request) {
+            events.append(event)
+        }
+    } catch {
+        failure = error
+    }
+
+    #expect(events == [
+        .started,
+        .fileSigning("agreement"),
+        .activity(.preparingSignatures),
+        .activity(.signingDocuments),
+        .activity(.validatingSignedDocuments),
+        .activity(.savingSignedDocuments)
+    ])
+    #expect(failure as? SigningFailure == .engine("The signing helper rejected the request. [SIGNING_UNAVAILABLE]"))
+}
+
 @Test func inspectionMapsExistingSignatureDetailsFromTheMachinePayload() async throws {
     let fixture = try InspectionMachineFixture()
     defer { try? fixture.remove() }
@@ -143,7 +179,7 @@ private struct SigningMachineFixture {
     let directoryURL: URL
     let executableURL: URL
 
-    init(failureCode: String? = nil) throws {
+    init(failureCode: String? = nil, terminalFailureCode: String? = nil) throws {
         directoryURL = FileManager.default.temporaryDirectory
             .appending(path: "AutogramCLIEngineTests-\(UUID().uuidString)", directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
@@ -160,6 +196,15 @@ private struct SigningMachineFixture {
             printf '%s\\n' '{"protocolVersion":1,"type":"file.completed","sessionId":"00000000-0000-0000-0000-000000000001","emittedAt":"2026-08-06T00:00:02Z","fileId":"agreement","payload":{}}'
             """
         }
+        let terminalEvent = if let terminalFailureCode {
+            """
+            printf '%s\\n' '{"protocolVersion":1,"type":"session.failed","sessionId":"00000000-0000-0000-0000-000000000001","emittedAt":"2026-08-06T00:00:03Z","fileId":null,"payload":{"code":"\(terminalFailureCode)","fallbackMessage":"The signing helper rejected the request."}}'
+            """
+        } else {
+            """
+            printf '%s\\n' '{"protocolVersion":1,"type":"session.completed","sessionId":"00000000-0000-0000-0000-000000000001","emittedAt":"2026-08-06T00:00:03Z","fileId":null,"payload":{}}'
+            """
+        }
         let script = """
         #!/bin/sh
         input="$AUTOGRAM_TEST_DIRECTORY/request.json"
@@ -170,7 +215,7 @@ private struct SigningMachineFixture {
         printf '%s\\n' '{"protocolVersion":1,"type":"file.progress","sessionId":"00000000-0000-0000-0000-000000000001","emittedAt":"2026-08-06T00:00:01Z","fileId":"agreement","payload":{"phase":"signing"}}'
         printf '%s\\n' '{"protocolVersion":1,"type":"file.progress","sessionId":"00000000-0000-0000-0000-000000000001","emittedAt":"2026-08-06T00:00:01Z","fileId":"agreement","payload":{"phase":"future-phase"}}'
         \(result)
-        printf '%s\\n' '{"protocolVersion":1,"type":"session.completed","sessionId":"00000000-0000-0000-0000-000000000001","emittedAt":"2026-08-06T00:00:03Z","fileId":null,"payload":{}}'
+        \(terminalEvent)
         """
         try script.write(to: executableURL, atomically: true, encoding: .utf8)
         try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: executableURL.path)
