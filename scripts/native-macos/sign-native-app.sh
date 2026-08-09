@@ -4,7 +4,7 @@ set -euo pipefail
 
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd -- "${script_dir}/../.." && pwd)"
-app_bundle="${repo_root}/build/native/Autogram.app"
+app_bundle="${repo_root}/build/native/Autogram macOS.app"
 main_executable="${app_bundle}/Contents/MacOS/Autogram"
 runtime_java="${app_bundle}/Contents/runtime/bin/java"
 java_entitlements="${repo_root}/native-macos/Helpers/JavaHelper.entitlements"

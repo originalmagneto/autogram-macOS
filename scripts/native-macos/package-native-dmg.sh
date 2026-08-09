@@ -5,7 +5,7 @@ set -euo pipefail
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd -- "${script_dir}/../.." && pwd)"
 build_root="${repo_root}/build/native"
-source_app="${build_root}/Autogram.app"
+source_app="${build_root}/Autogram macOS.app"
 readme_source="${repo_root}/native-macos/README.md"
 output_dmg="${build_root}/Autogram-native-preview.dmg"
 checksum_file="${output_dmg}.sha256"
@@ -28,7 +28,7 @@ fail() {
 command -v hdiutil >/dev/null 2>&1 || fail "hdiutil is required to create a DMG"
 command -v shasum >/dev/null 2>&1 || fail "shasum is required to write the DMG checksum"
 
-ditto "${source_app}" "${staging_dir}/Autogram.app"
+ditto "${source_app}" "${staging_dir}/Autogram macOS.app"
 ln -s /Applications "${staging_dir}/Applications"
 cp "${readme_source}" "${staging_dir}/README.md"
 

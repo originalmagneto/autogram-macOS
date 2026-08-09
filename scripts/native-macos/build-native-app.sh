@@ -5,7 +5,7 @@ set -euo pipefail
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd -- "${script_dir}/../.." && pwd)"
 build_root="${repo_root}/build/native"
-app_bundle="${build_root}/Autogram.app"
+app_bundle="${build_root}/Autogram macOS.app"
 dependency_dir="${repo_root}/target/native-dependency-jars"
 runtime_dir="${repo_root}/target/native-runtime"
 temporary_build_dir="$(mktemp -d "${TMPDIR:-/tmp}/autogram-native-build.XXXXXX")"

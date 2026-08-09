@@ -73,12 +73,12 @@ else
 fi
 mounted=true
 
-app_bundle="${mountpoint}/Autogram.app"
+app_bundle="${mountpoint}/Autogram macOS.app"
 main_executable="${app_bundle}/Contents/MacOS/Autogram"
 helper_executable="${app_bundle}/Contents/Helpers/AutogramCLI-arm64"
 runtime_java="${app_bundle}/Contents/runtime/bin/java"
 
-[[ -d "${app_bundle}" ]] || fail "DMG does not contain Autogram.app"
+[[ -d "${app_bundle}" ]] || fail "DMG does not contain Autogram macOS.app"
 [[ -L "${mountpoint}/Applications" && "$(readlink "${mountpoint}/Applications")" == "/Applications" ]] || fail "DMG Applications link is missing"
 [[ -f "${mountpoint}/README.md" ]] || fail "DMG README is missing"
 [[ -x "${main_executable}" ]] || fail "Native app executable is missing"
