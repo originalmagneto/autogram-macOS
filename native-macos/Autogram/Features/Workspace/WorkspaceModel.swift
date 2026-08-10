@@ -327,9 +327,13 @@ final class WorkspaceModel {
         items = items.map { item in
             guard requestedIDs.contains(item.descriptor.id) else { return item }
             guard let result = results[item.descriptor.id], result.isSignable else {
-                return item.updatingInspection(to: .failed)
+                return item
+                    .updatingInspection(to: .failed)
+                    .updatingStatus(to: .failed)
             }
-            return item.updatingInspection(to: .completed(result))
+            return item
+                .updatingInspection(to: .completed(result))
+                .updatingStatus(to: .inspected)
         }
     }
 
@@ -343,8 +347,15 @@ final class WorkspaceModel {
 
     private func updateInspection(for fileIDs: [String], to inspection: PDFItemInspection) {
         let inspectedIDs = Set(fileIDs)
+        let status: PDFItemStatus = switch inspection {
+        case .pending: .pending
+        case .completed: .inspected
+        case .failed: .failed
+        }
         items = items.map { item in
-            inspectedIDs.contains(item.descriptor.id) ? item.updatingInspection(to: inspection) : item
+            inspectedIDs.contains(item.descriptor.id)
+                ? item.updatingInspection(to: inspection).updatingStatus(to: status)
+                : item
         }
     }
 

@@ -20,6 +20,9 @@ import Testing
     #expect(workspace.items[0].inspection.signatures.map(\.signerDisplayName) == ["Ada Lovelace"])
     #expect(workspace.items[1].inspection.signatures.isEmpty)
     #expect(workspace.items[2].inspection == .failed)
+    #expect(workspace.items[0].status == .inspected)
+    #expect(workspace.items[1].status == .inspected)
+    #expect(workspace.items[2].status == .failed)
     #expect(workspace.canStartSigning == false)
 }
 

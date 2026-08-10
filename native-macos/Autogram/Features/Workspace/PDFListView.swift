@@ -28,11 +28,11 @@ struct PDFListView: View {
 private extension PDFItemStatus {
     var workspaceLabel: String {
         switch self {
-        case .pending: "Ready"
+        case .pending: "Inspecting"
         case .inspected: "Ready"
         case .signing: "Signing"
         case .completed: "Signed"
-        case .failed: "Failed"
+        case .failed: "Inspection failed"
         }
     }
 

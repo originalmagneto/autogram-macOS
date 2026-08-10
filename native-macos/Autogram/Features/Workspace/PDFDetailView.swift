@@ -28,13 +28,18 @@ private struct ASiCContentsView: View {
 
     var body: some View {
         GroupBox("ASiC-E Contents") {
-            if case .completed(let document) = inspection {
+            switch inspection {
+            case .pending:
+                ProgressView("Inspecting container")
+            case .failed:
+                ContentUnavailableView(
+                    "ASiC inspection failed",
+                    systemImage: "exclamationmark.triangle"
+                )
+            case .completed(let document):
                 ForEach(document.documents, id: \.self) { name in
                     Label(name, systemImage: "doc")
                 }
-            } else {
-                Text("Inspecting container contents…")
-                    .foregroundStyle(.secondary)
             }
         }
         .padding()
