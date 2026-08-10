@@ -121,15 +121,28 @@ class MachineSigningServiceTest {
         var writer = new RecordingWriter();
         var target = target("visible-signed.pdf");
         var sessionOpened = new AtomicBoolean();
+        var signatureInspected = new AtomicBoolean();
         var service = new MachineSigningService(writer.writer(), request -> {
             sessionOpened.set(true);
             throw new AssertionError("Token work must not start without trusted lists");
-        }, content -> true, () -> { throw new MachineProtocolException("TRUSTED_LIST_UNAVAILABLE"); });
+        }, new MachineSigningService.OutputValidator() {
+            @Override
+            public boolean isValid(byte[] content) {
+                return true;
+            }
+
+            @Override
+            public java.util.Set<String> signatureIds(byte[] content) {
+                signatureInspected.set(true);
+                return java.util.Set.of();
+            }
+        }, () -> { throw new MachineProtocolException("TRUSTED_LIST_UNAVAILABLE"); });
 
         service.sign("request-1", request("1234".toCharArray(),
                 visibleFile("one", "visible-source.pdf", target.getFileName().toString())));
 
         assertFalse(sessionOpened.get());
+        assertFalse(signatureInspected.get());
         assertFalse(Files.exists(target));
         assertEquals("TRUSTED_LIST_UNAVAILABLE", writer.payloadCode(2));
     }

@@ -87,11 +87,11 @@ public final class MachineSigningService {
         try {
             var validatedRequest = MachineRequestValidator.validateSign(request);
             preparedFiles = prepare(requestId, validatedRequest.files());
-            for (var prepared : preparedFiles) {
-                prepared.setPreviousSignatureIds(signatureIds(prepared.sourceContent()));
-            }
             if (preparedFiles.stream().anyMatch(PreparedFile::hasVisibleAppearance)) {
                 trustInitializer.run();
+            }
+            for (var prepared : preparedFiles) {
+                prepared.setPreviousSignatureIds(signatureIds(prepared.sourceContent()));
             }
             try (var session = sessionFactory.apply(request)) {
                 for (; processedFiles < preparedFiles.size(); processedFiles++) {

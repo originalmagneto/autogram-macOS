@@ -26,3 +26,9 @@
 - Visible publication independently requires a PDF output whose new signature format is exactly `PAdES_BASELINE_T`. Non-visible validation retains the existing Baseline T formats.
 - `progress.md` restores Task 4 to pending and contains no placeholder commit.
 - GREEN: focused `MachineSigningServiceTest` and `AutogramCLIEngineTests` passed. `git diff --check` passed.
+
+## Fix round 2
+
+- RED: the existing visible trusted-list failure test proved that `signatureIds` ran before trusted-list initialization.
+- Moved visible-only trusted-list initialization immediately after preparation and before the first trusted signature inspection. Protocol v1 remains unchanged because the gate still requires a visible appearance.
+- GREEN: focused `MachineSigningServiceTest` and `AutogramCLIEngineTests` passed. `git diff --check` passed.
