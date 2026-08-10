@@ -98,7 +98,8 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
                 validFrom: validFrom,
                 validUntil: validUntil,
                 certificateKey: certificateKey,
-                holderKey: holderKey
+                holderKey: holderKey,
+                certificateQualification: string(in: certificate["qualification"])
             )
         }
         return CertificateDiscovery(

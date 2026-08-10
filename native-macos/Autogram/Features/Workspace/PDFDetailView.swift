@@ -1,8 +1,20 @@
+import AppKit
 import SwiftUI
 
 struct PDFDetailView: View {
     let item: PDFItem?
-    @State private var visibleSignaturePlacement: VisibleSignaturePlacement?
+    let workspace: WorkspaceModel
+
+    var visibleSignaturePlacement: Binding<VisibleSignaturePlacement?> {
+        Binding(
+            get: { workspace.visibleSignaturePlacement },
+            set: { workspace.updateVisibleSignaturePlacement($0) }
+        )
+    }
+
+    var cardPreview: NSImage? {
+        workspace.visibleSignatureCardPreview
+    }
 
     var body: some View {
         if let item {
@@ -10,8 +22,8 @@ struct PDFDetailView: View {
                 if item.descriptor.isPDF {
                     PDFPreviewView(
                         url: item.descriptor.sourceURL,
-                        placement: $visibleSignaturePlacement,
-                        cardPreview: nil
+                        placement: visibleSignaturePlacement,
+                        cardPreview: cardPreview
                     )
                 } else {
                     ASiCContentsView(inspection: item.inspection)

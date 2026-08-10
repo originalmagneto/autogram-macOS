@@ -32,6 +32,7 @@ struct SigningCertificate: Sendable, Equatable, Identifiable {
     let validUntil: Date
     let certificateKey: String
     let holderKey: String
+    let certificateQualification: String?
 
     var id: String {
         certificateKey.isEmpty ? serialNumber : certificateKey
@@ -45,6 +46,7 @@ struct SigningCertificate: Sendable, Equatable, Identifiable {
         validUntil = .distantFuture
         certificateKey = ""
         holderKey = ""
+        certificateQualification = nil
     }
 
     init(
@@ -54,7 +56,8 @@ struct SigningCertificate: Sendable, Equatable, Identifiable {
         validFrom: Date,
         validUntil: Date,
         certificateKey: String,
-        holderKey: String
+        holderKey: String,
+        certificateQualification: String? = nil
     ) {
         self.serialNumber = serialNumber
         self.displayName = displayName
@@ -63,5 +66,6 @@ struct SigningCertificate: Sendable, Equatable, Identifiable {
         self.validUntil = validUntil
         self.certificateKey = certificateKey
         self.holderKey = holderKey
+        self.certificateQualification = certificateQualification
     }
 }

@@ -91,7 +91,7 @@ import Testing
     defer { try? FileManager.default.removeItem(at: directory) }
     let source = directory.appending(path: "document.pdf")
     let artwork = directory.appending(path: "artwork.png")
-    try Data("%PDF-1.7\nsource\n%%EOF\n".utf8).write(to: source)
+    try writeWorkspaceFixturePDF(to: source)
     try workspaceFixturePNG().write(to: artwork)
 
     let store = SignatureAssetStore(applicationSupportRoot: directory.appending(path: "Application Support"))
@@ -114,10 +114,17 @@ import Testing
         asset: asset,
         enabled: true,
         placement: VisibleSignaturePlacement(
-            pageIndex: 1,
-            pageRect: CGRect(x: 72, y: 144, width: 216, height: 108),
-            rotationDegrees: 27
+            pageIndex: 0,
+            pageRect: CGRect(x: 10, y: 20, width: 30, height: 40),
+            rotationDegrees: 0
         )
+    )
+    let detail = PDFDetailView(item: workspace.items[0], workspace: workspace)
+    #expect(detail.cardPreview != nil)
+    detail.visibleSignaturePlacement.wrappedValue = VisibleSignaturePlacement(
+        pageIndex: 1,
+        pageRect: CGRect(x: 72, y: 144, width: 216, height: 108),
+        rotationDegrees: 27
     )
 
     await workspace.refreshInspections()
@@ -136,6 +143,10 @@ import Testing
     #expect(appearance.originY == 540)
     #expect(appearance.width == 216)
     #expect(appearance.height == 108)
+    #expect(workspace.visibleSignatureCardContent == VisibleSignatureCardContent(
+        signerName: "Test Certificate",
+        certificateQualification: "QESIG"
+    ))
 }
 
 @Test func failedWorkspaceItemDistinguishesInspectionFromSigningFailure() {
@@ -290,7 +301,8 @@ private final class CountingWorkspaceSigningEngine: SigningEngine, @unchecked Se
                 validFrom: .distantPast,
                 validUntil: .distantFuture,
                 certificateKey: "test-certificate-key",
-                holderKey: "test-holder-key"
+                holderKey: "test-holder-key",
+                certificateQualification: "QESIG"
             )]
         )
     }
@@ -364,7 +376,8 @@ private final class VisibleAppearanceCapturingEngine: SigningEngine, @unchecked 
                 validFrom: .distantPast,
                 validUntil: .distantFuture,
                 certificateKey: "test-certificate-key",
-                holderKey: "test-holder-key"
+                holderKey: "test-holder-key",
+                certificateQualification: "QESIG"
             )]
         )
     }
@@ -416,6 +429,19 @@ private func workspaceFixturePNG() throws -> Data {
     return png
 }
 
+private func writeWorkspaceFixturePDF(to url: URL) throws {
+    var mediaBox = CGRect(x: 0, y: 0, width: 612, height: 792)
+    guard let context = CGContext(url as CFURL, mediaBox: &mediaBox, nil) else {
+        throw WorkspaceFixtureError.unableToEncodePDF
+    }
+    context.beginPDFPage(nil)
+    context.endPDFPage()
+    context.beginPDFPage(nil)
+    context.endPDFPage()
+    context.closePDF()
+}
+
 private enum WorkspaceFixtureError: Error {
+    case unableToEncodePDF
     case unableToEncodePNG
 }

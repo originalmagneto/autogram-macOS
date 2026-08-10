@@ -21,7 +21,7 @@ struct WorkspaceView: View {
                 NavigationSplitView {
                     PDFListView(workspace: workspace)
                 } detail: {
-                    PDFDetailView(item: selectedItem)
+                    PDFDetailView(item: selectedItem, workspace: workspace)
                 }
                 .navigationSplitViewStyle(.balanced)
                 .inspector(isPresented: $inspectorPresented) {

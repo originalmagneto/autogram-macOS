@@ -12,6 +12,8 @@ final class WorkspaceModel {
     var visibleSignatureAsset: SignatureAsset?
     var visibleSignatureEnabled = false
     var visibleSignaturePlacement: VisibleSignaturePlacement?
+    private(set) var visibleSignatureCardContent: VisibleSignatureCardContent?
+    private(set) var visibleSignatureCardPreview: NSImage?
     private(set) var availableDrivers: [SigningDriver] = []
     private(set) var selectedDriverID: String?
     private(set) var discoveredCertificates: [SigningCertificate] = []
@@ -319,6 +321,7 @@ final class WorkspaceModel {
         visibleSignatureAsset = asset
         visibleSignatureEnabled = enabled
         visibleSignaturePlacement = placement
+        refreshVisibleSignatureArtworkPreview()
         persistVisibleSignaturePreferences()
     }
 
@@ -335,6 +338,7 @@ final class WorkspaceModel {
             asset = try signatureAssetStore.importPNG(sourceURL)
         }
         visibleSignatureAsset = asset
+        refreshVisibleSignatureArtworkPreview()
         if visibleSignaturePlacement == nil {
             visibleSignaturePlacement = VisibleSignaturePlacement(pageIndex: 0, pageRect: .zero, rotationDegrees: 0)
         }
@@ -344,6 +348,8 @@ final class WorkspaceModel {
     func removeVisibleSignatureArtwork() {
         visibleSignatureAsset = nil
         visibleSignatureEnabled = false
+        visibleSignatureCardContent = nil
+        visibleSignatureCardPreview = nil
         persistVisibleSignaturePreferences()
     }
 
@@ -584,12 +590,25 @@ final class WorkspaceModel {
                       let page = document.page(at: placement.pageIndex) else {
                     throw SigningFailure.engine("Choose readable artwork and place the graphic signature before signing.")
                 }
+                let content = VisibleSignatureCardContent(
+                    signerName: certificate.displayName,
+                    certificateQualification: certificate.certificateQualification
+                )
+                visibleSignatureCardContent = content
+                let previewURL = try visibleSignatureRenderer.render(
+                    asset: asset,
+                    content: content,
+                    signingTime: signingTime,
+                    rotationDegrees: 0
+                )
+                defer { try? FileManager.default.removeItem(at: previewURL) }
+                guard let cardPreview = NSImage(contentsOf: previewURL) else {
+                    throw VisibleSignatureRendererError.unreadableArtwork
+                }
+                visibleSignatureCardPreview = cardPreview
                 let renderedPNGURL = try visibleSignatureRenderer.render(
                     asset: asset,
-                    content: VisibleSignatureCardContent(
-                        signerName: certificate.displayName,
-                        certificateQualification: nil
-                    ),
+                    content: content,
                     signingTime: signingTime,
                     rotationDegrees: placement.rotationDegrees
                 )
@@ -630,6 +649,7 @@ final class WorkspaceModel {
         }
         visibleSignatureEnabled = preferences.enabled
         visibleSignaturePlacement = preferences.defaultPlacement?.placement
+        refreshVisibleSignatureArtworkPreview()
     }
 
     private func persistVisibleSignaturePreferences() {
@@ -639,6 +659,11 @@ final class WorkspaceModel {
             defaultPlacement: visibleSignaturePlacement.map(VisibleSignaturePreferences.Placement.init)
         )
         defaults.set(try? JSONEncoder().encode(preferences), forKey: VisibleSignaturePreferences.storageKey)
+    }
+
+    private func refreshVisibleSignatureArtworkPreview() {
+        visibleSignatureCardContent = nil
+        visibleSignatureCardPreview = visibleSignatureArtworkURL.flatMap(NSImage.init(contentsOf:))
     }
 }
 

@@ -16,3 +16,11 @@
 - Artwork is imported to managed storage. Signing renders the complete card only after certificate selection, uses the Java-supplied certificate display name, and passes no inferred qualification so the renderer shows `Certificate qualification unavailable` until Java supplies an authoritative value.
 - One `Date` instance is used for the rendered card and every v2 appearance request. Missing, unreadable, unplaced, or non-PDF artwork stops before the signing coordinator begins.
 - Preferences encode only managed asset ID, enabled state, and placement values. They do not encode original paths, rendered cards, PINs, or timestamp credentials.
+
+## Fix round 1
+
+- RED: the workspace test did not compile because `PDFDetailView` had no workspace input, `WorkspaceModel` had no card-content state, and `SigningCertificate` had no qualification field.
+- `PDFDetailView` now binds the PDF overlay directly to `WorkspaceModel.visibleSignaturePlacement` and supplies the workspace card preview. Overlay edits update the exact placement later converted for signing.
+- Certificate decoding now carries the optional Java `qualification` field into `SigningCertificate`. Final card rendering uses that authoritative value and retains the existing unavailable fallback when absent.
+- GREEN: the focused `WorkspaceInspectionTests` command and the required `AutogramTests` plus `AutogramIntegrationTests` command completed without test failures.
+- `git diff --check` passes.
