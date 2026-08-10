@@ -2,12 +2,17 @@ import SwiftUI
 
 struct PDFDetailView: View {
     let item: PDFItem?
+    @State private var visibleSignaturePlacement: VisibleSignaturePlacement?
 
     var body: some View {
         if let item {
             VStack(spacing: 0) {
                 if item.descriptor.isPDF {
-                    PDFPreviewView(url: item.descriptor.sourceURL)
+                    PDFPreviewView(
+                        url: item.descriptor.sourceURL,
+                        placement: $visibleSignaturePlacement,
+                        cardPreview: nil
+                    )
                 } else {
                     ASiCContentsView(inspection: item.inspection)
                 }
