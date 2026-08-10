@@ -28,7 +28,8 @@ class MachineV2CliAppTest {
         var target = temporaryDirectory.resolve("signed.pdf");
         var input = "{\"protocolVersion\":2,\"requestId\":\"capabilities-1\",\"operation\":\"CAPABILITIES\",\"payload\":{}}\n"
                 + "{\"protocolVersion\":2,\"requestId\":\"inspect-1\",\"operation\":\"INSPECT\",\"payload\":{\"files\":[{\"id\":\"file-1\",\"source\":\""
-                + source + "\",\"target\":\"" + target + "\"}]}}\n";
+                + source + "\",\"target\":\"" + target + "\"}]}}\n"
+                + "{\"protocolVersion\":2,\"requestId\":\"inspect-invalid\",\"operation\":\"INSPECT\",\"payload\":{\"unexpected\":true}}\n";
         var output = new StringWriter();
         var code = MachineV2CliApp.start(commandLine(), new StringReader(input), new PrintWriter(output),
                 new PrintWriter(new StringWriter()), new MachineDriverService(), new MachineInspectionService());
@@ -42,12 +43,13 @@ class MachineV2CliAppTest {
                 .toList();
 
         assertEquals(0, code);
-        assertEquals(List.of("capabilities-1", "inspect-1"), terminalEvents.stream()
+        assertEquals(List.of("capabilities-1", "inspect-1", "inspect-invalid"), terminalEvents.stream()
                 .map(event -> event.get("requestId").getAsString()).toList());
         assertEquals(1, terminalEvents.stream()
                 .filter(event -> "capabilities-1".equals(event.get("requestId").getAsString())).count());
         assertEquals(1, terminalEvents.stream()
                 .filter(event -> "inspect-1".equals(event.get("requestId").getAsString())).count());
+        assertEquals("PROTOCOL_INVALID_REQUEST", terminalEvents.get(2).getAsJsonObject("payload").get("code").getAsString());
     }
 
     private static org.apache.commons.cli.CommandLine commandLine() throws Exception {

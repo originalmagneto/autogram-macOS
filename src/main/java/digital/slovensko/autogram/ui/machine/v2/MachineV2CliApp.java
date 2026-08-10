@@ -123,7 +123,8 @@ public final class MachineV2CliApp {
     }
 
     private static List<MachineFile> requiredFiles(JsonObject payload) {
-        if (payload.size() != 1 || !payload.get("files").isJsonArray() || payload.getAsJsonArray("files").isEmpty()) {
+        if (payload.size() != 1 || !payload.has("files") || !payload.get("files").isJsonArray()
+                || payload.getAsJsonArray("files").isEmpty()) {
             throw new MachineProtocolException("PROTOCOL_INVALID_REQUEST");
         }
         var files = new ArrayList<MachineFile>();

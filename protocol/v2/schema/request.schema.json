@@ -1,16 +1,222 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Autogram Machine Protocol v2 Request",
-  "type": "object",
-  "additionalProperties": false,
-  "required": ["protocolVersion", "requestId", "operation", "payload"],
-  "properties": {
-    "protocolVersion": { "const": 2 },
-    "requestId": { "type": "string", "minLength": 1 },
-    "operation": {
+  "oneOf": [
+    { "$ref": "#/$defs/capabilitiesRequest" },
+    { "$ref": "#/$defs/inspectRequest" },
+    { "$ref": "#/$defs/certificatesRequest" },
+    { "$ref": "#/$defs/signRequest" },
+    { "$ref": "#/$defs/timestampOperationRequest" },
+    { "$ref": "#/$defs/validateRequest" }
+  ],
+  "$defs": {
+    "nonBlankString": {
       "type": "string",
-      "enum": ["CAPABILITIES", "INSPECT", "CERTIFICATES", "SIGN", "TIMESTAMP", "VALIDATE"]
+      "pattern": ".*\\S.*"
     },
-    "payload": { "type": "object" }
+    "file": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "source", "target"],
+      "properties": {
+        "id": { "$ref": "#/$defs/nonBlankString" },
+        "source": { "$ref": "#/$defs/nonBlankString" },
+        "target": { "$ref": "#/$defs/nonBlankString" }
+      }
+    },
+    "visibleAppearance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "renderedPngPath",
+        "page",
+        "originX",
+        "originY",
+        "width",
+        "height",
+        "signingTime"
+      ],
+      "properties": {
+        "renderedPngPath": { "$ref": "#/$defs/nonBlankString" },
+        "page": { "type": "integer", "minimum": 1 },
+        "originX": { "type": "number" },
+        "originY": { "type": "number" },
+        "width": { "type": "number", "exclusiveMinimum": 0 },
+        "height": { "type": "number", "exclusiveMinimum": 0 },
+        "signingTime": { "type": "string", "format": "date-time" }
+      }
+    },
+    "signFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "source", "target"],
+      "properties": {
+        "id": { "$ref": "#/$defs/nonBlankString" },
+        "source": { "$ref": "#/$defs/nonBlankString" },
+        "target": { "$ref": "#/$defs/nonBlankString" },
+        "visibleAppearance": { "$ref": "#/$defs/visibleAppearance" }
+      }
+    },
+    "files": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/file" }
+    },
+    "signFiles": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/signFile" }
+    },
+    "timestampAuthentication": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "username", "password"],
+          "properties": {
+            "type": { "const": "basic" },
+            "username": { "$ref": "#/$defs/nonBlankString" },
+            "password": { "$ref": "#/$defs/nonBlankString" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "token"],
+          "properties": {
+            "type": { "const": "bearer" },
+            "token": { "$ref": "#/$defs/nonBlankString" }
+          }
+        }
+      ]
+    },
+    "timestamp": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required", "servers"],
+      "properties": {
+        "required": { "const": true },
+        "servers": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/nonBlankString" }
+        },
+        "authentication": { "$ref": "#/$defs/timestampAuthentication" }
+      }
+    },
+    "capabilitiesRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocolVersion", "requestId", "operation", "payload"],
+      "properties": {
+        "protocolVersion": { "const": 2 },
+        "requestId": { "$ref": "#/$defs/nonBlankString" },
+        "operation": { "const": "CAPABILITIES" },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false
+        }
+      }
+    },
+    "inspectRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocolVersion", "requestId", "operation", "payload"],
+      "properties": {
+        "protocolVersion": { "const": 2 },
+        "requestId": { "$ref": "#/$defs/nonBlankString" },
+        "operation": { "const": "INSPECT" },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["files"],
+          "properties": {
+            "files": { "$ref": "#/$defs/files" }
+          }
+        }
+      }
+    },
+    "certificatesRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocolVersion", "requestId", "operation", "payload"],
+      "properties": {
+        "protocolVersion": { "const": 2 },
+        "requestId": { "$ref": "#/$defs/nonBlankString" },
+        "operation": { "const": "CERTIFICATES" },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["driver", "pin"],
+          "properties": {
+            "driver": { "$ref": "#/$defs/nonBlankString" },
+            "pin": { "$ref": "#/$defs/nonBlankString" }
+          }
+        }
+      }
+    },
+    "signRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocolVersion", "requestId", "operation", "payload"],
+      "properties": {
+        "protocolVersion": { "const": 2 },
+        "requestId": { "$ref": "#/$defs/nonBlankString" },
+        "operation": { "const": "SIGN" },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["driver", "certificateSerial", "pin", "signatureLevel", "timestamp", "files"],
+          "properties": {
+            "driver": { "$ref": "#/$defs/nonBlankString" },
+            "certificateSerial": { "$ref": "#/$defs/nonBlankString" },
+            "pin": { "$ref": "#/$defs/nonBlankString" },
+            "signatureLevel": {
+              "type": "string",
+              "enum": ["PAdES_BASELINE_T", "XAdES_BASELINE_T"]
+            },
+            "timestamp": { "$ref": "#/$defs/timestamp" },
+            "files": { "$ref": "#/$defs/signFiles" }
+          }
+        }
+      }
+    },
+    "timestampOperationRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocolVersion", "requestId", "operation", "payload"],
+      "properties": {
+        "protocolVersion": { "const": 2 },
+        "requestId": { "$ref": "#/$defs/nonBlankString" },
+        "operation": { "const": "TIMESTAMP" },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["timestamp", "files"],
+          "properties": {
+            "timestamp": { "$ref": "#/$defs/timestamp" },
+            "files": { "$ref": "#/$defs/files" }
+          }
+        }
+      }
+    },
+    "validateRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocolVersion", "requestId", "operation", "payload"],
+      "properties": {
+        "protocolVersion": { "const": 2 },
+        "requestId": { "$ref": "#/$defs/nonBlankString" },
+        "operation": { "const": "VALIDATE" },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["files"],
+          "properties": {
+            "files": { "$ref": "#/$defs/files" }
+          }
+        }
+      }
+    }
   }
 }
