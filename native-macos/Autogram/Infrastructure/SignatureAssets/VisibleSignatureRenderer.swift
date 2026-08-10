@@ -8,10 +8,16 @@ enum VisibleSignatureRendererError: Error {
 }
 
 struct VisibleSignatureRenderer {
+    let assetStore: SignatureAssetStore
     let cacheRoot: URL
     let fileManager: FileManager
 
-    init(cacheRoot: URL? = nil, fileManager: FileManager = .default) {
+    init(
+        assetStore: SignatureAssetStore = SignatureAssetStore(),
+        cacheRoot: URL? = nil,
+        fileManager: FileManager = .default
+    ) {
+        self.assetStore = assetStore
         self.fileManager = fileManager
         self.cacheRoot = cacheRoot ?? fileManager.urls(for: .cachesDirectory, in: .userDomainMask)[0]
     }
@@ -22,7 +28,7 @@ struct VisibleSignatureRenderer {
         signingTime: Date,
         rotationDegrees: Double
     ) throws -> URL {
-        guard let artwork = NSImage(contentsOf: asset.fileURL) else {
+        guard let artwork = NSImage(contentsOf: assetStore.fileURL(for: asset)) else {
             throw VisibleSignatureRendererError.unreadableArtwork
         }
         let card = try renderedCard(artwork: artwork, content: content, signingTime: signingTime)
@@ -68,18 +74,21 @@ struct VisibleSignatureRenderer {
             .foregroundColor: NSColor.labelColor,
             .paragraphStyle: paragraph
         ]
-        let lines = [
-            ("Digitally signed by", headingAttributes),
-            (content.signerName, headingAttributes),
-            (content.certificateQualification ?? "Certificate qualification unavailable", textAttributes),
-            (content.profile, textAttributes),
-            (content.timestampStatus, textAttributes),
-            (DateFormatter.localizedString(from: signingTime, dateStyle: .medium, timeStyle: .medium), textAttributes)
-        ]
+        ("Digitally signed by" as NSString).draw(
+            in: NSRect(x: 32, y: 260, width: size.width - 64, height: 18),
+            withAttributes: headingAttributes
+        )
         let artworkRect = NSRect(x: 162, y: 195, width: 96, height: 48)
         artwork.draw(in: artworkRect, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: false, hints: [.interpolation: NSImageInterpolation.high])
-        var y: CGFloat = 260
-        for (line, attributes) in lines {
+        let details = [
+            (content.signerName, headingAttributes),
+            (content.certificateQualification ?? "Certificate qualification unavailable", textAttributes),
+            ("PAdES Baseline T", textAttributes),
+            ("Qualified timestamp required", textAttributes),
+            (DateFormatter.localizedString(from: signingTime, dateStyle: .medium, timeStyle: .medium), textAttributes)
+        ]
+        var y: CGFloat = 170
+        for (line, attributes) in details {
             (line as NSString).draw(in: NSRect(x: 32, y: y, width: size.width - 64, height: 18), withAttributes: attributes)
             y -= 25
         }

@@ -9,7 +9,7 @@ struct SignatureAsset: Codable, Sendable, Equatable, Identifiable {
 
     let id: UUID
     let kind: Kind
-    let fileURL: URL
+    let managedFilename: String
 }
 
 struct VisibleSignaturePlacement: Sendable, Equatable {
@@ -21,6 +21,4 @@ struct VisibleSignaturePlacement: Sendable, Equatable {
 struct VisibleSignatureCardContent: Sendable, Equatable {
     var signerName: String
     var certificateQualification: String?
-    var profile: String
-    var timestampStatus: String
 }

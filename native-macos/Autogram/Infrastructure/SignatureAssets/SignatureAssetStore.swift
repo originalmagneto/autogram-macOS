@@ -40,9 +40,10 @@ struct SignatureAssetStore {
         guard containsVisiblePixels(image) else { throw SignatureAssetStoreError.emptyArtwork }
 
         let id = UUID()
-        let destination = try managedURL(for: id)
+        let managedFilename = managedFilename(for: id)
+        let destination = try prepareManagedURL(filename: managedFilename)
         try data.write(to: destination, options: .withoutOverwriting)
-        return SignatureAsset(id: id, kind: .png, fileURL: destination)
+        return SignatureAsset(id: id, kind: .png, managedFilename: managedFilename)
     }
 
     func importPDF(_ sourceURL: URL, pageIndex: Int) throws -> SignatureAsset {
@@ -53,14 +54,23 @@ struct SignatureAssetStore {
         let image = try rasterizedImage(for: page)
         let cropped = try croppedToVisiblePixels(image)
         let id = UUID()
-        let destination = try managedURL(for: id)
+        let managedFilename = managedFilename(for: id)
+        let destination = try prepareManagedURL(filename: managedFilename)
         try pngData(for: cropped).write(to: destination, options: .withoutOverwriting)
-        return SignatureAsset(id: id, kind: .pdf, fileURL: destination)
+        return SignatureAsset(id: id, kind: .pdf, managedFilename: managedFilename)
     }
 
-    private func managedURL(for id: UUID) throws -> URL {
+    func fileURL(for asset: SignatureAsset) -> URL {
+        assetsDirectory.appending(path: asset.managedFilename)
+    }
+
+    private func managedFilename(for id: UUID) -> String {
+        "\(id.uuidString).png"
+    }
+
+    private func prepareManagedURL(filename: String) throws -> URL {
         try fileManager.createDirectory(at: assetsDirectory, withIntermediateDirectories: true)
-        return assetsDirectory.appending(path: id.uuidString).appendingPathExtension("png")
+        return assetsDirectory.appending(path: filename)
     }
 
     private func decodedImage(from data: Data) throws -> CGImage {
