@@ -41,6 +41,38 @@ import Testing
     #expect(try fixture.finalizedOutput().starts(with: Data("%PDF-".utf8)))
 }
 
+@Test func signingAsXAdESRequestsAndFinalizesASiCE() async throws {
+    let fixture = try SigningMachineFixture()
+    defer { try? fixture.remove() }
+
+    let source = fixture.directoryURL.appending(path: "agreement.pdf")
+    try Data("%PDF-1.7\nsource\n%%EOF\n".utf8).write(to: source)
+    let engine = AutogramCLIEngine(configuration: fixture.configuration())
+    let request = SigningRequest(
+        sessionID: UUID(uuidString: "00000000-0000-0000-0000-000000000002")!,
+        driverID: "token-1",
+        certificateSerial: "certificate-1",
+        pin: Secret("1234"),
+        files: [SigningFile(id: "agreement", sourceURL: source)],
+        outputFormat: .asiceXAdES
+    )
+
+    var events: [SigningEvent] = []
+    for try await event in engine.sign(request: request) {
+        events.append(event)
+    }
+
+    let requestJSON = try fixture.requestJSON()
+    let payload = try #require(requestJSON["payload"] as? [String: Any])
+    #expect(payload["signatureLevel"] as? String == "XAdES_BASELINE_T")
+    #expect(events.last == .completed(
+        "agreement",
+        outputURL: fixture.directoryURL.appending(path: "agreement_signed.asice")
+    ))
+    #expect(try Data(contentsOf: fixture.directoryURL.appending(path: "agreement_signed.asice"))
+        .starts(with: Data([0x50, 0x4B, 0x03, 0x04])))
+}
+
 @Test func signingContinuesWhenInspectedOutputReservationIsAlreadyAbsent() async throws {
     let fixture = try SigningMachineFixture()
     defer { try? fixture.remove() }
@@ -225,7 +257,12 @@ private struct SigningMachineFixture {
         } else {
             """
             target=$(/usr/bin/plutil -extract payload.files.0.target raw -o - "$input")
-            printf '%%PDF-1.7\\n%%%%EOF\\n' > "$target"
+            signature_level=$(/usr/bin/plutil -extract payload.signatureLevel raw -o - "$input")
+            if [ "$signature_level" = "XAdES_BASELINE_T" ]; then
+                printf '\\120\\113\\003\\004' > "$target"
+            else
+                printf '%%PDF-1.7\\n%%%%EOF\\n' > "$target"
+            fi
             printf '{"protocolVersion":1,"type":"file.progress","sessionId":"%s","emittedAt":"2026-08-06T00:00:02Z","fileId":"agreement","payload":{"phase":"validating"}}\\n' "$session_id"
             printf '{"protocolVersion":1,"type":"file.progress","sessionId":"%s","emittedAt":"2026-08-06T00:00:02Z","fileId":"agreement","payload":{"phase":"saving"}}\\n' "$session_id"
             printf '{"protocolVersion":1,"type":"file.completed","sessionId":"%s","emittedAt":"2026-08-06T00:00:02Z","fileId":"agreement","payload":{}}\\n' "$session_id"

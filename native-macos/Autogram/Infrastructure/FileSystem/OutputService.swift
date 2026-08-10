@@ -18,10 +18,18 @@ enum OutputServiceError: Error {
 struct OutputService {
     private let validator = PDFArtifactValidator()
 
-    func reserve(for sourceURL: URL, finalURL requestedFinalURL: URL? = nil) throws -> OutputReservation {
+    func reserve(
+        for sourceURL: URL,
+        finalURL requestedFinalURL: URL? = nil,
+        outputExtension: String? = nil
+    ) throws -> OutputReservation {
         guard !isSymbolicLink(sourceURL) else { throw OutputServiceError.unsafeSource }
         let source = canonicalURL(sourceURL)
-        let destination = try resolvedDestination(for: source, requestedFinalURL: requestedFinalURL)
+        let destination = try resolvedDestination(
+            for: source,
+            requestedFinalURL: requestedFinalURL,
+            outputExtension: outputExtension
+        )
         guard source != destination else { throw OutputServiceError.sourceAndTargetAreIdentical }
 
         let temporary = try reserveTemporarySibling(of: destination)
@@ -37,7 +45,11 @@ struct OutputService {
         }
     }
 
-    private func resolvedDestination(for source: URL, requestedFinalURL: URL?) throws -> URL {
+    private func resolvedDestination(
+        for source: URL,
+        requestedFinalURL: URL?,
+        outputExtension: String?
+    ) throws -> URL {
         if let requestedFinalURL {
             guard !isSymbolicLink(requestedFinalURL) else { throw OutputServiceError.unsafeTarget }
             return canonicalURL(requestedFinalURL)
@@ -45,10 +57,11 @@ struct OutputService {
 
         let directory = source.deletingLastPathComponent()
         let stem = source.deletingPathExtension().lastPathComponent
+        let destinationExtension = outputExtension ?? source.pathExtension
         var number = 1
         while true {
             let suffix = number == 1 ? "_signed" : "_signed (\(number))"
-            let candidate = directory.appending(path: stem + suffix).appendingPathExtension(source.pathExtension)
+            let candidate = directory.appending(path: stem + suffix).appendingPathExtension(destinationExtension)
             if !pathExists(candidate) { return candidate }
             number += 1
         }

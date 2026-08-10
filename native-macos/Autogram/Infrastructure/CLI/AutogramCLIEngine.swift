@@ -33,6 +33,7 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
         let signatureLevels = strings(in: payload["signatureLevels"])
         let timestampPolicy = object(in: payload["timestampPolicy"])
         guard signatureLevels.contains("PAdES_BASELINE_T"),
+              signatureLevels.contains("XAdES_BASELINE_T"),
               timestampPolicy?["required"] == .bool(true),
               timestampPolicy?["qualified"] == .bool(true) else {
             throw SigningFailure.engine("The signing helper does not require qualified timestamps.")
@@ -136,7 +137,11 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
                         try await withTaskCancellationHandler {
                             let timestamp = try qualifiedTimestampRequest()
                             let files = try request.files.map { file in
-                                let reservation = try reservation(for: file.id, sourceURL: file.sourceURL)
+                                let reservation = try reservation(
+                                    for: file.id,
+                                    sourceURL: file.sourceURL,
+                                    outputExtension: request.outputFormat.outputExtension(for: file.sourceURL)
+                                )
                                 do {
                                     try FileManager.default.removeItem(at: reservation.temporaryURL)
                                 } catch let error as CocoaError where error.code == .fileNoSuchFile {
@@ -150,7 +155,7 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
                                 payload: [
                                     "driver": .string(request.driverID),
                                     "certificateSerial": .string(request.certificateSerial),
-                                    "signatureLevel": .string("PAdES_BASELINE_T"),
+                                    "signatureLevel": .string(request.outputFormat.signatureLevel),
                                     "timestamp": .object([
                                         "required": .bool(true),
                                         "servers": .array(timestamp.endpoints.map(JSONValue.string))
@@ -225,11 +230,22 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
         await runner.cancel()
     }
 
-    private func reservation(for fileID: String, sourceURL: URL) throws -> OutputReservation {
+    private func reservation(
+        for fileID: String,
+        sourceURL: URL,
+        outputExtension: String? = nil
+    ) throws -> OutputReservation {
         lock.lock()
         defer { lock.unlock() }
-        if let reservation = reservations[fileID] { return reservation }
-        let reservation = try outputService.reserve(for: sourceURL)
+        if let reservation = reservations[fileID] {
+            let expectedExtension = outputExtension ?? sourceURL.pathExtension
+            if reservation.finalURL.pathExtension.caseInsensitiveCompare(expectedExtension) == .orderedSame {
+                return reservation
+            }
+            try? FileManager.default.removeItem(at: reservation.temporaryURL)
+            reservations.removeValue(forKey: fileID)
+        }
+        let reservation = try outputService.reserve(for: sourceURL, outputExtension: outputExtension)
         reservations[fileID] = reservation
         return reservation
     }

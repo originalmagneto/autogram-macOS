@@ -72,8 +72,9 @@ struct FakeSigningEngine: SigningEngine {
                 switch event {
                 case .completed(let fileID):
                     guard let file = request.files.first(where: { $0.id == fileID }) else { continue }
-                    let outputURL = file.sourceURL.deletingPathExtension()
-                        .appendingPathExtension("signed.(file.sourceURL.pathExtension)")
+                    let outputURL = file.sourceURL.deletingLastPathComponent()
+                        .appending(path: file.sourceURL.deletingPathExtension().lastPathComponent + "_signed")
+                        .appendingPathExtension(request.outputFormat.outputExtension(for: file.sourceURL))
                     continuation.yield(.completed(fileID, outputURL: outputURL))
                 case .failed(let fileID):
                     continuation.yield(.failed(fileID, .fileFailed(fileID)))

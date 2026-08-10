@@ -1,5 +1,32 @@
 import Foundation
 
+enum SigningOutputFormat: String, CaseIterable, Identifiable, Sendable {
+    case automatic
+    case pades
+    case asiceXAdES
+
+    var id: Self { self }
+
+    var signatureLevel: String {
+        self == .asiceXAdES ? "XAdES_BASELINE_T" : "PAdES_BASELINE_T"
+    }
+
+    var displayName: String {
+        switch self {
+        case .automatic: "Automatic"
+        case .pades: "PDF with PAdES"
+        case .asiceXAdES: "ASiC-E with XAdES"
+        }
+    }
+
+    func outputExtension(for sourceURL: URL) -> String {
+        if sourceURL.pathExtension.lowercased() == "asice" {
+            return "asice"
+        }
+        return self == .asiceXAdES ? "asice" : sourceURL.pathExtension
+    }
+}
+
 struct SigningFile: Sendable, Equatable, Identifiable {
     let id: String
     let sourceURL: URL
@@ -20,19 +47,22 @@ struct SigningRequest: Sendable {
     let certificateSerial: String
     let pin: Secret
     let files: [SigningFile]
+    let outputFormat: SigningOutputFormat
 
     init(
         sessionID: UUID,
         driverID: String,
         certificateSerial: String,
         pin: Secret,
-        files: [SigningFile]
+        files: [SigningFile],
+        outputFormat: SigningOutputFormat = .automatic
     ) {
         self.sessionID = sessionID
         self.driverID = driverID
         self.certificateSerial = certificateSerial
         self.pin = pin
         self.files = files
+        self.outputFormat = outputFormat
     }
 }
 

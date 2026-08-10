@@ -61,6 +61,17 @@ import Testing
     }
 }
 
+@Test func asicOutputIntentChangesTheReservedExtension() throws {
+    try withTemporaryDirectory { directory in
+        let source = directory.appending(path: "case.pdf")
+        try validPDF().write(to: source)
+
+        let reservation = try OutputService().reserve(for: source, outputExtension: "asice")
+
+        #expect(reservation.finalURL.lastPathComponent == "case_signed.asice")
+    }
+}
+
 private func validPDF() -> Data {
     Data("%PDF-1.7\\n%%EOF\\n".utf8)
 }
