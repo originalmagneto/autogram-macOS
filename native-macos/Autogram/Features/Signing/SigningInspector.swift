@@ -10,8 +10,22 @@ struct SigningInspector: View {
     var body: some View {
         Form {
             Section("Signing") {
-                LabeledContent("Profile", value: "PAdES baseline")
+                Picker("Format", selection: Binding(
+                    get: { workspace.selectedOutputFormat },
+                    set: { workspace.selectedOutputFormat = $0 }
+                )) {
+                    ForEach(SigningOutputFormat.allCases) { format in
+                        Text(format.displayName).tag(format)
+                    }
+                }
+                LabeledContent("Level", value: "Baseline T")
                 LabeledContent("Timestamp", value: "Qualified")
+
+                if selectedItem?.descriptor.sourceURL.pathExtension.lowercased() == "asice" {
+                    Text("An existing ASiC-E keeps its current XAdES or CAdES signature family.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             Section("Driver") {

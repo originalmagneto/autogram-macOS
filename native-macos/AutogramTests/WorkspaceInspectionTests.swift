@@ -67,6 +67,23 @@ import Testing
     #expect(workspace.items[0].inspection.isComplete)
 }
 
+@Test @MainActor func selectedAsicFormatReachesTheSigningRequest() async {
+    let descriptor = PDFItemDescriptor(id: "document", sourceURL: URL(fileURLWithPath: "/tmp/document.pdf"))
+    let engine = CountingWorkspaceSigningEngine()
+    let workspace = WorkspaceModel(engine: engine, items: [PDFItem(descriptor: descriptor)])
+    workspace.selectedOutputFormat = .asiceXAdES
+
+    await workspace.refreshInspections()
+    await workspace.refreshSigningEnvironment()
+    _ = await workspace.resolveCertificates(using: PINSubmission(
+        certificatePIN: Secret("1234"),
+        signingPIN: Secret("5678")
+    ))
+    await engine.waitForSigning()
+
+    #expect(engine.lastOutputFormat == .asiceXAdES)
+}
+
 @Test func failedWorkspaceItemDistinguishesInspectionFromSigningFailure() {
     let descriptor = PDFItemDescriptor(id: "document", sourceURL: URL(fileURLWithPath: "/tmp/document.pdf"))
     let inspected = InspectedPDF(id: descriptor.id, isSignable: true)
@@ -186,10 +203,15 @@ private final class CountingWorkspaceSigningEngine: SigningEngine, @unchecked Se
     private let lock = NSLock()
     private var storedInspectCallCount = 0
     private var signingStarted = false
+    private var storedOutputFormat: SigningOutputFormat?
     private var signingWaiters: [CheckedContinuation<Void, Never>] = []
 
     var inspectCallCount: Int {
         lock.withLock { storedInspectCallCount }
+    }
+
+    var lastOutputFormat: SigningOutputFormat? {
+        lock.withLock { storedOutputFormat }
     }
 
     func capabilities() async throws -> EngineCapabilities {
@@ -227,6 +249,7 @@ private final class CountingWorkspaceSigningEngine: SigningEngine, @unchecked Se
     func sign(request: SigningRequest) -> AsyncThrowingStream<SigningEvent, Error> {
         let waiters = lock.withLock { () -> [CheckedContinuation<Void, Never>] in
             signingStarted = true
+            storedOutputFormat = request.outputFormat
             let waiters = signingWaiters
             signingWaiters.removeAll()
             return waiters

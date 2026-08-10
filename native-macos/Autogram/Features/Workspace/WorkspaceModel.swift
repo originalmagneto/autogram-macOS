@@ -7,6 +7,7 @@ import UniformTypeIdentifiers
 final class WorkspaceModel {
     private(set) var items: [PDFItem] = []
     var selection: PDFItem.ID?
+    var selectedOutputFormat: SigningOutputFormat = .automatic
     private(set) var availableDrivers: [SigningDriver] = []
     private(set) var selectedDriverID: String?
     private(set) var discoveredCertificates: [SigningCertificate] = []
@@ -472,7 +473,8 @@ final class WorkspaceModel {
             driverID: driverID,
             certificateSerial: certificateSerial,
             pin: pin,
-            files: descriptors.map { SigningFile(id: $0.id, sourceURL: $0.sourceURL) }
+            files: descriptors.map { SigningFile(id: $0.id, sourceURL: $0.sourceURL) },
+            outputFormat: selectedOutputFormat
         )
 
         do {

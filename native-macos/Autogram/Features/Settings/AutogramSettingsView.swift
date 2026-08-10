@@ -25,14 +25,15 @@ struct AutogramSettingsView: View {
                     Text("Add _signed suffix").tag(OutputPolicy.signedSuffix.rawValue)
                 }
                 Picker("Destination", selection: $destinationBehaviorRaw) {
-                    Text("Beside source PDF").tag(DestinationBehavior.besideSource.rawValue)
+                    Text("Beside source file").tag(DestinationBehavior.besideSource.rawValue)
                     Text("Ask each time").tag(DestinationBehavior.askEachTime.rawValue)
                 }
-                Toggle("Reveal signed PDF in Finder", isOn: $revealInFinderAfterSigning)
+                Toggle("Reveal signed file in Finder", isOn: $revealInFinderAfterSigning)
             }
 
             Section("Signing requirements") {
-                LabeledContent("Profile", value: "PAdES Baseline T")
+                LabeledContent("Formats", value: "PAdES or ASiC-E with XAdES")
+                LabeledContent("Level", value: "Baseline T")
                 LabeledContent("Timestamp", value: "Qualified timestamp required")
             }
 
