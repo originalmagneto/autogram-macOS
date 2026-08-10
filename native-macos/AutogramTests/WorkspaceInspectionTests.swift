@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 @testable import Autogram
@@ -82,6 +83,59 @@ import Testing
     await engine.waitForSigning()
 
     #expect(engine.lastOutputFormat == .asiceXAdES)
+}
+
+@Test @MainActor func selectedCertificatePropagatesRenderedVisibleAppearanceToSigningRequest() async throws {
+    let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let source = directory.appending(path: "document.pdf")
+    let artwork = directory.appending(path: "artwork.png")
+    try Data("%PDF-1.7\nsource\n%%EOF\n".utf8).write(to: source)
+    try workspaceFixturePNG().write(to: artwork)
+
+    let store = SignatureAssetStore(applicationSupportRoot: directory.appending(path: "Application Support"))
+    let asset = try store.importPNG(artwork)
+    let engine = VisibleAppearanceCapturingEngine()
+    let preferencesSuite = "WorkspaceInspectionTests.\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: preferencesSuite))
+    defer { defaults.removePersistentDomain(forName: preferencesSuite) }
+    let workspace = WorkspaceModel(
+        engine: engine,
+        items: [PDFItem(descriptor: PDFItemDescriptor(id: "document", sourceURL: source))],
+        signatureAssetStore: store,
+        visibleSignatureRenderer: VisibleSignatureRenderer(
+            assetStore: store,
+            cacheRoot: directory.appending(path: "Caches")
+        ),
+        defaults: defaults
+    )
+    workspace.configureVisibleAppearance(
+        asset: asset,
+        enabled: true,
+        placement: VisibleSignaturePlacement(
+            pageIndex: 1,
+            pageRect: CGRect(x: 72, y: 144, width: 216, height: 108),
+            rotationDegrees: 27
+        )
+    )
+
+    await workspace.refreshInspections()
+    await workspace.refreshSigningEnvironment()
+    let resolution = await workspace.resolveCertificates(using: PINSubmission(
+        certificatePIN: Secret("1234"),
+        signingPIN: Secret("5678")
+    ))
+    await engine.waitForSigning()
+
+    let appearance = try #require(engine.lastRequest?.files.first?.visibleAppearance)
+    #expect(resolution == .signingStarted)
+    #expect(FileManager.default.fileExists(atPath: appearance.renderedPNGURL.path))
+    #expect(appearance.page == 2)
+    #expect(appearance.originX == 72)
+    #expect(appearance.originY == 540)
+    #expect(appearance.width == 216)
+    #expect(appearance.height == 108)
 }
 
 @Test func failedWorkspaceItemDistinguishesInspectionFromSigningFailure() {
@@ -276,4 +330,92 @@ private final class CountingWorkspaceSigningEngine: SigningEngine, @unchecked Se
             }
         }
     }
+}
+
+private final class VisibleAppearanceCapturingEngine: SigningEngine, @unchecked Sendable {
+    private let lock = NSLock()
+    private var signingStarted = false
+    private var signingWaiters: [CheckedContinuation<Void, Never>] = []
+    private var storedRequest: SigningRequest?
+
+    var lastRequest: SigningRequest? {
+        lock.withLock { storedRequest }
+    }
+
+    func capabilities() async throws -> EngineCapabilities {
+        EngineCapabilities(protocolVersion: 2, supportsQualifiedTimestamp: true)
+    }
+
+    func drivers() async throws -> [SigningDriver] {
+        [SigningDriver(id: "test-driver", displayName: "Test Driver")]
+    }
+
+    func certificates(driverID: String, pin: Secret?) async throws -> [SigningCertificate] {
+        try await certificateDiscovery(driverID: driverID, pin: pin).certificates
+    }
+
+    func certificateDiscovery(driverID: String, pin: Secret?) async throws -> CertificateDiscovery {
+        CertificateDiscovery(
+            token: SigningToken(tokenKey: "test-token", providerName: "Test Token"),
+            certificates: [SigningCertificate(
+                serialNumber: "test-certificate",
+                displayName: "Test Certificate",
+                issuer: "Test Issuer",
+                validFrom: .distantPast,
+                validUntil: .distantFuture,
+                certificateKey: "test-certificate-key",
+                holderKey: "test-holder-key"
+            )]
+        )
+    }
+
+    func inspect(files: [PDFItemDescriptor]) async throws -> [PDFInspection] {
+        [PDFInspection(files: files.map { InspectedPDF(id: $0.id, isSignable: true) })]
+    }
+
+    func sign(request: SigningRequest) -> AsyncThrowingStream<SigningEvent, Error> {
+        let waiters = lock.withLock { () -> [CheckedContinuation<Void, Never>] in
+            storedRequest = request
+            signingStarted = true
+            let waiters = signingWaiters
+            signingWaiters.removeAll()
+            return waiters
+        }
+        waiters.forEach { $0.resume() }
+        return AsyncThrowingStream { continuation in
+            continuation.finish()
+        }
+    }
+
+    func cancel() async {}
+
+    func waitForSigning() async {
+        await withCheckedContinuation { continuation in
+            lock.withLock {
+                if signingStarted {
+                    continuation.resume()
+                } else {
+                    signingWaiters.append(continuation)
+                }
+            }
+        }
+    }
+}
+
+private func workspaceFixturePNG() throws -> Data {
+    let image = NSImage(size: NSSize(width: 24, height: 24))
+    image.lockFocus()
+    NSColor.systemPurple.setFill()
+    NSBezierPath(ovalIn: NSRect(x: 4, y: 4, width: 16, height: 16)).fill()
+    image.unlockFocus()
+    guard let tiff = image.tiffRepresentation,
+          let bitmap = NSBitmapImageRep(data: tiff),
+          let png = bitmap.representation(using: .png, properties: [:]) else {
+        throw WorkspaceFixtureError.unableToEncodePNG
+    }
+    return png
+}
+
+private enum WorkspaceFixtureError: Error {
+    case unableToEncodePNG
 }

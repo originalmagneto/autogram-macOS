@@ -28,6 +28,10 @@ struct SigningInspector: View {
                 }
             }
 
+            if selectedItem?.descriptor.isPDF == true, workspace.selectedOutputFormat != .asiceXAdES {
+                VisibleAppearanceInspector(workspace: workspace)
+            }
+
             Section("Driver") {
                 if workspace.isLoadingSigningEnvironment {
                     ProgressView("Discovering signing drivers")

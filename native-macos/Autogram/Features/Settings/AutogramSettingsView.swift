@@ -37,6 +37,11 @@ struct AutogramSettingsView: View {
                 LabeledContent("Timestamp", value: "Qualified timestamp required")
             }
 
+            Section("Graphic signature") {
+                Text("Only the managed artwork ID, enabled state, and default placement are stored in preferences.")
+                    .foregroundStyle(.secondary)
+            }
+
             Section("Qualified timestamp source") {
                 Picker("Timestamp Source", selection: Binding(
                     get: { timestampConfiguration.source },

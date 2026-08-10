@@ -30,6 +30,11 @@ struct WorkspaceView: View {
                         isPINSheetPresented: $isPINSheetPresented
                     )
                 }
+                .onChange(of: workspace.selectedOutputFormat) { _, format in
+                    if format == .asiceXAdES {
+                        workspace.setVisibleSignatureEnabled(false)
+                    }
+                }
             }
         }
         .dropDestination(for: URL.self) { urls, _ in
