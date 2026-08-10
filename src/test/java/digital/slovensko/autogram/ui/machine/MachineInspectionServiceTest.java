@@ -180,6 +180,17 @@ class MachineInspectionServiceTest {
     }
 
     @Test
+    void returnsDocumentsAndSignaturesForAsicWithoutTrustedLists() {
+        var sample = Path.of(MachineInspectionServiceTest.class
+                .getResource("/digital/slovensko/autogram/general_agenda.asice").getFile());
+
+        var payload = new MachineInspectionService().inspect(sample);
+
+        assertFalse(payload.getAsJsonArray("documents").isEmpty());
+        assertFalse(payload.getAsJsonArray("signatures").isEmpty());
+    }
+
+    @Test
     void rejectsBatchEntryWithoutTargetBeforeTrustInitialization() throws Exception {
         var trustInitialized = new AtomicBoolean();
         var stdout = new java.io.StringWriter();

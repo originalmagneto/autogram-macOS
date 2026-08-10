@@ -193,6 +193,7 @@ public final class MachineInspectionService {
         if (validator == null) {
             throw new IllegalArgumentException("Unsupported document");
         }
+        validator.setCertificateVerifier(new CommonCertificateVerifier());
         return validator;
     }
 
