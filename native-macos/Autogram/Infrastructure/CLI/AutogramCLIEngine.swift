@@ -137,7 +137,10 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
                             let timestamp = try qualifiedTimestampRequest()
                             let files = try request.files.map { file in
                                 let reservation = try reservation(for: file.id, sourceURL: file.sourceURL)
-                                try FileManager.default.removeItem(at: reservation.temporaryURL)
+                                do {
+                                    try FileManager.default.removeItem(at: reservation.temporaryURL)
+                                } catch let error as CocoaError where error.code == .fileNoSuchFile {
+                                }
                                 return machineFile(id: file.id, sourceURL: file.sourceURL, targetURL: reservation.temporaryURL)
                             }
                             let machineRequest = MachineRequest(

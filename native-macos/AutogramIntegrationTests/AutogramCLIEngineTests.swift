@@ -41,6 +41,36 @@ import Testing
     #expect(try fixture.finalizedOutput().starts(with: Data("%PDF-".utf8)))
 }
 
+@Test func signingContinuesWhenInspectedOutputReservationIsAlreadyAbsent() async throws {
+    let fixture = try SigningMachineFixture()
+    defer { try? fixture.remove() }
+
+    let source = fixture.directoryURL.appending(path: "agreement.pdf")
+    try Data("%PDF-1.7\nsource\n%%EOF\n".utf8).write(to: source)
+    let engine = AutogramCLIEngine(configuration: fixture.configuration())
+
+    _ = try await engine.inspect(files: [PDFItemDescriptor(id: "agreement", sourceURL: source)])
+    let reservedOutput = try #require(
+        FileManager.default.contentsOfDirectory(at: fixture.directoryURL, includingPropertiesForKeys: nil)
+            .first { $0.lastPathComponent.hasPrefix(".agreement_signed.pdf.") }
+    )
+    try FileManager.default.removeItem(at: reservedOutput)
+
+    let request = SigningRequest(
+        sessionID: UUID(uuidString: "00000000-0000-0000-0000-000000000001")!,
+        driverID: "token-1",
+        certificateSerial: "certificate-1",
+        pin: Secret("1234"),
+        files: [SigningFile(id: "agreement", sourceURL: source)]
+    )
+    var events: [SigningEvent] = []
+    for try await event in engine.sign(request: request) {
+        events.append(event)
+    }
+
+    #expect(events.last == .completed("agreement"))
+}
+
 @Test func fileFailureCodeBecomesAnActionableSigningFailure() async throws {
     let fixture = try SigningMachineFixture(failureCode: "TIMESTAMP_FAILED")
     defer { try? fixture.remove() }
@@ -187,35 +217,36 @@ private struct SigningMachineFixture {
         executableURL = directoryURL.appending(path: "machine-helper")
         let result = if let failureCode {
             """
-            printf '%s\\n' '{"protocolVersion":1,"type":"file.failed","sessionId":"00000000-0000-0000-0000-000000000001","emittedAt":"2026-08-06T00:00:02Z","fileId":"agreement","payload":{"code":"\(failureCode)"}}'
+            printf '{"protocolVersion":1,"type":"file.failed","sessionId":"%s","emittedAt":"2026-08-06T00:00:02Z","fileId":"agreement","payload":{"code":"\(failureCode)"}}\\n' "$session_id"
             """
         } else {
             """
             target=$(/usr/bin/plutil -extract payload.files.0.target raw -o - "$input")
             printf '%%PDF-1.7\\n%%%%EOF\\n' > "$target"
-            printf '%s\\n' '{"protocolVersion":1,"type":"file.progress","sessionId":"00000000-0000-0000-0000-000000000001","emittedAt":"2026-08-06T00:00:02Z","fileId":"agreement","payload":{"phase":"validating"}}'
-            printf '%s\\n' '{"protocolVersion":1,"type":"file.progress","sessionId":"00000000-0000-0000-0000-000000000001","emittedAt":"2026-08-06T00:00:02Z","fileId":"agreement","payload":{"phase":"saving"}}'
-            printf '%s\\n' '{"protocolVersion":1,"type":"file.completed","sessionId":"00000000-0000-0000-0000-000000000001","emittedAt":"2026-08-06T00:00:02Z","fileId":"agreement","payload":{}}'
+            printf '{"protocolVersion":1,"type":"file.progress","sessionId":"%s","emittedAt":"2026-08-06T00:00:02Z","fileId":"agreement","payload":{"phase":"validating"}}\\n' "$session_id"
+            printf '{"protocolVersion":1,"type":"file.progress","sessionId":"%s","emittedAt":"2026-08-06T00:00:02Z","fileId":"agreement","payload":{"phase":"saving"}}\\n' "$session_id"
+            printf '{"protocolVersion":1,"type":"file.completed","sessionId":"%s","emittedAt":"2026-08-06T00:00:02Z","fileId":"agreement","payload":{}}\\n' "$session_id"
             """
         }
         let terminalEvent = if let terminalFailureCode {
             """
-            printf '%s\\n' '{"protocolVersion":1,"type":"session.failed","sessionId":"00000000-0000-0000-0000-000000000001","emittedAt":"2026-08-06T00:00:03Z","fileId":null,"payload":{"code":"\(terminalFailureCode)","fallbackMessage":"The signing helper rejected the request."}}'
+            printf '{"protocolVersion":1,"type":"session.failed","sessionId":"%s","emittedAt":"2026-08-06T00:00:03Z","fileId":null,"payload":{"code":"\(terminalFailureCode)","fallbackMessage":"The signing helper rejected the request."}}\\n' "$session_id"
             """
         } else {
             """
-            printf '%s\\n' '{"protocolVersion":1,"type":"session.completed","sessionId":"00000000-0000-0000-0000-000000000001","emittedAt":"2026-08-06T00:00:03Z","fileId":null,"payload":{}}'
+            printf '{"protocolVersion":1,"type":"session.completed","sessionId":"%s","emittedAt":"2026-08-06T00:00:03Z","fileId":null,"payload":{}}\\n' "$session_id"
             """
         }
         let script = """
         #!/bin/sh
         input="$AUTOGRAM_TEST_DIRECTORY/request.json"
         cat > "$input"
-        printf '%s\\n' '{"protocolVersion":1,"type":"session.started","sessionId":"00000000-0000-0000-0000-000000000001","emittedAt":"2026-08-06T00:00:00.123456Z","fileId":null,"payload":{}}'
-        printf '%s\\n' '{"protocolVersion":1,"type":"file.signingStarted","sessionId":"00000000-0000-0000-0000-000000000001","emittedAt":"2026-08-06T00:00:01Z","fileId":"agreement","payload":{}}'
-        printf '%s\\n' '{"protocolVersion":1,"type":"file.progress","sessionId":"00000000-0000-0000-0000-000000000001","emittedAt":"2026-08-06T00:00:01Z","fileId":"agreement","payload":{"phase":"preparing"}}'
-        printf '%s\\n' '{"protocolVersion":1,"type":"file.progress","sessionId":"00000000-0000-0000-0000-000000000001","emittedAt":"2026-08-06T00:00:01Z","fileId":"agreement","payload":{"phase":"signing"}}'
-        printf '%s\\n' '{"protocolVersion":1,"type":"file.progress","sessionId":"00000000-0000-0000-0000-000000000001","emittedAt":"2026-08-06T00:00:01Z","fileId":"agreement","payload":{"phase":"future-phase"}}'
+        session_id=$(/usr/bin/plutil -extract requestId raw -o - "$input")
+        printf '{"protocolVersion":1,"type":"session.started","sessionId":"%s","emittedAt":"2026-08-06T00:00:00.123456Z","fileId":null,"payload":{}}\\n' "$session_id"
+        printf '{"protocolVersion":1,"type":"file.signingStarted","sessionId":"%s","emittedAt":"2026-08-06T00:00:01Z","fileId":"agreement","payload":{}}\\n' "$session_id"
+        printf '{"protocolVersion":1,"type":"file.progress","sessionId":"%s","emittedAt":"2026-08-06T00:00:01Z","fileId":"agreement","payload":{"phase":"preparing"}}\\n' "$session_id"
+        printf '{"protocolVersion":1,"type":"file.progress","sessionId":"%s","emittedAt":"2026-08-06T00:00:01Z","fileId":"agreement","payload":{"phase":"signing"}}\\n' "$session_id"
+        printf '{"protocolVersion":1,"type":"file.progress","sessionId":"%s","emittedAt":"2026-08-06T00:00:01Z","fileId":"agreement","payload":{"phase":"future-phase"}}\\n' "$session_id"
         \(result)
         \(terminalEvent)
         """

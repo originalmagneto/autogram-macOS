@@ -43,6 +43,17 @@ struct PDFItem: Sendable, Equatable, Identifiable {
     func updatingInspection(to inspection: PDFItemInspection) -> PDFItem {
         PDFItem(id: id, descriptor: descriptor, status: status, inspection: inspection)
     }
+
+    var workspaceLabel: String {
+        switch status {
+        case .pending: "Inspecting"
+        case .inspected: "Ready"
+        case .signing: "Signing"
+        case .completed: "Signed"
+        case .failed where inspection == .failed: "Inspection failed"
+        case .failed: "Signing failed"
+        }
+    }
 }
 
 enum PDFItemInspection: Sendable, Equatable {

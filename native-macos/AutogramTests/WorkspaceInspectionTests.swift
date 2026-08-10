@@ -67,6 +67,14 @@ import Testing
     #expect(workspace.items[0].inspection.isComplete)
 }
 
+@Test func failedWorkspaceItemDistinguishesInspectionFromSigningFailure() {
+    let descriptor = PDFItemDescriptor(id: "document", sourceURL: URL(fileURLWithPath: "/tmp/document.pdf"))
+    let inspected = InspectedPDF(id: descriptor.id, isSignable: true)
+
+    #expect(PDFItem(descriptor: descriptor, status: .failed, inspection: .failed).workspaceLabel == "Inspection failed")
+    #expect(PDFItem(descriptor: descriptor, status: .failed, inspection: .completed(inspected)).workspaceLabel == "Signing failed")
+}
+
 private actor ControlledInspectionEngine: SigningEngine {
     private struct PendingRequest {
         let files: [PDFItemDescriptor]

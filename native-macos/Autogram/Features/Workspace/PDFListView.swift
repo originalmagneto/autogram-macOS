@@ -12,7 +12,7 @@ struct PDFListView: View {
                     Image(systemName: "doc.richtext")
                     Text(item.descriptor.redactedDisplayName)
                     Spacer()
-                    Text(item.status.workspaceLabel)
+                    Text(item.workspaceLabel)
                         .foregroundStyle(item.status.workspaceColor)
                 }
                 .tag(item.id)
@@ -26,16 +26,6 @@ struct PDFListView: View {
 }
 
 private extension PDFItemStatus {
-    var workspaceLabel: String {
-        switch self {
-        case .pending: "Inspecting"
-        case .inspected: "Ready"
-        case .signing: "Signing"
-        case .completed: "Signed"
-        case .failed: "Inspection failed"
-        }
-    }
-
     var workspaceColor: Color {
         switch self {
         case .failed: .red
