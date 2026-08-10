@@ -36,7 +36,7 @@ import Testing
         .activity(.signingDocuments),
         .activity(.validatingSignedDocuments),
         .activity(.savingSignedDocuments),
-        .completed("agreement")
+        .completed("agreement", outputURL: fixture.directoryURL.appending(path: "agreement_signed.pdf"))
     ])
     #expect(try fixture.finalizedOutput().starts(with: Data("%PDF-".utf8)))
 }
@@ -68,7 +68,10 @@ import Testing
         events.append(event)
     }
 
-    #expect(events.last == .completed("agreement"))
+    #expect(events.last == .completed(
+        "agreement",
+        outputURL: fixture.directoryURL.appending(path: "agreement_signed.pdf")
+    ))
 }
 
 @Test func fileFailureCodeBecomesAnActionableSigningFailure() async throws {

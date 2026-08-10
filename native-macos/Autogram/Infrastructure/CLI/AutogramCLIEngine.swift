@@ -201,8 +201,8 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
                             }
                             for fileID in completedFileIDs {
                                 do {
-                                    try finalizeOutput(for: fileID)
-                                    continuation.yield(.completed(fileID))
+                                    let outputURL = try finalizeOutput(for: fileID)
+                                    continuation.yield(.completed(fileID, outputURL: outputURL))
                                 } catch {
                                     continuation.yield(.failed(fileID, .fileFailed(fileID)))
                                 }
@@ -234,12 +234,13 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
         return reservation
     }
 
-    private func finalizeOutput(for fileID: String) throws {
+    private func finalizeOutput(for fileID: String) throws -> URL {
         lock.lock()
         let reservation = reservations.removeValue(forKey: fileID)
         lock.unlock()
         guard let reservation else { throw OutputServiceError.unableToFinalize }
         try outputService.finalize(reservation)
+        return reservation.finalURL
     }
 
     private func discardTemporaryOutputs(for fileIDs: [String]) {

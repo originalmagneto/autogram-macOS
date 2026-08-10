@@ -1,3 +1,5 @@
+import Foundation
+
 actor SigningCoordinator {
     private let engine: any SigningEngine
     private let workspace: WorkspaceModel?
@@ -55,6 +57,7 @@ actor SigningCoordinator {
         var succeeded = 0
         var failed = 0
         var firstFailure: SigningFailure?
+        var completedOutputs: [PDFItemDescriptor] = []
 
         do {
             for try await event in engine.sign(request: request) {
@@ -65,8 +68,10 @@ actor SigningCoordinator {
                     await updateWorkspaceActivity(phase)
                 case .fileSigning(let fileID):
                     await updateWorkspace([fileID], to: .signing)
-                case .completed(let fileID):
+                case .completed(let fileID, let outputURL):
                     succeeded += 1
+                    completedOutputs.append(PDFItemDescriptor(id: fileID, sourceURL: outputURL))
+                    await updateWorkspaceOutput(for: fileID, to: outputURL)
                     await updateWorkspace([fileID], to: .completed)
                     state = .signing(progress: BatchProgress(total: request.files.count, completed: succeeded, failed: failed))
                 case .failed(let fileID, let failure):
@@ -86,6 +91,8 @@ actor SigningCoordinator {
             await updateWorkspaceActivity(nil)
             throw failure
         }
+
+        await inspectCompletedOutputs(completedOutputs)
 
         let summary = BatchSummary(succeeded: succeeded, failed: failed)
         if failed == 0 {
@@ -119,6 +126,24 @@ actor SigningCoordinator {
     private func updateWorkspace(_ inspections: [PDFInspection], for files: [PDFItemDescriptor]) async {
         guard let workspace else { return }
         await workspace.applyInspectionResults(inspections, for: files)
+    }
+
+    private func updateWorkspaceOutput(for fileID: String, to outputURL: URL) async {
+        guard let workspace else { return }
+        await workspace.updateSignedOutput(for: fileID, to: outputURL)
+    }
+
+    private func inspectCompletedOutputs(_ files: [PDFItemDescriptor]) async {
+        guard !files.isEmpty else { return }
+        await updateWorkspaceActivity(.inspectingDocuments)
+        do {
+            let inspections = try await engine.inspect(files: files)
+            guard let workspace else { return }
+            await workspace.applyPostSigningInspectionResults(inspections, for: files)
+        } catch {
+            guard let workspace else { return }
+            await workspace.markPostSigningInspectionFailed(for: files.map(\.id))
+        }
     }
 
     private func updateWorkspaceInspectionFailure(for fileIDs: [String]) async {

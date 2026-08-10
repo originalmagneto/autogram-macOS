@@ -44,6 +44,10 @@ struct PDFItem: Sendable, Equatable, Identifiable {
         PDFItem(id: id, descriptor: descriptor, status: status, inspection: inspection)
     }
 
+    func updatingDescriptor(to descriptor: PDFItemDescriptor) -> PDFItem {
+        PDFItem(id: id, descriptor: descriptor, status: status, inspection: inspection)
+    }
+
     var workspaceLabel: String {
         switch status {
         case .pending: "Inspecting"

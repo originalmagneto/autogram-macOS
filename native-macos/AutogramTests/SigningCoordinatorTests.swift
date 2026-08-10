@@ -54,6 +54,35 @@ import Foundation
     #expect(engine.signCallCount == 0)
 }
 
+@Test @MainActor func completedSignedOutputBecomesActiveAndIsReinspected() async throws {
+    let source = URL(fileURLWithPath: "/tmp/agreement.pdf")
+    let output = URL(fileURLWithPath: "/tmp/agreement_signed.pdf")
+    let descriptor = PDFItemDescriptor(id: "agreement", sourceURL: source)
+    let engine = PostSigningInspectionEngine(outputURL: output)
+    let workspace = WorkspaceModel(
+        engine: engine,
+        items: [PDFItem(
+            descriptor: descriptor,
+            status: .inspected,
+            inspection: .completed(InspectedPDF(id: descriptor.id, isSignable: true))
+        )]
+    )
+    let coordinator = SigningCoordinator(engine: engine, workspace: workspace)
+
+    try await coordinator.seedCompletedInspection(for: [descriptor])
+    try await coordinator.beginSigning(request: SigningRequest(
+        sessionID: UUID(),
+        driverID: "driver",
+        certificateSerial: "certificate",
+        pin: Secret("1234"),
+        files: [SigningFile(id: descriptor.id, sourceURL: source)]
+    ))
+
+    #expect(workspace.items[0].descriptor.sourceURL == output)
+    #expect(workspace.items[0].inspection.signatures.map(\.signerDisplayName) == ["Ada Lovelace"])
+    #expect(workspace.items[0].status == .completed)
+}
+
 private final class IncompleteInspectionEngine: SigningEngine, @unchecked Sendable {
     private let lock = NSLock()
     private var storedSignCallCount = 0
@@ -108,6 +137,48 @@ private struct FailureSigningEngine: SigningEngine {
     func sign(request: SigningRequest) -> AsyncThrowingStream<SigningEvent, Error> {
         AsyncThrowingStream { continuation in
             continuation.yield(.failed(request.files[0].id, failure))
+            continuation.finish()
+        }
+    }
+
+    func cancel() async {}
+}
+
+private struct PostSigningInspectionEngine: SigningEngine {
+    let outputURL: URL
+
+    func capabilities() async throws -> EngineCapabilities {
+        EngineCapabilities(protocolVersion: 1, supportsQualifiedTimestamp: true)
+    }
+
+    func drivers() async throws -> [SigningDriver] { [] }
+
+    func certificates(driverID: String, pin: Secret?) async throws -> [SigningCertificate] { [] }
+
+    func certificateDiscovery(driverID: String, pin: Secret?) async throws -> CertificateDiscovery {
+        CertificateDiscovery(token: SigningToken(tokenKey: "test-token", providerName: "Test Token"), certificates: [])
+    }
+
+    func inspect(files: [PDFItemDescriptor]) async throws -> [PDFInspection] {
+        [PDFInspection(files: files.map { file in
+            InspectedPDF(
+                id: file.id,
+                isSignable: true,
+                signatures: [ExistingPDFSignature(
+                    id: "signature-1",
+                    signerDisplayName: "Ada Lovelace",
+                    validationState: .indeterminate,
+                    signingTime: nil,
+                    format: "PAdES_BASELINE_T",
+                    hasQualifiedTimestamp: true
+                )]
+            )
+        })]
+    }
+
+    func sign(request: SigningRequest) -> AsyncThrowingStream<SigningEvent, Error> {
+        AsyncThrowingStream<SigningEvent, Error> { continuation in
+            continuation.yield(.completed(request.files[0].id, outputURL: outputURL))
             continuation.finish()
         }
     }

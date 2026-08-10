@@ -234,7 +234,7 @@ private final class CountingWorkspaceSigningEngine: SigningEngine, @unchecked Se
         waiters.forEach { $0.resume() }
         return AsyncThrowingStream { continuation in
             for file in request.files {
-                continuation.yield(.completed(file.id))
+                continuation.yield(.completed(file.id, outputURL: file.sourceURL))
             }
             continuation.finish()
         }

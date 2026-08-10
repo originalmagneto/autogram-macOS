@@ -306,6 +306,37 @@ final class WorkspaceModel {
         }
     }
 
+    func updateSignedOutput(for fileID: String, to outputURL: URL) {
+        items = items.map { item in
+            guard item.descriptor.id == fileID else { return item }
+            return item.updatingDescriptor(to: PDFItemDescriptor(id: fileID, sourceURL: outputURL))
+        }
+    }
+
+    func applyPostSigningInspectionResults(_ inspections: [PDFInspection], for descriptors: [PDFItemDescriptor]) {
+        let requestedIDs = Set(descriptors.map(\.id))
+        let results = Dictionary(
+            inspections.flatMap(\.files)
+                .filter { requestedIDs.contains($0.id) }
+                .map { ($0.id, $0) },
+            uniquingKeysWith: { _, latest in latest }
+        )
+        items = items.map { item in
+            guard requestedIDs.contains(item.descriptor.id) else { return item }
+            guard let result = results[item.descriptor.id], result.isSignable else {
+                return item.updatingInspection(to: .failed)
+            }
+            return item.updatingInspection(to: .completed(result))
+        }
+    }
+
+    func markPostSigningInspectionFailed(for fileIDs: [String]) {
+        let failedIDs = Set(fileIDs)
+        items = items.map { item in
+            failedIDs.contains(item.descriptor.id) ? item.updatingInspection(to: .failed) : item
+        }
+    }
+
     func applyInspectionResults(
         _ inspections: [PDFInspection],
         for descriptors: [PDFItemDescriptor],
