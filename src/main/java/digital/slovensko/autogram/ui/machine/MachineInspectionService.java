@@ -56,6 +56,14 @@ public final class MachineInspectionService {
         return new MachineInspectionService(validatorReportReader, true);
     }
 
+    public static MachineInspectionService forTrustedValidation() {
+        return forTrustedValidation(MachineInspectionService::readTrustedReport);
+    }
+
+    static MachineInspectionService forTrustedValidation(ValidatorReportReader validatorReportReader) {
+        return new MachineInspectionService(validatorReportReader, true);
+    }
+
     private MachineInspectionService(ValidatorReportReader validatorReportReader, boolean genericPathInspection) {
         reportReader = null;
         byteReportReader = null;

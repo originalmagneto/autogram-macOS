@@ -99,19 +99,38 @@ class MachineSigningServiceTest {
     }
 
     @Test
-    void trustedListUnavailabilityPreventsPublication() throws Exception {
+    void v1SigningDoesNotInitializeTrustedLists() throws Exception {
         var writer = new RecordingWriter();
         var target = target("signed.pdf");
+        var trustInitialized = new AtomicBoolean();
         var service = new MachineSigningService(writer.writer(), request -> new FakeSession((file, completed) -> {
             file.writeSignedContent("%PDF-1.7\nsigned\n%%EOF".getBytes());
             completed.run();
-        }), content -> true, () -> { throw new MachineProtocolException("TRUSTED_LIST_UNAVAILABLE"); });
+        }), content -> true, () -> trustInitialized.set(true));
 
         service.sign("request-1", request("1234".toCharArray(), file("one", "source.pdf", target.getFileName().toString())));
 
-        assertFalse(Files.exists(target));
-        assertEquals(List.of("session.started", "file.signingStarted", "file.failed", "session.failed"),
+        assertFalse(trustInitialized.get());
+        assertTrue(Files.exists(target));
+        assertEquals(List.of("session.started", "file.signingStarted", "file.completed", "session.completed"),
                 writer.lifecycleEventTypes());
+    }
+
+    @Test
+    void visibleSigningRequiresTrustedListsBeforeTokenWork() throws Exception {
+        var writer = new RecordingWriter();
+        var target = target("visible-signed.pdf");
+        var sessionOpened = new AtomicBoolean();
+        var service = new MachineSigningService(writer.writer(), request -> {
+            sessionOpened.set(true);
+            throw new AssertionError("Token work must not start without trusted lists");
+        }, content -> true, () -> { throw new MachineProtocolException("TRUSTED_LIST_UNAVAILABLE"); });
+
+        service.sign("request-1", request("1234".toCharArray(),
+                visibleFile("one", "visible-source.pdf", target.getFileName().toString())));
+
+        assertFalse(sessionOpened.get());
+        assertFalse(Files.exists(target));
         assertEquals("TRUSTED_LIST_UNAVAILABLE", writer.payloadCode(2));
     }
 
@@ -448,10 +467,31 @@ class MachineSigningServiceTest {
         }), new MachineSigningService.PdfOutputValidator(inspection));
 
         service.sign("request-1", request("1234".toCharArray(),
-                file("one", "source.pdf", target.getFileName().toString())));
+                visibleFile("one", "source.pdf", target.getFileName().toString())));
 
         assertFalse(Files.exists(target));
         assertEquals("TIMESTAMP_QUALIFICATION_FAILED", writer.payloadCode(2));
+    }
+
+    @Test
+    void productionTrustedInspectionAllowsQualifiedVisiblePadesPublication() {
+        var inspection = MachineInspectionService.forTrustedValidation(ignored -> qualifiedReport("new"));
+        var validator = new MachineSigningService.PdfOutputValidator(inspection);
+        var output = "%PDF-1.7\nvalidated\n%%EOF".getBytes(java.nio.charset.StandardCharsets.ISO_8859_1);
+
+        assertEquals(null, validator.validationFailure(output, java.util.Set.of(), true));
+    }
+
+    @Test
+    void visiblePublicationRequiresPadesWhileV1KeepsBaselineTFormats() {
+        var report = qualifiedReport("new");
+        when(report.getSignatureFormat("new")).thenReturn(SignatureLevel.XAdES_BASELINE_T);
+        var validator = new MachineSigningService.PdfOutputValidator(new MachineInspectionService(path -> report,
+                content -> report));
+        var output = "%PDF-1.7\nvalidated\n%%EOF".getBytes(java.nio.charset.StandardCharsets.ISO_8859_1);
+
+        assertEquals("OUTPUT_VALIDATION_FAILED", validator.validationFailure(output, java.util.Set.of(), true));
+        assertEquals(null, validator.validationFailure(output, java.util.Set.of(), false));
     }
 
     @Test
@@ -645,6 +685,16 @@ class MachineSigningServiceTest {
     private MachineFile file(String id, String sourceName, String targetName) throws Exception {
         var source = Files.writeString(temporaryDirectory.resolve(sourceName), "%PDF-1.7\nfixture\n%%EOF").toRealPath();
         return new MachineFile(id, source.toString(), target(targetName).toString());
+    }
+
+    private MachineFile visibleFile(String id, String sourceName, String targetName) throws Exception {
+        var file = file(id, sourceName, targetName);
+        var image = temporaryDirectory.resolve(id + "-visible.png");
+        Files.copy(Path.of(MachineSigningServiceTest.class
+                .getResource("/digital/slovensko/autogram/sample.png").getFile()), image);
+        var appearance = new VisibleSignatureAppearance(image.toString(), 2, 72, 540, 216, 108,
+                Instant.parse("2026-08-10T12:34:56Z")).snapshot();
+        return new MachineFile(file.id(), file.source(), file.target(), appearance);
     }
 
     private Path target(String name) throws Exception {

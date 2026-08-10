@@ -17,3 +17,12 @@
 - Trusted-list initialization occurs before signing. Publication requires one new intact PAdES Baseline T signature, preservation of previous signature IDs, an intact timestamp, and authoritative qualified timestamp status.
 - The Swift visible path uses one supplied signing instant for the v2 request and removes rendered PNG files on success, failure, or cancellation. The v1 one-shot path is unchanged for requests without visible appearance.
 - The focused suites emit pre-existing toolchain warnings about deprecated APIs and headermaps. They contain no test failures.
+
+## Fix round 1
+
+- Production protocol v2 signing now constructs `MachineInspectionService` with trusted DSS reports, so authoritative timestamp qualification can pass the publication gate.
+- Rendered PNG cleanup is registered at the start of the Swift signing task, before timestamp configuration and helper-gate waiting.
+- Trusted-list initialization and qualified timestamp publication checks now apply only when a file carries a visible appearance. Protocol v1 signing retains its previous behavior.
+- Visible publication independently requires a PDF output whose new signature format is exactly `PAdES_BASELINE_T`. Non-visible validation retains the existing Baseline T formats.
+- `progress.md` restores Task 4 to pending and contains no placeholder commit.
+- GREEN: focused `MachineSigningServiceTest` and `AutogramCLIEngineTests` passed. `git diff --check` passed.

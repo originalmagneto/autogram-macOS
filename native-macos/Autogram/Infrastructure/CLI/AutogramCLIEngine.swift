@@ -135,6 +135,8 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
     func sign(request: SigningRequest) -> AsyncThrowingStream<SigningEvent, Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
+                let renderedImages = request.files.compactMap(\.visibleAppearance?.renderedPNGURL)
+                defer { discardRenderedImages(renderedImages) }
                 do {
                     try await helperOperationGate.withPermit {
                         try await withTaskCancellationHandler {
@@ -244,8 +246,6 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
         timestamp: (endpoints: [String], authentication: TimestampAuthenticationSecret?),
         continuation: AsyncThrowingStream<SigningEvent, Error>.Continuation
     ) async throws {
-        let renderedImages = request.files.compactMap(\.visibleAppearance?.renderedPNGURL)
-        defer { discardRenderedImages(renderedImages) }
         guard request.outputFormat != .asiceXAdES else {
             throw SigningFailure.engine("Visible appearance requires PAdES Baseline T.")
         }

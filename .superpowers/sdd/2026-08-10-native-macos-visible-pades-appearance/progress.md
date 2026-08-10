@@ -13,8 +13,6 @@ Task 2: complete
 Task 3: complete
   Commits: db3ffd95, 28233120
   Proof: focused Java and Swift session tests passed; spec and code quality review approved
-Task 4: complete
-  Commit: pending
-  Proof: focused MachineSigningServiceTest and AutogramCLIEngineTests passed; task-4-report.md records RED, GREEN, and self-review evidence
+Task 4: pending
 Task 5: pending
 Task 6: pending

@@ -90,7 +90,9 @@ public final class MachineSigningService {
             for (var prepared : preparedFiles) {
                 prepared.setPreviousSignatureIds(signatureIds(prepared.sourceContent()));
             }
-            trustInitializer.run();
+            if (preparedFiles.stream().anyMatch(PreparedFile::hasVisibleAppearance)) {
+                trustInitializer.run();
+            }
             try (var session = sessionFactory.apply(request)) {
                 for (; processedFiles < preparedFiles.size(); processedFiles++) {
                     signFile(requestId, session, preparedFiles.get(processedFiles));
@@ -164,7 +166,8 @@ public final class MachineSigningService {
             }
             progress(requestId, file, "validating");
             var signedContent = prepared.readSignedContent();
-            var validationFailure = outputValidationFailure(signedContent, previousSignatureIds);
+            var validationFailure = outputValidationFailure(signedContent, previousSignatureIds,
+                    prepared.hasVisibleAppearance());
             if (validationFailure != null) {
                 throw new MachineProtocolException(validationFailure);
             }
@@ -202,9 +205,10 @@ public final class MachineSigningService {
         }
     }
 
-    private String outputValidationFailure(byte[] content, Set<String> previousSignatureIds) {
+    private String outputValidationFailure(byte[] content, Set<String> previousSignatureIds,
+            boolean visibleAppearance) {
         try {
-            return outputValidator.validationFailure(content, previousSignatureIds);
+            return outputValidator.validationFailure(content, previousSignatureIds, visibleAppearance);
         } catch (Throwable exception) {
             throw new MachineProtocolException("OUTPUT_VALIDATION_FAILED", exception);
         }
@@ -328,6 +332,10 @@ public final class MachineSigningService {
             return previousSignatureIds;
         }
 
+        private boolean hasVisibleAppearance() {
+            return file.visibleAppearance() != null;
+        }
+
         private SigningInput signingInput() {
             return new SigningInput(file, sourceContent.clone(), source, staging);
         }
@@ -421,6 +429,11 @@ public final class MachineSigningService {
 
         default String validationFailure(byte[] content, Set<String> previousSignatureIds) throws Exception {
             return isValid(content, previousSignatureIds) ? null : "OUTPUT_VALIDATION_FAILED";
+        }
+
+        default String validationFailure(byte[] content, Set<String> previousSignatureIds,
+                boolean visibleAppearance) throws Exception {
+            return validationFailure(content, previousSignatureIds);
         }
     }
 
@@ -681,12 +694,19 @@ public final class MachineSigningService {
 
         @Override
         public boolean isValid(byte[] content, Set<String> previousSignatureIds) {
-            return validationFailure(content, previousSignatureIds) == null;
+            return validationFailure(content, previousSignatureIds, false) == null;
         }
 
         @Override
         public String validationFailure(byte[] content, Set<String> previousSignatureIds) {
-            if (!hasPdfHeaderAndEof(content) && !isAsic("output.asice", content)) {
+            return validationFailure(content, previousSignatureIds, false);
+        }
+
+        @Override
+        public String validationFailure(byte[] content, Set<String> previousSignatureIds,
+                boolean visibleAppearance) {
+            if (visibleAppearance ? !hasPdfHeaderAndEof(content)
+                    : !hasPdfHeaderAndEof(content) && !isAsic("output.asice", content)) {
                 return "OUTPUT_VALIDATION_FAILED";
             }
             var signatures = inspectionService.inspect(content).getAsJsonArray("signatures");
@@ -701,7 +721,11 @@ public final class MachineSigningService {
                     || !hasCryptographicIntegrity(added.getFirst()) || !hasCryptographicallyValidTimestamp(added.getFirst())) {
                 return "OUTPUT_VALIDATION_FAILED";
             }
-            return hasQualifiedTimestamp(added.getFirst()) ? null : "TIMESTAMP_QUALIFICATION_FAILED";
+            if (visibleAppearance && !"PAdES_BASELINE_T".equals(string(added.getFirst(), "format"))) {
+                return "OUTPUT_VALIDATION_FAILED";
+            }
+            return !visibleAppearance || hasQualifiedTimestamp(added.getFirst())
+                    ? null : "TIMESTAMP_QUALIFICATION_FAILED";
         }
 
         @Override

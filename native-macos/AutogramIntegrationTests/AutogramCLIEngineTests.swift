@@ -49,6 +49,47 @@ import Testing
     #expect(!FileManager.default.fileExists(atPath: rendered.path))
 }
 
+@Test func visibleAppearanceIsRemovedWhenTimestampConfigurationFailsEarly() async throws {
+    let fixture = try SigningMachineFixture()
+    defer { try? fixture.remove() }
+
+    let source = fixture.directoryURL.appending(path: "agreement.pdf")
+    let rendered = fixture.directoryURL.appending(path: "visible-signature.png")
+    try Data("%PDF-1.7\nsource\n%%EOF\n".utf8).write(to: source)
+    try Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]).write(to: rendered)
+    let engine = AutogramCLIEngine(
+        configuration: fixture.configuration(),
+        timestampSourceProvider: EmptyTimestampSourceProvider()
+    )
+    let request = SigningRequest(
+        sessionID: UUID(),
+        driverID: "token-1",
+        certificateSerial: "certificate-1",
+        pin: Secret("1234"),
+        files: [SigningFile(
+            id: "agreement",
+            sourceURL: source,
+            visibleAppearance: VisibleSignatureRequest(
+                renderedPNGURL: rendered,
+                page: 2,
+                originX: 72,
+                originY: 540,
+                width: 216,
+                height: 108,
+                signingTime: Date(timeIntervalSince1970: 1_786_377_296)
+            )
+        )]
+    )
+
+    do {
+        for try await _ in engine.sign(request: request) {
+        }
+    } catch {
+    }
+
+    #expect(!FileManager.default.fileExists(atPath: rendered.path))
+}
+
 @Test func signingTranslatesToQualifiedTimestampRequestAndFinalizesValidatedOutput() async throws {
     let fixture = try SigningMachineFixture()
     defer { try? fixture.remove() }
@@ -362,6 +403,19 @@ private struct SigningMachineFixture {
 
     func remove() throws {
         try FileManager.default.removeItem(at: directoryURL)
+    }
+}
+
+private struct EmptyTimestampSourceProvider: TimestampSourceProviding {
+    func load() -> TimestampSourceConfiguration {
+        TimestampSourceConfiguration(
+            source: .custom,
+            customProvider: CustomTimestampProviderConfiguration(urls: [])
+        )
+    }
+
+    func credential(for provider: CustomTimestampProviderConfiguration) throws -> Secret? {
+        nil
     }
 }
 

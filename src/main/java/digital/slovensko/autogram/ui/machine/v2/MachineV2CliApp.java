@@ -86,7 +86,7 @@ public final class MachineV2CliApp {
     private static void sign(MachineV2Request request, EventWriter writer) {
         var intermediate = new StringWriter();
         var service = new MachineSigningService(new MachineEventWriter(new PrintWriter(intermediate)),
-                new MachineInspectionService(), new MachineTrustService()::initialize);
+                MachineInspectionService.forTrustedValidation(), new MachineTrustService()::initialize);
         var failure = service.signV2(request.requestId(), request.payload());
         for (var line : intermediate.toString().strip().split("\\n")) {
             if (line.isBlank()) {
