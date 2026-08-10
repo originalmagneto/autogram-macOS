@@ -422,6 +422,7 @@ public final class MachineSigningService {
         public SigningSession apply(SignRequest request) {
             var timestampDataLoader = MachineTimestampDataLoader.create(request.timestamp());
             try {
+                settings.setSignatureLevel(SignatureLevel.valueOf(request.signatureLevel()));
                 settings.setTsaServer(String.join(",", request.timestamp().servers()), timestampDataLoader);
                 settings.setTsaEnabled(true);
                 var driver = driverDetector.getAvailableDrivers().stream()
@@ -521,6 +522,10 @@ public final class MachineSigningService {
                             false, false, settings.getTspSource());
                 }
                 throw new IOException("Unsupported ASiC signature format");
+            }
+            if (settings.getSignatureLevel() == SignatureLevel.XAdES_BASELINE_T) {
+                return SigningParameters.buildForASiCWithXAdES(document, false, false,
+                        settings.getTspSource(), true);
             }
             return SigningParameters.buildForPDF(document, false, false, settings.getTspSource());
         }

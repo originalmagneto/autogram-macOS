@@ -29,12 +29,13 @@ class MachineDriverServiceTest {
     private final MachineProtocolCodec codec = new MachineProtocolCodec();
 
     @Test
-    void capabilitiesForcePdfBaselineTAndQualifiedTimestamp() {
+    void capabilitiesAdvertiseBaselineTFormatsAndQualifiedTimestamp() {
         var service = serviceWith();
 
         var payload = service.capabilities();
 
-        assertEquals(List.of("PAdES_BASELINE_T"), strings(payload.getAsJsonArray("signatureLevels")));
+        assertEquals(List.of("PAdES_BASELINE_T", "XAdES_BASELINE_T"),
+                strings(payload.getAsJsonArray("signatureLevels")));
         var timestampPolicy = payload.getAsJsonObject("timestampPolicy");
         assertTrue(timestampPolicy.get("required").getAsBoolean());
         assertTrue(timestampPolicy.get("qualified").getAsBoolean());

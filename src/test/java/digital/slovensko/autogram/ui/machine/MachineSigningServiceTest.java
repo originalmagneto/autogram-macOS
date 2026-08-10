@@ -5,7 +5,9 @@ import digital.slovensko.autogram.core.PasswordManager;
 import digital.slovensko.autogram.core.SignedDocument;
 import digital.slovensko.autogram.core.errors.PINIncorrectException;
 import digital.slovensko.autogram.drivers.TokenDriver;
+import eu.europa.esig.dss.enumerations.ASiCContainerType;
 import eu.europa.esig.dss.enumerations.Indication;
+import eu.europa.esig.dss.enumerations.SignatureForm;
 import eu.europa.esig.dss.enumerations.SignatureLevel;
 import eu.europa.esig.dss.model.InMemoryDocument;
 import eu.europa.esig.dss.simplereport.SimpleReport;
@@ -529,6 +531,24 @@ class MachineSigningServiceTest {
 
         assertEquals(SignatureLevel.PAdES_BASELINE_T, job.getParameters().getLevel());
         assertEquals(eu.europa.esig.dss.enumerations.SignatureForm.PAdES, job.getParameters().getSignatureType());
+    }
+
+    @Test
+    void signingJobWrapsPdfInAsicEWithXadesWhenRequested() throws Exception {
+        var source = Path.of(MachineSigningServiceTest.class
+                .getResource("/digital/slovensko/autogram/sample.pdf").getFile());
+        var responder = new MachineFileResponder(new MemoryRetainedFile(), () -> { });
+        var settings = new MachineSettings(true);
+        settings.setSignatureLevel(SignatureLevel.XAdES_BASELINE_T);
+        settings.setTsaServer("https://tsa.example.test");
+        settings.setTsaEnabled(true);
+
+        var job = MachineSigningService.DefaultSigningSession.signingJob(Files.readAllBytes(source), source.toString(),
+                responder, settings);
+
+        assertEquals(SignatureLevel.XAdES_BASELINE_T, job.getParameters().getLevel());
+        assertEquals(SignatureForm.XAdES, job.getParameters().getSignatureType());
+        assertEquals(ASiCContainerType.ASiC_E, job.getParameters().getContainer());
     }
 
     @Test

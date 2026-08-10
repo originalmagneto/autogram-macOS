@@ -49,6 +49,7 @@ public final class MachineDriverService {
         var payload = new JsonObject();
         var signatureLevels = new JsonArray();
         signatureLevels.add("PAdES_BASELINE_T");
+        signatureLevels.add("XAdES_BASELINE_T");
         payload.add("signatureLevels", signatureLevels);
 
         var timestampPolicy = new JsonObject();

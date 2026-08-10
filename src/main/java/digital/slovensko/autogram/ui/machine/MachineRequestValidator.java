@@ -45,7 +45,8 @@ public final class MachineRequestValidator {
                 || request.pin() == null || request.pin().length == 0 || request.files() == null || request.files().isEmpty()) {
             throw invalidRequest();
         }
-        if (!"PAdES_BASELINE_T".equals(request.signatureLevel())) {
+        if (!"PAdES_BASELINE_T".equals(request.signatureLevel())
+                && !"XAdES_BASELINE_T".equals(request.signatureLevel())) {
             throw new MachineProtocolException("SIGNATURE_LEVEL_REQUIRED");
         }
         validateTimestamp(request.timestamp());

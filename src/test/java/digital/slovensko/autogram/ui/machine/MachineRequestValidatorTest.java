@@ -34,6 +34,13 @@ class MachineRequestValidatorTest {
     }
 
     @Test
+    void acceptsXadesBaselineTForAsicOutput() throws Exception {
+        var request = signRequest("XAdES_BASELINE_T", files(pdf("source.pdf"), target("signed.asice")));
+
+        assertDoesNotThrow(() -> MachineRequestValidator.validateSign(request));
+    }
+
+    @Test
     void rejectsMissingAndExistingTargetFiles() throws Exception {
         var missing = signRequest("PAdES_BASELINE_T", files(temporaryDirectory.resolve("missing.pdf"), target("one.pdf")));
         var existingTarget = Files.writeString(target("existing.pdf"), "%PDF-1.7\n%%EOF");
