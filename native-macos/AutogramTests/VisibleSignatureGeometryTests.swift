@@ -31,3 +31,29 @@ import Testing
         #expect(field.height == testCase.height)
     }
 }
+
+@Test func rotatedPlacementGeometryAlignsVisualBoundsAndHitTesting() {
+    let rect = CGRect(x: 10, y: 20, width: 100, height: 50)
+    let geometry = PDFPlacementGeometry(rect: rect, rotationDegrees: 90)
+    let rotatedTopLeft = geometry.rotatedPoint(CGPoint(x: rect.minX, y: rect.minY))
+
+    #expect(approximatelyEqual(rotatedTopLeft, CGPoint(x: 85, y: -5)))
+    #expect(approximatelyEqual(geometry.visualBounds, CGRect(x: 35, y: -5, width: 50, height: 100)))
+    #expect(approximatelyEqual(geometry.unrotatedPoint(rotatedTopLeft), CGPoint(x: rect.minX, y: rect.minY)))
+    #expect(geometry.contains(geometry.rotatedPoint(CGPoint(x: 20, y: 30))))
+    #expect(!geometry.contains(CGPoint(x: rect.minX, y: rect.minY)))
+}
+
+private func approximatelyEqual(_ lhs: CGPoint, _ rhs: CGPoint) -> Bool {
+    approximatelyEqual(lhs.x, rhs.x) && approximatelyEqual(lhs.y, rhs.y)
+}
+
+private func approximatelyEqual(_ lhs: CGRect, _ rhs: CGRect) -> Bool {
+    approximatelyEqual(lhs.origin, rhs.origin)
+        && approximatelyEqual(lhs.width, rhs.width)
+        && approximatelyEqual(lhs.height, rhs.height)
+}
+
+private func approximatelyEqual(_ lhs: CGFloat, _ rhs: CGFloat) -> Bool {
+    abs(lhs - rhs) <= CGFloat.ulpOfOne.squareRoot()
+}

@@ -1,6 +1,34 @@
 import AppKit
 import PDFKit
 
+struct PDFPlacementGeometry {
+    let rect: CGRect
+    let rotationDegrees: Double
+
+    var transform: CGAffineTransform {
+        let center = CGPoint(x: rect.midX, y: rect.midY)
+        return CGAffineTransform(translationX: center.x, y: center.y)
+            .rotated(by: CGFloat(rotationDegrees) * .pi / 180)
+            .translatedBy(x: -center.x, y: -center.y)
+    }
+
+    var visualBounds: CGRect {
+        rect.applying(transform)
+    }
+
+    func rotatedPoint(_ point: CGPoint) -> CGPoint {
+        point.applying(transform)
+    }
+
+    func unrotatedPoint(_ point: CGPoint) -> CGPoint {
+        point.applying(transform.inverted())
+    }
+
+    func contains(_ point: CGPoint) -> Bool {
+        rect.contains(unrotatedPoint(point))
+    }
+}
+
 final class PDFPlacementOverlayView: NSView {
     private enum Handle: CaseIterable {
         case topLeft
@@ -20,7 +48,7 @@ final class PDFPlacementOverlayView: NSView {
 
     private enum Interaction {
         case drag(startPoint: CGPoint, startRect: CGRect)
-        case resize(handle: Handle, anchor: CGPoint, aspectRatio: CGFloat)
+        case resize(handle: Handle, geometry: PDFPlacementGeometry, aspectRatio: CGFloat)
         case rotate(center: CGPoint, startAngle: CGFloat, startRotation: Double)
     }
 
@@ -43,7 +71,11 @@ final class PDFPlacementOverlayView: NSView {
     override var acceptsFirstResponder: Bool { true }
 
     override func draw(_ dirtyRect: NSRect) {
-        guard let targetRect = placementRectInOverlay() else { return }
+        guard let geometry = placementGeometry() else { return }
+        let targetRect = geometry.rect
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current?.cgContext.concatenate(geometry.transform)
+        defer { NSGraphicsContext.restoreGraphicsState() }
 
         if let cardPreview {
             cardPreview.draw(in: targetRect)
@@ -64,23 +96,25 @@ final class PDFPlacementOverlayView: NSView {
     }
 
     override func mouseDown(with event: NSEvent) {
-        guard let targetRect = placementRectInOverlay() else { return }
+        guard let geometry = placementGeometry() else { return }
+        let targetRect = geometry.rect
         let point = convert(event.locationInWindow, from: nil)
+        let unrotatedPoint = geometry.unrotatedPoint(point)
 
-        if let handle = Handle.allCases.first(where: { handleRect(for: $0, in: targetRect).contains(point) }) {
+        if let handle = Handle.allCases.first(where: { handleRect(for: $0, in: targetRect).contains(unrotatedPoint) }) {
             interaction = .resize(
                 handle: handle,
-                anchor: oppositeCorner(for: handle, in: targetRect),
+                geometry: geometry,
                 aspectRatio: targetRect.width / targetRect.height
             )
-        } else if rotationHandleRect(in: targetRect).contains(point) {
+        } else if rotationHandleRect(in: targetRect).contains(unrotatedPoint) {
             let center = CGPoint(x: targetRect.midX, y: targetRect.midY)
             interaction = .rotate(
                 center: center,
                 startAngle: angle(from: center, to: point),
                 startRotation: placement?.rotationDegrees ?? 0
             )
-        } else if targetRect.contains(point) {
+        } else if geometry.contains(point) {
             interaction = .drag(startPoint: point, startRect: targetRect)
         } else {
             interaction = nil
@@ -95,16 +129,24 @@ final class PDFPlacementOverlayView: NSView {
         switch interaction {
         case let .drag(startPoint, startRect):
             let rect = startRect.offsetBy(dx: point.x - startPoint.x, dy: point.y - startPoint.y)
-            updatePlacement(from: snapped(rect, near: point))
-        case let .resize(handle, anchor, aspectRatio):
+            updatePlacement(from: snapped(
+                rect,
+                rotationDegrees: placement?.rotationDegrees ?? 0,
+                near: point
+            ))
+        case let .resize(handle, geometry, aspectRatio):
             let rect = resizedRect(
                 handle: handle,
-                anchor: anchor,
+                geometry: geometry,
                 point: point,
                 aspectRatio: aspectRatio,
                 preservesAspectRatio: !event.modifierFlags.contains(.option)
             )
-            updatePlacement(from: snapped(rect, near: point))
+            updatePlacement(from: snapped(
+                rect,
+                rotationDegrees: geometry.rotationDegrees,
+                near: point
+            ))
         case let .rotate(center, startAngle, startRotation):
             var updated = placement
             updated?.rotationDegrees = startRotation + Double(angle(from: center, to: point) - startAngle) * 180 / .pi
@@ -117,7 +159,7 @@ final class PDFPlacementOverlayView: NSView {
     }
 
     override func accessibilityChildren() -> [Any]? {
-        guard placementRectInOverlay() != nil else { return [] }
+        guard placementGeometry() != nil else { return [] }
         return Handle.allCases.map { handle in
             let element = NSAccessibilityElement()
             element.setAccessibilityRole(.button)
@@ -160,6 +202,11 @@ final class PDFPlacementOverlayView: NSView {
         return convert(pdfViewRect, from: pdfView)
     }
 
+    private func placementGeometry() -> PDFPlacementGeometry? {
+        guard let placement, let rect = placementRectInOverlay() else { return nil }
+        return PDFPlacementGeometry(rect: rect, rotationDegrees: placement.rotationDegrees)
+    }
+
     private func updatePlacement(from overlayRect: CGRect) {
         guard let pdfView,
               let document = pdfView.document else {
@@ -181,14 +228,20 @@ final class PDFPlacementOverlayView: NSView {
         publish(updated)
     }
 
-    private func snapped(_ rect: CGRect, near point: CGPoint) -> CGRect {
+    private func snapped(_ rect: CGRect, rotationDegrees: Double, near point: CGPoint) -> CGRect {
         guard let page = pageRect(at: point) else { return rect }
+        let visualBounds = PDFPlacementGeometry(
+            rect: rect,
+            rotationDegrees: rotationDegrees
+        ).visualBounds
         let distance = handleDiameter / 2
-        let xCandidates = [page.minX, page.midX - rect.width / 2, page.maxX - rect.width]
-        let yCandidates = [page.minY, page.midY - rect.height / 2, page.maxY - rect.height]
-        let x = xCandidates.first { abs($0 - rect.minX) <= distance } ?? rect.minX
-        let y = yCandidates.first { abs($0 - rect.minY) <= distance } ?? rect.minY
-        return CGRect(x: x, y: y, width: rect.width, height: rect.height)
+        let xCandidates = [page.minX, page.midX - visualBounds.width / 2, page.maxX - visualBounds.width]
+        let yCandidates = [page.minY, page.midY - visualBounds.height / 2, page.maxY - visualBounds.height]
+        let xOffset = xCandidates.first { abs($0 - visualBounds.minX) <= distance }
+            .map { $0 - visualBounds.minX } ?? 0
+        let yOffset = yCandidates.first { abs($0 - visualBounds.minY) <= distance }
+            .map { $0 - visualBounds.minY } ?? 0
+        return rect.offsetBy(dx: xOffset, dy: yOffset)
     }
 
     private func pageRect(at point: CGPoint) -> CGRect? {
@@ -200,18 +253,34 @@ final class PDFPlacementOverlayView: NSView {
 
     private func resizedRect(
         handle: Handle,
-        anchor: CGPoint,
+        geometry: PDFPlacementGeometry,
         point: CGPoint,
         aspectRatio: CGFloat,
         preservesAspectRatio: Bool
     ) -> CGRect {
-        let width = abs(point.x - anchor.x)
-        let height = preservesAspectRatio ? width / aspectRatio : abs(point.y - anchor.y)
+        let anchor = oppositeCorner(for: handle, in: geometry.rect)
+        let fixedPoint = geometry.rotatedPoint(anchor)
+        let alignedPoint = point.applying(
+            CGAffineTransform(translationX: fixedPoint.x, y: fixedPoint.y)
+                .rotated(by: -CGFloat(geometry.rotationDegrees) * .pi / 180)
+                .translatedBy(x: -fixedPoint.x, y: -fixedPoint.y)
+        )
+        let width = abs(alignedPoint.x - fixedPoint.x)
+        let height = preservesAspectRatio ? width / aspectRatio : abs(alignedPoint.y - fixedPoint.y)
         guard width > 0, height > 0 else { return placementRectInOverlay() ?? .zero }
 
-        let x = handle == .topLeft || handle == .bottomLeft ? anchor.x - width : anchor.x
-        let y = handle == .topLeft || handle == .topRight ? anchor.y - height : anchor.y
-        return CGRect(x: x, y: y, width: width, height: height)
+        let x = handle == .topLeft || handle == .bottomLeft ? fixedPoint.x - width : fixedPoint.x
+        let y = handle == .topLeft || handle == .topRight ? fixedPoint.y - height : fixedPoint.y
+        let candidate = CGRect(x: x, y: y, width: width, height: height)
+        let candidateGeometry = PDFPlacementGeometry(
+            rect: candidate,
+            rotationDegrees: geometry.rotationDegrees
+        )
+        let rotatedAnchor = candidateGeometry.rotatedPoint(oppositeCorner(for: handle, in: candidate))
+        return candidate.offsetBy(
+            dx: fixedPoint.x - rotatedAnchor.x,
+            dy: fixedPoint.y - rotatedAnchor.y
+        )
     }
 
     private func handleRect(for handle: Handle, in rect: CGRect) -> CGRect {
