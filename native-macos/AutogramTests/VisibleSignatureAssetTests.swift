@@ -28,8 +28,14 @@ import Testing
         let pdfAsset = try store.importPDF(fixturePDF, pageIndex: 1)
         let pdfURL = store.fileURL(for: pdfAsset)
         let pdfSize = try pngPixelSize(pdfURL)
+        let persistedPDFAsset = try JSONDecoder().decode(
+            SignatureAsset.self,
+            from: JSONEncoder().encode(pdfAsset)
+        )
 
         #expect(pdfAsset.kind == .pdf)
+        #expect(persistedPDFAsset == pdfAsset)
+        #expect(store.fileURL(for: persistedPDFAsset) == pdfURL)
         #expect(pdfURL.deletingLastPathComponent() == store.assetsDirectory)
         #expect(pdfSize.width == 40)
         #expect(pdfSize.height == 20)
