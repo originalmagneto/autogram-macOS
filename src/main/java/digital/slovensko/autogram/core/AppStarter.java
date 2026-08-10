@@ -3,6 +3,7 @@ package digital.slovensko.autogram.core;
 import digital.slovensko.autogram.ui.cli.CliApp;
 import digital.slovensko.autogram.ui.gui.GUIApp;
 import digital.slovensko.autogram.ui.machine.MachineCliApp;
+import digital.slovensko.autogram.ui.machine.v2.MachineV2CliApp;
 import javafx.application.Application;
 import org.apache.commons.cli.*;
 
@@ -59,10 +60,7 @@ public class AppStarter {
             } else if (cmd.hasOption("u")) {
                 printUsage();
             } else if (cmd.hasOption("c")) {
-                var exitCode = dispatchCli(cmd, CliApp::start, machineCommandLine -> MachineCliApp.start(machineCommandLine,
-                                new InputStreamReader(System.in, StandardCharsets.UTF_8),
-                                new PrintWriter(System.out, true, StandardCharsets.UTF_8),
-                                new PrintWriter(System.err, true, StandardCharsets.UTF_8)));
+                var exitCode = dispatchCli(cmd, CliApp::start, machineCommandLine -> machineCliStart(machineCommandLine));
                 System.out.flush();
                 System.err.flush();
                 if (cmd.hasOption("machine-readable")) {
@@ -87,6 +85,16 @@ public class AppStarter {
     static int dispatchCli(CommandLine commandLine, Function<CommandLine, Integer> humanCli,
             Function<CommandLine, Integer> machineCli) {
         return commandLine.hasOption("machine-readable") ? machineCli.apply(commandLine) : humanCli.apply(commandLine);
+    }
+
+    private static int machineCliStart(CommandLine commandLine) {
+        var input = new InputStreamReader(System.in, StandardCharsets.UTF_8);
+        var output = new PrintWriter(System.out, true, StandardCharsets.UTF_8);
+        var error = new PrintWriter(System.err, true, StandardCharsets.UTF_8);
+        if ("2".equals(commandLine.getOptionValue("protocol-version"))) {
+            return MachineV2CliApp.start(commandLine, input, output, error);
+        }
+        return MachineCliApp.start(commandLine, input, output, error);
     }
 
     static boolean requiresIntelCliCleanup(CommandLine commandLine) {

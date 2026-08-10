@@ -2,6 +2,7 @@ import Foundation
 
 final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
     private let runner: CLIProcessRunner
+    private let machineSession: MachineSessionProcess
     private let configuration: ProcessConfiguration
     private let driverResolver: DriverResolver
     private let outputService: OutputService
@@ -13,12 +14,14 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
     init(
         configuration: ProcessConfiguration = .production,
         runner: CLIProcessRunner = .init(),
+        machineSession: MachineSessionProcess = .init(),
         driverResolver: DriverResolver = .init(),
         outputService: OutputService = .init(),
         timestampSourceProvider: any TimestampSourceProviding = TimestampSourcePreferencesStore()
     ) {
         self.configuration = configuration
         self.runner = runner
+        self.machineSession = machineSession
         self.driverResolver = driverResolver
         self.outputService = outputService
         self.timestampSourceProvider = timestampSourceProvider
@@ -228,6 +231,7 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
 
     func cancel() async {
         await runner.cancel()
+        await machineSession.stop()
     }
 
     private func reservation(
@@ -270,6 +274,10 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
 
     private func run(_ request: MachineRequest) async throws -> [MachineEvent] {
         try await run(SecureMachineRequest(envelope: request))
+    }
+
+    private func runV2(_ request: SecureMachineV2Request) async throws -> [MachineV2Event] {
+        try await machineSession.send(request, configuration: configuration)
     }
 
     private func run(_ request: SecureMachineRequest) async throws -> [MachineEvent] {

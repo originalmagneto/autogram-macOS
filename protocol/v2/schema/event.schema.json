@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Autogram Machine Protocol v2 Event",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocolVersion", "requestId", "type", "emittedAt", "payload"],
+  "properties": {
+    "protocolVersion": { "const": 2 },
+    "requestId": { "type": "string", "minLength": 1 },
+    "type": {
+      "type": "string",
+      "enum": [
+        "request.started",
+        "certificates.available",
+        "inspection.completed",
+        "file.failed",
+        "request.completed",
+        "request.failed"
+      ]
+    },
+    "emittedAt": { "type": "string", "format": "date-time" },
+    "fileId": { "type": ["string", "null"] },
+    "payload": { "type": "object" }
+  }
+}
