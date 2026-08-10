@@ -5,6 +5,7 @@ import digital.slovensko.autogram.core.PasswordManager;
 import digital.slovensko.autogram.core.SignedDocument;
 import digital.slovensko.autogram.core.errors.PINIncorrectException;
 import digital.slovensko.autogram.drivers.TokenDriver;
+import digital.slovensko.autogram.ui.machine.v2.VisibleSignatureAppearance;
 import eu.europa.esig.dss.enumerations.ASiCContainerType;
 import eu.europa.esig.dss.enumerations.Indication;
 import eu.europa.esig.dss.enumerations.SignatureForm;
@@ -24,6 +25,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.security.KeyStore;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -97,17 +99,20 @@ class MachineSigningServiceTest {
     }
 
     @Test
-    void signsWithoutInitializingTrustedListsForLocalOutputValidation() throws Exception {
+    void trustedListUnavailabilityPreventsPublication() throws Exception {
         var writer = new RecordingWriter();
+        var target = target("signed.pdf");
         var service = new MachineSigningService(writer.writer(), request -> new FakeSession((file, completed) -> {
             file.writeSignedContent("%PDF-1.7\nsigned\n%%EOF".getBytes());
             completed.run();
         }), content -> true, () -> { throw new MachineProtocolException("TRUSTED_LIST_UNAVAILABLE"); });
 
-        service.sign("request-1", request("1234".toCharArray(), file("one", "source.pdf", "signed.pdf")));
+        service.sign("request-1", request("1234".toCharArray(), file("one", "source.pdf", target.getFileName().toString())));
 
-        assertEquals(List.of("session.started", "file.signingStarted", "file.completed", "session.completed"),
+        assertFalse(Files.exists(target));
+        assertEquals(List.of("session.started", "file.signingStarted", "file.failed", "session.failed"),
                 writer.lifecycleEventTypes());
+        assertEquals("TRUSTED_LIST_UNAVAILABLE", writer.payloadCode(2));
     }
 
     @Test
@@ -431,12 +436,22 @@ class MachineSigningServiceTest {
     }
 
     @Test
-    void outputValidatorAcceptsANewBaselineTSignatureWhenTimestampQualificationIsUnavailable() {
-        var validator = new MachineSigningService.PdfOutputValidator(new MachineInspectionService(path -> qualifiedReport(),
-                content -> locallyValidTimestampReport("existing", "new")));
-        var output = "%PDF-1.7\nvalidated\n%%EOF".getBytes(java.nio.charset.StandardCharsets.ISO_8859_1);
+    void unavailableTimestampQualificationPreventsPublication() throws Exception {
+        var writer = new RecordingWriter();
+        var target = target("timestamp-unqualified.pdf");
+        var inspection = new MachineInspectionService(path -> locallyValidTimestampReport("existing"), content ->
+                new String(content, java.nio.charset.StandardCharsets.ISO_8859_1).contains("signed")
+                        ? locallyValidTimestampReport("existing", "new") : locallyValidTimestampReport("existing"));
+        var service = new MachineSigningService(writer.writer(), request -> new FakeSession((file, completed) -> {
+            file.writeSignedContent("%PDF-1.7\nsigned\n%%EOF".getBytes());
+            completed.run();
+        }), new MachineSigningService.PdfOutputValidator(inspection));
 
-        assertTrue(validator.isValid(output, java.util.Set.of("existing")));
+        service.sign("request-1", request("1234".toCharArray(),
+                file("one", "source.pdf", target.getFileName().toString())));
+
+        assertFalse(Files.exists(target));
+        assertEquals("TIMESTAMP_QUALIFICATION_FAILED", writer.payloadCode(2));
     }
 
     @Test
@@ -531,6 +546,41 @@ class MachineSigningServiceTest {
 
         assertEquals(SignatureLevel.PAdES_BASELINE_T, job.getParameters().getLevel());
         assertEquals(eu.europa.esig.dss.enumerations.SignatureForm.PAdES, job.getParameters().getSignatureType());
+    }
+
+    @Test
+    void signingJobBindsTheSnapshottedVisiblePadesAppearance() throws Exception {
+        var source = Path.of(MachineSigningServiceTest.class
+                .getResource("/digital/slovensko/autogram/sample.pdf").getFile());
+        var image = temporaryDirectory.resolve("visible-signature.png");
+        Files.copy(Path.of(MachineSigningServiceTest.class
+                .getResource("/digital/slovensko/autogram/sample.png").getFile()), image);
+        var appearance = new VisibleSignatureAppearance(image.toString(), 2, 72, 540, 216, 108,
+                Instant.parse("2026-08-10T12:34:56Z"));
+        var snapshot = appearance.snapshot();
+        Files.writeString(image, "replacement");
+        var responder = new MachineFileResponder(new MemoryRetainedFile(), () -> { });
+        var settings = new MachineSettings(true);
+        settings.setTsaServer("https://tsa.example.test");
+        settings.setTsaEnabled(true);
+
+        var job = MachineSigningService.DefaultSigningSession.signingJob(Files.readAllBytes(source), source.toString(),
+                responder, settings, snapshot);
+        var parameters = job.getParameters().getPAdESSignatureParameters();
+        var field = parameters.getImageParameters().getFieldParameters();
+
+        assertEquals(2, field.getPage());
+        assertEquals(72, field.getOriginX());
+        assertEquals(540, field.getOriginY());
+        assertEquals(216, field.getWidth());
+        assertEquals(108, field.getHeight());
+        assertEquals(eu.europa.esig.dss.enumerations.VisualSignatureRotation.NONE, field.getRotation());
+        assertEquals(eu.europa.esig.dss.enumerations.ImageScaling.STRETCH,
+                parameters.getImageParameters().getImageScaling());
+        assertEquals(Instant.parse("2026-08-10T12:34:56Z"), parameters.getSigningDate().toInstant());
+        try (var imageStream = parameters.getImageParameters().getImage().openStream()) {
+            assertTrue(Arrays.equals(snapshot.pngBytes(), imageStream.readAllBytes()));
+        }
     }
 
     @Test

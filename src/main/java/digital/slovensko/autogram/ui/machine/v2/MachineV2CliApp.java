@@ -5,13 +5,17 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import digital.slovensko.autogram.ui.machine.MachineDriverService;
 import digital.slovensko.autogram.ui.machine.MachineInspectionService;
+import digital.slovensko.autogram.ui.machine.MachineEventWriter;
 import digital.slovensko.autogram.ui.machine.MachineProtocolException;
+import digital.slovensko.autogram.ui.machine.MachineSigningService;
+import digital.slovensko.autogram.ui.machine.MachineTrustService;
 import org.apache.commons.cli.CommandLine;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.Reader;
+import java.io.StringWriter;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -74,7 +78,31 @@ public final class MachineV2CliApp {
             case CAPABILITIES -> capabilities(request, writer, driverService);
             case INSPECT -> inspect(request, writer, inspectionService);
             case CERTIFICATES -> certificates(request, writer, driverService);
-            case SIGN, TIMESTAMP, VALIDATE -> throw new MachineProtocolException("OPERATION_UNAVAILABLE");
+            case SIGN -> sign(request, writer);
+            case TIMESTAMP, VALIDATE -> throw new MachineProtocolException("OPERATION_UNAVAILABLE");
+        }
+    }
+
+    private static void sign(MachineV2Request request, EventWriter writer) {
+        var intermediate = new StringWriter();
+        var service = new MachineSigningService(new MachineEventWriter(new PrintWriter(intermediate)),
+                new MachineInspectionService(), new MachineTrustService()::initialize);
+        var failure = service.signV2(request.requestId(), request.payload());
+        for (var line : intermediate.toString().strip().split("\\n")) {
+            if (line.isBlank()) {
+                continue;
+            }
+            var event = com.google.gson.JsonParser.parseString(line).getAsJsonObject();
+            var type = event.get("type").getAsString();
+            if (type.startsWith("file.")) {
+                writer.write(type, request.requestId(), event.get("fileId").getAsString(),
+                        event.getAsJsonObject("payload"));
+            }
+        }
+        if (failure == null) {
+            writer.completed(request.requestId(), new JsonObject());
+        } else {
+            writer.failed(request.requestId(), failure);
         }
     }
 

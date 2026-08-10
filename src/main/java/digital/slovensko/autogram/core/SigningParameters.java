@@ -15,13 +15,22 @@ import eu.europa.esig.dss.asic.xades.ASiCWithXAdESSignatureParameters;
 import eu.europa.esig.dss.cades.CAdESSignatureParameters;
 import eu.europa.esig.dss.enumerations.ASiCContainerType;
 import eu.europa.esig.dss.enumerations.DigestAlgorithm;
+import eu.europa.esig.dss.enumerations.ImageScaling;
+import eu.europa.esig.dss.enumerations.MimeTypeEnum;
 import eu.europa.esig.dss.enumerations.SignatureForm;
 import eu.europa.esig.dss.enumerations.SignatureLevel;
 import eu.europa.esig.dss.enumerations.SignaturePackaging;
+import eu.europa.esig.dss.enumerations.VisualSignatureRotation;
 import eu.europa.esig.dss.model.DSSDocument;
+import eu.europa.esig.dss.model.InMemoryDocument;
 import eu.europa.esig.dss.pades.PAdESSignatureParameters;
+import eu.europa.esig.dss.pades.SignatureFieldParameters;
+import eu.europa.esig.dss.pades.SignatureImageParameters;
 import eu.europa.esig.dss.spi.x509.tsp.TSPSource;
 import eu.europa.esig.dss.xades.XAdESSignatureParameters;
+
+import java.time.Instant;
+import java.util.Date;
 
 import static digital.slovensko.autogram.core.errors.SigningParametersException.Error.WRONG_MIME_TYPE;
 import static digital.slovensko.autogram.core.errors.SigningParametersException.Error.XSLT_NO_XDC;
@@ -39,6 +48,7 @@ public class SigningParameters {
     private final boolean checkPDFACompliance;
     private final int visualizationWidth;
     private final TSPSource tspSource;
+    private VisiblePadesAppearance visiblePadesAppearance;
 
     private SigningParameters(
             SignatureLevel level, DigestAlgorithm digestAlgorithm, ASiCContainerType container, SignaturePackaging signaturePackaging,
@@ -209,8 +219,44 @@ public class SigningParameters {
         parameters.setSignatureLevel(getLevel());
         parameters.setDigestAlgorithm(getDigestAlgorithm());
         parameters.setEn319122(isEn319132());
+        if (visiblePadesAppearance != null) {
+            var field = new SignatureFieldParameters();
+            field.setPage(visiblePadesAppearance.page());
+            field.setOriginX(visiblePadesAppearance.originX());
+            field.setOriginY(visiblePadesAppearance.originY());
+            field.setWidth(visiblePadesAppearance.width());
+            field.setHeight(visiblePadesAppearance.height());
+            field.setRotation(VisualSignatureRotation.NONE);
+
+            var image = new SignatureImageParameters();
+            image.setImage(new InMemoryDocument(visiblePadesAppearance.pngBytes(), "visible-signature.png", MimeTypeEnum.PNG));
+            image.setFieldParameters(field);
+            image.setImageScaling(ImageScaling.STRETCH);
+            parameters.setImageParameters(image);
+            parameters.bLevel().setSigningDate(Date.from(visiblePadesAppearance.signingTime()));
+        }
 
         return parameters;
+    }
+
+    public void setVisiblePadesAppearance(byte[] pngBytes, int page, float originX, float originY, float width,
+            float height, Instant signingTime) {
+        if (getLevel() != SignatureLevel.PAdES_BASELINE_T) {
+            throw new IllegalArgumentException("Visible appearance requires PAdES Baseline T");
+        }
+        visiblePadesAppearance = new VisiblePadesAppearance(pngBytes, page, originX, originY, width, height, signingTime);
+    }
+
+    private record VisiblePadesAppearance(byte[] pngBytes, int page, float originX, float originY, float width,
+            float height, Instant signingTime) {
+        private VisiblePadesAppearance {
+            pngBytes = pngBytes.clone();
+        }
+
+        @Override
+        public byte[] pngBytes() {
+            return pngBytes.clone();
+        }
     }
 
     public ASiCWithCAdESSignatureParameters getASiCWithCAdESSignatureParameters() {

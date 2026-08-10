@@ -9,6 +9,8 @@ import digital.slovensko.autogram.core.SigningKey;
 import digital.slovensko.autogram.core.SigningParameters;
 import digital.slovensko.autogram.core.errors.PINIncorrectException;
 import digital.slovensko.autogram.drivers.TokenDriver;
+import digital.slovensko.autogram.ui.machine.v2.MachineV2RequestValidator;
+import digital.slovensko.autogram.ui.machine.v2.VisibleSignatureAppearance;
 import digital.slovensko.autogram.ui.cli.CliKeySelector;
 import digital.slovensko.autogram.util.DSSUtils;
 import eu.europa.esig.dss.asic.cades.validation.ASiCContainerWithCAdESValidator;
@@ -88,6 +90,7 @@ public final class MachineSigningService {
             for (var prepared : preparedFiles) {
                 prepared.setPreviousSignatureIds(signatureIds(prepared.sourceContent()));
             }
+            trustInitializer.run();
             try (var session = sessionFactory.apply(request)) {
                 for (; processedFiles < preparedFiles.size(); processedFiles++) {
                     signFile(requestId, session, preparedFiles.get(processedFiles));
@@ -113,6 +116,23 @@ public final class MachineSigningService {
             writer.writeTerminal("session.completed", requestId, new JsonObject());
         }
         return sessionFailureCode;
+    }
+
+    public String signV2(String requestId, JsonObject payload) {
+        var request = MachineV2RequestValidator.validateSign(payload);
+        var pin = request.pin();
+        try {
+            var files = request.files().stream().map(file -> new MachineFile(file.id(), file.source(), file.target(),
+                    file.appearance())).toList();
+            var authentication = request.timestamp().authentication();
+            return sign(requestId, new SignRequest(request.driver(), request.certificateSerial(), pin,
+                    request.signatureLevel(), new QualifiedTimestampRequest(true, request.timestamp().servers(),
+                    authentication == null ? null : new TimestampAuthentication(authentication.type(), authentication.username(),
+                            authentication.secret())), files));
+        } finally {
+            Arrays.fill(pin, '\0');
+            request.clearPin();
+        }
     }
 
     private List<PreparedFile> prepare(String requestId, List<ValidatedMachineFile> files) {
@@ -144,8 +164,9 @@ public final class MachineSigningService {
             }
             progress(requestId, file, "validating");
             var signedContent = prepared.readSignedContent();
-            if (!validOutput(signedContent, previousSignatureIds)) {
-                throw new MachineProtocolException("OUTPUT_VALIDATION_FAILED");
+            var validationFailure = outputValidationFailure(signedContent, previousSignatureIds);
+            if (validationFailure != null) {
+                throw new MachineProtocolException(validationFailure);
             }
             progress(requestId, file, "saving");
             prepared.publish();
@@ -181,9 +202,9 @@ public final class MachineSigningService {
         }
     }
 
-    private boolean validOutput(byte[] content, Set<String> previousSignatureIds) {
+    private String outputValidationFailure(byte[] content, Set<String> previousSignatureIds) {
         try {
-            return outputValidator.isValid(content, previousSignatureIds);
+            return outputValidator.validationFailure(content, previousSignatureIds);
         } catch (Throwable exception) {
             throw new MachineProtocolException("OUTPUT_VALIDATION_FAILED", exception);
         }
@@ -196,8 +217,9 @@ public final class MachineSigningService {
             }
             if (cause instanceof MachineProtocolException protocolException) {
                 return switch (protocolException.getMessage()) {
-                    case "OUTPUT_CLEANUP_FAILED", "OUTPUT_VALIDATION_FAILED", "OUTPUT_PUBLISH_UNSUPPORTED",
-                            "OUTPUT_TARGET_EXISTS", "MACHINE_PLATFORM_UNSUPPORTED" -> protocolException.getMessage();
+                    case "OUTPUT_CLEANUP_FAILED", "OUTPUT_VALIDATION_FAILED", "TIMESTAMP_QUALIFICATION_FAILED",
+                            "OUTPUT_PUBLISH_UNSUPPORTED", "OUTPUT_TARGET_EXISTS", "MACHINE_PLATFORM_UNSUPPORTED",
+                            "TRUSTED_LIST_UNAVAILABLE" -> protocolException.getMessage();
                     default -> fallback;
                 };
             }
@@ -396,6 +418,10 @@ public final class MachineSigningService {
         default Set<String> signatureIds(byte[] content) throws Exception {
             return Set.of();
         }
+
+        default String validationFailure(byte[] content, Set<String> previousSignatureIds) throws Exception {
+            return isValid(content, previousSignatureIds) ? null : "OUTPUT_VALIDATION_FAILED";
+        }
     }
 
     static final class DefaultSessionFactory implements Function<SignRequest, SigningSession> {
@@ -497,16 +523,27 @@ public final class MachineSigningService {
         @Override
         public void sign(SigningInput input, Runnable completed) throws Exception {
             var responder = new MachineFileResponder(input.staging(), completed);
-            var job = signingJob(input.sourceContent(), input.file().source(), responder, settings);
+            var job = signingJob(input.sourceContent(), input.file().source(), responder, settings,
+                    input.file().visibleAppearance());
             job.signWithKeyAndRespond(key);
         }
 
         static SigningJob signingJob(byte[] source, String name, MachineFileResponder responder, MachineSettings settings)
                 throws Exception {
+            return signingJob(source, name, responder, settings, null);
+        }
+
+        static SigningJob signingJob(byte[] source, String name, MachineFileResponder responder, MachineSettings settings,
+                VisibleSignatureAppearance.Snapshot appearance) throws Exception {
             var filename = Path.of(name).getFileName().toString();
             var document = new InMemoryDocument(source, filename,
                     isAsic(filename, source) ? MimeTypeEnum.ASICE : MimeTypeEnum.PDF);
             var parameters = signingParameters(document, settings);
+            if (appearance != null) {
+                var field = appearance.appearance();
+                parameters.setVisiblePadesAppearance(appearance.pngBytes(), field.page(), field.originX(), field.originY(),
+                        field.width(), field.height(), field.signingTime());
+            }
             return SigningJob.buildFromRequest(document, parameters, responder);
         }
 
@@ -644,21 +681,27 @@ public final class MachineSigningService {
 
         @Override
         public boolean isValid(byte[] content, Set<String> previousSignatureIds) {
+            return validationFailure(content, previousSignatureIds) == null;
+        }
+
+        @Override
+        public String validationFailure(byte[] content, Set<String> previousSignatureIds) {
             if (!hasPdfHeaderAndEof(content) && !isAsic("output.asice", content)) {
-                return false;
+                return "OUTPUT_VALIDATION_FAILED";
             }
             var signatures = inspectionService.inspect(content).getAsJsonArray("signatures");
             var signatureIds = signatures.asList().stream().map(value -> value.getAsJsonObject())
                     .map(signature -> string(signature, "id")).collect(java.util.stream.Collectors.toSet());
             if (!signatureIds.containsAll(previousSignatureIds)) {
-                return false;
+                return "OUTPUT_VALIDATION_FAILED";
             }
             var added = signatures.asList().stream().map(value -> value.getAsJsonObject())
                     .filter(signature -> !previousSignatureIds.contains(string(signature, "id"))).toList();
-            return added.size() == 1
-                    && isQualifiedBaselineT(string(added.getFirst(), "format"))
-                    && hasCryptographicIntegrity(added.getFirst())
-                    && hasCryptographicallyValidTimestamp(added.getFirst());
+            if (added.size() != 1 || !isQualifiedBaselineT(string(added.getFirst(), "format"))
+                    || !hasCryptographicIntegrity(added.getFirst()) || !hasCryptographicallyValidTimestamp(added.getFirst())) {
+                return "OUTPUT_VALIDATION_FAILED";
+            }
+            return hasQualifiedTimestamp(added.getFirst()) ? null : "TIMESTAMP_QUALIFICATION_FAILED";
         }
 
         @Override
@@ -696,6 +739,10 @@ public final class MachineSigningService {
             return signature.getAsJsonArray("timestamps").asList().stream()
                     .map(value -> value.getAsJsonObject())
                     .anyMatch(PdfOutputValidator::hasCryptographicIntegrity);
+        }
+
+        private static boolean hasQualifiedTimestamp(JsonObject signature) {
+            return booleanField(signature, "qualifiedTimestampValid", "qualifiedTimestampValid");
         }
 
         private static boolean booleanField(JsonObject value, String preferredField, String fallbackField) {

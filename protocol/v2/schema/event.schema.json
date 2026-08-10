@@ -13,6 +13,9 @@
         "request.started",
         "certificates.available",
         "inspection.completed",
+        "file.signingStarted",
+        "file.progress",
+        "file.completed",
         "file.failed",
         "request.completed",
         "request.failed"

@@ -139,6 +139,11 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
                     try await helperOperationGate.withPermit {
                         try await withTaskCancellationHandler {
                             let timestamp = try qualifiedTimestampRequest()
+                            if request.files.contains(where: { $0.visibleAppearance != nil }) {
+                                try await signVisiblePAdES(request: request, timestamp: timestamp, continuation: continuation)
+                                continuation.finish()
+                                return
+                            }
                             let files = try request.files.map { file in
                                 let reservation = try reservation(
                                     for: file.id,
@@ -232,6 +237,76 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
     func cancel() async {
         await runner.cancel()
         await machineSession.stop()
+    }
+
+    private func signVisiblePAdES(
+        request: SigningRequest,
+        timestamp: (endpoints: [String], authentication: TimestampAuthenticationSecret?),
+        continuation: AsyncThrowingStream<SigningEvent, Error>.Continuation
+    ) async throws {
+        let renderedImages = request.files.compactMap(\.visibleAppearance?.renderedPNGURL)
+        defer { discardRenderedImages(renderedImages) }
+        guard request.outputFormat != .asiceXAdES else {
+            throw SigningFailure.engine("Visible appearance requires PAdES Baseline T.")
+        }
+        let files = try request.files.map { file -> JSONValue in
+            let reservation = try reservation(for: file.id, sourceURL: file.sourceURL, outputExtension: "pdf")
+            try? FileManager.default.removeItem(at: reservation.temporaryURL)
+            return machineV2File(id: file.id, sourceURL: file.sourceURL, targetURL: reservation.temporaryURL,
+                appearance: file.visibleAppearance)
+        }
+        let requestID = request.sessionID.uuidString
+        let machineRequest = MachineV2Request(protocolVersion: 2, requestID: requestID, operation: .sign, payload: [
+            "driver": .string(request.driverID),
+            "certificateSerial": .string(request.certificateSerial),
+            "signatureLevel": .string("PAdES_BASELINE_T"),
+            "timestamp": .object([
+                "required": .bool(true),
+                "servers": .array(timestamp.endpoints.map(JSONValue.string))
+            ]),
+            "files": .array(files)
+        ])
+        let events = try await runV2(SecureMachineV2Request(envelope: machineRequest, pin: request.pin,
+            timestampAuthentication: timestamp.authentication))
+        var completedFileIDs: [String] = []
+        continuation.yield(.started)
+        for event in events {
+            guard event.requestID == requestID else {
+                throw SigningFailure.engine("The signing helper returned an invalid session.")
+            }
+            switch event.type {
+            case .fileProgress:
+                if let phase = string(in: event.payload["phase"]), let activity = SigningActivityPhase(machinePhase: phase) {
+                    continuation.yield(.activity(activity))
+                }
+            case .fileSigningStarted:
+                if let fileID = event.fileID { continuation.yield(.fileSigning(fileID)) }
+            case .fileCompleted:
+                if let fileID = event.fileID { completedFileIDs.append(fileID) }
+            case .fileFailed:
+                if let fileID = event.fileID {
+                    let code = string(in: event.payload["code"]) ?? "SIGNING_FAILED"
+                    continuation.yield(.failed(fileID, .engine(Self.fileFailureMessage(code: code))))
+                }
+            case .requestStarted, .certificatesAvailable, .inspectionCompleted, .requestCompleted, .requestFailed:
+                break
+            }
+        }
+        guard !events.contains(where: { $0.type == .requestFailed }) else {
+            let code = events.last(where: { $0.type == .requestFailed }).flatMap { string(in: $0.payload["code"]) }
+                ?? "SIGNING_FAILED"
+            throw SigningFailure.engine(Self.fileFailureMessage(code: code))
+        }
+        guard events.contains(where: { $0.type == .requestCompleted }) else {
+            throw SigningFailure.engine("The signing helper did not confirm completion.")
+        }
+        for fileID in completedFileIDs {
+            do {
+                continuation.yield(.completed(fileID, outputURL: try finalizeOutput(for: fileID)))
+            } catch {
+                continuation.yield(.failed(fileID, .fileFailed(fileID)))
+            }
+        }
     }
 
     private func reservation(
@@ -329,6 +404,33 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
             "source": .string(sourceURL.standardizedFileURL.path),
             "target": .string(targetURL.standardizedFileURL.path)
         ])
+    }
+
+    private func machineV2File(id: String, sourceURL: URL, targetURL: URL,
+        appearance: VisibleSignatureRequest?) -> JSONValue {
+        var file: [String: JSONValue] = [
+            "id": .string(id),
+            "source": .string(sourceURL.standardizedFileURL.path),
+            "target": .string(targetURL.standardizedFileURL.path)
+        ]
+        if let appearance {
+            file["visibleAppearance"] = .object([
+                "renderedPngPath": .string(appearance.renderedPNGURL.standardizedFileURL.path),
+                "page": .number(Double(appearance.page)),
+                "originX": .number(appearance.originX),
+                "originY": .number(appearance.originY),
+                "width": .number(appearance.width),
+                "height": .number(appearance.height),
+                "signingTime": .string(ISO8601DateFormatter().string(from: appearance.signingTime))
+            ])
+        }
+        return .object(file)
+    }
+
+    private func discardRenderedImages(_ urls: [URL]) {
+        for url in urls {
+            try? FileManager.default.removeItem(at: url)
+        }
     }
 
     private func qualifiedTimestampRequest() throws -> (endpoints: [String], authentication: TimestampAuthenticationSecret?) {

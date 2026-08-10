@@ -30,15 +30,27 @@ enum SigningOutputFormat: String, CaseIterable, Identifiable, Sendable {
 struct SigningFile: Sendable, Equatable, Identifiable {
     let id: String
     let sourceURL: URL
+    let visibleAppearance: VisibleSignatureRequest?
 
     var redactedDisplayName: String {
         sourceURL.lastPathComponent
     }
 
-    init(id: String, sourceURL: URL) {
+    init(id: String, sourceURL: URL, visibleAppearance: VisibleSignatureRequest? = nil) {
         self.id = id
         self.sourceURL = sourceURL
+        self.visibleAppearance = visibleAppearance
     }
+}
+
+struct VisibleSignatureRequest: Sendable, Equatable {
+    let renderedPNGURL: URL
+    let page: Int
+    let originX: Double
+    let originY: Double
+    let width: Double
+    let height: Double
+    let signingTime: Date
 }
 
 struct SigningRequest: Sendable {

@@ -2,6 +2,53 @@ import Foundation
 import Testing
 @testable import Autogram
 
+@Test func visibleAppearanceUsesProtocolV2AndCarriesTheSharedSigningTime() async throws {
+    let fixture = try SigningMachineFixture()
+    defer { try? fixture.remove() }
+
+    let source = fixture.directoryURL.appending(path: "agreement.pdf")
+    let rendered = fixture.directoryURL.appending(path: "visible-signature.png")
+    let signingTime = Date(timeIntervalSince1970: 1_786_377_296)
+    try Data("%PDF-1.7\nsource\n%%EOF\n".utf8).write(to: source)
+    try Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]).write(to: rendered)
+    let engine = AutogramCLIEngine(configuration: fixture.configuration())
+    let request = SigningRequest(
+        sessionID: UUID(uuidString: "00000000-0000-0000-0000-000000000003")!,
+        driverID: "token-1",
+        certificateSerial: "certificate-1",
+        pin: Secret("1234"),
+        files: [SigningFile(
+            id: "agreement",
+            sourceURL: source,
+            visibleAppearance: VisibleSignatureRequest(
+                renderedPNGURL: rendered,
+                page: 2,
+                originX: 72,
+                originY: 540,
+                width: 216,
+                height: 108,
+                signingTime: signingTime
+            )
+        )]
+    )
+
+    for try await _ in engine.sign(request: request) {
+    }
+
+    let requestJSON = try fixture.requestJSON()
+    #expect(requestJSON["protocolVersion"] as? Int == 2)
+    let payload = try #require(requestJSON["payload"] as? [String: Any])
+    let file = try #require((payload["files"] as? [[String: Any]])?.first)
+    let appearance = try #require(file["visibleAppearance"] as? [String: Any])
+    #expect(appearance["page"] as? Int == 2)
+    #expect(appearance["originX"] as? Double == 72)
+    #expect(appearance["originY"] as? Double == 540)
+    #expect(appearance["width"] as? Double == 216)
+    #expect(appearance["height"] as? Double == 108)
+    #expect(appearance["signingTime"] as? String == ISO8601DateFormatter().string(from: signingTime))
+    #expect(!FileManager.default.fileExists(atPath: rendered.path))
+}
+
 @Test func signingTranslatesToQualifiedTimestampRequestAndFinalizesValidatedOutput() async throws {
     let fixture = try SigningMachineFixture()
     defer { try? fixture.remove() }
