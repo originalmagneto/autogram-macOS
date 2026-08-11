@@ -24,3 +24,9 @@
 - Certificate decoding now carries the optional Java `qualification` field into `SigningCertificate`. Final card rendering uses that authoritative value and retains the existing unavailable fallback when absent.
 - GREEN: the focused `WorkspaceInspectionTests` command and the required `AutogramTests` plus `AutogramIntegrationTests` command completed without test failures.
 - `git diff --check` passes.
+
+## Fix round 2
+
+- Java certificate discovery now emits `qualification: "QESIG"` only when DSS parses QC compliance, QSCD, and the e-signature QC type from the certificate's QC statements. Certificates without that complete authoritative evidence retain the absent-field fallback consumed by Swift as unavailable.
+- The existing `MachineDriverServiceTest` payload test constructs the structured QC statement extension and asserts the emitted `QESIG` value at the machine protocol boundary.
+- `./mvnw -q -Psystem-jdk -Dtest=MachineDriverServiceTest test` passed with JDK 25. `AutogramTests` and `AutogramIntegrationTests` passed under Xcode 26.5. `git diff --check` passed.

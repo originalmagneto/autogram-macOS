@@ -7,11 +7,17 @@ import digital.slovensko.autogram.drivers.FakeTokenDriver;
 import digital.slovensko.autogram.drivers.TokenDriver;
 import eu.europa.esig.dss.token.AbstractKeyStoreTokenConnection;
 import eu.europa.esig.dss.token.Pkcs12SignatureToken;
+import org.bouncycastle.asn1.DEROctetString;
+import org.bouncycastle.asn1.DERSequence;
+import org.bouncycastle.asn1.x509.Extension;
+import org.bouncycastle.asn1.x509.qualified.ETSIQCObjectIdentifiers;
+import org.bouncycastle.asn1.x509.qualified.QCStatement;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.nio.file.Path;
 import java.security.KeyStore;
+import java.security.cert.X509Certificate;
 import java.math.BigInteger;
 import java.util.Arrays;
 import java.util.Date;
@@ -93,6 +99,7 @@ class MachineDriverServiceTest {
         assertTrue(certificate.get("holderKey").getAsString().startsWith("v1:"));
         assertTrue(certificate.has("validFrom"));
         assertTrue(certificate.has("validUntil"));
+        assertEquals("QESIG", certificate.get("qualification").getAsString());
     }
 
     @Test
@@ -165,6 +172,7 @@ class MachineDriverServiceTest {
             String issuer, boolean valid) {
         var entry = mock(eu.europa.esig.dss.token.DSSPrivateKeyEntry.class);
         var certificate = mock(eu.europa.esig.dss.model.x509.CertificateToken.class);
+        var qualifiedCertificate = qualifiedCertificate();
         var subjectPrincipal = mock(eu.europa.esig.dss.model.x509.X500PrincipalHelper.class);
         var issuerPrincipal = mock(eu.europa.esig.dss.model.x509.X500PrincipalHelper.class);
         when(entry.getCertificate()).thenReturn(certificate);
@@ -177,7 +185,25 @@ class MachineDriverServiceTest {
         when(certificate.getNotBefore()).thenReturn(new Date(0));
         when(certificate.getNotAfter()).thenReturn(new Date(Long.MAX_VALUE));
         when(certificate.isValidOn(org.mockito.ArgumentMatchers.any(Date.class))).thenReturn(valid);
+        when(certificate.getCertificate()).thenReturn(qualifiedCertificate);
         return entry;
+    }
+
+    private static X509Certificate qualifiedCertificate() {
+        try {
+            var certificate = mock(X509Certificate.class);
+            var statements = new DERSequence(new QCStatement[] {
+                    new QCStatement(ETSIQCObjectIdentifiers.id_etsi_qcs_QcCompliance),
+                    new QCStatement(ETSIQCObjectIdentifiers.id_etsi_qcs_QcSSCD),
+                    new QCStatement(ETSIQCObjectIdentifiers.id_etsi_qcs_QcType,
+                            new DERSequence(ETSIQCObjectIdentifiers.id_etsi_qct_esign))
+            });
+            when(certificate.getExtensionValue(Extension.qCStatements.getId()))
+                    .thenReturn(new DEROctetString(statements).getEncoded());
+            return certificate;
+        } catch (IOException exception) {
+            throw new AssertionError(exception);
+        }
     }
 
     private static List<String> strings(JsonArray values) {

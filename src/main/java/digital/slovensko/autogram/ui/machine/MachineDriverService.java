@@ -9,6 +9,8 @@ import digital.slovensko.autogram.core.errors.AutogramException;
 import digital.slovensko.autogram.drivers.TokenDriver;
 import digital.slovensko.autogram.ui.cli.CliKeySelector;
 import eu.europa.esig.dss.model.DSSException;
+import eu.europa.esig.dss.enumerations.QCTypeEnum;
+import eu.europa.esig.dss.spi.QcStatementUtils;
 
 import java.time.Instant;
 import java.nio.charset.StandardCharsets;
@@ -141,7 +143,20 @@ public final class MachineDriverService {
         payload.addProperty("validUntil", timestamp(certificate.getNotAfter()));
         payload.addProperty("certificateKey", opaqueKey("certificate", certificate.getEncoded()));
         payload.addProperty("holderKey", opaqueKey("holder", normalizedSubject(certificate)));
+        var qualification = qualification(certificate);
+        if (qualification != null) {
+            payload.addProperty("qualification", qualification);
+        }
         return payload;
+    }
+
+    private static String qualification(eu.europa.esig.dss.model.x509.CertificateToken certificate) {
+        var statements = QcStatementUtils.getQcStatements(certificate);
+        if (statements != null && statements.isQcCompliance() && statements.isQcQSCD()
+                && statements.getQcTypes().contains(QCTypeEnum.QCT_ESIGN)) {
+            return "QESIG";
+        }
+        return null;
     }
 
     private static String normalizedSubject(eu.europa.esig.dss.model.x509.CertificateToken certificate) {
