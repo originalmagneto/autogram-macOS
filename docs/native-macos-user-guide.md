@@ -2,7 +2,7 @@
 
 ## Open documents
 
-Open files with **File > Open**, drag them into the application, use the add button, or send them from Finder through the Quick Action. PDF and ASiC-E files can share one workspace. The newest successfully added file becomes active automatically.
+Open files with **File > Open**, drag them into the application, or use the add button. PDF and ASiC-E files can share one workspace. The newest successfully added file becomes active automatically.
 
 The sidebar shows every open item and its current state. Selecting an item changes the document preview and signing inspector.
 
@@ -92,7 +92,9 @@ For multiple files, Autogram reports each result separately. A failure does not 
 
 ## Finder workflow
 
-Install the Finder Quick Action from Settings. Select supported files in Finder and choose **Quick Actions > Sign with Autogram macOS**. The application opens, receives all selections, and activates the newest file after loading.
+Install the managed Finder Quick Action from Settings. Select one or more PDFs in Finder and choose **Quick Actions > Sign PDFs Autogram**. The action prompts for the signing card, certificate, and PIN, then directly creates PAdES Baseline T output beside each source PDF without opening the Autogram macOS workspace or Terminal.
+
+The repository also includes an older standalone CLI Quick Action with separate requirements and behavior. See [macOS CLI automation](macos-cli-automation.md) if you intentionally use that action instead of the Settings-managed action.
 
 ## Safety expectations
 

@@ -48,7 +48,7 @@ Autogram macOS is a SwiftUI and AppKit workspace that supervises the established
 flowchart LR
     A[Document intake] --> B[Inspect signatures]
     B --> C{Signatures present?}
-    C -->|Yes| D[Optional DSS validation]
+    C -->|Yes| D[Run DSS validation]
     C -->|No| E[Select certificate]
     D --> E
     E --> F[Secure PIN entry]
@@ -156,12 +156,13 @@ Upstream project: [slovensko-digital/autogram](https://github.com/slovensko-digi
 
 ## License
 
-Autogram is distributed under the [EUPL v1.2](LICENSE). The project was originally derived from the Octosign White Label project by Jakub Duras, licensed under MIT and distributed here with the author's permission.
+Autogram is distributed under the [EUPL v1.2](LICENSE). The project was originally derived from the Octosign White Label project by Jakub Ďuraš, licensed under MIT and distributed here with the author's permission.
 
 Commercial and non-commercial use is permitted subject to the EUPL conditions, including publication of covered modifications and preservation of applicable copyright notices.
 
+<a id="developer-build-and-test"></a>
 <details>
-<summary><h2 id="developer-build-and-test">Developer build and test</h2></summary>
+<summary><strong>Developer build and test</strong></summary>
 
 Build a local native application:
 
