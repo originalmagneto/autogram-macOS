@@ -133,6 +133,63 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
         })]
     }
 
+    func previewEmbeddedDocument(sourceURL: URL, named: String) async throws -> EmbeddedDocumentPreview {
+        let requestID = UUID().uuidString
+        let request = MachineV2Request(protocolVersion: 2, requestID: requestID, operation: .preview, payload: [
+            "source": .string(sourceURL.standardizedFileURL.path),
+            "document": .string(named)
+        ])
+        let events = try await runV2(SecureMachineV2Request(envelope: request))
+        guard let event = events.last(where: { $0.type == .previewCompleted && $0.requestID == requestID }),
+              let name = string(in: event.payload["name"]),
+              let mediaType = string(in: event.payload["mediaType"]),
+              let contentBase64 = string(in: event.payload["contentBase64"]),
+              let content = Data(base64Encoded: contentBase64) else {
+            throw SigningFailure.engine("The signing helper returned an incomplete embedded document preview.")
+        }
+        let displayName = URL(fileURLWithPath: name).lastPathComponent
+        guard !displayName.isEmpty else {
+            throw SigningFailure.engine("The signing helper returned an invalid embedded document name.")
+        }
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: "Autogram-EmbeddedPreviews", directoryHint: .isDirectory)
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        do {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            let url = directory.appending(path: displayName)
+            try content.write(to: url, options: .atomic)
+            return EmbeddedDocumentPreview(displayName: displayName, mediaType: mediaType, url: url)
+        } catch {
+            try? FileManager.default.removeItem(at: directory)
+            throw SigningFailure.engine("The embedded document preview could not be saved.")
+        }
+    }
+
+    func validate(files: [PDFItemDescriptor]) async throws -> [PDFInspection] {
+        let machineFiles = try files.map { file in
+            let reservation = try reservation(for: file.id, sourceURL: file.sourceURL)
+            return machineFile(id: file.id, sourceURL: file.sourceURL, targetURL: reservation.temporaryURL)
+        }
+        let requestID = UUID().uuidString
+        let request = MachineV2Request(protocolVersion: 2, requestID: requestID, operation: .validate, payload: [
+            "files": .array(machineFiles)
+        ])
+        let events = try await runV2(SecureMachineV2Request(envelope: request))
+        return [PDFInspection(files: files.compactMap { file in
+            guard let event = events.last(where: {
+                $0.type == .validationCompleted && $0.requestID == requestID && $0.fileID == file.id
+            }) else {
+                return nil
+            }
+            return InspectedPDF(
+                id: file.id,
+                isSignable: true,
+                signatures: signatures(in: event.payload["signatures"]),
+                documents: documents(in: event.payload["documents"])
+            )
+        })]
+    }
+
     func sign(request: SigningRequest) -> AsyncThrowingStream<SigningEvent, Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
@@ -289,7 +346,8 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
                     let code = string(in: event.payload["code"]) ?? "SIGNING_FAILED"
                     continuation.yield(.failed(fileID, .engine(Self.fileFailureMessage(code: code))))
                 }
-            case .requestStarted, .certificatesAvailable, .inspectionCompleted, .requestCompleted, .requestFailed:
+            case .requestStarted, .certificatesAvailable, .inspectionCompleted, .previewCompleted,
+                    .validationCompleted, .requestCompleted, .requestFailed:
                 break
             }
         }
@@ -512,6 +570,8 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
                     || (array(in: signature["timestamps"]) ?? []).contains {
                         bool(in: $0["cryptographicIntegrity"]) == true
                     },
+                subIndication: string(in: signature["subIndication"]),
+                validationReason: string(in: signature["validationReason"]),
                 documents: strings(in: signature["documents"])
             )
         }

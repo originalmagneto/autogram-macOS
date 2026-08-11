@@ -3,6 +3,7 @@ import Foundation
 enum MachineV2Operation: String, Codable, Sendable, Equatable {
     case capabilities = "CAPABILITIES"
     case inspect = "INSPECT"
+    case preview = "PREVIEW"
     case certificates = "CERTIFICATES"
     case sign = "SIGN"
     case timestamp = "TIMESTAMP"
@@ -60,6 +61,8 @@ enum MachineV2EventType: String, Codable, Sendable, Equatable {
     case requestStarted = "request.started"
     case certificatesAvailable = "certificates.available"
     case inspectionCompleted = "inspection.completed"
+    case previewCompleted = "preview.completed"
+    case validationCompleted = "validation.completed"
     case fileSigningStarted = "file.signingStarted"
     case fileProgress = "file.progress"
     case fileCompleted = "file.completed"

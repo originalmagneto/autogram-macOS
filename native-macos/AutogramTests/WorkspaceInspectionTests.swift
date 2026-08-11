@@ -27,6 +27,31 @@ import Testing
     #expect(workspace.canStartSigning == false)
 }
 
+@Test @MainActor func embeddedPreviewClosesAndSelectedDocumentCanBeValidatedAgain() async throws {
+    let descriptor = PDFItemDescriptor(id: "sample", sourceURL: URL(fileURLWithPath: "/tmp/sample.asice"))
+    let engine = PreviewAndValidationEngine()
+    let workspace = WorkspaceModel(engine: engine, items: [PDFItem(descriptor: descriptor)])
+
+    await workspace.previewEmbeddedDocument(named: "sample.pdf")
+
+    #expect(workspace.embeddedPreview?.displayName == "sample.pdf")
+    #expect(workspace.embeddedPreview?.url.pathExtension == "pdf")
+    #expect(engine.previewCalls.count == 1)
+    #expect(engine.previewCalls.first?.sourceURL == descriptor.sourceURL)
+    #expect(engine.previewCalls.first?.name == "sample.pdf")
+    let previewURL = try #require(workspace.embeddedPreview?.url)
+
+    workspace.closeEmbeddedPreview()
+
+    #expect(workspace.embeddedPreview == nil)
+    #expect(!FileManager.default.fileExists(atPath: previewURL.deletingLastPathComponent().path))
+
+    await workspace.verifySelectedDocumentAgain()
+
+    #expect(workspace.selectedItem?.inspection.signatures.first?.validationState == .valid)
+    #expect(engine.validationCalls == [[descriptor]])
+}
+
 @Test @MainActor func staleAutomaticInspectionCannotOverwriteNewerResult() async {
     let descriptor = PDFItemDescriptor(id: "document", sourceURL: URL(fileURLWithPath: "/tmp/document.pdf"))
     let addedDescriptor = PDFItemDescriptor(id: "added", sourceURL: URL(fileURLWithPath: "/tmp/added.pdf"))
@@ -300,6 +325,74 @@ private struct InspectionEngine: SigningEngine {
             InspectedPDF(id: "unsigned", isSignable: true),
             InspectedPDF(id: "failed", isSignable: false)
         ])]
+    }
+
+    func sign(request: SigningRequest) -> AsyncThrowingStream<SigningEvent, Error> {
+        AsyncThrowingStream { $0.finish() }
+    }
+
+    func cancel() async {}
+}
+
+private final class PreviewAndValidationEngine: SigningEngine, @unchecked Sendable {
+    private let lock = NSLock()
+    private var storedPreviewCalls: [(sourceURL: URL, name: String)] = []
+    private var storedValidationCalls: [[PDFItemDescriptor]] = []
+
+    var previewCalls: [(sourceURL: URL, name: String)] {
+        lock.withLock { storedPreviewCalls }
+    }
+
+    var validationCalls: [[PDFItemDescriptor]] {
+        lock.withLock { storedValidationCalls }
+    }
+
+    func capabilities() async throws -> EngineCapabilities {
+        EngineCapabilities(protocolVersion: 2, supportsQualifiedTimestamp: true)
+    }
+
+    func drivers() async throws -> [SigningDriver] { [] }
+
+    func certificates(driverID: String, pin: Secret?) async throws -> [SigningCertificate] { [] }
+
+    func certificateDiscovery(driverID: String, pin: Secret?) async throws -> CertificateDiscovery {
+        CertificateDiscovery(token: SigningToken(tokenKey: "test-token", providerName: "Test Token"), certificates: [])
+    }
+
+    func inspect(files: [PDFItemDescriptor]) async throws -> [PDFInspection] {
+        [PDFInspection(files: files.map { InspectedPDF(id: $0.id, isSignable: true) })]
+    }
+
+    func previewEmbeddedDocument(sourceURL: URL, named: String) async throws -> EmbeddedDocumentPreview {
+        lock.withLock { storedPreviewCalls.append((sourceURL, named)) }
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let url = directory.appending(path: named)
+        try Data().write(to: url)
+        return EmbeddedDocumentPreview(
+            displayName: named,
+            mediaType: "application/pdf",
+            url: url
+        )
+    }
+
+    func validate(files: [PDFItemDescriptor]) async throws -> [PDFInspection] {
+        lock.withLock { storedValidationCalls.append(files) }
+        return [PDFInspection(files: files.map {
+            InspectedPDF(
+                id: $0.id,
+                isSignable: true,
+                signatures: [ExistingPDFSignature(
+                    id: "validated-signature",
+                    signerDisplayName: "Ada Lovelace",
+                    validationState: .valid,
+                    signingTime: nil,
+                    format: "PAdES_BASELINE_T",
+                    hasQualifiedTimestamp: true
+                )]
+            )
+        })]
     }
 
     func sign(request: SigningRequest) -> AsyncThrowingStream<SigningEvent, Error> {

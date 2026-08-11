@@ -1,5 +1,17 @@
 import Foundation
 
+struct EmbeddedDocumentPreview: Sendable, Equatable {
+    let displayName: String
+    let mediaType: String
+    let url: URL
+}
+
+enum SignatureValidationProgress: Sendable, Equatable {
+    case provisional
+    case validating
+    case complete
+}
+
 struct PDFInspection: Sendable, Equatable {
     let files: [InspectedPDF]
 
@@ -29,6 +41,8 @@ struct ExistingPDFSignature: Sendable, Equatable, Identifiable {
     let signingTime: Date?
     let format: String?
     let hasQualifiedTimestamp: Bool
+    let subIndication: String?
+    let validationReason: String?
     let documents: [String]
 
     init(
@@ -38,6 +52,8 @@ struct ExistingPDFSignature: Sendable, Equatable, Identifiable {
         signingTime: Date?,
         format: String?,
         hasQualifiedTimestamp: Bool,
+        subIndication: String? = nil,
+        validationReason: String? = nil,
         documents: [String] = []
     ) {
         self.id = id
@@ -46,6 +62,8 @@ struct ExistingPDFSignature: Sendable, Equatable, Identifiable {
         self.signingTime = signingTime
         self.format = format
         self.hasQualifiedTimestamp = hasQualifiedTimestamp
+        self.subIndication = subIndication
+        self.validationReason = validationReason
         self.documents = documents
     }
 }
