@@ -105,19 +105,15 @@ struct AutogramSettingsView: View {
             }
 
             Section("Finder") {
-                Text("Install a Quick Action to open one or more selected PDFs in Autogram from Finder.")
-                HStack {
-                    if quickActionStatus == .current {
-                        Button("Remove Finder Quick Action", role: .destructive) {
-                            updateQuickAction(quickActionInstaller.remove)
-                        }
-                    } else {
-                        Button("Install Finder Quick Action") {
-                            updateQuickAction(quickActionInstaller.install)
-                        }
-                    }
-                    Spacer()
-                    Text(quickActionStatus.finderStatusText)
+                Text("The Finder Quick Action directly signs one or more selected PDFs. It prompts for a card, certificate, and PIN without opening the workspace.")
+                    .foregroundStyle(.secondary)
+                LabeledContent("Signing helper", value: quickActionHelperStatus)
+                LabeledContent("I.CA SecureStore", value: "8.3.1 or later required")
+                LabeledContent("eID middleware", value: eIDMiddlewareStatus)
+                LabeledContent("Quick Action version", value: quickActionStatus.finderStatusText)
+                quickActionControls
+                if quickActionStatus == .updateRequired {
+                    Text("Update to install the Quick Action bundled with this version of Autogram macOS.")
                         .foregroundStyle(.secondary)
                 }
                 if hasLegacyCLIQuickAction {
@@ -192,6 +188,32 @@ struct AutogramSettingsView: View {
             hasLegacyCLIQuickAction = quickActionInstaller.hasLegacyCLIWorkflow
         } catch {
             quickActionError = error.localizedDescription
+        }
+    }
+
+    @ViewBuilder
+    private var quickActionControls: some View {
+        HStack {
+            switch quickActionStatus {
+            case .notInstalled:
+                Button("Install Finder Quick Action") {
+                    updateQuickAction(quickActionInstaller.install)
+                }
+            case .updateRequired:
+                Button("Update Finder Quick Action") {
+                    updateQuickAction(quickActionInstaller.install)
+                }
+                Button("Remove Finder Quick Action", role: .destructive) {
+                    updateQuickAction(quickActionInstaller.remove)
+                }
+            case .current:
+                Button("Reinstall Finder Quick Action") {
+                    updateQuickAction(quickActionInstaller.install)
+                }
+                Button("Remove Finder Quick Action", role: .destructive) {
+                    updateQuickAction(quickActionInstaller.remove)
+                }
+            }
         }
     }
 
@@ -386,6 +408,30 @@ struct AutogramSettingsView: View {
     private var middlewareDescription: String {
         let names = workspace.availableDrivers.map(friendlyDriverName)
         return names.isEmpty ? "No middleware detected" : names.joined(separator: ", ")
+    }
+
+    private var quickActionHelperStatus: String {
+        if workspace.isLoadingSigningEnvironment {
+            return "Checking"
+        }
+        if workspace.credentialError != nil {
+            return "Unavailable"
+        }
+        return workspace.signingEnvironment == nil ? "Unavailable" : "Ready"
+    }
+
+    private var eIDMiddlewareStatus: String {
+        if workspace.isLoadingSigningEnvironment {
+            return "Checking"
+        }
+        if workspace.credentialError != nil || workspace.signingEnvironment == nil {
+            return "Unavailable"
+        }
+        let hasEIDMiddleware = workspace.availableDrivers.contains { driver in
+            driver.id.localizedCaseInsensitiveContains("eid") ||
+                driver.displayName.localizedCaseInsensitiveContains("eID")
+        }
+        return hasEIDMiddleware ? "Detected and ARM64 validated" : "Not detected"
     }
 
     private var connectedCardDescription: String {
