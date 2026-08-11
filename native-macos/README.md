@@ -1,42 +1,89 @@
-# Autogram native macOS workspace
+# Autogram macOS developer workspace
 
-This directory contains the native macOS SwiftUI workspace for Autogram. It uses SwiftUI and AppKit for the application shell and PDFKit for document preview, while a bundled Java Autogram/DSS helper performs signing and validation through the machine protocol.
+This directory contains the native SwiftUI application. It uses AppKit for macOS integration, PDFKit for document preview and visible-signature placement, and the bundled Autogram and DSS helper for cryptographic operations.
 
-## Development status
+Start with the root [README](../README.md), [installation guide](../docs/native-macos-installation.md), [user guide](../docs/native-macos-user-guide.md), and [architecture](../docs/native-macos-architecture.md).
 
-The workspace is under active development. It supports PDF intake, preview, signing configuration, certificate selection, PIN entry, output handling, the qualified timestamp signing flow, and explicit Finder Quick Action installation. The Quick Action accepts one or more selected PDFs through native Finder open-document events.
-
-For requirements, DMG installation, Finder setup, privacy, and troubleshooting, see the [native macOS preview installation guide](../docs/native-macos-installation.md).
-
-## Requirements
+## Target
 
 - macOS 27 or later.
 - Apple silicon only.
-- Native arm64 Java Autogram/DSS helper.
-- eID middleware and an arm64 PKCS#11 library for the selected token.
-- I.CA SecureStore 8.3.1 or later when using an I.CA token.
-- Network access to obtain and validate a qualified timestamp.
+- Xcode with the macOS 27 SDK.
+- JDK 25 with JavaFX for helper packaging.
+- arm64 or universal PKCS#11 middleware.
 
-The PIN is entered in a secure field, cleared after use or dismissal, and sent to the helper only through standard input. It is not stored in preferences, process arguments, environment variables, or diagnostics.
+The native target does not use Rosetta or an Intel helper fallback.
 
-## Setup
+## Project structure
 
-1. Install the required eID middleware and confirm that its selected PKCS#11 library is arm64.
-2. For I.CA tokens, install I.CA SecureStore 8.3.1 or later.
-3. Place the native arm64 Java Autogram/DSS helper in the app bundle at `Contents/Helpers/AutogramCLI-arm64`.
-4. Ensure the machine can reach the qualified timestamp service used by the helper.
-5. Open `Autogram.xcodeproj` in Xcode and select the `Autogram` scheme.
+- `Autogram/`: application sources and resources.
+- `AutogramTests/`: native unit and integration-boundary tests.
+- `Autogram.xcodeproj/`: Xcode project and schemes.
+- `Package.swift`: package metadata used by supporting workflows.
+- `resources/`: application resources included by the native build.
 
-## Build and run
+Important source areas:
 
-Build for Apple silicon:
+- `Core/Models`: workspace and preference models.
+- `Features/Workspace`: document intake, selection, signing state, and results.
+- `Infrastructure/Machine`: machine-protocol transport and decoding.
+- `Infrastructure/PDF`: PDFKit preview and placement overlay.
+- `Infrastructure/SignatureAssets`: managed artwork library and visible appearance rendering.
+
+## Build the complete app bundle
+
+From the repository root:
 
 ```sh
-xcodebuild -project Autogram.xcodeproj -scheme Autogram -destination 'platform=macOS,arch=arm64' build
+export AUTOGRAM_JAVA_HOME="/path/to/arm64-jdk-with-javafx"
+export DEVELOPER_DIR="/Applications/Xcode-beta.app/Contents/Developer"
+scripts/native-macos/build-native-app.sh
+scripts/native-macos/sign-native-app.sh
+open "build/native/Autogram macOS.app"
 ```
 
-Run from Xcode with the `Autogram` scheme. The application opens a native workspace where PDFs can be selected, inspected, and signed.
+The resulting bundle includes the Swift application, arm64 machine helper, Java dependencies, and reduced Java runtime. The local signature is ad-hoc and is not a notarized public release.
 
-## Verification status and limitation
+## Build the Xcode target
 
-The project is configured for an arm64-only macOS 27 target. Automated verification covers the native unit and helper integration suites. A physical token signing session together with live qualified timestamp authority acceptance has not yet been verified.
+```sh
+DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
+  xcodebuild \
+  -project native-macos/Autogram.xcodeproj \
+  -scheme Autogram \
+  -destination 'platform=macOS,arch=arm64' \
+  build
+```
+
+Running only the Xcode target may not provide a packaged helper. Use the complete bundle build for signing acceptance tests.
+
+## Tests
+
+```sh
+DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
+  xcodebuild \
+  -project native-macos/Autogram.xcodeproj \
+  -scheme Autogram \
+  -destination 'platform=macOS' \
+  -only-testing:AutogramTests \
+  test
+```
+
+Keep tests focused on observable protocol, state, geometry, output, and security behavior. Physical-card and live timestamp acceptance remain explicit release checks rather than mocked claims.
+
+## Security constraints
+
+- Never place PINs in arguments, environment variables, preferences, or logs.
+- Never bundle private documents or user-specific paths.
+- Validate every selected PKCS#11 library for arm64 support.
+- Do not overwrite source documents.
+- Treat the Autogram and DSS helper as the signing and validation authority.
+- Keep `AGENTS.md` and `CLAUDE.md` identical.
+
+## Finder integration
+
+The application installs its Finder Quick Action explicitly from Settings. The action forwards selected file URLs to the installed native application. It must not depend on a global Autogram CLI or another app bundle.
+
+## Release
+
+Follow [native-macos-release-checklist.md](../docs/native-macos-release-checklist.md) for architecture checks, helper packaging, middleware acceptance, Developer ID signing, notarization, and clean-machine verification.

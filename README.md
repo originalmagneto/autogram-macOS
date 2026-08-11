@@ -1,225 +1,213 @@
 # Autogram macOS
-[🇸🇰 Slovenská verzia](README-SK.md)
 
-Autogram is a desktop application for signing and verifying electronic documents in accordance with the eIDAS regulation. This repository is a macOS-specialized fork of the upstream [Slovensko.Digital Autogram](https://github.com/slovensko-digital/autogram) project: it keeps the signing core, HTTP API, CLI workflows, and eForm support, while redesigning the desktop experience for a more native, readable, and trustworthy macOS workflow.
+Native electronic signing for Apple silicon Macs.
 
-## Project Scope
-- Sign and verify electronic documents from a desktop app with one primary workflow.
-- Support legal and public-sector use cases where the user needs to inspect a document before signing it.
-- Preserve automation paths through CLI, HTTP API, and the `autogram://` protocol.
-- Keep compatibility with Slovak eGovernment forms and PKCS#11-based signing devices.
+[Slovenska dokumentacia](README-SK.md) | [Installation](docs/native-macos-installation.md) | [User guide](docs/native-macos-user-guide.md) | [Architecture](docs/native-macos-architecture.md)
 
-## Why This Redesign Exists
-The original application already had strong signing capabilities, but the macOS UX needed a more deliberate surface for high-trust work.
+Autogram macOS is a SwiftUI and AppKit desktop application for reviewing, signing, and validating electronic documents. It combines a native macOS workspace with the proven Java Autogram and European Commission DSS signing engine.
 
-- Document signing is a consequential action, so the UI has to be calm, legible, and explicit.
-- The old screens were functionally correct, but visually dense and uneven in hierarchy.
-- Dark mode readability, dialog sizing, and signing-state communication needed refinement.
-- New users needed clearer onboarding before they reached certificate selection and final signing.
+The application is designed for legal, business, and public-sector workflows where the user must understand what is being signed, which certificate is used, whether qualified timestamping succeeded, and which signatures already exist in the document.
 
-The redesign therefore focuses on the places where users make legal or operational decisions: file intake, document review, signature verification, update prompts, and inline warnings. The core signing behavior remains unchanged.
+> Development status: active preview. The native application currently targets macOS 27 or later and Apple silicon only. Public release artifacts still require Developer ID signing and notarization.
 
-More detailed rollout notes live in [PLAN.md](PLAN.md) and upstream sync guidance in [PORTING.md](PORTING.md).
+## Highlights
 
-The Apple silicon native macOS preview, including its Finder Quick Action, is documented in the [native macOS preview installation guide](docs/native-macos-installation.md).
+- Native SwiftUI document workspace with AppKit and PDFKit integration.
+- Apple silicon architecture from the application through the bundled Java runtime and signing helper.
+- PDF signing with PAdES Baseline T and a qualified timestamp requirement.
+- ASiC-E and XAdES workflows, including inspection of existing containers.
+- Existing signature detection and complete DSS validation.
+- Revalidation after countersigning, with truthful valid, invalid, and indeterminate states.
+- Automatic card and certificate discovery for supported PKCS#11 middleware.
+- Remembered default certificate based only on public token metadata.
+- Secure PIN entry that is never stored in preferences or command arguments.
+- Reusable PNG and PDF graphic signature artwork library.
+- Direct on-page placement, drag, resize, rotation, and page selection.
+- Batch intake and signing of multiple selected documents.
+- Finder Quick Action integration without Terminal interaction.
+- Qualified timestamp provider selection and custom TSA endpoints.
 
-## Redesign Scope
-- Welcome screen and file intake, including clearer drag-and-drop guidance.
-- Signing and verification screen, with stronger state hierarchy and denser summary blocks.
-- Sidebar metadata and existing-signature summaries.
-- Update dialog and overlay ergonomics.
-- macOS-native theme tokens, dark-mode readability, and dialog sizing rules.
+## Native signing workflow
 
-## Screenshots
-### Welcome Screen
-![Redesigned macOS home screen](assets/readme/autogram-macos-home.png)
+1. Open or drag one or more PDF or ASiC-E files into Autogram macOS.
+2. The newest file becomes active automatically after it is loaded.
+3. Autogram inspects the document and lists existing electronic signatures.
+4. Complete DSS validation runs only when electronic signatures are present.
+5. The application detects compatible connected signing middleware and certificates.
+6. Choose the signing format, certificate, timestamp configuration, and optional graphic appearance.
+7. Enter the PIN in the native secure sheet.
+8. Autogram creates a new collision-safe output beside the source file.
+9. The signed result becomes active and every electronic signature is validated again.
 
-The home screen now explains the workflow before the user starts:
-- open one file or multiple files for batch signing,
-- understand the supported document types at a glance,
-- use drag and drop or explicit file selection,
-- see update messaging inside a clearer, larger overlay.
+The original document is never overwritten.
 
-### Document Review and Signing
-![Redesigned macOS signing workflow](assets/readme/autogram-macos-signing.png)
+## Supported document workflows
 
-The signing workflow keeps the document preview dominant while surfacing the right decisions:
-- review the PDF preview before signing,
-- see the current signing state and selected certificate immediately above the preview,
-- understand whether the document is ready for signing before the final action,
-- choose signature format, timestamp, and certificate in one place.
+| Input or output | Current native workflow |
+| --- | --- |
+| PDF | Preview, inspect, validate, and sign with PAdES Baseline T |
+| Existing signed PDF | Display existing signatures, countersign, and revalidate all signatures |
+| ASiC-E `.asice` | Inspect container contents, preview embedded PDFs, and preserve the existing XAdES or CAdES signature family |
+| New ASiC-E output | Create an ASiC-E container with XAdES when selected |
+| Multiple files | Add or open together and process in one workspace |
 
-## Main Capabilities
-- Desktop GUI for signing and verifying documents in a single-window flow.
-- Signature profiles and document workflows including PAdES, XAdES, CAdES, and Slovak eForms.
-- Existing signature validation before countersigning.
-- Batch signing from the command line.
-- HTTP API integration for web systems and internal tools.
-- Custom protocol launch via `autogram://`.
-- Support for commonly used PKCS#11 cards, native eID integrations, and PKCS#12 workflows where available.
+The repository also retains the upstream JavaFX application, HTTP API, machine CLI, eForm support, and automation scripts inherited from [Slovensko.Digital Autogram](https://github.com/slovensko-digital/autogram).
 
-## Slovak eGovernment Forms
-Autogram can work with the most common Slovak public-sector document flows:
+## Existing signatures and validation
 
-- `slovensko.sk` forms, including automatic schema and metadata loading.
-- ORSR forms, including embedded-schema handling for signature generation.
-- Finančná správa forms in `.asice` containers and XML workflows when the form identifier is known.
+Autogram macOS separates fast inspection from authoritative validation:
 
-See the Slovak README for the full practical examples and naming rules used in these workflows.
+- Fast inspection discovers whether signatures exist and makes document metadata available quickly.
+- Complete validation is delegated to the bundled Autogram and DSS engine.
+- Unsigned documents do not trigger unnecessary complete validation.
+- Signed outputs are inspected and validated again automatically.
+- `Valid` means the available DSS evidence supports the signature.
+- `Invalid` means validation found a signature failure.
+- `Validation indeterminate` means the signature was found, but available trust, revocation, timestamp, or certificate-chain evidence was insufficient for a definitive result.
+- The user can request validation again when the required online evidence later becomes available.
 
-## Run on macOS
-Official cross-platform releases are available in the upstream [Releases](https://github.com/slovensko-digital/autogram/releases) section. This fork focuses on the macOS application surface and development workflow.
+Autogram macOS does not reimplement cryptography or eIDAS validation in Swift. The native layer supervises the signing engine and presents its results.
 
-### Option A: Run from Source
-```sh
-./mvnw -q -Psystem-jdk -DskipTests package
-open target/app-image/Autogram.app
-```
+## Graphic signatures
 
-### Option B: Run from a Downloaded DMG Without Notarization
-```sh
-# 1) Remove quarantine from the downloaded DMG
-xattr -dr com.apple.quarantine "$HOME/Downloads/Autogram-<version>.dmg"
+A graphic signature is an optional visible appearance attached to the cryptographic PDF signature. It is not a substitute for the electronic signature.
 
-# 2) Mount DMG and copy the app to Applications
-hdiutil attach "$HOME/Downloads/Autogram-<version>.dmg"
-ditto "/Volumes/Autogram/Autogram.app" "/Applications/Autogram.app"
-hdiutil detach "/Volumes/Autogram"
+- Import transparent PNG artwork or a selected page from a PDF.
+- Imported artwork is copied into a private reusable application library.
+- Artwork keeps its original aspect ratio.
+- Choosing artwork explicitly enables a fresh placement for the active document.
+- The initial placement is centered on the last page, or the first page for a one-page PDF.
+- Drag, resize, or rotate the card directly on the PDF preview.
+- Change the target page from the signing inspector.
+- The placement and rotation are never reused automatically for another document.
+- The preview uses placeholder timing text. The signed output contains the real signing time and timestamp status.
+- After signing, the editable overlay is cleared so it cannot overlap the embedded appearance.
 
-# 3) Remove quarantine from the installed app
-xattr -dr com.apple.quarantine "/Applications/Autogram.app"
+## Cards, certificates, and middleware
 
-# 4) Self-sign locally with an ad-hoc signature
-codesign --remove-signature "/Applications/Autogram.app" || true
-codesign --force --deep --sign - --timestamp=none "/Applications/Autogram.app"
-codesign --verify --deep --strict --verbose=2 "/Applications/Autogram.app"
+The native application discovers supported PKCS#11 middleware and asks the signing engine for the certificates available on the connected token.
 
-# 5) Launch
-open -a "/Applications/Autogram.app"
-```
+Supported and tested development paths include:
 
-Notes:
-- This is a local ad-hoc signature, not Apple notarization.
-- For public distribution without warnings, use Apple Developer signing and notarization.
+- I.CA SecureStore 8.3.1 or later.
+- Slovak eID middleware with an arm64-capable PKCS#11 library.
+- Other PKCS#11 tokens when their library and token behavior are compatible with Autogram.
 
-## Finder Quick Action: CLI PDF Signing
+The application is arm64-only. Intel-only PKCS#11 libraries and Rosetta compatibility paths are intentionally unsupported.
 
-This repository includes a macOS Finder Quick Action that signs one or more selected PDF files through the Autogram CLI. It is an Automator Quick Action available from Finder's right-click menu. It opens macOS dialogs for the certificate store, signing certificate, and PIN, but it does not open the Autogram GUI or a Terminal window. This is not a macOS Shortcuts workflow.
+## Requirements
 
-### Requirements
+### End users
 
-- macOS with Finder and Automator.
-- A CLI-capable Autogram application, installed from a release package or built locally.
-- The required signing token or card, its PKCS#11 driver, and the PIN.
-- Network access to the configured qualified timestamp service when using PAdES Baseline T.
-- An Apple silicon compatible PKCS#11 driver. I.CA users need SecureStore 8.3.1 or later.
+- Apple silicon Mac.
+- macOS 27 or later.
+- Compatible signing card or token.
+- arm64 or universal PKCS#11 middleware.
+- I.CA SecureStore 8.3.1 or later for I.CA cards.
+- Network access for qualified timestamping and online signature validation.
+- Write access to the source document folder.
 
-The Quick Action runs the signing process in the background. Certificate store selection, certificate selection, and PIN entry are intentionally shown as macOS dialogs. The original PDFs are never overwritten. The scripts are integration files and do not install the Autogram application or the token driver.
+### Developers
 
-The default Quick Action configuration is:
+- Xcode with the macOS 27 SDK.
+- Apple silicon build machine.
+- JDK 25 with JavaFX for the Autogram helper build.
+- Maven through the included wrapper.
 
-- PAdES Baseline T for PDF files.
-- A timestamp request to `http://timestamp.sectigo.com/qualified`.
-- A new output beside each source file named `<name>_signed.pdf`. Existing outputs are preserved and numbered.
+Liberica JDK with JavaFX is the recommended Java distribution for local development.
 
-### Install the scripts
+## Install the native application
 
-Clone the repository and make the macOS scripts executable:
+Release installation and Finder integration are described in the [native macOS installation guide](docs/native-macos-installation.md).
+
+For a local development build:
 
 ```sh
-git clone https://github.com/originalmagneto/autogram-macOS.git
-cd autogram-macOS
-chmod +x scripts/macos-automation/*.sh
+export AUTOGRAM_JAVA_HOME="/path/to/arm64-jdk-with-javafx"
+export DEVELOPER_DIR="/Applications/Xcode-beta.app/Contents/Developer"
+scripts/native-macos/build-native-app.sh
+scripts/native-macos/sign-native-app.sh
+open "build/native/Autogram macOS.app"
 ```
 
-Intel-only PKCS#11 drivers are not supported by the Apple silicon workflow. Update the token middleware before installation. The architecture checks are documented in [docs/macos-cli-automation.md](docs/macos-cli-automation.md).
+The build script creates `build/native/Autogram macOS.app` with:
 
-### Create the Finder Quick Action
+- the native Swift application;
+- the arm64 Autogram machine helper;
+- the Java dependencies used by Autogram and DSS;
+- a reduced arm64 Java runtime.
 
-1. Open **Automator** and choose **New Document > Quick Action**. Do not create a macOS Shortcut for this integration.
-2. Set **Workflow receives current** to `files or folders` and **In** to `Finder`.
-3. Add the **Run Shell Script** action.
-4. Set **Shell** to `/bin/bash` and **Pass input** to `as arguments`.
-5. Use this script body, replacing the repository path with the location where you cloned it:
+The local signing script applies an ad-hoc signature. It does not provide Apple notarization.
 
-```bash
-REPO_DIR="/path/to/autogram-macOS"
-"$REPO_DIR/scripts/macos-automation/autogram-quick-action.sh" "$@"
-```
+## Finder Quick Action
 
-6. Save the Quick Action as `Sign PDFs Autogram`.
+The Finder Quick Action is an explicit integration for sending selected documents to Autogram macOS.
 
-Select one or more PDF files in Finder, right-click, open **Quick Actions**, and choose `Sign PDFs Autogram`. The original files are not overwritten. The signing process is CLI-based and the PIN is entered through a hidden macOS dialog. Only PDF files are processed; if the selection contains no PDF files, the action reports that there is nothing to sign.
+1. Open Autogram macOS Settings.
+2. Choose **Install Finder Quick Action**.
+3. If required, enable the action under **System Settings > General > Login Items & Extensions > Finder Extensions**.
+4. Select one or more supported files in Finder.
+5. Control-click and choose **Quick Actions > Sign with Autogram macOS**.
 
-For manual CLI use, run:
+The action does not expose the PIN in a script and does not require Terminal interaction. Detailed setup and troubleshooting are in the [installation guide](docs/native-macos-installation.md).
+
+The repository also includes the older standalone CLI Quick Action. Its separate requirements and installation are documented in [macOS CLI automation](docs/macos-cli-automation.md).
+
+## Build and test
+
+Run the native unit suite:
 
 ```sh
-scripts/macos-automation/autogram-cli-sign.sh --driver secure_store "/path/to/file.pdf"
+DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
+  xcodebuild \
+  -project native-macos/Autogram.xcodeproj \
+  -scheme Autogram \
+  -destination 'platform=macOS' \
+  -only-testing:AutogramTests \
+  test
 ```
 
-The CLI also supports `--list-keys`, `--key`, `--pin-stdin`, `--pdf-level`, `--tsa-server`, and batch directory signing. Do not put a PIN in shell history or commit it to a script. For troubleshooting and the full verification checklist, see [docs/macos-cli-automation.md](docs/macos-cli-automation.md).
-
-## Integration
-Swagger documentation for the HTTP API is available on [GitHub](https://generator3.swagger.io/index.html?url=https://raw.githubusercontent.com/slovensko-digital/autogram/main/src/main/resources/digital/slovensko/autogram/server/server.yml) or after launching the app at [http://localhost:37200/docs](http://localhost:37200/docs).
-
-You can also trigger the application directly from a browser or another app by opening a URL with the special protocol `autogram://`, for example `autogram://go`.
-
-## Console Mode
-Autogram can run from the command line for scripted and batch workflows. Use:
+Build the upstream Java application and helper:
 
 ```sh
-autogram --help
+./mvnw -Psystem-jdk test
+./mvnw -Psystem-jdk -DskipTests package
 ```
 
-On Windows, use:
+## Security and privacy
 
-```sh
-autogram-cli --help
-```
+- PIN values are held only for the active operation and cleared after use.
+- PIN values are sent to the bundled helper through standard input.
+- PINs are not stored in preferences, logs, process arguments, or environment variables.
+- Timestamp credentials are not stored in plaintext preferences.
+- Diagnostics are designed to exclude secrets and private document content.
+- Source documents are not overwritten.
+- Managed graphic artwork is stored inside application support, not by referencing the original private path.
+- PKCS#11 libraries are checked for arm64 compatibility before use.
 
-## Supported Cards and Drivers
-- Any PKCS#11-compatible card when the driver path is known.
-- Native support for the Slovak eID card.
-- Native support for I.CA SecureStore, MONET+ ProID+Q, and Gemalto IDPrime 940.
+Review [native macOS architecture](docs/native-macos-architecture.md) for the trust boundaries and process model.
 
-Adding more cards is typically straightforward as long as they expose PKCS#11.
+## Documentation
 
-## Development
-### Prerequisites
-- JDK 25 with JavaFX
-- Maven
-- Optional: Visual Studio Code or IntelliJ IDEA Community Edition
+- [Native macOS installation](docs/native-macos-installation.md)
+- [Native macOS user guide](docs/native-macos-user-guide.md)
+- [Native macOS architecture](docs/native-macos-architecture.md)
+- [Native release checklist](docs/native-macos-release-checklist.md)
+- [Machine CLI protocol](docs/machine-cli-protocol-v1.md)
+- [macOS CLI and standalone Finder Quick Action](docs/macos-cli-automation.md)
+- [Batch signing API](docs/batch-sign-api.md)
+- [Batch signing GUI](docs/batch-sign-gui.md)
+- [Upstream porting notes](PORTING.md)
+- [Development plan](PLAN.md)
 
-Liberica JDK with JavaFX is the recommended setup on macOS.
+## Upstream relationship
 
-### Build and Test
-```sh
-./mvnw -q -Psystem-jdk test
-./mvnw -q -Psystem-jdk -DskipTests package
-```
+This fork keeps the upstream Autogram and DSS signing engine as the cryptographic authority. Native macOS work is intentionally separated into the Swift application, machine protocol, Finder integration, and platform packaging so generally useful changes can be proposed upstream without coupling cryptographic behavior to Apple frameworks.
 
-The package build prepares the application image in `target/app-image/Autogram.app`.
-
-### Packaging on Linux
-`docker-compose.yml` contains services for packaging on Ubuntu, Debian, and Fedora:
-
-```sh
-docker compose up --build
-```
-
-Resulting packages appear in `packaging/output/`.
-
-### Additional Engineering Docs
-- [DEVELOPER.md](DEVELOPER.md)
-- [PORTING.md](PORTING.md)
-- [PLAN.md](PLAN.md)
-- [UPSTREAM_SYNC_PR_CHECKLIST.md](UPSTREAM_SYNC_PR_CHECKLIST.md)
-- [macOS CLI and Finder Quick Action](docs/macos-cli-automation.md)
-
-## Authors and Sponsors
-Jakub Duras, Slovensko.Digital, CRYSTAL CONSULTING, s.r.o., Solver IT s.r.o., and other contributors.
+Upstream project: [slovensko-digital/autogram](https://github.com/slovensko-digital/autogram)
 
 ## License
-This software is licensed under EUPL v1.2. It was originally derived from the Octosign White Label project by Jakub Duras, which is licensed under MIT, and is distributed here under EUPL v1.2 with the author’s permission.
 
-In short, the software can be used commercially and non-commercially, and you can create your own versions as long as you publish changes and extensions under the same license and preserve the original copyright.
+Autogram is distributed under the EUPL v1.2. The project was originally derived from the Octosign White Label project by Jakub Duras, licensed under MIT and distributed here with the author's permission.
+
+Commercial and non-commercial use is permitted subject to the EUPL conditions, including publication of covered modifications and preservation of applicable copyright notices.
