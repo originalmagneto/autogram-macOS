@@ -120,6 +120,16 @@ workflow_root="${app_bundle}/Contents/Resources/Sign PDFs with Autogram.workflow
 plutil -lint "${workflow_root}/Info.plist" >/dev/null
 plutil -lint "${workflow_root}/document.wflow" >/dev/null
 
+managed_workflow="${app_bundle}/Contents/Resources/Sign PDFs Autogram.workflow/Contents"
+[[ "$(cat "${managed_workflow}/Resources/managed-version")" == "1" ]] || fail "Managed workflow version is invalid"
+plutil -lint "${managed_workflow}/Info.plist" >/dev/null
+plutil -lint "${managed_workflow}/document.wflow" >/dev/null
+[[ -x "${managed_workflow}/Resources/autogram-quick-action.sh" ]] || fail "Managed workflow launcher is not executable"
+[[ -x "${managed_workflow}/Resources/autogram-cli-sign.sh" ]] || fail "Managed workflow CLI signer is not executable"
+bash -n "${managed_workflow}/Resources/autogram-quick-action.sh"
+bash -n "${managed_workflow}/Resources/autogram-cli-sign.sh"
+[[ -z "$(rg -a -l -e '/Users/' -e 'Intel' -e 'Rosetta' "${managed_workflow}" 2>/dev/null || true)" ]] || fail "Managed workflow contains a personal path, Intel, or Rosetta text"
+
 capabilities_response="$(printf '%s' '{"protocolVersion":1,"requestId":"native-release-audit","operation":"CAPABILITIES","payload":{}}' | "${helper_executable}" --cli --machine-readable --protocol-version 1 --operation CAPABILITIES)"
 CAPABILITIES_RESPONSE="${capabilities_response}" python3 - <<'PY'
 import json

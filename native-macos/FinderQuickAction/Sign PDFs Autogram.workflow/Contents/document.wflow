@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>actions</key>
+    <array>
+        <dict>
+            <key>action</key>
+            <dict>
+                <key>ActionBundlePath</key>
+                <string>/System/Library/Automator/Run Shell Script.action</string>
+                <key>ActionName</key>
+                <string>Run Shell Script</string>
+                <key>ActionParameters</key>
+                <dict>
+                    <key>COMMAND_STRING</key>
+                    <string>workflow_resources="$HOME/Library/Services/Sign PDFs Autogram.workflow/Contents/Resources"
+exec "${workflow_resources}/autogram-quick-action.sh" "$@"</string>
+                    <key>inputMethod</key>
+                    <integer>0</integer>
+                    <key>shell</key>
+                    <string>/bin/bash</string>
+                </dict>
+                <key>AMAccepts</key>
+                <dict>
+                    <key>Container</key>
+                    <string>List</string>
+                    <key>Optional</key>
+                    <true/>
+                    <key>Types</key>
+                    <array>
+                        <string>com.adobe.pdf</string>
+                    </array>
+                </dict>
+                <key>AMActionVersion</key>
+                <string>2.0.3</string>
+                <key>AMApplication</key>
+                <array>
+                    <string>Automator</string>
+                </array>
+                <key>AMParameterProperties</key>
+                <dict>
+                    <key>COMMAND_STRING</key>
+                    <dict>
+                        <key>default value</key>
+                        <string>workflow_resources="$HOME/Library/Services/Sign PDFs Autogram.workflow/Contents/Resources"
+exec "${workflow_resources}/autogram-quick-action.sh" "$@"</string>
+                    </dict>
+                </dict>
+                <key>AMProvides</key>
+                <dict>
+                    <key>Results</key>
+                    <dict>
+                        <key>Types</key>
+                        <array>
+                            <string>com.adobe.pdf</string>
+                        </array>
+                    </dict>
+                </dict>
+                <key>CFBundleIdentifier</key>
+                <string>com.apple.Automator.RunShellScript</string>
+                <key>CFBundleVersion</key>
+                <string>2.0.3</string>
+            </dict>
+            <key>isViewVisible</key>
+            <true/>
+        </dict>
+    </array>
+    <key>AMApplicationBuild</key>
+    <string>523</string>
+    <key>AMApplicationVersion</key>
+    <string>2.10</string>
+    <key>workflowMetaData</key>
+    <dict>
+        <key>applicationBundleIDsByPath</key>
+        <dict>
+            <key>/System/Library/Automator/Run Shell Script.action</key>
+            <string>com.apple.Automator.RunShellScript</string>
+        </dict>
+        <key>inputTypeIdentifier</key>
+        <string>com.adobe.pdf</string>
+        <key>outputTypeIdentifier</key>
+        <string>com.adobe.pdf</string>
+        <key>presentationMode</key>
+        <integer>15</integer>
+        <key>processesInput</key>
+        <false/>
+        <key>serviceApplicationBundleID</key>
+        <string>com.apple.finder</string>
+    </dict>
+</dict>
+</plist>

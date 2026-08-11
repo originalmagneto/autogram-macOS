@@ -126,7 +126,7 @@
 /* End PBXGroup section */
 
 /* Begin PBXFileReference section */
-		A10000000000000000000081 /* Sign PDFs with Autogram.workflow */ = { isa = PBXFileReference; lastKnownFileType = wrapper.workflow; path = "FinderQuickAction/Sign PDFs with Autogram.workflow"; sourceTree = SOURCE_ROOT; };
+		A10000000000000000000081 /* Sign PDFs Autogram.workflow */ = { isa = PBXFileReference; lastKnownFileType = wrapper.workflow; path = "FinderQuickAction/Sign PDFs Autogram.workflow"; sourceTree = SOURCE_ROOT; };
 		A10000000000000000000041 /* Autogram.app */ = { isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Autogram.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A10000000000000000000042 /* AutogramTests.xctest */ = { isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AutogramTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A10000000000000000000043 /* AutogramIntegrationTests.xctest */ = { isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AutogramIntegrationTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -134,7 +134,7 @@
 /* End PBXFileReference section */
 
 /* Begin PBXBuildFile section */
-		A10000000000000000000082 /* Sign PDFs with Autogram.workflow in Resources */ = { isa = PBXBuildFile; fileRef = A10000000000000000000081 /* Sign PDFs with Autogram.workflow */; };
+		A10000000000000000000082 /* Sign PDFs Autogram.workflow in Resources */ = { isa = PBXBuildFile; fileRef = A10000000000000000000081 /* Sign PDFs Autogram.workflow */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -152,7 +152,7 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXResourcesBuildPhase section */
-		A10000000000000000000033 /* Resources */ = { isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (A10000000000000000000082 /* Sign PDFs with Autogram.workflow in Resources */,); runOnlyForDeploymentPostprocessing = 0; };
+		A10000000000000000000033 /* Resources */ = { isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (A10000000000000000000082 /* Sign PDFs Autogram.workflow in Resources */,); runOnlyForDeploymentPostprocessing = 0; };
 		A10000000000000000000036 /* Resources */ = { isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 		A10000000000000000000039 /* Resources */ = { isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 		A1000000000000000000003C /* Resources */ = { isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
