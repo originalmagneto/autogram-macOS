@@ -3,6 +3,19 @@ import Foundation
 import Testing
 @testable import Autogram
 
+@Test @MainActor func addingFilesSelectsTheLastNewlyAcceptedFile() {
+    let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+    let existingURL = directory.appending(path: "existing.pdf")
+    let firstNewURL = directory.appending(path: "first-new.pdf")
+    let lastNewURL = directory.appending(path: "last-new.pdf")
+    let workspace = WorkspaceModel(items: [PDFItem(descriptor: PDFItemDescriptor(id: "existing", sourceURL: existingURL))])
+
+    #expect(!workspace.addFiles([existingURL]))
+    #expect(workspace.selection == workspace.items[0].id)
+    #expect(workspace.addFiles([existingURL, firstNewURL, lastNewURL]))
+    #expect(workspace.selectedItem?.descriptor.sourceURL == lastNewURL)
+}
+
 @Test @MainActor func inspectionStoresSignedAndUnsignedResultsPerWorkspaceItem() async throws {
     let signed = PDFItemDescriptor(id: "signed", sourceURL: URL(fileURLWithPath: "/tmp/signed.pdf"))
     let unsigned = PDFItemDescriptor(id: "unsigned", sourceURL: URL(fileURLWithPath: "/tmp/unsigned.pdf"))

@@ -737,9 +737,7 @@ final class WorkspaceModel {
         guard !newItems.isEmpty else { return false }
         invalidateCompleteValidation()
         items.append(contentsOf: newItems)
-        if selection == nil {
-            selection = newItems.first?.id
-        }
+        selection = newItems.last?.id
         Task { await refreshInspections() }
         return true
     }
