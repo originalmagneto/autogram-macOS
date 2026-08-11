@@ -80,7 +80,10 @@ import Foundation
 
     #expect(workspace.items[0].descriptor.sourceURL == output)
     #expect(workspace.items[0].inspection.signatures.map(\.signerDisplayName) == ["Ada Lovelace"])
-    #expect(workspace.items[0].status == .completed)
+    #expect(workspace.items[0].status == .inspected)
+    #expect(engine.validateCallCount == 1)
+    #expect(workspace.signatureValidationProgress == .complete)
+    #expect(workspace.items[0].inspection.signatures.map(\.validationState) == [.valid])
 }
 
 private final class IncompleteInspectionEngine: SigningEngine, @unchecked Sendable {
@@ -144,8 +147,18 @@ private struct FailureSigningEngine: SigningEngine {
     func cancel() async {}
 }
 
-private struct PostSigningInspectionEngine: SigningEngine {
+private final class PostSigningInspectionEngine: SigningEngine, @unchecked Sendable {
     let outputURL: URL
+    private let lock = NSLock()
+    private var storedValidateCallCount = 0
+
+    var validateCallCount: Int {
+        lock.withLock { storedValidateCallCount }
+    }
+
+    init(outputURL: URL) {
+        self.outputURL = outputURL
+    }
 
     func capabilities() async throws -> EngineCapabilities {
         EngineCapabilities(protocolVersion: 1, supportsQualifiedTimestamp: true)
@@ -168,6 +181,24 @@ private struct PostSigningInspectionEngine: SigningEngine {
                     id: "signature-1",
                     signerDisplayName: "Ada Lovelace",
                     validationState: .indeterminate,
+                    signingTime: nil,
+                    format: "PAdES_BASELINE_T",
+                    hasQualifiedTimestamp: true
+                )]
+            )
+        })]
+    }
+
+    func validate(files: [PDFItemDescriptor]) async throws -> [PDFInspection] {
+        lock.withLock { storedValidateCallCount += 1 }
+        return [PDFInspection(files: files.map { file in
+            InspectedPDF(
+                id: file.id,
+                isSignable: true,
+                signatures: [ExistingPDFSignature(
+                    id: "signature-1",
+                    signerDisplayName: "Ada Lovelace",
+                    validationState: .valid,
                     signingTime: nil,
                     format: "PAdES_BASELINE_T",
                     hasQualifiedTimestamp: true

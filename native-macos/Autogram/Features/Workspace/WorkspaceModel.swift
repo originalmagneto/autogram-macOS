@@ -489,6 +489,10 @@ final class WorkspaceModel {
             }
             return item.updatingInspection(to: .completed(result))
         }
+        startCompleteValidation(
+            for: descriptors,
+            requestGeneration: inspectionRequestGeneration
+        )
     }
 
     func markPostSigningInspectionFailed(for fileIDs: [String]) {
