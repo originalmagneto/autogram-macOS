@@ -12,6 +12,7 @@ struct VisibleAppearanceInspector: View {
                 get: { workspace.visibleSignatureEnabled },
                 set: { workspace.setVisibleSignatureEnabled($0) }
             ))
+            .disabled(workspace.visibleSignatureAsset == nil)
             if let url = workspace.visibleSignatureArtworkURL,
                let image = NSImage(contentsOf: url) {
                 Image(nsImage: image)

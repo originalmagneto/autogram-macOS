@@ -248,6 +248,57 @@ import Testing
     #expect(workspace.visibleSignaturePlacement?.pageIndex == 1)
 }
 
+@Test @MainActor func savedArtworkDoesNotActivateGraphicSignatureInNewWorkspace() throws {
+    let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let artwork = directory.appending(path: "artwork.png")
+    try workspaceFixturePNG().write(to: artwork)
+    let store = SignatureAssetStore(applicationSupportRoot: directory.appending(path: "Application Support"))
+    let asset = try store.importPNG(artwork)
+    let preferencesSuite = "WorkspaceInspectionTests.\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: preferencesSuite))
+    defer { defaults.removePersistentDomain(forName: preferencesSuite) }
+
+    WorkspaceModel(signatureAssetStore: store, defaults: defaults).configureVisibleAppearance(
+        asset: asset,
+        enabled: true,
+        placement: nil
+    )
+    let workspace = WorkspaceModel(signatureAssetStore: store, defaults: defaults)
+
+    #expect(workspace.visibleSignatureAsset != nil)
+    #expect(workspace.visibleSignatureEnabled == false)
+}
+
+@Test @MainActor func completedOutputDisablesPendingGraphicSignatureOverlay() throws {
+    let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let source = directory.appending(path: "document.pdf")
+    let artwork = directory.appending(path: "artwork.png")
+    let output = directory.appending(path: "signed-document.pdf")
+    try writeWorkspaceFixturePDF(to: source, pageCount: 1)
+    try workspaceFixturePNG().write(to: artwork)
+    let store = SignatureAssetStore(applicationSupportRoot: directory.appending(path: "Application Support"))
+    let asset = try store.importPNG(artwork)
+    let workspace = WorkspaceModel(
+        items: [PDFItem(descriptor: PDFItemDescriptor(id: "document", sourceURL: source))],
+        signatureAssetStore: store
+    )
+    let placement = VisibleSignaturePlacement(
+        pageIndex: 0,
+        pageRect: CGRect(x: 10, y: 20, width: 30, height: 40),
+        rotationDegrees: 0
+    )
+
+    workspace.configureVisibleAppearance(asset: asset, enabled: true, placement: placement)
+    workspace.updateSignedOutput(for: "document", to: output)
+
+    #expect(workspace.visibleSignatureEnabled == false)
+    #expect(PDFDetailView(item: workspace.items[0], workspace: workspace).cardPreview == nil)
+}
+
 @Test @MainActor func documentChangeClampsPersistedVisiblePlacementToItsPageRange() throws {
     let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)

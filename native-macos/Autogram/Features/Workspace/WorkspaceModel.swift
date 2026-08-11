@@ -396,6 +396,7 @@ final class WorkspaceModel {
             asset = try signatureAssetStore.importPNG(sourceURL)
         }
         visibleSignatureAsset = asset
+        visibleSignatureEnabled = true
         refreshVisibleSignatureArtworkPreview()
         if visibleSignaturePlacement == nil {
             visibleSignaturePlacement = VisibleSignaturePlacement(
@@ -468,6 +469,10 @@ final class WorkspaceModel {
 
     func updateSignedOutput(for fileID: String, to outputURL: URL) {
         invalidateCompleteValidation()
+        visibleSignatureEnabled = false
+        visibleSignatureCardContent = nil
+        visibleSignatureCardPreview = nil
+        persistVisibleSignaturePreferences()
         items = items.map { item in
             guard item.descriptor.id == fileID else { return item }
             return item.updatingDescriptor(to: PDFItemDescriptor(id: fileID, sourceURL: outputURL))
@@ -846,7 +851,7 @@ final class WorkspaceModel {
         visibleSignatureAsset = preferences.assetID.map {
             SignatureAsset(id: $0, kind: .png, managedFilename: "\($0.uuidString).png")
         }
-        visibleSignatureEnabled = preferences.enabled
+        visibleSignatureEnabled = false
         visibleSignaturePlacement = preferences.defaultPlacement?.placement
         refreshVisibleSignatureArtworkPreview()
     }
@@ -854,7 +859,7 @@ final class WorkspaceModel {
     private func persistVisibleSignaturePreferences() {
         let preferences = VisibleSignaturePreferences(
             assetID: visibleSignatureAsset?.id,
-            enabled: visibleSignatureEnabled,
+            enabled: false,
             defaultPlacement: visibleSignaturePlacement.map(VisibleSignaturePreferences.Placement.init)
         )
         defaults.set(try? JSONEncoder().encode(preferences), forKey: VisibleSignaturePreferences.storageKey)
