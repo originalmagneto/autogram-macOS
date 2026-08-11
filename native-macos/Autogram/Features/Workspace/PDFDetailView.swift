@@ -42,7 +42,7 @@ struct PDFDetailView: View {
                         cardPreview: cardPreview
                     )
                 } else {
-                    ASiCContentsView(inspection: item.inspection)
+                    ASiCContentsView(inspection: item.inspection, workspace: workspace)
                 }
             }
             .navigationTitle(item.descriptor.redactedDisplayName)

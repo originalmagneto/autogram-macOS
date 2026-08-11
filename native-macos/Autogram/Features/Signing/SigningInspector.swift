@@ -168,7 +168,7 @@ struct SigningInspector: View {
                     .foregroundStyle(.secondary)
             }
 
-            if shouldOfferVerificationRetry(for: selectedItem) {
+            if case .incomplete = workspace.signatureValidationProgress {
                 Button("Verify Again") {
                     Task { await workspace.verifySelectedDocumentAgain() }
                 }
@@ -176,13 +176,6 @@ struct SigningInspector: View {
         } else {
             ContentUnavailableView("No document selected", systemImage: "doc")
         }
-    }
-
-    private func shouldOfferVerificationRetry(for item: PDFItem) -> Bool {
-        if case .incomplete = workspace.signatureValidationProgress {
-            return true
-        }
-        return item.inspection.signatures.contains { $0.validationState == .indeterminate }
     }
 
     private func signatureSummary(for signatures: [ExistingPDFSignature]) -> String {

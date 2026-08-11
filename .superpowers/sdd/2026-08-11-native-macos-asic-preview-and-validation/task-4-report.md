@@ -4,7 +4,12 @@
 
 - PDF entries in an ASiC contents list request an internal preview through the Task 3 workspace API.
 - The extracted PDF uses the existing PDFKit preview without visible-signature placement and has a Back to ASiC Contents control.
-- The signing inspector shows indeterminate trust-check progress, safe reasons for incomplete or non-valid results, and Verify Again only for incomplete or indeterminate validation.
+- The signing inspector shows indeterminate trust-check progress, safe reasons for incomplete or non-valid results, and Verify Again only for incomplete validation requests.
+
+## Follow-up fix
+
+- Added the missing `ASiCContentsView(inspection: item.inspection, workspace: workspace)` call-site argument to make the committed preview UI self-contained.
+- Restricted Verify Again to `SignatureValidationProgress.incomplete`. Trusted-list request failures are represented by `.incomplete(reason)`.
 
 ## Changed files
 
@@ -31,6 +36,8 @@ DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer xcodebuild -projec
 ```
 
 The Debug build completed successfully.
+
+Follow-up verification reran both commands after the two review fixes. The test target again ran 46 tests with 0 failures, and the Debug build again completed successfully.
 
 ## Remaining risk
 
