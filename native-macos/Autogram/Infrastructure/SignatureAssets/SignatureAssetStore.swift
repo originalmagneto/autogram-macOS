@@ -58,7 +58,7 @@ struct SignatureAssetStore {
         let managedFilename = managedFilename(for: id)
         let destination = try prepareManagedURL(filename: managedFilename)
         try pngData(for: cropped).write(to: destination, options: .withoutOverwriting)
-        return SignatureAsset(id: id, kind: .pdf, managedFilename: managedFilename)
+        return SignatureAsset(id: id, kind: .png, managedFilename: managedFilename)
     }
 
     func fileURL(for asset: SignatureAsset) -> URL {

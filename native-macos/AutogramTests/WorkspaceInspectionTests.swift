@@ -27,6 +27,40 @@ import Testing
     #expect(workspace.canStartSigning == false)
 }
 
+@Test @MainActor func completeValidationRunsAfterFastInspectionFailure() async {
+    let descriptor = PDFItemDescriptor(id: "sample", sourceURL: URL(fileURLWithPath: "/tmp/sample.pdf"))
+    let workspace = WorkspaceModel(
+        engine: FastFailureCompleteValidationEngine(),
+        items: [PDFItem(descriptor: descriptor)]
+    )
+
+    await workspace.refreshInspections()
+    try? await Task.sleep(for: .milliseconds(100))
+
+    #expect(workspace.signatureValidationProgress == .complete)
+    #expect(workspace.items[0].inspection.isComplete)
+}
+
+@Test @MainActor func changingOrReplacingActiveDocumentDisablesGraphicComposition() {
+    let first = PDFItem(descriptor: PDFItemDescriptor(id: "first", sourceURL: URL(fileURLWithPath: "/tmp/first.pdf")))
+    let second = PDFItem(descriptor: PDFItemDescriptor(id: "second", sourceURL: URL(fileURLWithPath: "/tmp/second.pdf")))
+    let workspace = WorkspaceModel(engine: IncompleteValidationEngine(), items: [first, second])
+    let asset = SignatureAsset(id: UUID(), kind: .png, managedFilename: "artwork.png")
+    let placement = VisibleSignaturePlacement(pageIndex: 0, pageRect: .zero, rotationDegrees: 0)
+
+    workspace.configureVisibleAppearance(asset: asset, enabled: true, placement: placement)
+    workspace.selection = second.id
+    #expect(workspace.visibleSignatureEnabled == false)
+
+    workspace.configureVisibleAppearance(asset: asset, enabled: true, placement: placement)
+    let replacement = PDFItem(
+        id: second.id,
+        descriptor: PDFItemDescriptor(id: "second", sourceURL: URL(fileURLWithPath: "/tmp/replacement.pdf"))
+    )
+    workspace.setItems([first, replacement])
+    #expect(workspace.visibleSignatureEnabled == false)
+}
+
 @Test @MainActor func embeddedPreviewClosesAndSelectedDocumentCanBeValidatedAgain() async throws {
     let descriptor = PDFItemDescriptor(id: "sample", sourceURL: URL(fileURLWithPath: "/tmp/sample.asice"))
     let engine = PreviewAndValidationEngine()
@@ -652,6 +686,34 @@ private struct IncompleteValidationEngine: SigningEngine {
 
     func validate(files: [PDFItemDescriptor]) async throws -> [PDFInspection] {
         [PDFInspection(files: [])]
+    }
+
+    func sign(request: SigningRequest) -> AsyncThrowingStream<SigningEvent, Error> {
+        AsyncThrowingStream { $0.finish() }
+    }
+
+    func cancel() async {}
+}
+
+private struct FastFailureCompleteValidationEngine: SigningEngine {
+    func capabilities() async throws -> EngineCapabilities {
+        EngineCapabilities(protocolVersion: 2, supportsQualifiedTimestamp: true)
+    }
+
+    func drivers() async throws -> [SigningDriver] { [] }
+
+    func certificates(driverID: String, pin: Secret?) async throws -> [SigningCertificate] { [] }
+
+    func certificateDiscovery(driverID: String, pin: Secret?) async throws -> CertificateDiscovery {
+        CertificateDiscovery(token: SigningToken(tokenKey: "test-token", providerName: "Test Token"), certificates: [])
+    }
+
+    func inspect(files: [PDFItemDescriptor]) async throws -> [PDFInspection] {
+        throw SigningFailure.engine("Fast inspection failed")
+    }
+
+    func validate(files: [PDFItemDescriptor]) async throws -> [PDFInspection] {
+        [PDFInspection(files: files.map { InspectedPDF(id: $0.id, isSignable: true) })]
     }
 
     func sign(request: SigningRequest) -> AsyncThrowingStream<SigningEvent, Error> {

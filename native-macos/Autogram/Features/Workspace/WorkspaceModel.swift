@@ -11,6 +11,7 @@ final class WorkspaceModel {
         didSet {
             guard selection != oldValue else { return }
             closeEmbeddedPreview()
+            disableVisibleSignatureComposition()
         }
     }
     var selectedOutputFormat: SigningOutputFormat = .automatic
@@ -126,6 +127,7 @@ final class WorkspaceModel {
             guard requestGeneration == inspectionRequestGeneration else { return }
             updateInspection(for: descriptors.map(\.id), to: .failed)
             signingActivityPhase = nil
+            startCompleteValidation(for: descriptors, requestGeneration: requestGeneration)
         }
     }
 
@@ -367,6 +369,7 @@ final class WorkspaceModel {
 
     func setItems(_ items: [PDFItem]) {
         invalidateCompleteValidation()
+        disableVisibleSignatureComposition()
         self.items = items
         discardEmbeddedPreviewIfSourceWasRemoved()
         if let selection, !items.contains(where: { $0.id == selection }) {
@@ -887,6 +890,12 @@ final class WorkspaceModel {
             defaultPlacement: visibleSignaturePlacement.map(VisibleSignaturePreferences.Placement.init)
         )
         defaults.set(try? JSONEncoder().encode(preferences), forKey: VisibleSignaturePreferences.storageKey)
+    }
+
+    private func disableVisibleSignatureComposition() {
+        visibleSignatureEnabled = false
+        visibleSignatureCardContent = nil
+        visibleSignatureCardPreview = nil
     }
 
     private func refreshVisibleSignatureAssets() {

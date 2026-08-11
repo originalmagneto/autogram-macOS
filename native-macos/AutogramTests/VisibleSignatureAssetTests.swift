@@ -33,7 +33,8 @@ import Testing
             from: JSONEncoder().encode(pdfAsset)
         )
 
-        #expect(pdfAsset.kind == .pdf)
+        #expect(pdfAsset.kind == .png)
+        #expect(try store.listAssets().contains(pdfAsset))
         #expect(persistedPDFAsset == pdfAsset)
         #expect(store.fileURL(for: persistedPDFAsset) == pdfURL)
         #expect(pdfURL.deletingLastPathComponent() == store.assetsDirectory)
