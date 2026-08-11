@@ -7,13 +7,16 @@ struct PDFDetailView: View {
 
     var visibleSignaturePlacement: Binding<VisibleSignaturePlacement?> {
         Binding(
-            get: { workspace.visibleSignaturePlacement },
-            set: { workspace.updateVisibleSignaturePlacement($0) }
+            get: { workspace.visibleSignatureEnabled ? workspace.visibleSignaturePlacement : nil },
+            set: { placement in
+                guard workspace.visibleSignatureEnabled else { return }
+                workspace.updateVisibleSignaturePlacement(placement)
+            }
         )
     }
 
     var cardPreview: NSImage? {
-        workspace.visibleSignatureCardPreview
+        workspace.visibleSignatureEnabled ? workspace.visibleSignatureCardPreview : nil
     }
 
     var body: some View {

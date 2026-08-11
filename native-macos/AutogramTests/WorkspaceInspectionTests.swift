@@ -252,23 +252,47 @@ import Testing
     let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: directory) }
+    let source = directory.appending(path: "document.pdf")
     let artwork = directory.appending(path: "artwork.png")
+    try writeWorkspaceFixturePDF(to: source, pageCount: 1)
     try workspaceFixturePNG().write(to: artwork)
     let store = SignatureAssetStore(applicationSupportRoot: directory.appending(path: "Application Support"))
     let asset = try store.importPNG(artwork)
     let preferencesSuite = "WorkspaceInspectionTests.\(UUID().uuidString)"
     let defaults = try #require(UserDefaults(suiteName: preferencesSuite))
     defer { defaults.removePersistentDomain(forName: preferencesSuite) }
-
-    WorkspaceModel(signatureAssetStore: store, defaults: defaults).configureVisibleAppearance(
-        asset: asset,
-        enabled: true,
-        placement: nil
+    let placement = VisibleSignaturePlacement(
+        pageIndex: 0,
+        pageRect: CGRect(x: 10, y: 20, width: 30, height: 40),
+        rotationDegrees: 0
     )
-    let workspace = WorkspaceModel(signatureAssetStore: store, defaults: defaults)
+    let legacyPreferences = try JSONSerialization.data(withJSONObject: [
+        "assetID": asset.id.uuidString,
+        "enabled": true,
+        "defaultPlacement": [
+            "pageIndex": placement.pageIndex,
+            "originX": placement.pageRect.origin.x,
+            "originY": placement.pageRect.origin.y,
+            "width": placement.pageRect.width,
+            "height": placement.pageRect.height,
+            "rotationDegrees": placement.rotationDegrees
+        ]
+    ])
+    defaults.set(legacyPreferences, forKey: "preferences.visibleSignature")
+
+    let workspace = WorkspaceModel(
+        items: [PDFItem(descriptor: PDFItemDescriptor(id: "document", sourceURL: source))],
+        signatureAssetStore: store,
+        defaults: defaults
+    )
+    let detail = PDFDetailView(item: workspace.items[0], workspace: workspace)
 
     #expect(workspace.visibleSignatureAsset != nil)
     #expect(workspace.visibleSignatureEnabled == false)
+    #expect(workspace.visibleSignaturePlacement == placement)
+    #expect(workspace.visibleSignatureCardPreview != nil)
+    #expect(detail.visibleSignaturePlacement.wrappedValue == nil)
+    #expect(detail.cardPreview == nil)
 }
 
 @Test @MainActor func completedOutputDisablesPendingGraphicSignatureOverlay() throws {
