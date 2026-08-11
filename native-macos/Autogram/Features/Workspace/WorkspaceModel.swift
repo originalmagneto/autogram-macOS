@@ -122,7 +122,10 @@ final class WorkspaceModel {
             let inspections = try await engine.inspect(files: descriptors)
             applyInspectionResults(inspections, for: descriptors, requestGeneration: requestGeneration)
             signingActivityPhase = nil
-            startCompleteValidation(for: descriptors, requestGeneration: requestGeneration)
+            startCompleteValidation(
+                for: descriptorsWithElectronicSignatures(in: inspections, matching: descriptors),
+                requestGeneration: requestGeneration
+            )
         } catch {
             guard requestGeneration == inspectionRequestGeneration else { return }
             updateInspection(for: descriptors.map(\.id), to: .failed)
@@ -407,13 +410,7 @@ final class WorkspaceModel {
         guard visibleSignatureAssets.contains(asset) else { return }
         visibleSignatureAsset = asset
         visibleSignatureEnabled = true
-        if visibleSignaturePlacement == nil {
-            visibleSignaturePlacement = VisibleSignaturePlacement(
-                pageIndex: max(visibleSignaturePageCount - 1, 0),
-                pageRect: .zero,
-                rotationDegrees: 0
-            )
-        }
+        visibleSignaturePlacement = defaultVisibleSignaturePlacement()
         refreshVisibleSignatureArtworkPreview()
         persistVisibleSignaturePreferences()
     }
@@ -433,6 +430,7 @@ final class WorkspaceModel {
     func removeVisibleSignatureArtwork() {
         visibleSignatureAsset = nil
         visibleSignatureEnabled = false
+        visibleSignaturePlacement = nil
         visibleSignatureCardContent = nil
         visibleSignatureCardPreview = nil
         persistVisibleSignaturePreferences()
@@ -495,9 +493,7 @@ final class WorkspaceModel {
 
     func updateSignedOutput(for fileID: String, to outputURL: URL) {
         invalidateCompleteValidation()
-        visibleSignatureEnabled = false
-        visibleSignatureCardContent = nil
-        visibleSignatureCardPreview = nil
+        disableVisibleSignatureComposition()
         persistVisibleSignaturePreferences()
         items = items.map { item in
             guard item.descriptor.id == fileID else { return item }
@@ -521,7 +517,7 @@ final class WorkspaceModel {
             return item.updatingInspection(to: .completed(result))
         }
         startCompleteValidation(
-            for: descriptors,
+            for: descriptorsWithElectronicSignatures(in: inspections, matching: descriptors),
             requestGeneration: inspectionRequestGeneration
         )
     }
@@ -596,6 +592,7 @@ final class WorkspaceModel {
     private func startCompleteValidation(for descriptors: [PDFItemDescriptor], requestGeneration: Int) {
         signatureValidationProgress = .provisional
         cancelCompleteValidation()
+        guard !descriptors.isEmpty else { return }
         completeValidationTask = Task { [weak self] in
             await self?.completeValidation(for: descriptors, requestGeneration: requestGeneration)
         }
@@ -656,6 +653,19 @@ final class WorkspaceModel {
     private func validationIncompleteReason(for descriptors: [PDFItemDescriptor]) -> String {
         let names = descriptors.map(\.redactedDisplayName).joined(separator: ", ")
         return "Complete validation returned no result for \(names)."
+    }
+
+    private func descriptorsWithElectronicSignatures(
+        in inspections: [PDFInspection],
+        matching descriptors: [PDFItemDescriptor]
+    ) -> [PDFItemDescriptor] {
+        let descriptorIDs = Set(descriptors.map(\.id))
+        let signedIDs = Set(
+            inspections.flatMap(\.files)
+                .filter { descriptorIDs.contains($0.id) && !$0.signatures.isEmpty }
+                .map(\.id)
+        )
+        return descriptors.filter { signedIDs.contains($0.id) }
     }
 
     private func cancelCompleteValidation() {
@@ -885,23 +895,45 @@ final class WorkspaceModel {
             visibleSignatureAssets.first { $0.id == id }
         }
         visibleSignatureEnabled = false
-        visibleSignaturePlacement = preferences.defaultPlacement?.placement
         refreshVisibleSignatureArtworkPreview()
     }
 
     private func persistVisibleSignaturePreferences() {
         let preferences = VisibleSignaturePreferences(
-            assetID: visibleSignatureAsset?.id,
-            enabled: false,
-            defaultPlacement: visibleSignaturePlacement.map(VisibleSignaturePreferences.Placement.init)
+            assetID: visibleSignatureAsset?.id
         )
         defaults.set(try? JSONEncoder().encode(preferences), forKey: VisibleSignaturePreferences.storageKey)
     }
 
     private func disableVisibleSignatureComposition() {
         visibleSignatureEnabled = false
+        visibleSignaturePlacement = nil
         visibleSignatureCardContent = nil
         visibleSignatureCardPreview = nil
+    }
+
+    private func defaultVisibleSignaturePlacement() -> VisibleSignaturePlacement? {
+        guard let selected = selectedItem,
+              selected.descriptor.isPDF,
+              let document = PDFDocument(url: selected.descriptor.sourceURL),
+              document.pageCount > 0,
+              let page = document.page(at: document.pageCount - 1) else {
+            return nil
+        }
+        let cropBox = page.bounds(for: .cropBox)
+        guard cropBox.width > 0, cropBox.height > 0 else { return nil }
+        let scale = min(1, cropBox.width / 250, cropBox.height / 150)
+        let size = CGSize(width: 250 * scale, height: 150 * scale)
+        return VisibleSignaturePlacement(
+            pageIndex: document.pageCount - 1,
+            pageRect: CGRect(
+                x: (cropBox.width - size.width) / 2,
+                y: (cropBox.height - size.height) / 2,
+                width: size.width,
+                height: size.height
+            ),
+            rotationDegrees: 0
+        )
     }
 
     private func refreshVisibleSignatureAssets() {
@@ -937,35 +969,7 @@ final class WorkspaceModel {
 private struct VisibleSignaturePreferences: Codable {
     static let storageKey = "preferences.visibleSignature"
 
-    struct Placement: Codable {
-        let pageIndex: Int
-        let originX: Double
-        let originY: Double
-        let width: Double
-        let height: Double
-        let rotationDegrees: Double
-
-        init(_ placement: VisibleSignaturePlacement) {
-            pageIndex = placement.pageIndex
-            originX = placement.pageRect.origin.x
-            originY = placement.pageRect.origin.y
-            width = placement.pageRect.width
-            height = placement.pageRect.height
-            rotationDegrees = placement.rotationDegrees
-        }
-
-        var placement: VisibleSignaturePlacement {
-            VisibleSignaturePlacement(
-                pageIndex: pageIndex,
-                pageRect: CGRect(x: originX, y: originY, width: width, height: height),
-                rotationDegrees: rotationDegrees
-            )
-        }
-    }
-
     let assetID: UUID?
-    let enabled: Bool
-    let defaultPlacement: Placement?
 }
 
 enum CertificateResolution: Sendable, Equatable {

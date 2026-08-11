@@ -40,6 +40,37 @@ import Testing
     #expect(workspace.items[0].inspection == .failed)
 }
 
+@Test @MainActor func completeValidationReceivesOnlyFastInspectedSignedDocuments() async {
+    let signed = PDFItemDescriptor(id: "signed", sourceURL: URL(fileURLWithPath: "/tmp/signed.pdf"))
+    let unsigned = PDFItemDescriptor(id: "unsigned", sourceURL: URL(fileURLWithPath: "/tmp/unsigned.pdf"))
+    let engine = CompleteValidationFilteringEngine()
+    let workspace = WorkspaceModel(
+        engine: engine,
+        items: [PDFItem(descriptor: signed), PDFItem(descriptor: unsigned)]
+    )
+
+    await workspace.refreshInspections()
+    await engine.waitForValidationRequest()
+
+    let validationCalls = await engine.validationCalls
+    #expect(validationCalls == [[signed]])
+}
+
+@Test @MainActor func postSigningInspectedSignaturesStillStartCompleteValidation() async {
+    let descriptor = PDFItemDescriptor(id: "signed", sourceURL: URL(fileURLWithPath: "/tmp/signed.pdf"))
+    let engine = CompleteValidationFilteringEngine()
+    let workspace = WorkspaceModel(engine: engine, items: [PDFItem(descriptor: descriptor)])
+
+    workspace.applyPostSigningInspectionResults(
+        [PDFInspection(files: [engine.signedInspection(for: descriptor)])],
+        for: [descriptor]
+    )
+    await engine.waitForValidationRequest()
+
+    let validationCalls = await engine.validationCalls
+    #expect(validationCalls == [[descriptor]])
+}
+
 @Test @MainActor func changingOrReplacingActiveDocumentDisablesGraphicComposition() {
     let first = PDFItem(descriptor: PDFItemDescriptor(id: "first", sourceURL: URL(fileURLWithPath: "/tmp/first.pdf")))
     let second = PDFItem(descriptor: PDFItemDescriptor(id: "second", sourceURL: URL(fileURLWithPath: "/tmp/second.pdf")))
@@ -50,6 +81,7 @@ import Testing
     workspace.configureVisibleAppearance(asset: asset, enabled: true, placement: placement)
     workspace.selection = second.id
     #expect(workspace.visibleSignatureEnabled == false)
+    #expect(workspace.visibleSignaturePlacement == nil)
 
     workspace.configureVisibleAppearance(asset: asset, enabled: true, placement: placement)
     let replacement = PDFItem(
@@ -58,6 +90,7 @@ import Testing
     )
     workspace.setItems([first, replacement])
     #expect(workspace.visibleSignatureEnabled == false)
+    #expect(workspace.visibleSignaturePlacement == nil)
 }
 
 @Test @MainActor func embeddedPreviewClosesAndSelectedDocumentCanBeValidatedAgain() async throws {
@@ -278,7 +311,51 @@ import Testing
 
     try workspace.importVisibleSignatureArtwork(from: artwork)
 
-    #expect(workspace.visibleSignaturePlacement?.pageIndex == 1)
+    let placement = try #require(workspace.visibleSignaturePlacement)
+    #expect(placement.pageIndex == 1)
+    #expect(placement.pageRect == CGRect(x: 181, y: 321, width: 250, height: 150))
+    #expect(placement.rotationDegrees == 0)
+}
+
+@Test @MainActor func selectingArtworkOnANewDocumentCreatesFreshDefaultPlacement() throws {
+    let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let firstSource = directory.appending(path: "first.pdf")
+    let secondSource = directory.appending(path: "second.pdf")
+    let artwork = directory.appending(path: "artwork.png")
+    try writeWorkspaceFixturePDF(to: firstSource, pageCount: 2)
+    try writeWorkspaceFixturePDF(to: secondSource, pageCount: 1)
+    try workspaceFixturePNG().write(to: artwork)
+    let store = SignatureAssetStore(applicationSupportRoot: directory.appending(path: "Application Support"))
+    let workspace = WorkspaceModel(
+        items: [
+            PDFItem(descriptor: PDFItemDescriptor(id: "first", sourceURL: firstSource)),
+            PDFItem(descriptor: PDFItemDescriptor(id: "second", sourceURL: secondSource))
+        ],
+        signatureAssetStore: store
+    )
+
+    try workspace.importVisibleSignatureArtwork(from: artwork)
+    let asset = try #require(workspace.visibleSignatureAsset)
+    workspace.updateVisibleSignaturePlacement(
+        VisibleSignaturePlacement(
+            pageIndex: 1,
+            pageRect: CGRect(x: 20, y: 30, width: 80, height: 40),
+            rotationDegrees: 27
+        )
+    )
+    workspace.selection = workspace.items[1].id
+
+    #expect(workspace.visibleSignaturePlacement == nil)
+    #expect(workspace.visibleSignatureEnabled == false)
+
+    workspace.selectVisibleSignatureArtwork(asset)
+
+    let placement = try #require(workspace.visibleSignaturePlacement)
+    #expect(placement.pageIndex == 0)
+    #expect(placement.pageRect == CGRect(x: 181, y: 321, width: 250, height: 150))
+    #expect(placement.rotationDegrees == 0)
 }
 
 @Test @MainActor func savedArtworkDoesNotActivateGraphicSignatureInNewWorkspace() throws {
@@ -322,10 +399,18 @@ import Testing
 
     #expect(workspace.visibleSignatureAsset != nil)
     #expect(workspace.visibleSignatureEnabled == false)
-    #expect(workspace.visibleSignaturePlacement == placement)
+    #expect(workspace.visibleSignaturePlacement == nil)
     #expect(workspace.visibleSignatureCardPreview != nil)
     #expect(detail.visibleSignaturePlacement.wrappedValue == nil)
     #expect(detail.cardPreview == nil)
+
+    workspace.selectVisibleSignatureArtwork(asset)
+
+    #expect(workspace.visibleSignaturePlacement == VisibleSignaturePlacement(
+        pageIndex: 0,
+        pageRect: CGRect(x: 181, y: 321, width: 250, height: 150),
+        rotationDegrees: 0
+    ))
 }
 
 @Test @MainActor func completedOutputDisablesPendingGraphicSignatureOverlay() throws {
@@ -356,7 +441,7 @@ import Testing
     #expect(PDFDetailView(item: workspace.items[0], workspace: workspace).cardPreview == nil)
 }
 
-@Test @MainActor func documentChangeClampsPersistedVisiblePlacementToItsPageRange() throws {
+@Test @MainActor func openingADocumentClearsTransientVisiblePlacement() throws {
     let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: directory) }
@@ -374,7 +459,7 @@ import Testing
 
     workspace.setItems([PDFItem(descriptor: PDFItemDescriptor(id: "document", sourceURL: source))])
 
-    #expect(workspace.visibleSignaturePlacement?.pageIndex == 0)
+    #expect(workspace.visibleSignaturePlacement == nil)
 }
 
 @Test func failedWorkspaceItemDistinguishesInspectionFromSigningFailure() {
@@ -383,6 +468,69 @@ import Testing
 
     #expect(PDFItem(descriptor: descriptor, status: .failed, inspection: .failed).workspaceLabel == "Inspection failed")
     #expect(PDFItem(descriptor: descriptor, status: .failed, inspection: .completed(inspected)).workspaceLabel == "Signing failed")
+}
+
+private actor CompleteValidationFilteringEngine: SigningEngine {
+    private var storedValidationCalls: [[PDFItemDescriptor]] = []
+    private var validationWaiters: [CheckedContinuation<Void, Never>] = []
+
+    var validationCalls: [[PDFItemDescriptor]] {
+        storedValidationCalls
+    }
+
+    func capabilities() async throws -> EngineCapabilities {
+        EngineCapabilities(protocolVersion: 2, supportsQualifiedTimestamp: true)
+    }
+
+    func drivers() async throws -> [SigningDriver] { [] }
+
+    func certificates(driverID: String, pin: Secret?) async throws -> [SigningCertificate] { [] }
+
+    func certificateDiscovery(driverID: String, pin: Secret?) async throws -> CertificateDiscovery {
+        CertificateDiscovery(token: SigningToken(tokenKey: "test-token", providerName: "Test Token"), certificates: [])
+    }
+
+    func inspect(files: [PDFItemDescriptor]) async throws -> [PDFInspection] {
+        [PDFInspection(files: files.map { descriptor in
+            descriptor.id == "signed"
+                ? signedInspection(for: descriptor)
+                : InspectedPDF(id: descriptor.id, isSignable: true)
+        })]
+    }
+
+    func validate(files: [PDFItemDescriptor]) async throws -> [PDFInspection] {
+        storedValidationCalls.append(files)
+        let waiters = validationWaiters
+        validationWaiters.removeAll()
+        waiters.forEach { $0.resume() }
+        return [PDFInspection(files: files.map(signedInspection(for:)))]
+    }
+
+    nonisolated func sign(request: SigningRequest) -> AsyncThrowingStream<SigningEvent, Error> {
+        AsyncThrowingStream { $0.finish() }
+    }
+
+    func cancel() async {}
+
+    nonisolated func signedInspection(for descriptor: PDFItemDescriptor) -> InspectedPDF {
+        InspectedPDF(
+            id: descriptor.id,
+            isSignable: true,
+            signatures: [ExistingPDFSignature(
+                id: "signature-\(descriptor.id)",
+                signerDisplayName: "Ada Lovelace",
+                validationState: .valid,
+                signingTime: nil,
+                format: "PAdES_BASELINE_T",
+                hasQualifiedTimestamp: true
+            )]
+        )
+    }
+
+    func waitForValidationRequest() async {
+        guard storedValidationCalls.isEmpty else { return }
+        await withCheckedContinuation { validationWaiters.append($0) }
+    }
 }
 
 private actor ControlledInspectionEngine: SigningEngine {
