@@ -180,6 +180,25 @@ class MachineInspectionServiceTest {
     }
 
     @Test
+    void trustedInspectionKeepsStructuralCryptographicIntegritySeparateFromTrustValidity() {
+        var trusted = com.google.gson.JsonParser.parseString("""
+                {"signatures":[{"id":"signature-1","valid":false,"timestamps":[{"id":"timestamp-1","valid":false}]}]}
+                """).getAsJsonObject();
+        var structural = com.google.gson.JsonParser.parseString("""
+                {"signatures":[{"id":"signature-1","cryptographicIntegrity":true,"timestamps":[{"id":"timestamp-1","cryptographicIntegrity":true}]}]}
+                """).getAsJsonObject();
+
+        var signature = MachineInspectionService.mergeCryptographicIntegrity(trusted, structural)
+                .getAsJsonArray("signatures").get(0).getAsJsonObject();
+
+        assertFalse(signature.get("valid").getAsBoolean());
+        assertTrue(signature.get("cryptographicIntegrity").getAsBoolean());
+        var mappedTimestamp = signature.getAsJsonArray("timestamps").get(0).getAsJsonObject();
+        assertFalse(mappedTimestamp.get("valid").getAsBoolean());
+        assertTrue(mappedTimestamp.get("cryptographicIntegrity").getAsBoolean());
+    }
+
+    @Test
     void returnsDocumentsAndSignaturesForAsicWithoutTrustedLists() {
         var sample = Path.of(MachineInspectionServiceTest.class
                 .getResource("/digital/slovensko/autogram/general_agenda.asice").getFile());

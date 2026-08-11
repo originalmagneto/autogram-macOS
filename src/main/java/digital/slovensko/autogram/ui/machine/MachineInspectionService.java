@@ -77,7 +77,8 @@ public final class MachineInspectionService {
             if (validatorReportReader == null) {
                 return inspectStructurally(new FileDocument(path.toFile()));
             }
-            return mapAsicInspection(readTrustedInspection(path));
+            var trusted = mapAsicInspection(readTrustedInspection(path));
+            return mergeStructuralIntegrityIfAvailable(trusted, new FileDocument(path.toFile()));
         }
         return mapReport(reportReader.read(path));
     }
@@ -87,9 +88,65 @@ public final class MachineInspectionService {
             if (validatorReportReader == null) {
                 return inspectStructurally(new InMemoryDocument(content));
             }
-            return mapReport(validatorReportReader.read(documentValidator(new InMemoryDocument(content))));
+            var trusted = mapReport(validatorReportReader.read(documentValidator(new InMemoryDocument(content))));
+            return mergeStructuralIntegrityIfAvailable(trusted, new InMemoryDocument(content));
         }
         return mapReport(byteReportReader.read(content));
+    }
+
+    private JsonObject mergeStructuralIntegrityIfAvailable(JsonObject trusted, DSSDocument document) {
+        try {
+            return mergeCryptographicIntegrity(trusted, inspectStructurally(document));
+        } catch (RuntimeException exception) {
+            return trusted;
+        }
+    }
+
+    static JsonObject mergeCryptographicIntegrity(JsonObject trusted, JsonObject structural) {
+        var structuralSignatures = objectsById(structural.getAsJsonArray("signatures"));
+        for (var value : trusted.getAsJsonArray("signatures")) {
+            var signature = value.getAsJsonObject();
+            var structuralSignature = structuralSignatures.get(stringValue(signature, "id"));
+            if (structuralSignature == null) {
+                continue;
+            }
+            copyBoolean(structuralSignature, signature, "cryptographicIntegrity");
+            var structuralTimestamps = objectsById(structuralSignature.getAsJsonArray("timestamps"));
+            for (var timestampValue : signature.getAsJsonArray("timestamps")) {
+                var timestamp = timestampValue.getAsJsonObject();
+                var structuralTimestamp = structuralTimestamps.get(stringValue(timestamp, "id"));
+                if (structuralTimestamp != null) {
+                    copyBoolean(structuralTimestamp, timestamp, "cryptographicIntegrity");
+                }
+            }
+        }
+        return trusted;
+    }
+
+    private static Map<String, JsonObject> objectsById(com.google.gson.JsonArray values) {
+        var result = new LinkedHashMap<String, JsonObject>();
+        if (values == null) {
+            return result;
+        }
+        for (var value : values) {
+            var object = value.getAsJsonObject();
+            var id = stringValue(object, "id");
+            if (id != null) {
+                result.put(id, object);
+            }
+        }
+        return result;
+    }
+
+    private static String stringValue(JsonObject value, String field) {
+        return value.has(field) && !value.get(field).isJsonNull() ? value.get(field).getAsString() : null;
+    }
+
+    private static void copyBoolean(JsonObject source, JsonObject target, String field) {
+        if (source.has(field) && source.get(field).isJsonPrimitive()
+                && source.get(field).getAsJsonPrimitive().isBoolean()) {
+            target.addProperty(field, source.get(field).getAsBoolean());
+        }
     }
 
     static int readStructuralSignatureCount(Path path) {
