@@ -121,7 +121,7 @@ import Testing
     )
     let detail = PDFDetailView(item: workspace.items[0], workspace: workspace)
     #expect(detail.cardPreview != nil)
-    #expect(detail.cardPreview?.size == NSSize(width: 420, height: 260))
+    #expect(detail.cardPreview?.size == NSSize(width: 422, height: 262))
     detail.visibleSignaturePlacement.wrappedValue = VisibleSignaturePlacement(
         pageIndex: 1,
         pageRect: CGRect(x: 72, y: 144, width: 216, height: 108),

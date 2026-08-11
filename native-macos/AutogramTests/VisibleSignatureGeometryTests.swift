@@ -90,9 +90,10 @@ import Testing
     let overlayRect = overlay.convert(pdfView.convert(pageRect, from: page), from: pdfView)
     let dragStart = CGPoint(x: overlayRect.midX, y: overlayRect.midY)
     let dragEnd = CGPoint(x: dragStart.x + 24, y: dragStart.y + 18)
-    overlay.mouseDown(with: mouseEvent(.leftMouseDown, at: dragStart, in: window))
-    overlay.mouseDragged(with: mouseEvent(.leftMouseDragged, at: dragEnd, in: window))
-    overlay.mouseUp(with: mouseEvent(.leftMouseUp, at: dragEnd, in: window))
+    #expect(documentView.hitTest(dragStart) === overlay)
+    overlay.mouseDown(with: mouseEvent(.leftMouseDown, at: overlay.convert(dragStart, to: nil), in: window))
+    overlay.mouseDragged(with: mouseEvent(.leftMouseDragged, at: overlay.convert(dragEnd, to: nil), in: window))
+    overlay.mouseUp(with: mouseEvent(.leftMouseUp, at: overlay.convert(dragEnd, to: nil), in: window))
 
     let dragged = try #require(published.last)
     #expect(dragged.pageIndex == 0)
@@ -101,9 +102,10 @@ import Testing
     overlay.placement = initial
     let resizeStart = CGPoint(x: overlayRect.minX, y: overlayRect.minY)
     let resizeEnd = CGPoint(x: resizeStart.x - 20, y: resizeStart.y - 20)
-    overlay.mouseDown(with: mouseEvent(.leftMouseDown, at: resizeStart, in: window))
-    overlay.mouseDragged(with: mouseEvent(.leftMouseDragged, at: resizeEnd, in: window))
-    overlay.mouseUp(with: mouseEvent(.leftMouseUp, at: resizeEnd, in: window))
+    #expect(documentView.hitTest(resizeStart) === overlay)
+    overlay.mouseDown(with: mouseEvent(.leftMouseDown, at: overlay.convert(resizeStart, to: nil), in: window))
+    overlay.mouseDragged(with: mouseEvent(.leftMouseDragged, at: overlay.convert(resizeEnd, to: nil), in: window))
+    overlay.mouseUp(with: mouseEvent(.leftMouseUp, at: overlay.convert(resizeEnd, to: nil), in: window))
 
     let resized = try #require(published.last)
     #expect(resized.pageIndex == 0)

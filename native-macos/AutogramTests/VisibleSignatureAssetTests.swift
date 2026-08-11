@@ -68,7 +68,7 @@ import Testing
     }
 }
 
-@Test func renderedCardUsesTransparentCanvasAndGreenSigningStatusCue() throws {
+@Test func renderedCardUsesTransparentCanvasAndGreenFinalStatusCue() throws {
     try withTemporaryDirectory { directory in
         let fixturePNG = directory.appending(path: "fixture.png")
         try transparentFixturePNG().write(to: fixturePNG)
@@ -87,7 +87,10 @@ import Testing
         )
 
         #expect(try cornerPixelsAreTransparent(output))
-        #expect(try pngContainsGreenStatusPixels(output))
+        #expect(try pngContainsGreenStatusPixels(
+            output,
+            in: CGRect(x: 20, y: 208, width: 160, height: 32)
+        ))
     }
 }
 
@@ -157,14 +160,16 @@ private func cornerPixelsAreTransparent(_ url: URL) throws -> Bool {
     }
 }
 
-private func pngContainsGreenStatusPixels(_ url: URL) throws -> Bool {
+private func pngContainsGreenStatusPixels(_ url: URL, in rect: CGRect) throws -> Bool {
     guard let image = NSImage(contentsOf: url),
           let tiff = image.tiffRepresentation,
           let bitmap = NSBitmapImageRep(data: tiff) else {
         throw FixtureError.unableToReadPNG
     }
-    for x in stride(from: 0, to: bitmap.pixelsWide, by: 4) {
-        for y in stride(from: 0, to: bitmap.pixelsHigh, by: 4) {
+    let bounds = CGRect(x: 0, y: 0, width: bitmap.pixelsWide, height: bitmap.pixelsHigh)
+    let sampleRect = rect.intersection(bounds).integral
+    for x in stride(from: Int(sampleRect.minX), to: Int(sampleRect.maxX), by: 4) {
+        for y in stride(from: Int(sampleRect.minY), to: Int(sampleRect.maxY), by: 4) {
             guard let color = bitmap.colorAt(x: x, y: y) else { continue }
             if color.greenComponent > 0.4,
                color.greenComponent > color.redComponent * 1.2,

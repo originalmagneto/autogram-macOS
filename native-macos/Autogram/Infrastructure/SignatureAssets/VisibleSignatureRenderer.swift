@@ -62,21 +62,8 @@ struct VisibleSignatureRenderer {
         cardBorder.lineWidth = 1
         cardBorder.stroke()
 
-        let statusRect = NSRect(x: 28, y: 214, width: 154, height: 20)
-        NSColor.systemGreen.withAlphaComponent(0.9).setFill()
-        NSBezierPath(roundedRect: statusRect, xRadius: 10, yRadius: 10).fill()
-        drawSymbol("checkmark.seal.fill", in: NSRect(x: 36, y: 217, width: 14, height: 14), color: .white)
-        let statusAttributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.boldSystemFont(ofSize: 10),
-            .foregroundColor: NSColor.white
-        ]
-        ("Timestamp required" as NSString).draw(
-            in: NSRect(x: 56, y: 218, width: 116, height: 14),
-            withAttributes: statusAttributes
-        )
-
         let paragraph = NSMutableParagraphStyle()
-        paragraph.alignment = .center
+        paragraph.alignment = .left
         let textAttributes: [NSAttributedString.Key: Any] = [
             .font: NSFont.systemFont(ofSize: 11),
             .foregroundColor: NSColor.labelColor,
@@ -88,37 +75,44 @@ struct VisibleSignatureRenderer {
             .paragraphStyle: paragraph
         ]
         ("Digitally signed by" as NSString).draw(
-            in: NSRect(x: 28, y: 188, width: 136, height: 18),
+            in: NSRect(x: 28, y: 210, width: size.width - 56, height: 18),
             withAttributes: headingAttributes
         )
-        let artworkRect = NSRect(x: 28, y: 86, width: 124, height: 80)
+        let artworkRect = NSRect(x: 28, y: 142, width: size.width - 56, height: 56)
         artwork.draw(in: artworkRect, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: false, hints: [.interpolation: NSImageInterpolation.high])
         NSColor.labelColor.withAlphaComponent(0.18).setStroke()
-        NSBezierPath(roundedRect: artworkRect.insetBy(dx: -8, dy: -8), xRadius: 10, yRadius: 10).stroke()
-        NSColor.labelColor.withAlphaComponent(0.18).setStroke()
         let divider = NSBezierPath()
-        divider.move(to: CGPoint(x: 176, y: 48))
-        divider.line(to: CGPoint(x: 176, y: 198))
+        divider.move(to: CGPoint(x: 28, y: 132))
+        divider.line(to: CGPoint(x: size.width - 28, y: 132))
         divider.stroke()
         let details = [
             (content.signerName, headingAttributes),
             (content.certificateQualification ?? "Certificate qualification unavailable", textAttributes),
             ("PAdES Baseline T", textAttributes),
-            ("Qualified timestamp required", textAttributes)
+            ("TSA: qualified", textAttributes)
         ]
-        var y: CGFloat = 174
+        var y: CGFloat = 108
         for (line, attributes) in details {
-            (line as NSString).draw(in: NSRect(x: 196, y: y, width: 184, height: 18), withAttributes: attributes)
-            y -= 26
+            (line as NSString).draw(in: NSRect(x: 28, y: y, width: size.width - 56, height: 16), withAttributes: attributes)
+            y -= 18
         }
-        drawSymbol("clock.fill", in: NSRect(x: 196, y: 50, width: 13, height: 13), color: .systemGreen)
+        drawSymbol("clock.fill", in: NSRect(x: 28, y: 34, width: 13, height: 13), color: .systemGreen)
         let timestampAttributes: [NSAttributedString.Key: Any] = [
             .font: NSFont.systemFont(ofSize: 10),
             .foregroundColor: NSColor.secondaryLabelColor
         ]
         (DateFormatter.localizedString(from: signingTime, dateStyle: .medium, timeStyle: .short) as NSString).draw(
-            in: NSRect(x: 216, y: 50, width: 164, height: 14),
+            in: NSRect(x: 48, y: 34, width: 150, height: 14),
             withAttributes: timestampAttributes
+        )
+        drawSymbol("checkmark.seal.fill", in: NSRect(x: 214, y: 32, width: 16, height: 16), color: .systemGreen)
+        let statusAttributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.boldSystemFont(ofSize: 10),
+            .foregroundColor: NSColor.systemGreen
+        ]
+        ("Qualified signature and timestamp" as NSString).draw(
+            in: NSRect(x: 236, y: 34, width: 156, height: 14),
+            withAttributes: statusAttributes
         )
         image.unlockFocus()
         return image
