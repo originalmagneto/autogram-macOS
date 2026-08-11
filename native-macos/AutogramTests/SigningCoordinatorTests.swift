@@ -86,6 +86,36 @@ import Foundation
     #expect(workspace.items[0].inspection.signatures.map(\.validationState) == [.valid])
 }
 
+@Test @MainActor func completedSignedOutputStillReceivesCompleteValidationWhenFastInspectionFails() async throws {
+    let source = URL(fileURLWithPath: "/tmp/agreement.pdf")
+    let output = URL(fileURLWithPath: "/tmp/agreement_signed.pdf")
+    let descriptor = PDFItemDescriptor(id: "agreement", sourceURL: source)
+    let engine = PostSigningInspectionEngine(outputURL: output, failsFastInspection: true)
+    let workspace = WorkspaceModel(
+        engine: engine,
+        items: [PDFItem(
+            descriptor: descriptor,
+            status: .inspected,
+            inspection: .completed(InspectedPDF(id: descriptor.id, isSignable: true))
+        )]
+    )
+    let coordinator = SigningCoordinator(engine: engine, workspace: workspace)
+
+    try await coordinator.seedCompletedInspection(for: [descriptor])
+    try await coordinator.beginSigning(request: SigningRequest(
+        sessionID: UUID(),
+        driverID: "driver",
+        certificateSerial: "certificate",
+        pin: Secret("1234"),
+        files: [SigningFile(id: descriptor.id, sourceURL: source)]
+    ))
+
+    #expect(workspace.items[0].descriptor.sourceURL == output)
+    #expect(engine.validateCallCount == 1)
+    #expect(workspace.signatureValidationProgress == .complete)
+    #expect(workspace.items[0].inspection.signatures.map(\.validationState) == [.valid])
+}
+
 private final class IncompleteInspectionEngine: SigningEngine, @unchecked Sendable {
     private let lock = NSLock()
     private var storedSignCallCount = 0
@@ -149,6 +179,7 @@ private struct FailureSigningEngine: SigningEngine {
 
 private final class PostSigningInspectionEngine: SigningEngine, @unchecked Sendable {
     let outputURL: URL
+    let failsFastInspection: Bool
     private let lock = NSLock()
     private var storedValidateCallCount = 0
 
@@ -156,8 +187,9 @@ private final class PostSigningInspectionEngine: SigningEngine, @unchecked Senda
         lock.withLock { storedValidateCallCount }
     }
 
-    init(outputURL: URL) {
+    init(outputURL: URL, failsFastInspection: Bool = false) {
         self.outputURL = outputURL
+        self.failsFastInspection = failsFastInspection
     }
 
     func capabilities() async throws -> EngineCapabilities {
@@ -173,7 +205,10 @@ private final class PostSigningInspectionEngine: SigningEngine, @unchecked Senda
     }
 
     func inspect(files: [PDFItemDescriptor]) async throws -> [PDFInspection] {
-        [PDFInspection(files: files.map { file in
+        if failsFastInspection {
+            throw SigningFailure.engine("Fast inspection failed")
+        }
+        return [PDFInspection(files: files.map { file in
             InspectedPDF(
                 id: file.id,
                 isSignable: true,

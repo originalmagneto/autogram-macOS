@@ -27,7 +27,7 @@ import Testing
     #expect(workspace.canStartSigning == false)
 }
 
-@Test @MainActor func completeValidationRunsAfterFastInspectionFailure() async {
+@Test @MainActor func fastInspectionFailureDoesNotStartCompleteValidation() async {
     let descriptor = PDFItemDescriptor(id: "sample", sourceURL: URL(fileURLWithPath: "/tmp/sample.pdf"))
     let workspace = WorkspaceModel(
         engine: FastFailureCompleteValidationEngine(),
@@ -35,10 +35,9 @@ import Testing
     )
 
     await workspace.refreshInspections()
-    try? await Task.sleep(for: .milliseconds(100))
 
-    #expect(workspace.signatureValidationProgress == .complete)
-    #expect(workspace.items[0].inspection.isComplete)
+    #expect(workspace.signatureValidationProgress == .provisional)
+    #expect(workspace.items[0].inspection == .failed)
 }
 
 @Test @MainActor func changingOrReplacingActiveDocumentDisablesGraphicComposition() {

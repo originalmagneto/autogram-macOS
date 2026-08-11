@@ -127,7 +127,6 @@ final class WorkspaceModel {
             guard requestGeneration == inspectionRequestGeneration else { return }
             updateInspection(for: descriptors.map(\.id), to: .failed)
             signingActivityPhase = nil
-            startCompleteValidation(for: descriptors, requestGeneration: requestGeneration)
         }
     }
 
@@ -532,6 +531,13 @@ final class WorkspaceModel {
         items = items.map { item in
             failedIDs.contains(item.descriptor.id) ? item.updatingInspection(to: .failed) : item
         }
+        let descriptors = items
+            .filter { failedIDs.contains($0.descriptor.id) }
+            .map(\.descriptor)
+        startCompleteValidation(
+            for: descriptors,
+            requestGeneration: inspectionRequestGeneration
+        )
     }
 
     func applyInspectionResults(
@@ -911,8 +917,7 @@ final class WorkspaceModel {
         let certificate = discoveredCertificates.first
         let content = VisibleSignatureCardContent(
             signerName: certificate?.displayName ?? "Certificate details pending",
-            certificateQualification: certificate?.certificateQualification,
-            isPreview: true
+            certificateQualification: certificate?.certificateQualification
         )
         visibleSignatureCardContent = content
         guard let previewURL = try? visibleSignatureRenderer.render(

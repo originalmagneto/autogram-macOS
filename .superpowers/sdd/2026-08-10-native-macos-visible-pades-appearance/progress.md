@@ -16,3 +16,7 @@ Task 3: complete
 Task 4: pending
 Task 5: pending
 Task 6: pending
+Audit fix round 1: addressed
+  Addressed: post-signing inspection failure now starts complete DSS validation; ordinary refresh failure no longer does
+  Addressed: removed unconsumed committed preview flag and workspace argument
+  Open: clean AutogramTests retains an unrelated renderer status-pixel assertion failure
