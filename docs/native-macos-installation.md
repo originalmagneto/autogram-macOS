@@ -71,7 +71,7 @@ Settings reports whether the installed action matches the version bundled with t
 - The default PDF output is `<name>_signed.pdf` beside the source.
 - Existing names are preserved and a collision-safe numbered name is created.
 - ASiC-E output uses the `.asice` extension.
-- A completed output becomes the active workspace document and is inspected again.
+- When signing in the Autogram macOS workspace, a completed output becomes the active document and is inspected again.
 - When signatures exist, complete DSS validation runs automatically.
 
 ## Privacy and credentials

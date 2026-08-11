@@ -110,6 +110,7 @@ struct AutogramSettingsView: View {
                 LabeledContent("Signing helper", value: quickActionHelperStatus)
                 LabeledContent("I.CA SecureStore", value: "8.3.1 or later required")
                 LabeledContent("eID middleware", value: eIDMiddlewareStatus)
+                LabeledContent("eID requirement", value: "ARM64 libPkcs11.dylib required")
                 LabeledContent("Quick Action version", value: quickActionStatus.finderStatusText)
                 quickActionControls
                 if quickActionStatus == .updateRequired {
@@ -431,7 +432,7 @@ struct AutogramSettingsView: View {
             driver.id.localizedCaseInsensitiveContains("eid") ||
                 driver.displayName.localizedCaseInsensitiveContains("eID")
         }
-        return hasEIDMiddleware ? "Detected and ARM64 validated" : "Not detected"
+        return hasEIDMiddleware ? "Detected" : "Not detected"
     }
 
     private var connectedCardDescription: String {
