@@ -3,6 +3,7 @@ package digital.slovensko.autogram.ui.machine.v2;
 import com.google.gson.JsonParser;
 import digital.slovensko.autogram.ui.machine.MachineDriverService;
 import digital.slovensko.autogram.ui.machine.MachineInspectionService;
+import digital.slovensko.autogram.ui.machine.MachineProtocolException;
 import eu.europa.esig.dss.enumerations.Indication;
 import eu.europa.esig.dss.enumerations.SubIndication;
 import eu.europa.esig.dss.jaxb.object.Message;
@@ -98,7 +99,7 @@ class MachineV2CliAppTest {
     }
 
     @Test
-    void validatesWithTrustedDssDetailsAndInitializesTrustedListsOnce() throws Exception {
+    void retriesTrustedInitializationReusesItAndContinuesAfterPerFileValidationFailure() throws Exception {
         var report = mock(SimpleReport.class);
         when(report.getSignatureIdList()).thenReturn(List.of("sig-1"));
         when(report.isValid("sig-1")).thenReturn(false);
@@ -110,25 +111,41 @@ class MachineV2CliAppTest {
         var trustedInspection = MachineInspectionService.forTrustedValidation(validator -> report);
         var initializations = new AtomicInteger();
         var source = Path.of(MachineV2CliAppTest.class.getResource("/digital/slovensko/autogram/sample.pdf").getFile());
-        var input = "{\"protocolVersion\":2,\"requestId\":\"validate-1\",\"operation\":\"VALIDATE\",\"payload\":{\"files\":[{\"id\":\"file-1\",\"source\":\""
-                + source + "\",\"target\":\"/selected/target.pdf\"}]}}\n";
+        var missingSource = temporaryDirectory.resolve("missing.pdf");
+        var input = "{\"protocolVersion\":2,\"requestId\":\"validate-init-failed\",\"operation\":\"VALIDATE\",\"payload\":{\"files\":[{\"id\":\"file-failed-init\",\"source\":\""
+                + source + "\",\"target\":\"/selected/target.pdf\"}]}}\n"
+                + "{\"protocolVersion\":2,\"requestId\":\"validate-retry\",\"operation\":\"VALIDATE\",\"payload\":{\"files\":[{\"id\":\"file-good\",\"source\":\""
+                + source + "\",\"target\":\"/selected/good.pdf\"},{\"id\":\"file-bad\",\"source\":\""
+                + missingSource + "\",\"target\":\"/selected/bad.pdf\"}]}}\n"
+                + "{\"protocolVersion\":2,\"requestId\":\"validate-reused\",\"operation\":\"VALIDATE\",\"payload\":{\"files\":[{\"id\":\"file-reused\",\"source\":\""
+                + source + "\",\"target\":\"/selected/reused.pdf\"}]}}\n";
         var output = new StringWriter();
 
         var code = MachineV2CliApp.start(commandLine(), new StringReader(input), new PrintWriter(output),
                 new PrintWriter(new StringWriter()), new MachineDriverService(), new MachineInspectionService(),
-                trustedInspection, initializations::incrementAndGet);
+                trustedInspection, () -> {
+                    if (initializations.getAndIncrement() == 0) {
+                        throw new MachineProtocolException("TRUSTED_LIST_UNAVAILABLE");
+                    }
+                });
 
         var events = Arrays.stream(output.toString().strip().split("\\n"))
                 .map(JsonParser::parseString)
                 .map(element -> element.getAsJsonObject())
                 .toList();
-        var validation = events.get(1).getAsJsonObject("payload").getAsJsonArray("signatures")
+        var validation = events.get(3).getAsJsonObject("payload").getAsJsonArray("signatures")
                 .get(0).getAsJsonObject();
 
         assertEquals(0, code);
-        assertEquals(1, initializations.get());
-        assertEquals(List.of("request.started", "validation.completed", "request.completed"),
+        assertEquals(2, initializations.get());
+        assertEquals(List.of("request.started", "request.failed", "request.started", "validation.completed",
+                "file.failed", "request.completed", "request.started", "validation.completed", "request.completed"),
                 events.stream().map(event -> event.get("type").getAsString()).toList());
+        assertEquals("TRUSTED_LIST_UNAVAILABLE", events.get(1).getAsJsonObject("payload").get("code").getAsString());
+        assertEquals("file-good", events.get(3).get("fileId").getAsString());
+        assertEquals("file-bad", events.get(4).get("fileId").getAsString());
+        assertEquals("VALIDATION_FAILED", events.get(4).getAsJsonObject("payload").get("code").getAsString());
+        assertEquals("file-reused", events.get(7).get("fileId").getAsString());
         assertEquals("INDETERMINATE", validation.get("indication").getAsString());
         assertEquals("NO_CERTIFICATE_CHAIN_FOUND", validation.get("subIndication").getAsString());
         assertEquals("Certificate chain could not be built", validation.get("validationReason").getAsString());
