@@ -10,6 +10,7 @@ enum SignatureAssetStoreError: Error {
     case emptyArtwork
     case unavailablePDFPage
     case unableToCreateManagedArtwork
+    case invalidManagedArtwork
 }
 
 struct SignatureAssetStore {
@@ -83,7 +84,11 @@ struct SignatureAssetStore {
     }
 
     func delete(_ asset: SignatureAsset) throws {
-        try fileManager.removeItem(at: fileURL(for: asset))
+        let managedFilename = managedFilename(for: asset.id)
+        guard asset.managedFilename == managedFilename else {
+            throw SignatureAssetStoreError.invalidManagedArtwork
+        }
+        try fileManager.removeItem(at: assetsDirectory.appending(path: managedFilename))
     }
 
     private func managedFilename(for id: UUID) -> String {

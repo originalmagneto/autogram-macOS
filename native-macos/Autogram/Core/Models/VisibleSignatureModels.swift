@@ -21,4 +21,5 @@ struct VisibleSignaturePlacement: Sendable, Equatable {
 struct VisibleSignatureCardContent: Sendable, Equatable {
     var signerName: String
     var certificateQualification: String?
+    var isPreview = false
 }

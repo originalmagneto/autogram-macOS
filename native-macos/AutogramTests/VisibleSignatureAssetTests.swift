@@ -61,6 +61,28 @@ import Testing
     }
 }
 
+@Test func deletingArtworkRejectsForgedManagedFilenameOutsideLibrary() throws {
+    try withTemporaryDirectory { directory in
+        let fixtureURL = directory.appending(path: "fixture.png")
+        try transparentFixturePNG().write(to: fixtureURL)
+        let store = SignatureAssetStore(applicationSupportRoot: directory.appending(path: "Application Support"))
+        let asset = try store.importPNG(fixtureURL)
+        let outsideURL = directory.appending(path: "Application Support/outside.png")
+        try Data("outside".utf8).write(to: outsideURL)
+        let forgedAsset = SignatureAsset(
+            id: asset.id,
+            kind: asset.kind,
+            managedFilename: "../../outside.png"
+        )
+
+        #expect(throws: SignatureAssetStoreError.self) {
+            try store.delete(forgedAsset)
+        }
+        #expect(FileManager.default.fileExists(atPath: outsideURL.path))
+        #expect(FileManager.default.fileExists(atPath: store.fileURL(for: asset).path))
+    }
+}
+
 @Test func rotatedCardHasTransparentCorners() throws {
     try withTemporaryDirectory { directory in
         let fixturePNG = directory.appending(path: "fixture.png")
