@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 
 enum QuickActionRunnerError: LocalizedError {
     case invalidArguments(String)
@@ -21,16 +22,64 @@ private enum HelperTerminalEvent {
     case failed
 }
 
+private final class HelperTerminationController {
+    // Process.terminate() sends SIGTERM to this local child. SIGTERM's default action is
+    // immediate termination, so 100 ms is only one local signal-delivery grace period,
+    // not a timeout for signing or any other helper work.
+    private let terminationGrace = DispatchTimeInterval.milliseconds(100)
+    private let processExited = DispatchSemaphore(value: 0)
+    private let closeReaders: () -> Void
+    private let lock = NSLock()
+    private var terminalTerminationRequested = false
+
+    init(closeReaders: @escaping () -> Void) {
+        self.closeReaders = closeReaders
+    }
+
+    func terminateAfterTerminalEvent(_ process: Process) {
+        lock.lock()
+        guard !terminalTerminationRequested else {
+            lock.unlock()
+            return
+        }
+        terminalTerminationRequested = true
+        lock.unlock()
+
+        if process.isRunning {
+            process.terminate()
+        } else {
+            closeReaders()
+        }
+
+        DispatchQueue.global().async { [self] in
+            if processExited.wait(timeout: .now() + terminationGrace) == .timedOut,
+               process.isRunning {
+                kill(process.processIdentifier, SIGKILL)
+            }
+        }
+    }
+
+    func processDidExit() {
+        lock.lock()
+        let shouldCloseReaders = terminalTerminationRequested
+        lock.unlock()
+        if shouldCloseReaders {
+            closeReaders()
+        }
+        processExited.signal()
+    }
+}
+
 private final class HelperOutputCollector {
-    private let process: Process
+    private let terminalEventHandler: () -> Void
     private let lock = NSLock()
     private var standardOutput = Data()
     private var standardError = Data()
     private var pendingOutput = Data()
     private var terminalEvent: HelperTerminalEvent?
 
-    init(process: Process) {
-        self.process = process
+    init(terminalEventHandler: @escaping () -> Void) {
+        self.terminalEventHandler = terminalEventHandler
     }
 
     func appendStandardOutput(_ data: Data) {
@@ -57,8 +106,8 @@ private final class HelperOutputCollector {
         }
         lock.unlock()
 
-        if shouldTerminate, process.isRunning {
-            process.terminate()
+        if shouldTerminate {
+            terminalEventHandler()
         }
     }
 
@@ -210,9 +259,18 @@ struct AutogramQuickActionRunner {
         process.standardInput = input
         process.standardOutput = output
         process.standardError = error
+        let terminationController = HelperTerminationController {
+            output.fileHandleForReading.closeFile()
+            error.fileHandleForReading.closeFile()
+        }
+        process.terminationHandler = { terminatedProcess in
+            terminationController.processDidExit()
+        }
         try process.run()
 
-        let collector = HelperOutputCollector(process: process)
+        let collector = HelperOutputCollector {
+            terminationController.terminateAfterTerminalEvent(process)
+        }
         let drainGroup = DispatchGroup()
         drainGroup.enter()
         DispatchQueue.global().async {

@@ -10,10 +10,14 @@ RUNNER_SOURCE="$REPO_ROOT/scripts/native-macos/autogram-quick-action-runner.swif
 TMP_DIR="$(mktemp -d -t autogram-cli-sign-test)"
 HELPER_PID_FILE="$TMP_DIR/helper.pid"
 
-cleanup() {
+stop_helper() {
   if [[ -f "$HELPER_PID_FILE" ]]; then
     kill "$(<"$HELPER_PID_FILE")" 2>/dev/null || true
   fi
+}
+
+cleanup() {
+  stop_helper
   rm -rf "$TMP_DIR"
 }
 trap cleanup EXIT
@@ -31,6 +35,7 @@ DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
 
 cat > "$TMP_DIR/helper.c" <<'C'
 #include <stdio.h>
+#include <signal.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -42,7 +47,7 @@ static void write_helper_pid(void) {
     }
     FILE *file = fopen(path, "w");
     if (file != NULL) {
-        fprintf(file, "%d\\n", getpid());
+        fprintf(file, "%d\n", getpid());
         fclose(file);
     }
 }
@@ -84,6 +89,19 @@ int main(int argc, char *argv[]) {
         fflush(stderr);
         puts("{\"protocolVersion\":1,\"type\":\"session.failed\",\"sessionId\":\"test\",\"payload\":{}}");
         fflush(stdout);
+        for (;;) {
+            pause();
+        }
+    }
+    if (mode != NULL && strcmp(mode, "completed-ignores-sigterm") == 0) {
+        signal(SIGTERM, SIG_IGN);
+        puts("{\"protocolVersion\":1,\"type\":\"session.completed\",\"sessionId\":\"test\",\"payload\":{}}");
+        fflush(stdout);
+        for (;;) {
+            pause();
+        }
+    }
+    if (mode != NULL && strcmp(mode, "waits-for-cleanup") == 0) {
         for (;;) {
             pause();
         }
@@ -162,6 +180,25 @@ run_runner_with_deadline \
   "$TMP_DIR/failed.err"
 [[ "$RUNNER_STATUS" -ne 0 ]]
 grep -q 'helper failed' "$TMP_DIR/failed.err"
+
+run_runner_with_deadline \
+  completed-ignores-sigterm \
+  "$TMP_DIR/ignores-sigterm.out" \
+  "$TMP_DIR/ignores-sigterm.err"
+[[ "$RUNNER_STATUS" -eq 0 ]]
+[[ "$(<"$HELPER_PID_FILE")" =~ ^[0-9]+$ ]]
+! kill -0 "$(<"$HELPER_PID_FILE")" 2>/dev/null
+
+rm -f "$HELPER_PID_FILE"
+RUNNER_TEST_MODE=waits-for-cleanup HELPER_PID_FILE="$HELPER_PID_FILE" \
+  "$APP_HELPERS/AutogramCLI-arm64" </dev/null >/dev/null 2>/dev/null &
+helper_pid=$!
+while [[ ! -s "$HELPER_PID_FILE" ]]; do
+  sleep 0.01
+done
+stop_helper
+wait "$helper_pid" 2>/dev/null || true
+! kill -0 "$(<"$HELPER_PID_FILE")" 2>/dev/null
 
 workflow_input_method="$(plutil -extract 'actions.0.action.ActionParameters.inputMethod' raw "$WORKFLOW")"
 [[ "$workflow_input_method" == "1" ]] || {
