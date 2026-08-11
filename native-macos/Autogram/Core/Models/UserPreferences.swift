@@ -30,7 +30,7 @@ enum TimestampSource: String, Codable, Sendable, CaseIterable, Identifiable {
 
     var endpoints: [String] {
         switch self {
-        case .automatic: [Self.sectigoURL, Self.belgiumURL]
+        case .automatic: [Self.belgiumURL, Self.sectigoURL]
         case .sectigo: [Self.sectigoURL]
         case .belgium: [Self.belgiumURL]
         case .custom: []

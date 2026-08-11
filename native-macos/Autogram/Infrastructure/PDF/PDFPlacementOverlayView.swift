@@ -70,6 +70,18 @@ final class PDFPlacementOverlayView: NSView {
     override var isFlipped: Bool { true }
     override var acceptsFirstResponder: Bool { true }
 
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        guard let geometry = placementGeometry() else { return nil }
+        let unrotatedPoint = geometry.unrotatedPoint(point)
+        let hitsHandle = Handle.allCases.contains { handleRect(for: $0, in: geometry.rect).contains(unrotatedPoint) }
+        let hitsRotation = rotationHandleRect(in: geometry.rect).contains(unrotatedPoint)
+        return geometry.contains(point) || hitsHandle || hitsRotation ? self : nil
+    }
+
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
+        true
+    }
+
     override func draw(_ dirtyRect: NSRect) {
         guard let geometry = placementGeometry() else { return }
         let targetRect = geometry.rect
@@ -214,7 +226,8 @@ final class PDFPlacementOverlayView: NSView {
         }
         let centerInPDFView = pdfView.convert(CGPoint(x: overlayRect.midX, y: overlayRect.midY), from: self)
         guard let page = pdfView.page(for: centerInPDFView, nearest: false) else { return }
-        let pageRect = pdfView.convert(overlayRect, to: page)
+        let rectInPDFView = pdfView.convert(overlayRect, from: self)
+        let pageRect = pdfView.convert(rectInPDFView, to: page)
         let cropBox = page.bounds(for: .cropBox)
         guard let pageIndex = document.index(for: page).nonNegative else { return }
 

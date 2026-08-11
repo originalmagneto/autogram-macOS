@@ -304,6 +304,30 @@ import Testing
     ))
 }
 
+@Test @MainActor func disabledVisibleSignatureHidesPlacementAndPreview() throws {
+    let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let source = directory.appending(path: "document.pdf")
+    let artwork = directory.appending(path: "artwork.png")
+    try writeWorkspaceFixturePDF(to: source, pageCount: 1)
+    try workspaceFixturePNG().write(to: artwork)
+    let workspace = WorkspaceModel(
+        engine: CountingWorkspaceSigningEngine(),
+        items: [PDFItem(descriptor: PDFItemDescriptor(id: "document", sourceURL: source))],
+        signatureAssetStore: SignatureAssetStore(applicationSupportRoot: directory.appending(path: "Application Support"))
+    )
+    try workspace.importVisibleSignatureArtwork(from: artwork)
+    workspace.setVisibleSignatureEnabled(false)
+
+    let detail = PDFDetailView(item: workspace.items[0], workspace: workspace)
+
+    #expect(workspace.visibleSignaturePlacement != nil)
+    #expect(workspace.visibleSignatureCardPreview != nil)
+    #expect(detail.visibleSignaturePlacement.wrappedValue == nil)
+    #expect(detail.cardPreview == nil)
+}
+
 @Test @MainActor func importedVisibleArtworkDefaultsToTheLastPageOfTheSelectedPDF() throws {
     let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)

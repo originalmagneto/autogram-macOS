@@ -25,28 +25,31 @@ struct PDFPreviewView: NSViewRepresentable {
         Coordinator()
     }
 
-    func makeNSView(context: Context) -> PDFView {
-        let view = PDFView()
-        view.autoScales = true
-        observePDFView(view, coordinator: context.coordinator)
+    func makeNSView(context: Context) -> PDFPreviewContainerView {
+        let view = PDFPreviewContainerView()
+        view.pdfView.autoScales = true
+        view.overlay.onPlacementChange = { [weak coordinator = context.coordinator] placement in
+            coordinator?.placementBinding?.wrappedValue = placement
+        }
+        context.coordinator.overlay = view.overlay
+        observePDFView(view.pdfView, coordinator: context.coordinator)
         return view
     }
 
-    func updateNSView(_ nsView: PDFView, context: Context) {
+    func updateNSView(_ nsView: PDFPreviewContainerView, context: Context) {
         let coordinator = context.coordinator
         coordinator.placementBinding = _placement
         if coordinator.loadedURL != url {
-            nsView.document = PDFDocument(url: url)
+            nsView.pdfView.document = PDFDocument(url: url)
             coordinator.loadedURL = url
         }
-        installOverlay(in: nsView, coordinator: coordinator)
-        coordinator.overlay?.placement = placement
-        coordinator.overlay?.cardPreview = cardPreview
-        coordinator.overlay?.refresh()
+        nsView.overlay.placement = placement
+        nsView.overlay.cardPreview = cardPreview
+        nsView.overlay.refresh()
     }
 
-    static func dismantleNSView(_ nsView: PDFView, coordinator: Coordinator) {
-        nsView.document = nil
+    static func dismantleNSView(_ nsView: PDFPreviewContainerView, coordinator: Coordinator) {
+        nsView.pdfView.document = nil
     }
 
     private func observePDFView(_ pdfView: PDFView, coordinator: Coordinator) {
@@ -56,17 +59,32 @@ struct PDFPreviewView: NSViewRepresentable {
         center.addObserver(coordinator, selector: #selector(Coordinator.refreshOverlay), name: .PDFViewDocumentChanged, object: pdfView)
     }
 
-    private func installOverlay(in pdfView: PDFView, coordinator: Coordinator) {
-        guard let documentView = pdfView.documentView else { return }
-        if coordinator.overlay?.superview !== documentView {
-            let overlay = PDFPlacementOverlayView(frame: documentView.bounds)
-            overlay.autoresizingMask = [.width, .height]
-            overlay.pdfView = pdfView
-            overlay.onPlacementChange = { [weak coordinator] placement in
-                coordinator?.placementBinding?.wrappedValue = placement
-            }
-            documentView.addSubview(overlay)
-            coordinator.overlay = overlay
+}
+
+final class PDFPreviewContainerView: NSView {
+    let pdfView = PDFView()
+    let overlay = PDFPlacementOverlayView()
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        pdfView.frame = bounds
+        pdfView.autoresizingMask = [.width, .height]
+        overlay.frame = bounds
+        overlay.autoresizingMask = [.width, .height]
+        overlay.pdfView = pdfView
+        addSubview(pdfView)
+        addSubview(overlay, positioned: .above, relativeTo: pdfView)
+    }
+
+    required init?(coder: NSCoder) {
+        nil
+    }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        let pointInOverlay = overlay.convert(point, from: self)
+        if overlay.hitTest(pointInOverlay) != nil {
+            return overlay
         }
+        return super.hitTest(point)
     }
 }

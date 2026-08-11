@@ -8,6 +8,8 @@ enum VisibleSignatureRendererError: Error {
 }
 
 struct VisibleSignatureRenderer {
+    static let artworkSlot = NSRect(x: 28, y: 116, width: 364, height: 84)
+
     let assetStore: SignatureAssetStore
     let cacheRoot: URL
     let fileManager: FileManager
@@ -22,16 +24,34 @@ struct VisibleSignatureRenderer {
         self.cacheRoot = cacheRoot ?? fileManager.urls(for: .cachesDirectory, in: .userDomainMask)[0]
     }
 
+    static func aspectFitRect(imageSize: CGSize, inside bounds: CGRect) -> CGRect {
+        guard imageSize.width > 0, imageSize.height > 0 else { return bounds }
+        let scale = min(bounds.width / imageSize.width, bounds.height / imageSize.height)
+        let size = CGSize(width: imageSize.width * scale, height: imageSize.height * scale)
+        return CGRect(
+            x: bounds.midX - size.width / 2,
+            y: bounds.midY - size.height / 2,
+            width: size.width,
+            height: size.height
+        )
+    }
+
     func render(
         asset: SignatureAsset,
         content: VisibleSignatureCardContent,
         signingTime: Date,
-        rotationDegrees: Double
+        rotationDegrees: Double,
+        isPreview: Bool = false
     ) throws -> URL {
         guard let artwork = NSImage(contentsOf: assetStore.fileURL(for: asset)) else {
             throw VisibleSignatureRendererError.unreadableArtwork
         }
-        let card = try renderedCard(artwork: artwork, content: content, signingTime: signingTime)
+        let card = try renderedCard(
+            artwork: artwork,
+            content: content,
+            signingTime: signingTime,
+            isPreview: isPreview
+        )
         let rotated = try rotatedImage(card, degrees: rotationDegrees)
         let directory = cacheRoot.appending(path: "Autogram macOS/Visual Signatures", directoryHint: .isDirectory)
         try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -45,7 +65,12 @@ struct VisibleSignatureRenderer {
         return output
     }
 
-    private func renderedCard(artwork: NSImage, content: VisibleSignatureCardContent, signingTime: Date) throws -> NSImage {
+    private func renderedCard(
+        artwork: NSImage,
+        content: VisibleSignatureCardContent,
+        signingTime: Date,
+        isPreview: Bool
+    ) throws -> NSImage {
         let size = NSSize(width: 420, height: 260)
         let image = NSImage(size: size)
         image.lockFocus()
@@ -78,30 +103,32 @@ struct VisibleSignatureRenderer {
             in: NSRect(x: 28, y: 210, width: size.width - 56, height: 18),
             withAttributes: headingAttributes
         )
-        let artworkRect = NSRect(x: 28, y: 142, width: size.width - 56, height: 56)
+        let artworkRect = Self.aspectFitRect(imageSize: artwork.size, inside: Self.artworkSlot)
         artwork.draw(in: artworkRect, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: false, hints: [.interpolation: NSImageInterpolation.high])
         NSColor.labelColor.withAlphaComponent(0.18).setStroke()
         let divider = NSBezierPath()
-        divider.move(to: CGPoint(x: 28, y: 132))
-        divider.line(to: CGPoint(x: size.width - 28, y: 132))
+        divider.move(to: CGPoint(x: 28, y: 106))
+        divider.line(to: CGPoint(x: size.width - 28, y: 106))
         divider.stroke()
         let details = [
             (content.signerName, headingAttributes),
             (content.certificateQualification ?? "Certificate qualification unavailable", textAttributes),
-            ("PAdES Baseline T", textAttributes),
-            ("TSA: qualified", textAttributes)
+            ("PAdES Baseline T · Qualified TSA", textAttributes)
         ]
-        var y: CGFloat = 108
+        var y: CGFloat = 86
         for (line, attributes) in details {
-            (line as NSString).draw(in: NSRect(x: 28, y: y, width: size.width - 56, height: 16), withAttributes: attributes)
-            y -= 18
+            (line as NSString).draw(in: NSRect(x: 28, y: y, width: size.width - 56, height: 14), withAttributes: attributes)
+            y -= 16
         }
         drawSymbol("clock.fill", in: NSRect(x: 28, y: 34, width: 13, height: 13), color: .systemGreen)
         let timestampAttributes: [NSAttributedString.Key: Any] = [
             .font: NSFont.systemFont(ofSize: 10),
             .foregroundColor: NSColor.secondaryLabelColor
         ]
-        (DateFormatter.localizedString(from: signingTime, dateStyle: .medium, timeStyle: .short) as NSString).draw(
+        let timeText = isPreview
+            ? "Signing time will be added"
+            : DateFormatter.localizedString(from: signingTime, dateStyle: .medium, timeStyle: .short)
+        (timeText as NSString).draw(
             in: NSRect(x: 48, y: 34, width: 150, height: 14),
             withAttributes: timestampAttributes
         )
@@ -110,7 +137,10 @@ struct VisibleSignatureRenderer {
             .font: NSFont.boldSystemFont(ofSize: 10),
             .foregroundColor: NSColor.systemGreen
         ]
-        ("Qualified signature and timestamp" as NSString).draw(
+        let statusText = isPreview
+            ? "Preview of qualified signature"
+            : "Qualified signature and timestamp"
+        (statusText as NSString).draw(
             in: NSRect(x: 236, y: 34, width: 156, height: 14),
             withAttributes: statusAttributes
         )

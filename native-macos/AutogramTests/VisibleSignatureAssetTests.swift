@@ -34,13 +34,13 @@ import Testing
         )
 
         #expect(pdfAsset.kind == .png)
-        #expect(try store.listAssets().contains(pdfAsset))
         #expect(persistedPDFAsset == pdfAsset)
         #expect(store.fileURL(for: persistedPDFAsset) == pdfURL)
         #expect(pdfURL.deletingLastPathComponent() == store.assetsDirectory)
         #expect(pdfSize.width == 40)
         #expect(pdfSize.height == 20)
         #expect(try pngHasAlpha(pdfURL))
+        #expect(try store.listAssets().contains(pdfAsset))
     }
 }
 
@@ -109,7 +109,7 @@ import Testing
     }
 }
 
-@Test func renderedCardUsesTransparentCanvasAndGreenFinalStatusCue() throws {
+@Test func renderedCardUsesTransparentCanvas() throws {
     try withTemporaryDirectory { directory in
         let fixturePNG = directory.appending(path: "fixture.png")
         try transparentFixturePNG().write(to: fixturePNG)
@@ -128,11 +128,20 @@ import Testing
         )
 
         #expect(try cornerPixelsAreTransparent(output))
-        #expect(try pngContainsGreenStatusPixels(
-            output,
-            in: CGRect(x: 20, y: 208, width: 160, height: 32)
-        ))
     }
+}
+
+@Test func artworkUsesAspectFitInsideItsCardSlot() {
+    let slot = VisibleSignatureRenderer.artworkSlot
+    let fitted = VisibleSignatureRenderer.aspectFitRect(
+        imageSize: CGSize(width: 120, height: 40),
+        inside: slot
+    )
+
+    #expect(abs(fitted.width / fitted.height - 3) < 0.001)
+    #expect(fitted.height == slot.height)
+    #expect(fitted.midX == slot.midX)
+    #expect(fitted.midY == slot.midY)
 }
 
 private func writeSelectedPageFixturePDF(to url: URL) throws {
@@ -199,28 +208,6 @@ private func cornerPixelsAreTransparent(_ url: URL) throws -> Bool {
     return corners.allSatisfy { x, y in
         bitmap.colorAt(x: x, y: y)?.alphaComponent == 0
     }
-}
-
-private func pngContainsGreenStatusPixels(_ url: URL, in rect: CGRect) throws -> Bool {
-    guard let image = NSImage(contentsOf: url),
-          let tiff = image.tiffRepresentation,
-          let bitmap = NSBitmapImageRep(data: tiff) else {
-        throw FixtureError.unableToReadPNG
-    }
-    let bounds = CGRect(x: 0, y: 0, width: bitmap.pixelsWide, height: bitmap.pixelsHigh)
-    let sampleRect = rect.intersection(bounds).integral
-    for x in stride(from: Int(sampleRect.minX), to: Int(sampleRect.maxX), by: 4) {
-        for y in stride(from: Int(sampleRect.minY), to: Int(sampleRect.maxY), by: 4) {
-            guard let color = bitmap.colorAt(x: x, y: y) else { continue }
-            if color.greenComponent > 0.4,
-               color.greenComponent > color.redComponent * 1.2,
-               color.greenComponent > color.blueComponent * 1.1,
-               color.alphaComponent > 0.8 {
-                return true
-            }
-        }
-    }
-    return false
 }
 
 private enum FixtureError: Error {

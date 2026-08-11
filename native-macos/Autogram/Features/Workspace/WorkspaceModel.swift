@@ -844,7 +844,8 @@ final class WorkspaceModel {
                     asset: asset,
                     content: content,
                     signingTime: signingTime,
-                    rotationDegrees: 0
+                    rotationDegrees: 0,
+                    isPreview: true
                 )
                 defer { try? FileManager.default.removeItem(at: previewURL) }
                 guard let cardPreview = NSImage(contentsOf: previewURL) else {
@@ -954,7 +955,8 @@ final class WorkspaceModel {
             asset: asset,
             content: content,
             signingTime: .now,
-            rotationDegrees: 0
+            rotationDegrees: 0,
+            isPreview: true
         ) else {
             visibleSignatureCardPreview = nil
             return

@@ -39,10 +39,10 @@ import Testing
     #expect(encodedObject == fixtureObject)
 }
 
-@Test func automaticTimestampSourceOrdersSectigoBeforeBelgium() {
+@Test func automaticTimestampSourceOrdersBelgiumBeforeSectigo() {
     #expect(TimestampSource.automatic.endpoints == [
-        "http://timestamp.sectigo.com/qualified",
-        "http://tsa.belgium.be/connect"
+        "http://tsa.belgium.be/connect",
+        "http://timestamp.sectigo.com/qualified"
     ])
 }
 

@@ -58,25 +58,23 @@ import Testing
         backing: .buffered,
         defer: false
     )
-    let pdfView = PDFView(frame: window.contentView?.bounds ?? .zero)
+    let container = PDFPreviewContainerView(frame: window.contentView?.bounds ?? .zero)
+    let pdfView = container.pdfView
     pdfView.autoScales = false
     pdfView.scaleFactor = 1
     pdfView.document = document
-    window.contentView = pdfView
+    window.contentView = container
     window.makeKeyAndOrderFront(nil)
     defer { window.orderOut(nil) }
     RunLoop.current.run(until: .now.addingTimeInterval(0.05))
 
-    let documentView = try #require(pdfView.documentView)
-    let overlay = PDFPlacementOverlayView(frame: documentView.bounds)
-    overlay.pdfView = pdfView
+    let overlay = container.overlay
     let initial = VisibleSignaturePlacement(
         pageIndex: 0,
         pageRect: CGRect(x: 72, y: 144, width: 144, height: 72),
         rotationDegrees: 0
     )
     overlay.placement = initial
-    documentView.addSubview(overlay)
     overlay.refresh()
 
     var published: [VisibleSignaturePlacement] = []
@@ -90,26 +88,33 @@ import Testing
     let overlayRect = overlay.convert(pdfView.convert(pageRect, from: page), from: pdfView)
     let dragStart = CGPoint(x: overlayRect.midX, y: overlayRect.midY)
     let dragEnd = CGPoint(x: dragStart.x + 24, y: dragStart.y + 18)
-    #expect(documentView.hitTest(dragStart) === overlay)
+    #expect(container.hitTest(dragStart) === overlay)
+    #expect(overlay.hitTest(CGPoint(x: 0, y: 0)) == nil)
     overlay.mouseDown(with: mouseEvent(.leftMouseDown, at: overlay.convert(dragStart, to: nil), in: window))
     overlay.mouseDragged(with: mouseEvent(.leftMouseDragged, at: overlay.convert(dragEnd, to: nil), in: window))
     overlay.mouseUp(with: mouseEvent(.leftMouseUp, at: overlay.convert(dragEnd, to: nil), in: window))
 
     let dragged = try #require(published.last)
     #expect(dragged.pageIndex == 0)
-    #expect(dragged.pageRect.origin != initial.pageRect.origin)
+    let draggedPageRect = PDFCoordinateConverter().pageRect(dragged.pageRect, in: page.bounds(for: .cropBox))
+    let draggedOverlayRect = overlay.convert(pdfView.convert(draggedPageRect, from: page), from: pdfView)
+    #expect(approximatelyEqual(draggedOverlayRect, overlayRect.offsetBy(dx: 24, dy: 18)))
 
     overlay.placement = initial
     let resizeStart = CGPoint(x: overlayRect.minX, y: overlayRect.minY)
     let resizeEnd = CGPoint(x: resizeStart.x - 20, y: resizeStart.y - 20)
-    #expect(documentView.hitTest(resizeStart) === overlay)
+    #expect(container.hitTest(resizeStart) === overlay)
     overlay.mouseDown(with: mouseEvent(.leftMouseDown, at: overlay.convert(resizeStart, to: nil), in: window))
     overlay.mouseDragged(with: mouseEvent(.leftMouseDragged, at: overlay.convert(resizeEnd, to: nil), in: window))
     overlay.mouseUp(with: mouseEvent(.leftMouseUp, at: overlay.convert(resizeEnd, to: nil), in: window))
 
     let resized = try #require(published.last)
     #expect(resized.pageIndex == 0)
-    #expect(resized.pageRect.width > initial.pageRect.width)
+    let resizedPageRect = PDFCoordinateConverter().pageRect(resized.pageRect, in: page.bounds(for: .cropBox))
+    let resizedOverlayRect = overlay.convert(pdfView.convert(resizedPageRect, from: page), from: pdfView)
+    #expect(approximatelyEqual(resizedOverlayRect.minX, overlayRect.minX - 20))
+    #expect(resizedOverlayRect.width > overlayRect.width)
+    #expect(resizedOverlayRect.height > overlayRect.height)
 }
 
 private func approximatelyEqual(_ lhs: CGPoint, _ rhs: CGPoint) -> Bool {
