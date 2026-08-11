@@ -1,190 +1,201 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Optional overrides:
-#   AUTOGRAM_BIN=/path/to/AutogramApp ./autogram-cli-sign.sh file1.pdf
-#   AUTOGRAM_INTEL_BIN=/path/to/Intel/AutogramApp ./autogram-cli-sign.sh --driver secure_store file1.pdf
-resolve_autogram_bin() {
-  local candidates=(
-    "${AUTOGRAM_BIN:-}"
-    "/Applications/Autogram.app/Contents/MacOS/AutogramApp"
-    "$HOME/Applications/Autogram.app/Contents/MacOS/AutogramApp"
-    "$(cd "$(dirname "$0")/../.." && pwd)/target/app-image/Autogram.app/Contents/MacOS/AutogramApp"
-  )
-
+resolve_helper() {
   local candidate
-  for candidate in "${candidates[@]}"; do
+  for candidate in \
+    "${AUTOGRAM_NATIVE_BIN:-}" \
+    "/Applications/Autogram macOS.app/Contents/Helpers/AutogramCLI-arm64" \
+    "$HOME/Applications/Autogram macOS.app/Contents/Helpers/AutogramCLI-arm64" \
+    "$(cd "$(dirname "$0")/../.." && pwd)/build/native/Autogram macOS.app/Contents/Helpers/AutogramCLI-arm64"; do
     if [[ -n "$candidate" && -x "$candidate" ]]; then
       printf '%s\n' "$candidate"
       return 0
     fi
   done
-
   return 1
 }
 
-resolve_intel_autogram_bin() {
-  local candidates=(
-    "${AUTOGRAM_INTEL_BIN:-}"
-    "${AUTOGRAM_BIN:-}"
-    "$HOME/Applications/Autogram Intel GUI.app/Contents/MacOS/AutogramApp"
-    "$HOME/Applications/Autogram Intel.app/Contents/MacOS/AutogramApp"
-    "/Applications/Autogram Intel.app/Contents/MacOS/AutogramApp"
-    "$HOME/Applications/Autogram-intel.app/Contents/MacOS/AutogramApp"
-    "/Applications/Autogram-intel.app/Contents/MacOS/AutogramApp"
-  )
-
+resolve_python() {
   local candidate
-  for candidate in "${candidates[@]}"; do
-    if [[ -n "$candidate" && -x "$candidate" ]] && lipo -verify_arch x86_64 "$candidate" >/dev/null 2>&1; then
+  for candidate in "${AUTOGRAM_JSON_PYTHON:-}" /usr/bin/python3 /opt/homebrew/bin/python3 /usr/local/bin/python3; do
+    if [[ -n "$candidate" && -x "$candidate" ]]; then
       printf '%s\n' "$candidate"
       return 0
     fi
   done
-
   return 1
 }
 
-secure_store_driver_path() {
-  printf '%s\n' "/usr/local/lib/pkcs11/libICASecureStorePkcs11.dylib"
-}
-
-secure_store_requires_intel_autogram() {
-  [[ "$(uname -m)" == "arm64" ]] || return 1
-
-  local driver_path
-  driver_path="$(secure_store_driver_path)"
-  [[ -f "$driver_path" ]] || return 1
-
-  ! lipo -verify_arch arm64 "$driver_path" >/dev/null 2>&1
-}
-
-should_use_intel_autogram() {
-  local requested_driver="${1:-}"
-
-  [[ "$(uname -m)" == "arm64" ]] || return 1
-
-  if [[ "$requested_driver" == "secure_store" ]]; then
-    secure_store_requires_intel_autogram
-    return $?
+absolute_path() {
+  local path="$1"
+  if [[ "$path" == /* ]]; then
+    printf '%s\n' "$path"
+  else
+    printf '%s/%s\n' "$(cd "$(dirname "$path")" && pwd)" "$(basename "$path")"
   fi
-
-  [[ -z "$requested_driver" ]] && secure_store_requires_intel_autogram
 }
 
-run_autogram() {
-  local app_bin="$1"
-  shift
+run_machine_request() {
+  local python_bin="$1"
+  local helper="$2"
+  local operation="$3"
+  shift 3
 
-  if [[ "$(uname -m)" == "arm64" ]] && lipo -verify_arch x86_64 "$app_bin" >/dev/null 2>&1 \
-    && ! lipo -verify_arch arm64 "$app_bin" >/dev/null 2>&1; then
-    echo "Using Intel Autogram through Rosetta: $app_bin" >&2
-    /usr/bin/arch -x86_64 "$app_bin" "$@"
-    return
-  fi
+  "$python_bin" -c '
+import json
+import selectors
+import subprocess
+import sys
 
-  "$app_bin" "$@"
+helper, operation, *args = sys.argv[1:]
+pin = sys.stdin.read()
+if operation == "CERTIFICATES":
+    driver, = args
+    payload = {"driver": driver, "pin": pin}
+else:
+    driver, certificate, source, target, level, tsa = args
+    payload = {
+        "driver": driver,
+        "certificateSerial": certificate,
+        "pin": pin,
+        "signatureLevel": level,
+        "timestamp": {"required": True, "servers": [tsa]},
+        "files": [{"id": "file-1", "source": source, "target": target}],
+    }
+request = json.dumps({
+    "protocolVersion": 1,
+    "requestId": "autogram-quick-action",
+    "operation": operation,
+    "payload": payload,
+}, ensure_ascii=False, separators=(",", ":")).encode()
+pin = ""
+
+process = subprocess.Popen(
+    [helper, "--cli", "--machine-readable", "--protocol-version", "1", "--operation", operation],
+    stdin=subprocess.PIPE,
+    stdout=subprocess.PIPE,
+    stderr=subprocess.PIPE,
+    bufsize=0,
+)
+process.stdin.write(request)
+process.stdin.close()
+request = b""
+
+selector = selectors.DefaultSelector()
+selector.register(process.stdout, selectors.EVENT_READ, "stdout")
+selector.register(process.stderr, selectors.EVENT_READ, "stderr")
+terminal = None
+while selector.get_map():
+    for key, _ in selector.select():
+        data = key.fileobj.readline()
+        if not data:
+            selector.unregister(key.fileobj)
+            continue
+        text = data.decode("utf-8", errors="replace")
+        print(text, end="", file=sys.stdout if key.data == "stdout" else sys.stderr, flush=True)
+        if key.data == "stdout":
+            try:
+                event_type = json.loads(text).get("type")
+            except json.JSONDecodeError:
+                event_type = None
+            if event_type in {"session.completed", "session.failed"}:
+                terminal = event_type
+                process.kill()
+                break
+    if terminal:
+        break
+process.wait()
+raise SystemExit(0 if terminal == "session.completed" else 1)
+' "$helper" "$operation" "$@"
+}
+
+parse_certificates() {
+  "$1" -c '
+import json
+import sys
+for line in sys.stdin:
+    try:
+        event = json.loads(line)
+    except json.JSONDecodeError:
+        continue
+    if event.get("type") != "certificates.available":
+        continue
+    for certificate in event.get("payload", {}).get("certificates", []):
+        serial = str(certificate.get("serial", "")).strip()
+        name = str(certificate.get("commonName", "")).replace("\\t", " ").replace("\\r", " ").replace("\\n", " ")
+        if serial:
+            print(f"AUTOGRAM_KEY\\t{serial}\\t{name}")
+'
 }
 
 usage() {
   cat <<'EOF'
 Usage:
-  autogram-cli-sign.sh [options] <file-or-dir> [...]
+  autogram-cli-sign.sh [options] <PDF>
 
-Examples:
-  autogram-cli-sign.sh "/path/to/sample.pdf"
-  autogram-cli-sign.sh --driver eid --pdfa "/path/to/invoice.pdf"
+Required for signing:
+  --driver NAME --key SERIAL --pin-stdin --target PATH --tsa-server URL
 
-Notes:
-  - Signed outputs are created by Autogram CLI defaults (e.g. *_signed).
-  - Use --key and --pin-stdin for non-interactive signing.
-  - On Apple Silicon, Intel-only I.CA SecureStore needs an Intel Autogram build through Rosetta.
-  - Common forwarded options include:
-      --driver, --key, --target, --pdf-level, --slot-id, --keystore, --tsa-server, --pkcs11-driver-path
-      --pin-stdin, --list-keys, --pdfa, --plain-xml, --en319132, --force, --parents
+Other options:
+  --list-keys --pdf-level LEVEL
+
+Autogram macOS and an arm64-capable PKCS#11 driver are required.
 EOF
 }
 
-if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
-  usage
-  exit 0
-fi
-
-declare -a common_opts=()
+driver=""
+certificate=""
+target=""
+level="PAdES_BASELINE_T"
+tsa=""
+pin_stdin=0
+list_keys=0
 declare -a sources=()
-requested_driver=""
-list_keys_requested=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --driver|--key|--target|--pdf-level|--slot-id|--keystore|--tsa-server|--pkcs11-driver-path)
-      if [[ $# -lt 2 ]]; then
-        echo "Missing value for option: $1"
-        exit 1
-      fi
-      common_opts+=("$1" "${2:-}")
-      if [[ "$1" == "--driver" ]]; then
-        requested_driver="${2:-}"
-      fi
-      shift 2
-      ;;
-    --pin-stdin|--list-keys|--pdfa|--plain-xml|--en319132|--force|--parents)
-      common_opts+=("$1")
-      [[ "$1" == "--list-keys" ]] && list_keys_requested=1
-      shift
-      ;;
-    -*)
-      echo "Unsupported option: $1"
-      usage
-      exit 1
-      ;;
-    *)
-      sources+=("$1")
-      shift
-      ;;
+    --driver) driver="${2:-}"; shift 2 ;;
+    --key) certificate="${2:-}"; shift 2 ;;
+    --target) target="${2:-}"; shift 2 ;;
+    --pdf-level) level="${2:-}"; shift 2 ;;
+    --tsa-server) tsa="${2:-}"; shift 2 ;;
+    --pin-stdin) pin_stdin=1; shift ;;
+    --list-keys) list_keys=1; shift ;;
+    -h|--help) usage; exit 0 ;;
+    -*) echo "Unsupported option: $1" >&2; usage >&2; exit 64 ;;
+    *) sources+=("$1"); shift ;;
   esac
 done
 
-if [[ ${#sources[@]} -eq 0 && "$list_keys_requested" -eq 0 ]]; then
-  echo "No source file or directory provided."
-  usage
-  exit 1
-fi
+helper="$(resolve_helper || true)"
+python_bin="$(resolve_python || true)"
+[[ -n "$helper" ]] || { echo "Autogram macOS helper was not found." >&2; exit 69; }
+[[ -n "$python_bin" ]] || { echo "Python 3 was not found." >&2; exit 69; }
+[[ "$pin_stdin" -eq 1 ]] || { echo "--pin-stdin is required." >&2; exit 64; }
+[[ -n "$driver" ]] || { echo "--driver is required." >&2; exit 64; }
 
-AUTOGRAM_APP_BIN="$(resolve_autogram_bin || true)"
-if should_use_intel_autogram "$requested_driver"; then
-  INTEL_AUTOGRAM_APP_BIN="$(resolve_intel_autogram_bin || true)"
-  if [[ -z "$INTEL_AUTOGRAM_APP_BIN" ]]; then
-    echo "Intel Autogram is required for the installed I.CA SecureStore driver."
-    echo "The driver is x86_64-only, while this Mac runs on Apple Silicon."
-    echo "Install the official Intel Autogram package or set AUTOGRAM_INTEL_BIN explicitly."
-    echo "Expected Intel app: \$HOME/Applications/Autogram Intel GUI.app/Contents/MacOS/AutogramApp"
-    exit 1
+if [[ "$list_keys" -eq 1 ]]; then
+  response_file="$(mktemp -t autogram-certificates)"
+  trap 'rm -f "$response_file"' EXIT
+  set +e
+  run_machine_request "$python_bin" "$helper" CERTIFICATES "$driver" > "$response_file"
+  status=$?
+  set -e
+  parse_certificates "$python_bin" < "$response_file"
+  if [[ "$status" -ne 0 ]]; then
+    cat "$response_file" >&2
+    exit "$status"
   fi
-  AUTOGRAM_APP_BIN="$INTEL_AUTOGRAM_APP_BIN"
+  exit 0
 fi
 
-if [[ -z "$AUTOGRAM_APP_BIN" ]]; then
-  echo "Autogram executable not found."
-  echo "Expected one of:"
-  echo "  /Applications/Autogram.app/Contents/MacOS/AutogramApp"
-  echo "  \$HOME/Applications/Autogram.app/Contents/MacOS/AutogramApp"
-  echo "  <repo>/target/app-image/Autogram.app/Contents/MacOS/AutogramApp"
-  echo "Or set AUTOGRAM_BIN explicitly."
-  exit 1
-fi
+[[ ${#sources[@]} -eq 1 ]] || { echo "Exactly one PDF source is required." >&2; exit 64; }
+[[ -n "$certificate" ]] || { echo "--key is required." >&2; exit 64; }
+[[ -n "$target" ]] || { echo "--target is required." >&2; exit 64; }
+[[ -n "$tsa" ]] || { echo "--tsa-server is required." >&2; exit 64; }
 
-if [[ "$list_keys_requested" -eq 1 ]]; then
-  run_autogram "$AUTOGRAM_APP_BIN" --cli "${common_opts[@]}"
-else
-  for src in "${sources[@]}"; do
-    echo "Signing: $src"
-    if [[ ${#common_opts[@]} -gt 0 ]]; then
-      run_autogram "$AUTOGRAM_APP_BIN" --cli -s "$src" "${common_opts[@]}"
-    else
-      run_autogram "$AUTOGRAM_APP_BIN" --cli -s "$src"
-    fi
-  done
-fi
-
+echo "Signing: ${sources[0]}"
+run_machine_request "$python_bin" "$helper" SIGN "$driver" "$certificate" \
+  "$(absolute_path "${sources[0]}")" "$(absolute_path "$target")" "$level" "$tsa"
 echo "Done."
