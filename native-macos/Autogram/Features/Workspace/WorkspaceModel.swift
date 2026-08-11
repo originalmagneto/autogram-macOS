@@ -135,8 +135,8 @@ final class WorkspaceModel {
         do {
             let preview = try await engine.previewEmbeddedDocument(sourceURL: item.descriptor.sourceURL, named: name)
             guard requestGeneration == previewRequestGeneration,
-                  selection == item.id,
-                  items.contains(where: { $0.id == item.id && $0.descriptor == item.descriptor }) else {
+                  selectedItem?.id == item.id,
+                  selectedItem?.descriptor == item.descriptor else {
                 discardEmbeddedPreviewDirectory(for: preview)
                 return
             }

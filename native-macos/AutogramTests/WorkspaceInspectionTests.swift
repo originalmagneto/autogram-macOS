@@ -31,6 +31,7 @@ import Testing
     let descriptor = PDFItemDescriptor(id: "sample", sourceURL: URL(fileURLWithPath: "/tmp/sample.asice"))
     let engine = PreviewAndValidationEngine()
     let workspace = WorkspaceModel(engine: engine, items: [PDFItem(descriptor: descriptor)])
+    workspace.selection = nil
 
     await workspace.previewEmbeddedDocument(named: "sample.pdf")
 
