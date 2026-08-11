@@ -16,6 +16,65 @@ enum QuickActionRunnerError: LocalizedError {
     }
 }
 
+private enum HelperTerminalEvent {
+    case completed
+    case failed
+}
+
+private final class HelperOutputCollector {
+    private let process: Process
+    private let lock = NSLock()
+    private var standardOutput = Data()
+    private var standardError = Data()
+    private var pendingOutput = Data()
+    private var terminalEvent: HelperTerminalEvent?
+
+    init(process: Process) {
+        self.process = process
+    }
+
+    func appendStandardOutput(_ data: Data) {
+        var shouldTerminate = false
+        lock.lock()
+        standardOutput.append(data)
+        pendingOutput.append(data)
+        while let newline = pendingOutput.firstIndex(of: 0x0A) {
+            let line = pendingOutput.prefix(upTo: newline)
+            pendingOutput.removeSubrange(...newline)
+            guard terminalEvent == nil,
+                  let event = try? JSONSerialization.jsonObject(with: line) as? [String: Any]
+            else { continue }
+            switch event["type"] as? String {
+            case "session.completed":
+                terminalEvent = .completed
+                shouldTerminate = true
+            case "session.failed":
+                terminalEvent = .failed
+                shouldTerminate = true
+            default:
+                break
+            }
+        }
+        lock.unlock()
+
+        if shouldTerminate, process.isRunning {
+            process.terminate()
+        }
+    }
+
+    func appendStandardError(_ data: Data) {
+        lock.lock()
+        standardError.append(data)
+        lock.unlock()
+    }
+
+    func result() -> (standardOutput: Data, standardError: Data, terminalEvent: HelperTerminalEvent?) {
+        lock.lock()
+        defer { lock.unlock() }
+        return (standardOutput, standardError, terminalEvent)
+    }
+}
+
 struct QuickActionRequest {
     enum Operation: String {
         case certificates = "CERTIFICATES"
@@ -121,7 +180,7 @@ struct AutogramQuickActionRunner {
                 FileHandle.standardOutput.write(result.standardOutput)
             }
             FileHandle.standardError.write(result.standardError)
-            guard completedSuccessfully(result.standardOutput) else {
+            guard result.terminalEvent == .completed else {
                 throw QuickActionRunnerError.machineRequestFailed
             }
         } catch {
@@ -130,7 +189,7 @@ struct AutogramQuickActionRunner {
         }
     }
 
-    private static func run(_ request: QuickActionRequest) throws -> (standardOutput: Data, standardError: Data) {
+    private static func run(_ request: QuickActionRequest) throws -> (standardOutput: Data, standardError: Data, terminalEvent: HelperTerminalEvent?) {
         var pin = try readPIN()
         defer { pin.removeAll(keepingCapacity: false) }
         var machineRequest = try requestData(for: request, pin: pin)
@@ -152,13 +211,33 @@ struct AutogramQuickActionRunner {
         process.standardOutput = output
         process.standardError = error
         try process.run()
+
+        let collector = HelperOutputCollector(process: process)
+        let drainGroup = DispatchGroup()
+        drainGroup.enter()
+        DispatchQueue.global().async {
+            defer { drainGroup.leave() }
+            while true {
+                let data = output.fileHandleForReading.availableData
+                guard !data.isEmpty else { return }
+                collector.appendStandardOutput(data)
+            }
+        }
+        drainGroup.enter()
+        DispatchQueue.global().async {
+            defer { drainGroup.leave() }
+            while true {
+                let data = error.fileHandleForReading.availableData
+                guard !data.isEmpty else { return }
+                collector.appendStandardError(data)
+            }
+        }
+
         try input.fileHandleForWriting.write(contentsOf: machineRequest)
         input.fileHandleForWriting.closeFile()
-
-        let outputData = output.fileHandleForReading.readDataToEndOfFile()
-        let errorData = error.fileHandleForReading.readDataToEndOfFile()
+        drainGroup.wait()
         process.waitUntilExit()
-        return (outputData, errorData)
+        return collector.result()
     }
 
     private static func readPIN() throws -> String {
@@ -202,10 +281,6 @@ struct AutogramQuickActionRunner {
             throw QuickActionRunnerError.missingHelper
         }
         return helper
-    }
-
-    private static func completedSuccessfully(_ output: Data) -> Bool {
-        events(in: output).contains { $0["type"] as? String == "session.completed" }
     }
 
     private static func writeCertificateList(from output: Data) {
