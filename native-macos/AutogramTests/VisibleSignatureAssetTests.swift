@@ -43,6 +43,24 @@ import Testing
     }
 }
 
+@Test func managedArtworkLibraryListsImportedAssetsAndDeletesOnlySelectedAsset() throws {
+    try withTemporaryDirectory { directory in
+        let firstURL = directory.appending(path: "first.png")
+        try transparentFixturePNG().write(to: firstURL)
+        let pdfURL = directory.appending(path: "second.pdf")
+        try writeSelectedPageFixturePDF(to: pdfURL)
+        let store = SignatureAssetStore(applicationSupportRoot: directory.appending(path: "Application Support"))
+
+        let first = try store.importPNG(firstURL)
+        let second = try store.importPDF(pdfURL, pageIndex: 0)
+
+        #expect(Set(try store.listAssets().map(\.id)) == Set([first.id, second.id]))
+        try store.delete(first)
+        #expect(try store.listAssets().map(\.id) == [second.id])
+        #expect(!FileManager.default.fileExists(atPath: store.fileURL(for: first).path))
+    }
+}
+
 @Test func rotatedCardHasTransparentCorners() throws {
     try withTemporaryDirectory { directory in
         let fixturePNG = directory.appending(path: "fixture.png")

@@ -15,6 +15,7 @@ final class WorkspaceModel {
     }
     var selectedOutputFormat: SigningOutputFormat = .automatic
     var visibleSignatureAsset: SignatureAsset?
+    private(set) var visibleSignatureAssets: [SignatureAsset] = []
     var visibleSignatureEnabled = false
     var visibleSignaturePlacement: VisibleSignaturePlacement?
     private(set) var visibleSignaturePageCount = 0
@@ -62,6 +63,7 @@ final class WorkspaceModel {
         self.defaults = defaults
         rememberedTokens = certificateDefaultStore.rememberedTokens
         self.selection = items.first?.id
+        refreshVisibleSignatureAssets()
         restoreVisibleSignaturePreferences()
         updateVisibleSignatureDocument()
         self.coordinator = SigningCoordinator(engine: engine, workspace: self)
@@ -395,9 +397,14 @@ final class WorkspaceModel {
         } else {
             asset = try signatureAssetStore.importPNG(sourceURL)
         }
+        refreshVisibleSignatureAssets()
+        selectVisibleSignatureArtwork(asset)
+    }
+
+    func selectVisibleSignatureArtwork(_ asset: SignatureAsset) {
+        guard visibleSignatureAssets.contains(asset) else { return }
         visibleSignatureAsset = asset
         visibleSignatureEnabled = true
-        refreshVisibleSignatureArtworkPreview()
         if visibleSignaturePlacement == nil {
             visibleSignaturePlacement = VisibleSignaturePlacement(
                 pageIndex: max(visibleSignaturePageCount - 1, 0),
@@ -405,6 +412,19 @@ final class WorkspaceModel {
                 rotationDegrees: 0
             )
         }
+        refreshVisibleSignatureArtworkPreview()
+        persistVisibleSignaturePreferences()
+    }
+
+    func deleteVisibleSignatureArtwork(_ asset: SignatureAsset) throws {
+        try signatureAssetStore.delete(asset)
+        refreshVisibleSignatureAssets()
+        guard visibleSignatureAsset == asset else { return }
+        visibleSignatureAsset = nil
+        visibleSignatureEnabled = false
+        visibleSignaturePlacement = nil
+        visibleSignatureCardContent = nil
+        visibleSignatureCardPreview = nil
         persistVisibleSignaturePreferences()
     }
 
@@ -418,6 +438,10 @@ final class WorkspaceModel {
 
     var visibleSignatureArtworkURL: URL? {
         visibleSignatureAsset.map(signatureAssetStore.fileURL(for:))
+    }
+
+    func visibleSignatureArtworkURL(for asset: SignatureAsset) -> URL {
+        signatureAssetStore.fileURL(for: asset)
     }
 
     func updateVisibleSignaturePlacement(_ placement: VisibleSignaturePlacement?) {
@@ -848,8 +872,8 @@ final class WorkspaceModel {
               let preferences = try? JSONDecoder().decode(VisibleSignaturePreferences.self, from: data) else {
             return
         }
-        visibleSignatureAsset = preferences.assetID.map {
-            SignatureAsset(id: $0, kind: .png, managedFilename: "\($0.uuidString).png")
+        visibleSignatureAsset = preferences.assetID.flatMap { id in
+            visibleSignatureAssets.first { $0.id == id }
         }
         visibleSignatureEnabled = false
         visibleSignaturePlacement = preferences.defaultPlacement?.placement
@@ -865,6 +889,10 @@ final class WorkspaceModel {
         defaults.set(try? JSONEncoder().encode(preferences), forKey: VisibleSignaturePreferences.storageKey)
     }
 
+    private func refreshVisibleSignatureAssets() {
+        visibleSignatureAssets = (try? signatureAssetStore.listAssets()) ?? []
+    }
+
     private func refreshVisibleSignatureArtworkPreview() {
         guard let asset = visibleSignatureAsset else {
             visibleSignatureCardContent = nil
@@ -874,7 +902,8 @@ final class WorkspaceModel {
         let certificate = discoveredCertificates.first
         let content = VisibleSignatureCardContent(
             signerName: certificate?.displayName ?? "Certificate details pending",
-            certificateQualification: certificate?.certificateQualification
+            certificateQualification: certificate?.certificateQualification,
+            isPreview: true
         )
         visibleSignatureCardContent = content
         guard let previewURL = try? visibleSignatureRenderer.render(

@@ -64,6 +64,28 @@ struct SignatureAssetStore {
         assetsDirectory.appending(path: asset.managedFilename)
     }
 
+    func listAssets() throws -> [SignatureAsset] {
+        guard fileManager.fileExists(atPath: assetsDirectory.path) else { return [] }
+        return try fileManager.contentsOfDirectory(
+            at: assetsDirectory,
+            includingPropertiesForKeys: [.isRegularFileKey],
+            options: [.skipsHiddenFiles]
+        )
+        .compactMap { url in
+            guard (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true,
+                  url.pathExtension.lowercased() == "png",
+                  let id = UUID(uuidString: url.deletingPathExtension().lastPathComponent) else {
+                return nil
+            }
+            return SignatureAsset(id: id, kind: .png, managedFilename: url.lastPathComponent)
+        }
+        .sorted { $0.managedFilename < $1.managedFilename }
+    }
+
+    func delete(_ asset: SignatureAsset) throws {
+        try fileManager.removeItem(at: fileURL(for: asset))
+    }
+
     private func managedFilename(for id: UUID) -> String {
         "\(id.uuidString).png"
     }

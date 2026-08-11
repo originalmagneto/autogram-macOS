@@ -13,22 +13,37 @@ struct VisibleAppearanceInspector: View {
                 set: { workspace.setVisibleSignatureEnabled($0) }
             ))
             .disabled(workspace.visibleSignatureAsset == nil)
-            if let url = workspace.visibleSignatureArtworkURL,
-               let image = NSImage(contentsOf: url) {
-                Image(nsImage: image)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(maxHeight: 96)
-            } else {
+            if workspace.visibleSignatureAssets.isEmpty {
                 Text("Choose PNG or PDF artwork to add a graphic signature.")
                     .foregroundStyle(.secondary)
+            } else {
+                ScrollView(.horizontal) {
+                    HStack(spacing: 8) {
+                        ForEach(workspace.visibleSignatureAssets) { asset in
+                            Button {
+                                workspace.selectVisibleSignatureArtwork(asset)
+                            } label: {
+                                artworkThumbnail(for: asset)
+                            }
+                            .buttonStyle(.plain)
+                            .padding(3)
+                            .background(
+                                workspace.visibleSignatureAsset == asset
+                                    ? Color.accentColor.opacity(0.22)
+                                    : Color.clear,
+                                in: RoundedRectangle(cornerRadius: 5)
+                            )
+                        }
+                    }
+                }
+                .frame(height: 70)
             }
             HStack {
                 Button("Choose PNG or PDF") {
                     chooseArtwork()
                 }
-                Button("Remove artwork", role: .destructive) {
-                    workspace.removeVisibleSignatureArtwork()
+                Button("Delete artwork", role: .destructive) {
+                    deleteSelectedArtwork()
                 }
                 .disabled(workspace.visibleSignatureAsset == nil)
             }
@@ -71,6 +86,28 @@ struct VisibleAppearanceInspector: View {
             } catch {
                 workspace.setVisibleSignatureError(error)
             }
+        }
+    }
+
+    @ViewBuilder
+    private func artworkThumbnail(for asset: SignatureAsset) -> some View {
+        if let image = NSImage(contentsOf: workspace.visibleSignatureArtworkURL(for: asset)) {
+            Image(nsImage: image)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 88, height: 58)
+        } else {
+            Image(systemName: "photo")
+                .frame(width: 88, height: 58)
+        }
+    }
+
+    private func deleteSelectedArtwork() {
+        guard let asset = workspace.visibleSignatureAsset else { return }
+        do {
+            try workspace.deleteVisibleSignatureArtwork(asset)
+        } catch {
+            workspace.setVisibleSignatureError(error)
         }
     }
 
