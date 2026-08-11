@@ -76,6 +76,7 @@ mounted=true
 app_bundle="${mountpoint}/Autogram macOS.app"
 main_executable="${app_bundle}/Contents/MacOS/Autogram"
 helper_executable="${app_bundle}/Contents/Helpers/AutogramCLI-arm64"
+quick_action_runner="${app_bundle}/Contents/Helpers/AutogramQuickActionRunner-arm64"
 runtime_java="${app_bundle}/Contents/runtime/bin/java"
 
 [[ -d "${app_bundle}" ]] || fail "DMG does not contain Autogram macOS.app"
@@ -83,6 +84,7 @@ runtime_java="${app_bundle}/Contents/runtime/bin/java"
 [[ -f "${mountpoint}/README.md" ]] || fail "DMG README is missing"
 [[ -x "${main_executable}" ]] || fail "Native app executable is missing"
 [[ -x "${helper_executable}" ]] || fail "ARM64 helper is missing"
+[[ -x "${quick_action_runner}" ]] || fail "ARM64 Quick Action runner is missing"
 [[ -x "${runtime_java}" ]] || fail "Bundled runtime java is missing"
 
 minimum_version="$(plutil -extract LSMinimumSystemVersion raw "${app_bundle}/Contents/Info.plist")"
@@ -104,7 +106,7 @@ while IFS= read -r -d '' candidate; do
     file_description="$(file -b "${candidate}")"
     if [[ "${file_description}" == *Mach-O* ]]; then
         case "${relative_path}" in
-            Contents/MacOS/Autogram|Contents/Helpers/AutogramCLI-arm64|Contents/runtime/*)
+            Contents/MacOS/Autogram|Contents/Helpers/AutogramCLI-arm64|Contents/Helpers/AutogramQuickActionRunner-arm64|Contents/runtime/*)
                 ;;
             *)
                 fail "Unexpected executable code: ${relative_path}"
@@ -116,12 +118,8 @@ done < <(find "${app_bundle}" -type f -print0)
 [[ -z "$(find "${app_bundle}" \( -name '.git' -o -name '.hg' -o -name '.svn' -o -iname '*cache*' -o -iname '*.log' -o -iname '*.map' -o -iname '*.java' -o -iname '*.swift' -o -iname '*.c' -o -iname '*.h' -o -iname '*.m' -o -iname '*.mm' -o -iname '*.pem' -o -iname '*.key' -o -iname '*.p12' -o -iname '*.pfx' -o -iname '*.mobileprovision' -o -iname '*provisionprofile*' -o -iname '*x86_64*' -o -iname '*rosetta*' \) -print -quit)" ]] || fail "Forbidden source, map, log, cache, repository, private key, provisioning, Intel, or Rosetta artifact in bundle"
 [[ -z "$(rg -a -l -e '/Users/' -e '/home/' -e '/private/var/folders/' "${app_bundle}" 2>/dev/null || true)" ]] || fail "Personal absolute path found in bundle"
 
-workflow_root="${app_bundle}/Contents/Resources/Sign PDFs with Autogram.workflow/Contents"
-plutil -lint "${workflow_root}/Info.plist" >/dev/null
-plutil -lint "${workflow_root}/document.wflow" >/dev/null
-
 managed_workflow="${app_bundle}/Contents/Resources/Sign PDFs Autogram.workflow/Contents"
-[[ "$(cat "${managed_workflow}/Resources/managed-version")" == "1" ]] || fail "Managed workflow version is invalid"
+[[ "$(cat "${managed_workflow}/Resources/managed-version")" == "2" ]] || fail "Managed workflow version is invalid"
 plutil -lint "${managed_workflow}/Info.plist" >/dev/null
 plutil -lint "${managed_workflow}/document.wflow" >/dev/null
 [[ -x "${managed_workflow}/Resources/autogram-quick-action.sh" ]] || fail "Managed workflow launcher is not executable"
@@ -129,6 +127,7 @@ plutil -lint "${managed_workflow}/document.wflow" >/dev/null
 bash -n "${managed_workflow}/Resources/autogram-quick-action.sh"
 bash -n "${managed_workflow}/Resources/autogram-cli-sign.sh"
 [[ -z "$(rg -a -l -e '/Users/' -e 'Intel' -e 'Rosetta' "${managed_workflow}" 2>/dev/null || true)" ]] || fail "Managed workflow contains a personal path, Intel, or Rosetta text"
+[[ -z "$(rg -a -l -e 'AUTOGRAM_NATIVE_BIN' -e 'AUTOGRAM_JSON_PYTHON' -e 'build/native' -e 'python3' "${managed_workflow}" 2>/dev/null || true)" ]] || fail "Managed workflow contains a development override, build fallback, or Python dependency"
 
 capabilities_response="$(printf '%s' '{"protocolVersion":1,"requestId":"native-release-audit","operation":"CAPABILITIES","payload":{}}' | "${helper_executable}" --cli --machine-readable --protocol-version 1 --operation CAPABILITIES)"
 CAPABILITIES_RESPONSE="${capabilities_response}" python3 - <<'PY'

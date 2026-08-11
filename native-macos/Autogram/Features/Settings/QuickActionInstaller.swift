@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import Observation
 
 struct QuickActionInstaller {
     static let workflowName = "Sign PDFs Autogram.workflow"
@@ -96,6 +97,9 @@ struct QuickActionInstaller {
 
     private func workflowSourceURL() throws -> URL {
         if let bundledWorkflowURL {
+            guard fileManager.fileExists(atPath: bundledWorkflowURL.path) else {
+                throw QuickActionInstallerError.missingBundledWorkflow
+            }
             return bundledWorkflowURL
         }
         guard let url = Bundle.main.url(forResource: "Sign PDFs Autogram", withExtension: "workflow") else {
@@ -113,5 +117,23 @@ enum QuickActionInstallerError: LocalizedError {
         case .missingBundledWorkflow:
             return "The Finder Quick Action is unavailable in this app bundle."
         }
+    }
+}
+
+@MainActor @Observable
+final class QuickActionMaintenanceState {
+    private(set) var errorMessage: String?
+
+    func maintain(using installer: QuickActionInstaller) {
+        do {
+            try installer.maintainIfInstalled()
+            errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func clearError() {
+        errorMessage = nil
     }
 }

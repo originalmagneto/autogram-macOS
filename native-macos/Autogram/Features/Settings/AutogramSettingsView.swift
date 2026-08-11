@@ -2,6 +2,7 @@ import SwiftUI
 
 struct AutogramSettingsView: View {
     let workspace: WorkspaceModel
+    let quickActionMaintenance: QuickActionMaintenanceState
     @AppStorage("preferences.outputPolicy") private var outputPolicyRaw = OutputPolicy.signedSuffix.rawValue
     @AppStorage("preferences.destinationBehavior") private var destinationBehaviorRaw = DestinationBehavior.besideSource.rawValue
     @AppStorage("preferences.revealInFinderAfterSigning") private var revealInFinderAfterSigning = true
@@ -108,11 +109,15 @@ struct AutogramSettingsView: View {
                 Text("The Finder Quick Action directly signs one or more selected PDFs. It prompts for a card, certificate, and PIN without opening the workspace.")
                     .foregroundStyle(.secondary)
                 LabeledContent("Signing helper", value: quickActionHelperStatus)
-                LabeledContent("I.CA SecureStore", value: "8.3.1 or later required")
+                LabeledContent("I.CA SecureStore", value: secureStoreStatus)
                 LabeledContent("eID middleware", value: eIDMiddlewareStatus)
                 LabeledContent("eID requirement", value: "ARM64 libPkcs11.dylib required")
                 LabeledContent("Quick Action version", value: quickActionStatus.finderStatusText)
                 quickActionControls
+                if let maintenanceError = quickActionMaintenance.errorMessage {
+                    Text("Automatic Quick Action maintenance needs repair: \(maintenanceError)")
+                        .foregroundStyle(.secondary)
+                }
                 if quickActionStatus == .updateRequired {
                     Text("Update to install the Quick Action bundled with this version of Autogram macOS.")
                         .foregroundStyle(.secondary)
@@ -185,6 +190,7 @@ struct AutogramSettingsView: View {
     private func updateQuickAction(_ action: () throws -> Void) {
         do {
             try action()
+            quickActionMaintenance.clearError()
             quickActionStatus = quickActionInstaller.status
             hasLegacyCLIQuickAction = quickActionInstaller.hasLegacyCLIWorkflow
         } catch {
@@ -433,6 +439,22 @@ struct AutogramSettingsView: View {
                 driver.displayName.localizedCaseInsensitiveContains("eID")
         }
         return hasEIDMiddleware ? "Detected" : "Not detected"
+    }
+
+    private var secureStoreStatus: String {
+        if workspace.isLoadingSigningEnvironment {
+            return "Checking"
+        }
+        if workspace.credentialError != nil || workspace.signingEnvironment == nil {
+            return "Unavailable"
+        }
+        guard let driver = workspace.availableDrivers.first(where: secureStoreIdentifier) else {
+            return "Not detected. 8.3.1 or later required"
+        }
+        if let version = driver.middlewareVersion, !version.isEmpty {
+            return "Detected, reported version \(version). 8.3.1 or later required"
+        }
+        return "Detected. 8.3.1 or later required. Version not verified"
     }
 
     private var connectedCardDescription: String {

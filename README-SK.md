@@ -114,16 +114,16 @@ Vyžaduje kompatibilný arm64 alebo universal PKCS#11 middleware. Pre I.CA kartu
 2. Vyber **Install Finder Quick Action**.
 3. Ak treba, zapni rozšírenie v **System Settings > General > Login Items & Extensions > Finder Extensions**.
 4. Vo Finderi označ jedno alebo viac PDF.
-5. Vyber **Quick Actions > Sign with Autogram macOS**.
+5. Vyber **Quick Actions > Sign PDFs Autogram**.
 
 Settings zobrazuje, či je pribalená verzia akcie aktuálna. Predtým nainštalovaná spravovaná akcia sa po aktualizácii aplikácie aktualizuje. Settings ponúka aj ovládanie Update, Reinstall a Remove. Odstránenie zabráni automatickej opätovnej inštalácii, kým znova nezvolíš Install.
 
-Quick Action neposiela PIN do skriptu. Starší samostatný CLI workflow je popísaný v [macOS CLI automation](docs/macos-cli-automation.md).
+PIN sa prenáša iba v pamäti skriptu a cez štandardný vstup, nikdy sa neukladá ani sa nedáva do argumentov, premenných prostredia alebo logov. Starší samostatný CLI workflow je popísaný v [macOS CLI automation](docs/macos-cli-automation.md).
 
 ## Bezpečnosť a súkromie
 
 - PIN existuje iba počas aktuálnej operácie.
-- Helper dostane PIN cez štandardný vstup, nie cez argumenty alebo premenné prostredia.
+- PIN sa prenáša iba v pamäti skriptu a cez štandardný vstup, nikdy sa neukladá ani sa nedáva do argumentov, premenných prostredia alebo logov.
 - PIN ani prihlasovacie údaje TSA sa neukladajú v otvorenom texte.
 - Diagnostika neobsahuje obsah dokumentov ani tajné údaje.
 - Zdrojové dokumenty sa neprepisujú.

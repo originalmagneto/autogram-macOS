@@ -10,6 +10,7 @@ enum AppIdentity {
 @main
 struct AutogramApp: App {
     @State private var workspace: WorkspaceModel
+    @State private var quickActionMaintenance: QuickActionMaintenanceState
     @NSApplicationDelegateAdaptor(OpenDocumentAppDelegate.self) private var appDelegate
 
     init() {
@@ -18,8 +19,10 @@ struct AutogramApp: App {
             engine: dependencies.engine,
             fixtureMode: dependencies.fixtureMode
         ))
+        let quickActionMaintenance = QuickActionMaintenanceState()
         let quickActionInstaller = QuickActionInstaller()
-        try? quickActionInstaller.maintainIfInstalled()
+        quickActionMaintenance.maintain(using: quickActionInstaller)
+        _quickActionMaintenance = State(initialValue: quickActionMaintenance)
     }
 
     var body: some Scene {
@@ -39,7 +42,7 @@ struct AutogramApp: App {
         }
 
         Settings {
-            AutogramSettingsView(workspace: workspace)
+            AutogramSettingsView(workspace: workspace, quickActionMaintenance: quickActionMaintenance)
         }
     }
 }

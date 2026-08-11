@@ -149,11 +149,11 @@ Compatible arm64 or universal PKCS#11 middleware is required. I.CA cards require
 2. Choose **Install Finder Quick Action**.
 3. If required, enable the action under **System Settings > General > Login Items & Extensions > Finder Extensions**.
 4. Select one or more supported files in Finder.
-5. Control-click one or more PDFs and choose **Quick Actions > Sign with Autogram macOS**.
+5. Control-click one or more PDFs and choose **Quick Actions > Sign PDFs Autogram**.
 
 Settings shows whether the bundled action is current. A previously installed managed action is updated after an app update, and Settings also offers Update, Reinstall, and Remove controls. Removing it prevents automatic reinstallation until you choose Install again.
 
-The action does not expose the PIN in a script. Detailed setup and troubleshooting are in the [installation guide](docs/native-macos-installation.md).
+The PIN remains only in script memory and passes through standard input. It is never persisted or placed in arguments, environment variables, or logs. Detailed setup and troubleshooting are in the [installation guide](docs/native-macos-installation.md).
 
 The repository also includes the older standalone CLI Quick Action. Its separate requirements and installation are documented in [macOS CLI automation](docs/macos-cli-automation.md).
 

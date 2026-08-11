@@ -146,6 +146,23 @@ import Testing
         #expect(installer.status == .notInstalled)
     }
 }
+
+@Test @MainActor func maintenanceFailureRemainsAvailableForSettings() throws {
+    try withQuickActionDirectories { _, services in
+        try writeManagedVersion("1", to: installedWorkflow(in: services))
+        let missingBundledWorkflow = services.appending(path: "missing.workflow", directoryHint: .isDirectory)
+        let installer = QuickActionInstaller(
+            fileManager: .default,
+            servicesURL: services,
+            bundledWorkflowURL: missingBundledWorkflow
+        )
+        let maintenance = QuickActionMaintenanceState()
+
+        maintenance.maintain(using: installer)
+
+        #expect(maintenance.errorMessage == QuickActionInstallerError.missingBundledWorkflow.errorDescription)
+    }
+}
 }
 
 private func withQuickActionDirectories(

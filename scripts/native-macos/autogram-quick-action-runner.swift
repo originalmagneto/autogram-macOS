@@ -1,0 +1,237 @@
+import Foundation
+
+enum QuickActionRunnerError: LocalizedError {
+    case invalidArguments(String)
+    case missingHelper
+    case invalidPIN
+    case machineRequestFailed
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidArguments(let message): message
+        case .missingHelper: "Autogram macOS helper was not found."
+        case .invalidPIN: "The signing PIN could not be read."
+        case .machineRequestFailed: "Autogram macOS signing helper did not complete the request."
+        }
+    }
+}
+
+struct QuickActionRequest {
+    enum Operation: String {
+        case certificates = "CERTIFICATES"
+        case sign = "SIGN"
+    }
+
+    let operation: Operation
+    let driver: String
+    let certificate: String?
+    let source: String?
+    let target: String?
+    let signatureLevel: String?
+    let timestampServer: String?
+
+    private init(
+        operation: Operation,
+        driver: String,
+        certificate: String?,
+        source: String?,
+        target: String?,
+        signatureLevel: String?,
+        timestampServer: String?
+    ) {
+        self.operation = operation
+        self.driver = driver
+        self.certificate = certificate
+        self.source = source
+        self.target = target
+        self.signatureLevel = signatureLevel
+        self.timestampServer = timestampServer
+    }
+
+    init(arguments: [String]) throws {
+        var values: [String: String] = [:]
+        var index = 0
+        while index < arguments.count {
+            let argument = arguments[index]
+            guard argument.hasPrefix("--") else {
+                throw QuickActionRunnerError.invalidArguments("Unsupported option: \(argument)")
+            }
+            guard argument == "--pin-stdin" else {
+                guard index + 1 < arguments.count else {
+                    throw QuickActionRunnerError.invalidArguments("Missing value for \(argument)")
+                }
+                values[argument] = arguments[index + 1]
+                index += 2
+                continue
+            }
+            values[argument] = "true"
+            index += 1
+        }
+
+        guard values["--pin-stdin"] == "true",
+              let operationValue = values["--operation"],
+              let operation = Operation(rawValue: operationValue),
+              let driver = values["--driver"], !driver.isEmpty
+        else {
+            throw QuickActionRunnerError.invalidArguments("A machine operation, signing driver, and PIN on standard input are required.")
+        }
+
+        switch operation {
+        case .certificates:
+            self = QuickActionRequest(
+                operation: operation,
+                driver: driver,
+                certificate: nil,
+                source: nil,
+                target: nil,
+                signatureLevel: nil,
+                timestampServer: nil
+            )
+        case .sign:
+            guard let certificate = values["--certificate"], !certificate.isEmpty,
+                  let source = values["--source"], !source.isEmpty,
+                  let target = values["--target"], !target.isEmpty,
+                  let signatureLevel = values["--signature-level"], !signatureLevel.isEmpty,
+                  let timestampServer = values["--tsa-server"], !timestampServer.isEmpty
+            else {
+                throw QuickActionRunnerError.invalidArguments("Certificate, source, target, signature level, and timestamp server are required for signing.")
+            }
+            self = QuickActionRequest(
+                operation: operation,
+                driver: driver,
+                certificate: certificate,
+                source: source,
+                target: target,
+                signatureLevel: signatureLevel,
+                timestampServer: timestampServer
+            )
+        }
+    }
+}
+
+@main
+struct AutogramQuickActionRunner {
+    static func main() {
+        do {
+            let request = try QuickActionRequest(arguments: Array(CommandLine.arguments.dropFirst()))
+            let result = try run(request)
+            if request.operation == .certificates {
+                writeCertificateList(from: result.standardOutput)
+            } else {
+                FileHandle.standardOutput.write(result.standardOutput)
+            }
+            FileHandle.standardError.write(result.standardError)
+            guard completedSuccessfully(result.standardOutput) else {
+                throw QuickActionRunnerError.machineRequestFailed
+            }
+        } catch {
+            FileHandle.standardError.write(Data("\(error.localizedDescription)\n".utf8))
+            exit(1)
+        }
+    }
+
+    private static func run(_ request: QuickActionRequest) throws -> (standardOutput: Data, standardError: Data) {
+        var pin = try readPIN()
+        defer { pin.removeAll(keepingCapacity: false) }
+        var machineRequest = try requestData(for: request, pin: pin)
+        defer { machineRequest.removeAll(keepingCapacity: false) }
+
+        let process = Process()
+        process.executableURL = try helperURL()
+        process.arguments = [
+            "--cli",
+            "--machine-readable",
+            "--protocol-version", "1",
+            "--operation", request.operation.rawValue,
+        ]
+
+        let input = Pipe()
+        let output = Pipe()
+        let error = Pipe()
+        process.standardInput = input
+        process.standardOutput = output
+        process.standardError = error
+        try process.run()
+        try input.fileHandleForWriting.write(contentsOf: machineRequest)
+        input.fileHandleForWriting.closeFile()
+
+        let outputData = output.fileHandleForReading.readDataToEndOfFile()
+        let errorData = error.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        return (outputData, errorData)
+    }
+
+    private static func readPIN() throws -> String {
+        let data = FileHandle.standardInput.readDataToEndOfFile()
+        guard var pin = String(data: data, encoding: .utf8) else {
+            throw QuickActionRunnerError.invalidPIN
+        }
+        while pin.last?.isNewline == true {
+            pin.removeLast()
+        }
+        return pin
+    }
+
+    private static func requestData(for request: QuickActionRequest, pin: String) throws -> Data {
+        let payload: [String: Any]
+        switch request.operation {
+        case .certificates:
+            payload = ["driver": request.driver, "pin": pin]
+        case .sign:
+            payload = [
+                "driver": request.driver,
+                "certificateSerial": request.certificate!,
+                "pin": pin,
+                "signatureLevel": request.signatureLevel!,
+                "timestamp": ["required": true, "servers": [request.timestampServer!]],
+                "files": [["id": "file-1", "source": request.source!, "target": request.target!]],
+            ]
+        }
+        return try JSONSerialization.data(withJSONObject: [
+            "protocolVersion": 1,
+            "requestId": "autogram-quick-action",
+            "operation": request.operation.rawValue,
+            "payload": payload,
+        ], options: [])
+    }
+
+    private static func helperURL() throws -> URL {
+        let runnerURL = URL(fileURLWithPath: CommandLine.arguments[0]).resolvingSymlinksInPath()
+        let helper = runnerURL.deletingLastPathComponent().appending(path: "AutogramCLI-arm64")
+        guard FileManager.default.isExecutableFile(atPath: helper.path) else {
+            throw QuickActionRunnerError.missingHelper
+        }
+        return helper
+    }
+
+    private static func completedSuccessfully(_ output: Data) -> Bool {
+        events(in: output).contains { $0["type"] as? String == "session.completed" }
+    }
+
+    private static func writeCertificateList(from output: Data) {
+        for event in events(in: output) where event["type"] as? String == "certificates.available" {
+            guard let payload = event["payload"] as? [String: Any],
+                  let certificates = payload["certificates"] as? [[String: Any]]
+            else { continue }
+            for certificate in certificates {
+                guard let serial = certificate["serial"] as? String, !serial.isEmpty else { continue }
+                let commonName = (certificate["commonName"] as? String ?? "")
+                    .replacingOccurrences(of: "\t", with: " ")
+                    .replacingOccurrences(of: "\n", with: " ")
+                    .replacingOccurrences(of: "\r", with: " ")
+                FileHandle.standardOutput.write(Data("AUTOGRAM_KEY\t\(serial)\t\(commonName)\n".utf8))
+            }
+        }
+    }
+
+    private static func events(in output: Data) -> [[String: Any]] {
+        String(decoding: output, as: UTF8.self)
+            .split(separator: "\n")
+            .compactMap { line in
+                guard let data = line.data(using: .utf8),
+                      let event = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+                else { return nil }
+                return event
+            }
+    }
+}

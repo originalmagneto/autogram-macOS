@@ -63,7 +63,7 @@ assert_clean_bundle() {
     done
 
     [[ ! -d "${app_bundle}/Contents/Helpers" ]] || \
-        [[ "$(find "${app_bundle}/Contents/Helpers" -mindepth 1 -maxdepth 1 -type f ! -name AutogramCLI-arm64 -print -quit)" == "" ]] || \
+        [[ "$(find "${app_bundle}/Contents/Helpers" -mindepth 1 -maxdepth 1 -type f ! -name AutogramCLI-arm64 ! -name AutogramQuickActionRunner-arm64 -print -quit)" == "" ]] || \
         fail "Unexpected helper artifact in bundle"
     [[ -z "$(find "${app_bundle}" \( -iname '*x86_64*' -o -iname '*rosetta*' -o -iname '*.log' -o -iname '*.java' -o -iname '*.swift' -o -iname '*.c' -o -iname '*.h' -o -iname '*cache*' -o -name '.git' -o -name '.hg' -o -name '.svn' -o -iname '*test*' \) -print -quit)" ]] || \
         fail "Forbidden source, test, log, cache, repository, Intel, or Rosetta artifact in bundle"
@@ -123,10 +123,15 @@ clang -arch arm64 -O2 -Wall -Wextra -Werror \
     "${script_dir}/autogram-cli-launcher.c" \
     -o "${app_bundle}/Contents/Helpers/AutogramCLI-arm64"
 chmod 755 "${app_bundle}/Contents/Helpers/AutogramCLI-arm64"
+CLANG_MODULE_CACHE_PATH="${temporary_build_dir}/SwiftModuleCache" swiftc -parse-as-library -target arm64-apple-macosx27.0 -O \
+    "${script_dir}/autogram-quick-action-runner.swift" \
+    -o "${app_bundle}/Contents/Helpers/AutogramQuickActionRunner-arm64"
+chmod 755 "${app_bundle}/Contents/Helpers/AutogramQuickActionRunner-arm64"
 plutil -replace LSMinimumSystemVersion -string 27.0 "${app_bundle}/Contents/Info.plist"
 
 [[ "$(plutil -extract LSMinimumSystemVersion raw "${app_bundle}/Contents/Info.plist")" == "27.0" ]] || fail "Bundle minimum system version must be 27.0"
 [[ -x "${app_bundle}/Contents/MacOS/Autogram" ]] || fail "Native app executable is missing"
 [[ -x "${app_bundle}/Contents/Helpers/AutogramCLI-arm64" ]] || fail "ARM64 CLI helper is missing"
+[[ -x "${app_bundle}/Contents/Helpers/AutogramQuickActionRunner-arm64" ]] || fail "ARM64 Quick Action runner is missing"
 assert_arm64_macho
 assert_clean_bundle

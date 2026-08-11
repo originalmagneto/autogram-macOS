@@ -61,7 +61,7 @@ The Quick Action uses the same signing requirements shown in Settings. Install c
 2. Choose **Install Finder Quick Action**.
 3. If macOS asks, enable it under **System Settings > General > Login Items & Extensions > Finder Extensions**.
 4. Select one or more PDFs in Finder.
-5. Control-click and choose **Quick Actions > Sign with Autogram macOS**.
+5. Control-click and choose **Quick Actions > Sign PDFs Autogram**.
 
 Settings reports whether the installed action matches the version bundled with the app. If a managed action is already installed, Autogram macOS maintains it after an app update. Use Update when Settings reports a newer bundled version, Reinstall to replace the current action manually, or Remove to uninstall it. A removed action stays removed until you choose Install again.
 
@@ -77,8 +77,8 @@ Settings reports whether the installed action matches the version bundled with t
 ## Privacy and credentials
 
 - PIN entry uses a native secure field.
-- The PIN is sent to the bundled helper through standard input.
-- The PIN is cleared after the operation and is not stored in settings, logs, arguments, or environment variables.
+- The PIN remains only in script memory and passes through standard input.
+- The PIN is never persisted or placed in settings, logs, arguments, or environment variables.
 - Imported signature artwork is copied into the application's managed library.
 - Diagnostics exclude private document content and credentials.
 - The application accesses documents explicitly opened by the user or supplied by Finder.

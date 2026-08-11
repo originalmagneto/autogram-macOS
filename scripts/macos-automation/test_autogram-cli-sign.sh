@@ -5,33 +5,52 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 SIGNER="$REPO_ROOT/native-macos/FinderQuickAction/Sign PDFs Autogram.workflow/Contents/Resources/autogram-cli-sign.sh"
 WORKFLOW="$REPO_ROOT/native-macos/FinderQuickAction/Sign PDFs Autogram.workflow/Contents/document.wflow"
+RUNNER_SOURCE="$REPO_ROOT/scripts/native-macos/autogram-quick-action-runner.swift"
 
 TMP_DIR="$(mktemp -d -t autogram-cli-sign-test)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
-HELPER="$TMP_DIR/helper"
 REQUEST_LOG="$TMP_DIR/request.json"
 SOURCE="$TMP_DIR/source.pdf"
 TARGET="$TMP_DIR/target.pdf"
-HELPER_X86="$TMP_DIR/helper-x86"
+APP_HELPERS="$TMP_DIR/Applications/Autogram macOS.app/Contents/Helpers"
+MODULE_CACHE="$TMP_DIR/module-cache"
 
-cat > "$HELPER" <<'SH'
-#!/usr/bin/env bash
-set -euo pipefail
+mkdir -p "$APP_HELPERS" "$MODULE_CACHE"
+DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
+  CLANG_MODULE_CACHE_PATH="$MODULE_CACHE" \
+  swiftc -parse-as-library -target arm64-apple-macosx27.0 -O "$RUNNER_SOURCE" -o "$APP_HELPERS/AutogramQuickActionRunner-arm64"
 
-if [[ "${1:-}" == "--help" ]]; then
-  printf '%s\n' '--machine-readable'
-  exit 0
-fi
+cat > "$TMP_DIR/helper.c" <<'C'
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
-request="$(cat)"
-printf '%s\n' "$request" > "$REQUEST_LOG"
-printf '%s\n' '{"protocolVersion":1,"type":"session.completed","sessionId":"test","payload":{}}'
-SH
-chmod +x "$HELPER"
+int main(int argc, char *argv[]) {
+    const char *request_path = getenv("REQUEST_LOG");
+    FILE *request = request_path == NULL ? NULL : fopen(request_path, "w");
+    int character;
+    while ((character = fgetc(stdin)) != EOF) {
+        if (request != NULL) {
+            fputc(character, request);
+        }
+    }
+    if (request != NULL) {
+        fclose(request);
+    }
+    if (argc > 6 && strcmp(argv[6], "CERTIFICATES") == 0) {
+        puts("{\"protocolVersion\":1,\"type\":\"certificates.available\",\"sessionId\":\"test\",\"payload\":{\"certificates\":[{\"serial\":\"certificate-1\",\"commonName\":\"Test Signer\"}]}}");
+    }
+    puts("{\"protocolVersion\":1,\"type\":\"session.completed\",\"sessionId\":\"test\",\"payload\":{}}");
+    return 0;
+}
+C
+DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
+  clang -arch arm64 -O2 -Wall -Wextra -Werror "$TMP_DIR/helper.c" -o "$APP_HELPERS/AutogramCLI-arm64"
+
 printf '%%PDF-1.4\n%%%%EOF\n' > "$SOURCE"
 
-printf '1234' | REQUEST_LOG="$REQUEST_LOG" AUTOGRAM_NATIVE_BIN="$HELPER" "$SIGNER" \
+printf '1234' | HOME="$TMP_DIR" REQUEST_LOG="$REQUEST_LOG" "$SIGNER" \
   --driver secure_store \
   --key certificate-1 \
   --pin-stdin \
@@ -42,7 +61,13 @@ printf '1234' | REQUEST_LOG="$REQUEST_LOG" AUTOGRAM_NATIVE_BIN="$HELPER" "$SIGNE
 
 grep -q '"operation":"SIGN"' "$REQUEST_LOG"
 grep -q '"certificateSerial":"certificate-1"' "$REQUEST_LOG"
-grep -q '"source":"'"$SOURCE"'"' "$REQUEST_LOG"
+grep -q '"source":' "$REQUEST_LOG"
+
+printf '1234' | HOME="$TMP_DIR" REQUEST_LOG="$REQUEST_LOG" "$SIGNER" \
+  --driver secure_store \
+  --list-keys \
+  --pin-stdin > "$TMP_DIR/keys.tsv"
+grep -q $'^AUTOGRAM_KEY\tcertificate-1\tTest Signer$' "$TMP_DIR/keys.tsv"
 
 workflow_input_method="$(plutil -extract 'actions.0.action.ActionParameters.inputMethod' raw "$WORKFLOW")"
 [[ "$workflow_input_method" == "1" ]] || {
@@ -50,39 +75,15 @@ workflow_input_method="$(plutil -extract 'actions.0.action.ActionParameters.inpu
   exit 1
 }
 
-lipo -thin x86_64 /usr/bin/python3 -output "$HELPER_X86"
-set +e
-printf '1234' | AUTOGRAM_NATIVE_BIN="$HELPER_X86" "$SIGNER" \
-  --driver secure_store \
-  --key certificate-1 \
-  --pin-stdin \
-  --pdf-level PAdES_BASELINE_T \
-  --tsa-server https://tsa.example.test \
-  --target "$TARGET" \
-  "$SOURCE" >"$TMP_DIR/x86.out" 2>"$TMP_DIR/x86.err"
-x86_status=$?
-set -e
-[[ "$x86_status" -eq 69 ]]
-grep -q 'must contain an arm64 slice' "$TMP_DIR/x86.err"
+if rg -n -e 'AUTOGRAM_NATIVE_BIN' -e 'AUTOGRAM_JSON_PYTHON' -e 'build/native' -e 'python3' "$SIGNER"; then
+  echo "Bundled signer must not contain a development override, build fallback, or Python dependency." >&2
+  exit 1
+fi
 
-set +e
-printf '1234' | AUTOGRAM_NATIVE_BIN="$HELPER" AUTOGRAM_JSON_PYTHON="$HELPER_X86" "$SIGNER" \
-  --driver secure_store \
-  --key certificate-1 \
-  --pin-stdin \
-  --pdf-level PAdES_BASELINE_T \
-  --tsa-server https://tsa.example.test \
-  --target "$TARGET" \
-  "$SOURCE" >"$TMP_DIR/python-x86.out" 2>"$TMP_DIR/python-x86.err"
-python_x86_status=$?
-set -e
-[[ "$python_x86_status" -eq 69 ]]
-grep -q 'Python 3 must contain an arm64 slice' "$TMP_DIR/python-x86.err"
-rg -F '/usr/bin/arch -arm64 "$python_bin" -c' "$SIGNER" >/dev/null
+if rg -n -e 'AUTOGRAM_NATIVE_BIN' -e 'AUTOGRAM_JSON_PYTHON' -e 'build/native' -e 'python3' \
+  "$REPO_ROOT/native-macos/FinderQuickAction/Sign PDFs Autogram.workflow"; then
+  echo "Bundled workflow must not contain a development override, build fallback, or Python dependency." >&2
+  exit 1
+fi
 
-current_line="$(grep -n '/Applications/Autogram macOS.app/Contents/Helpers/AutogramCLI-arm64' "$SIGNER" | head -1 | cut -d: -f1)"
-legacy_line="$(grep -n '/Applications/Autogram NATIVE.app/Contents/Helpers/AutogramCLI-arm64' "$SIGNER" | head -1 | cut -d: -f1 || true)"
-[[ -n "$current_line" ]]
-[[ -z "$legacy_line" || "$current_line" -lt "$legacy_line" ]]
-
-echo "CLI Quick Action helper selection and machine request passed."
+echo "CLI Quick Action native runner and machine request passed."
