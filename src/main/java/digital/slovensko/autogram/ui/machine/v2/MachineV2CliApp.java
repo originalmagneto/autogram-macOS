@@ -27,12 +27,21 @@ public final class MachineV2CliApp {
     }
 
     public static int start(CommandLine commandLine, Reader input, PrintWriter output, PrintWriter error) {
-        return start(commandLine, input, output, error, new MachineDriverService(), new MachineInspectionService());
+        return start(commandLine, input, output, error, new MachineDriverService(), new MachineInspectionService(),
+                MachineInspectionService.forTrustedValidation(), new MachineTrustService()::initialize);
     }
 
     static int start(CommandLine commandLine, Reader input, PrintWriter output, PrintWriter error,
             MachineDriverService driverService, MachineInspectionService inspectionService) {
+        return start(commandLine, input, output, error, driverService, inspectionService,
+                MachineInspectionService.forTrustedValidation(), new MachineTrustService()::initialize);
+    }
+
+    static int start(CommandLine commandLine, Reader input, PrintWriter output, PrintWriter error,
+            MachineDriverService driverService, MachineInspectionService inspectionService,
+            MachineInspectionService trustedInspection, Runnable trustInitializer) {
         var writer = new EventWriter(output);
+        var validationSession = new ValidationSession(trustedInspection, trustInitializer);
         try {
             validateCommandLine(commandLine);
         } catch (MachineProtocolException exception) {
@@ -47,7 +56,7 @@ public final class MachineV2CliApp {
                     writer.failed("unknown", "PROTOCOL_INVALID_REQUEST");
                     continue;
                 }
-                handle(line, writer, driverService, inspectionService);
+                handle(line, writer, driverService, inspectionService, validationSession);
             }
         } catch (IOException exception) {
             error.println("Machine protocol v2 input could not be read.");
@@ -58,14 +67,14 @@ public final class MachineV2CliApp {
     }
 
     private static void handle(String line, EventWriter writer, MachineDriverService driverService,
-            MachineInspectionService inspectionService) {
+            MachineInspectionService inspectionService, ValidationSession validationSession) {
         var codec = new MachineV2ProtocolCodec();
         var requestId = MachineV2ProtocolCodec.requestId(line);
         try {
             var request = codec.decodeRequest(line);
             requestId = request.requestId();
             writer.started(requestId);
-            dispatch(request, writer, driverService, inspectionService);
+            dispatch(request, writer, driverService, inspectionService, validationSession);
         } catch (MachineProtocolException exception) {
             writer.failed(requestId, exception.getMessage());
         } catch (Exception exception) {
@@ -74,14 +83,15 @@ public final class MachineV2CliApp {
     }
 
     private static void dispatch(MachineV2Request request, EventWriter writer, MachineDriverService driverService,
-            MachineInspectionService inspectionService) {
+            MachineInspectionService inspectionService, ValidationSession validationSession) {
         switch (request.operation()) {
             case CAPABILITIES -> capabilities(request, writer, driverService);
             case INSPECT -> inspect(request, writer, inspectionService);
             case PREVIEW -> preview(request, writer, inspectionService);
             case CERTIFICATES -> certificates(request, writer, driverService);
             case SIGN -> sign(request, writer);
-            case TIMESTAMP, VALIDATE -> throw new MachineProtocolException("OPERATION_UNAVAILABLE");
+            case VALIDATE -> validate(request, writer, validationSession);
+            case TIMESTAMP -> throw new MachineProtocolException("OPERATION_UNAVAILABLE");
         }
     }
 
@@ -131,6 +141,21 @@ public final class MachineV2CliApp {
             } catch (Exception exception) {
                 var payload = new JsonObject();
                 payload.addProperty("code", "INSPECTION_FAILED");
+                writer.write("file.failed", request.requestId(), file.id(), payload);
+            }
+        }
+        writer.completed(request.requestId(), new JsonObject());
+    }
+
+    private static void validate(MachineV2Request request, EventWriter writer, ValidationSession validationSession) {
+        validationSession.initialize();
+        for (var file : requiredFiles(request.payload())) {
+            try {
+                writer.write("validation.completed", request.requestId(), file.id(),
+                        validationSession.trustedInspection().inspect(java.nio.file.Path.of(file.source())));
+            } catch (Exception exception) {
+                var payload = new JsonObject();
+                payload.addProperty("code", "VALIDATION_FAILED");
                 writer.write("file.failed", request.requestId(), file.id(), payload);
             }
         }
@@ -209,6 +234,28 @@ public final class MachineV2CliApp {
     }
 
     private record MachineFile(String id, String source, String target) {
+    }
+
+    private static final class ValidationSession {
+        private final MachineInspectionService trustedInspection;
+        private final Runnable trustInitializer;
+        private boolean trustedListsInitialized;
+
+        private ValidationSession(MachineInspectionService trustedInspection, Runnable trustInitializer) {
+            this.trustedInspection = trustedInspection;
+            this.trustInitializer = trustInitializer;
+        }
+
+        private void initialize() {
+            if (!trustedListsInitialized) {
+                trustInitializer.run();
+                trustedListsInitialized = true;
+            }
+        }
+
+        private MachineInspectionService trustedInspection() {
+            return trustedInspection;
+        }
     }
 
     private static final class EventWriter {

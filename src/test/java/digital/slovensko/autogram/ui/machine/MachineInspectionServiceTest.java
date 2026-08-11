@@ -4,7 +4,9 @@ import digital.slovensko.autogram.core.UserSettings;
 import eu.europa.esig.dss.enumerations.Indication;
 import eu.europa.esig.dss.enumerations.SignatureLevel;
 import eu.europa.esig.dss.enumerations.SignatureQualification;
+import eu.europa.esig.dss.enumerations.SubIndication;
 import eu.europa.esig.dss.enumerations.TimestampQualification;
+import eu.europa.esig.dss.jaxb.object.Message;
 import eu.europa.esig.dss.simplereport.SimpleReport;
 import eu.europa.esig.dss.simplereport.jaxb.XmlTimestamp;
 import eu.europa.esig.dss.spi.validation.CommonCertificateVerifier;
@@ -71,6 +73,26 @@ class MachineInspectionServiceTest {
         assertArrayEquals(expectedPdf, embedded.content());
         assertThrows(MachineProtocolException.class,
                 () -> service.extractEmbeddedDocument(sample, "missing.pdf"));
+    }
+
+    @Test
+    void mapsDssSubIndicationAndFirstNonblankValidationReason() {
+        var expectedSubIndication = SubIndication.NO_CERTIFICATE_CHAIN_FOUND;
+        var expectedSafeReason = "Certificate chain could not be built";
+        var report = reportWithOneQualifiedTimestamp();
+        when(report.isValid("sig-1")).thenReturn(false);
+        when(report.getIndication("sig-1")).thenReturn(Indication.INDETERMINATE);
+        when(report.getSubIndication("sig-1")).thenReturn(expectedSubIndication);
+        when(report.getAdESValidationErrors("sig-1")).thenReturn(List.of(
+                new Message("blank", "   "),
+                new Message("chain", expectedSafeReason)));
+
+        var signature = new MachineInspectionService(path -> report).inspect(Path.of("signed.pdf"))
+                .getAsJsonArray("signatures").get(0).getAsJsonObject();
+
+        assertEquals("INDETERMINATE", signature.get("indication").getAsString());
+        assertEquals(expectedSubIndication.name(), signature.get("subIndication").getAsString());
+        assertEquals(expectedSafeReason, signature.get("validationReason").getAsString());
     }
 
     @Test

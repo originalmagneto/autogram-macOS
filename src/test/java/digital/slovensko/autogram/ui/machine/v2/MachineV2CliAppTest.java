@@ -3,6 +3,10 @@ package digital.slovensko.autogram.ui.machine.v2;
 import com.google.gson.JsonParser;
 import digital.slovensko.autogram.ui.machine.MachineDriverService;
 import digital.slovensko.autogram.ui.machine.MachineInspectionService;
+import eu.europa.esig.dss.enumerations.Indication;
+import eu.europa.esig.dss.enumerations.SubIndication;
+import eu.europa.esig.dss.jaxb.object.Message;
+import eu.europa.esig.dss.simplereport.SimpleReport;
 import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.Options;
 import org.junit.jupiter.api.Test;
@@ -16,10 +20,13 @@ import java.nio.file.Path;
 import java.util.Base64;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class MachineV2CliAppTest {
     @TempDir
@@ -88,6 +95,43 @@ class MachineV2CliAppTest {
                 preview.getAsJsonObject("payload").get("contentBase64").getAsString()));
         assertEquals("PREVIEW_DOCUMENT_NOT_FOUND", events.get(4).getAsJsonObject("payload").get("code").getAsString());
         assertFalse(output.toString().contains(source.toString()));
+    }
+
+    @Test
+    void validatesWithTrustedDssDetailsAndInitializesTrustedListsOnce() throws Exception {
+        var report = mock(SimpleReport.class);
+        when(report.getSignatureIdList()).thenReturn(List.of("sig-1"));
+        when(report.isValid("sig-1")).thenReturn(false);
+        when(report.getIndication("sig-1")).thenReturn(Indication.INDETERMINATE);
+        when(report.getSubIndication("sig-1")).thenReturn(SubIndication.NO_CERTIFICATE_CHAIN_FOUND);
+        when(report.getAdESValidationErrors("sig-1")).thenReturn(List.of(
+                new Message("chain", "Certificate chain could not be built")));
+        when(report.getSignatureTimestamps("sig-1")).thenReturn(List.of());
+        var trustedInspection = MachineInspectionService.forTrustedValidation(validator -> report);
+        var initializations = new AtomicInteger();
+        var source = Path.of(MachineV2CliAppTest.class.getResource("/digital/slovensko/autogram/sample.pdf").getFile());
+        var input = "{\"protocolVersion\":2,\"requestId\":\"validate-1\",\"operation\":\"VALIDATE\",\"payload\":{\"files\":[{\"id\":\"file-1\",\"source\":\""
+                + source + "\",\"target\":\"/selected/target.pdf\"}]}}\n";
+        var output = new StringWriter();
+
+        var code = MachineV2CliApp.start(commandLine(), new StringReader(input), new PrintWriter(output),
+                new PrintWriter(new StringWriter()), new MachineDriverService(), new MachineInspectionService(),
+                trustedInspection, initializations::incrementAndGet);
+
+        var events = Arrays.stream(output.toString().strip().split("\\n"))
+                .map(JsonParser::parseString)
+                .map(element -> element.getAsJsonObject())
+                .toList();
+        var validation = events.get(1).getAsJsonObject("payload").getAsJsonArray("signatures")
+                .get(0).getAsJsonObject();
+
+        assertEquals(0, code);
+        assertEquals(1, initializations.get());
+        assertEquals(List.of("request.started", "validation.completed", "request.completed"),
+                events.stream().map(event -> event.get("type").getAsString()).toList());
+        assertEquals("INDETERMINATE", validation.get("indication").getAsString());
+        assertEquals("NO_CERTIFICATE_CHAIN_FOUND", validation.get("subIndication").getAsString());
+        assertEquals("Certificate chain could not be built", validation.get("validationReason").getAsString());
     }
 
     private static org.apache.commons.cli.CommandLine commandLine() throws Exception {

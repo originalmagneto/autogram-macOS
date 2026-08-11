@@ -61,7 +61,7 @@ public final class MachineInspectionService {
         return forTrustedValidation(MachineInspectionService::readTrustedReport);
     }
 
-    static MachineInspectionService forTrustedValidation(ValidatorReportReader validatorReportReader) {
+    public static MachineInspectionService forTrustedValidation(ValidatorReportReader validatorReportReader) {
         return new MachineInspectionService(validatorReportReader, true);
     }
 
@@ -346,6 +346,8 @@ public final class MachineInspectionService {
         addDate(signature, "signingTime", report.getSigningTime(signatureId));
         signature.addProperty("valid", report.isValid(signatureId));
         addEnum(signature, "indication", report.getIndication(signatureId));
+        addEnum(signature, "subIndication", report.getSubIndication(signatureId));
+        addString(signature, "validationReason", firstValidationReason(report, signatureId));
         signature.addProperty("qualifiedTimestampValid",
                 timestampQualificationEvaluator.hasValidQualifiedTimestamp(report, signatureId));
 
@@ -362,6 +364,14 @@ public final class MachineInspectionService {
             signature.add("documents", documents);
         }
         return signature;
+    }
+
+    private static String firstValidationReason(SimpleReport report, String signatureId) {
+        return report.getAdESValidationErrors(signatureId).stream()
+                .map(message -> message.getValue())
+                .filter(value -> value != null && !value.isBlank())
+                .findFirst()
+                .orElse(null);
     }
 
     private static JsonObject mapTimestamp(SimpleReport report, String timestampId) {
@@ -409,7 +419,7 @@ public final class MachineInspectionService {
     }
 
     @FunctionalInterface
-    interface ValidatorReportReader {
+    public interface ValidatorReportReader {
         SimpleReport read(SignedDocumentValidator validator);
     }
 
