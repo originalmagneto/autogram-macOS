@@ -17,6 +17,7 @@ import eu.europa.esig.dss.spi.validation.CommonCertificateVerifier;
 import eu.europa.esig.dss.spi.x509.tsp.TimestampToken;
 import eu.europa.esig.dss.validation.SignedDocumentValidator;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Date;
@@ -92,6 +93,23 @@ public final class MachineInspectionService {
             return mergeStructuralIntegrityIfAvailable(trusted, new InMemoryDocument(content));
         }
         return mapReport(byteReportReader.read(content));
+    }
+
+    public EmbeddedDocument extractEmbeddedDocument(Path path, String expectedName) {
+        DSSDocument source = new FileDocument(path.toFile());
+        var validator = documentValidator(source);
+        if (!isAsic(validator)) {
+            throw new MachineProtocolException("PREVIEW_UNSUPPORTED");
+        }
+        return extractedDocuments(source, validator).stream()
+                .filter(document -> expectedName.equals(document.getName()))
+                .findFirst()
+                .map(document -> new EmbeddedDocument(
+                        document.getName(),
+                        document.getMimeType() == null ? "application/octet-stream"
+                                : document.getMimeType().getMimeTypeString(),
+                        readBytes(document)))
+                .orElseThrow(() -> new MachineProtocolException("PREVIEW_DOCUMENT_NOT_FOUND"));
     }
 
     private JsonObject mergeStructuralIntegrityIfAvailable(JsonObject trusted, DSSDocument document) {
@@ -267,10 +285,22 @@ public final class MachineInspectionService {
     }
 
     private static List<String> asicDocuments(DSSDocument document, SignedDocumentValidator validator) {
+        return documentNames(extractedDocuments(document, validator));
+    }
+
+    private static List<DSSDocument> extractedDocuments(DSSDocument document, SignedDocumentValidator validator) {
         if (validator instanceof ASiCContainerWithXAdESValidator) {
-            return documentNames(new ASiCWithXAdESContainerExtractor(document).extract().getSignedDocuments());
+            return new ASiCWithXAdESContainerExtractor(document).extract().getSignedDocuments();
         }
-        return documentNames(new ASiCWithCAdESContainerExtractor(document).extract().getSignedDocuments());
+        return new ASiCWithCAdESContainerExtractor(document).extract().getSignedDocuments();
+    }
+
+    private static byte[] readBytes(DSSDocument document) {
+        try (var stream = document.openStream()) {
+            return stream.readAllBytes();
+        } catch (IOException exception) {
+            throw new MachineProtocolException("PREVIEW_READ_FAILED", exception);
+        }
     }
 
     private static List<String> documentNames(List<DSSDocument> documents) {
@@ -381,6 +411,9 @@ public final class MachineInspectionService {
     @FunctionalInterface
     interface ValidatorReportReader {
         SimpleReport read(SignedDocumentValidator validator);
+    }
+
+    public record EmbeddedDocument(String name, String mediaType, byte[] content) {
     }
 
     private record AsicInspection(SimpleReport report, List<String> documents, Map<String, List<String>> coverage) {

@@ -10,6 +10,7 @@ import eu.europa.esig.dss.simplereport.jaxb.XmlTimestamp;
 import eu.europa.esig.dss.spi.validation.CommonCertificateVerifier;
 import org.junit.jupiter.api.Test;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
@@ -26,6 +27,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -52,6 +54,23 @@ class MachineInspectionServiceTest {
         assertEquals(1, signatures.size());
         assertEquals(List.of("sample.pdf"), signatures.get(0).getAsJsonObject().getAsJsonArray("documents").asList()
                 .stream().map(document -> document.getAsString()).toList());
+    }
+
+    @Test
+    void extractsEmbeddedDocumentFromAsic() throws Exception {
+        var sample = Path.of(MachineInspectionServiceTest.class
+                .getResource("/digital/slovensko/autogram/sample_pdf_xades.asice").getFile());
+        var expectedPdf = Files.readAllBytes(Path.of(MachineInspectionServiceTest.class
+                .getResource("/digital/slovensko/autogram/sample.pdf").getFile()));
+
+        var service = new MachineInspectionService();
+        var embedded = service.extractEmbeddedDocument(sample, "sample.pdf");
+
+        assertEquals("sample.pdf", embedded.name());
+        assertEquals("application/pdf", embedded.mediaType());
+        assertArrayEquals(expectedPdf, embedded.content());
+        assertThrows(MachineProtocolException.class,
+                () -> service.extractEmbeddedDocument(sample, "missing.pdf"));
     }
 
     @Test

@@ -19,6 +19,7 @@ import java.io.StringWriter;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.List;
 
 public final class MachineV2CliApp {
@@ -77,6 +78,7 @@ public final class MachineV2CliApp {
         switch (request.operation()) {
             case CAPABILITIES -> capabilities(request, writer, driverService);
             case INSPECT -> inspect(request, writer, inspectionService);
+            case PREVIEW -> preview(request, writer, inspectionService);
             case CERTIFICATES -> certificates(request, writer, driverService);
             case SIGN -> sign(request, writer);
             case TIMESTAMP, VALIDATE -> throw new MachineProtocolException("OPERATION_UNAVAILABLE");
@@ -132,6 +134,21 @@ public final class MachineV2CliApp {
                 writer.write("file.failed", request.requestId(), file.id(), payload);
             }
         }
+        writer.completed(request.requestId(), new JsonObject());
+    }
+
+    private static void preview(MachineV2Request request, EventWriter writer, MachineInspectionService inspectionService) {
+        var payload = request.payload();
+        if (payload.size() != 2 || !isNonBlankString(payload.get("source")) || !isNonBlankString(payload.get("document"))) {
+            throw new MachineProtocolException("PROTOCOL_INVALID_REQUEST");
+        }
+        var document = inspectionService.extractEmbeddedDocument(java.nio.file.Path.of(payload.get("source").getAsString()),
+                payload.get("document").getAsString());
+        var preview = new JsonObject();
+        preview.addProperty("name", document.name());
+        preview.addProperty("mediaType", document.mediaType());
+        preview.addProperty("contentBase64", Base64.getEncoder().encodeToString(document.content()));
+        writer.write("preview.completed", request.requestId(), null, preview);
         writer.completed(request.requestId(), new JsonObject());
     }
 

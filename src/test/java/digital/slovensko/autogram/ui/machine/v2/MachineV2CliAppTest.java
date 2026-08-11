@@ -13,10 +13,13 @@ import java.io.StringReader;
 import java.io.StringWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Base64;
 import java.util.Arrays;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 class MachineV2CliAppTest {
     @TempDir
@@ -50,6 +53,41 @@ class MachineV2CliAppTest {
         assertEquals(1, terminalEvents.stream()
                 .filter(event -> "inspect-1".equals(event.get("requestId").getAsString())).count());
         assertEquals("PROTOCOL_INVALID_REQUEST", terminalEvents.get(2).getAsJsonObject("payload").get("code").getAsString());
+    }
+
+    @Test
+    void previewsEmbeddedAsicDocumentAndRedactsSourceForUnknownName() throws Exception {
+        var source = Path.of(MachineV2CliAppTest.class
+                .getResource("/digital/slovensko/autogram/sample_pdf_xades.asice").getFile());
+        var expectedPdf = Files.readAllBytes(Path.of(MachineV2CliAppTest.class
+                .getResource("/digital/slovensko/autogram/sample.pdf").getFile()));
+        var input = "{\"protocolVersion\":2,\"requestId\":\"preview-1\",\"operation\":\"PREVIEW\",\"payload\":{\"source\":\""
+                + source + "\",\"document\":\"sample.pdf\"}}\n"
+                + "{\"protocolVersion\":2,\"requestId\":\"preview-missing\",\"operation\":\"PREVIEW\",\"payload\":{\"source\":\""
+                + source + "\",\"document\":\"missing.pdf\"}}\n";
+        var output = new StringWriter();
+
+        var code = MachineV2CliApp.start(commandLine(), new StringReader(input), new PrintWriter(output),
+                new PrintWriter(new StringWriter()), new MachineDriverService(), new MachineInspectionService());
+
+        var events = Arrays.stream(output.toString().strip().split("\\n"))
+                .map(JsonParser::parseString)
+                .map(element -> element.getAsJsonObject())
+                .toList();
+        var preview = events.stream()
+                .filter(event -> "preview.completed".equals(event.get("type").getAsString()))
+                .findFirst()
+                .orElseThrow();
+
+        assertEquals(0, code);
+        assertEquals(List.of("request.started", "preview.completed", "request.completed", "request.started", "request.failed"),
+                events.stream().map(event -> event.get("type").getAsString()).toList());
+        assertEquals("sample.pdf", preview.getAsJsonObject("payload").get("name").getAsString());
+        assertEquals("application/pdf", preview.getAsJsonObject("payload").get("mediaType").getAsString());
+        assertArrayEquals(expectedPdf, Base64.getDecoder().decode(
+                preview.getAsJsonObject("payload").get("contentBase64").getAsString()));
+        assertEquals("PREVIEW_DOCUMENT_NOT_FOUND", events.get(4).getAsJsonObject("payload").get("code").getAsString());
+        assertFalse(output.toString().contains(source.toString()));
     }
 
     private static org.apache.commons.cli.CommandLine commandLine() throws Exception {

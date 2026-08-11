@@ -104,6 +104,7 @@ record MachineV2Event(int protocolVersion, String requestId, String type, String
 enum MachineV2Operation {
     CAPABILITIES,
     INSPECT,
+    PREVIEW,
     CERTIFICATES,
     SIGN,
     TIMESTAMP,
