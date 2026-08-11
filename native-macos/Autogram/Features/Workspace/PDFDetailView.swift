@@ -30,6 +30,12 @@ struct PDFDetailView: View {
                 }
             }
             .navigationTitle(item.descriptor.redactedDisplayName)
+            .onAppear {
+                workspace.updateVisibleSignatureDocument()
+            }
+            .onChange(of: item.descriptor.sourceURL) {
+                workspace.updateVisibleSignatureDocument()
+            }
         } else {
             ContentUnavailableView {
                 Label("No PDF Selected", systemImage: "doc.richtext")

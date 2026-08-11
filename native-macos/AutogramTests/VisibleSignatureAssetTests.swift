@@ -68,6 +68,29 @@ import Testing
     }
 }
 
+@Test func renderedCardUsesTransparentCanvasAndGreenSigningStatusCue() throws {
+    try withTemporaryDirectory { directory in
+        let fixturePNG = directory.appending(path: "fixture.png")
+        try transparentFixturePNG().write(to: fixturePNG)
+        let store = SignatureAssetStore(applicationSupportRoot: directory.appending(path: "Application Support"))
+        let asset = try store.importPNG(fixturePNG)
+        let renderer = VisibleSignatureRenderer(
+            assetStore: store,
+            cacheRoot: directory.appending(path: "Caches")
+        )
+
+        let output = try renderer.render(
+            asset: asset,
+            content: .init(signerName: "Test Signer", certificateQualification: "Qualified certificate"),
+            signingTime: .now,
+            rotationDegrees: 0
+        )
+
+        #expect(try cornerPixelsAreTransparent(output))
+        #expect(try pngContainsGreenStatusPixels(output))
+    }
+}
+
 private func writeSelectedPageFixturePDF(to url: URL) throws {
     var mediaBox = CGRect(x: 0, y: 0, width: 200, height: 100)
     guard let context = CGContext(url as CFURL, mediaBox: &mediaBox, nil) else {
@@ -132,6 +155,26 @@ private func cornerPixelsAreTransparent(_ url: URL) throws -> Bool {
     return corners.allSatisfy { x, y in
         bitmap.colorAt(x: x, y: y)?.alphaComponent == 0
     }
+}
+
+private func pngContainsGreenStatusPixels(_ url: URL) throws -> Bool {
+    guard let image = NSImage(contentsOf: url),
+          let tiff = image.tiffRepresentation,
+          let bitmap = NSBitmapImageRep(data: tiff) else {
+        throw FixtureError.unableToReadPNG
+    }
+    for x in stride(from: 0, to: bitmap.pixelsWide, by: 4) {
+        for y in stride(from: 0, to: bitmap.pixelsHigh, by: 4) {
+            guard let color = bitmap.colorAt(x: x, y: y) else { continue }
+            if color.greenComponent > 0.4,
+               color.greenComponent > color.redComponent * 1.2,
+               color.greenComponent > color.blueComponent * 1.1,
+               color.alphaComponent > 0.8 {
+                return true
+            }
+        }
+    }
+    return false
 }
 
 private enum FixtureError: Error {

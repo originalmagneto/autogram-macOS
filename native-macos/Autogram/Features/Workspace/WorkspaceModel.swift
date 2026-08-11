@@ -12,6 +12,7 @@ final class WorkspaceModel {
     var visibleSignatureAsset: SignatureAsset?
     var visibleSignatureEnabled = false
     var visibleSignaturePlacement: VisibleSignaturePlacement?
+    private(set) var visibleSignaturePageCount = 0
     private(set) var visibleSignatureCardContent: VisibleSignatureCardContent?
     private(set) var visibleSignatureCardPreview: NSImage?
     private(set) var availableDrivers: [SigningDriver] = []
@@ -51,6 +52,7 @@ final class WorkspaceModel {
         rememberedTokens = certificateDefaultStore.rememberedTokens
         self.selection = items.first?.id
         restoreVisibleSignaturePreferences()
+        updateVisibleSignatureDocument()
         self.coordinator = SigningCoordinator(engine: engine, workspace: self)
     }
 
@@ -172,6 +174,7 @@ final class WorkspaceModel {
             certificateDefaultStore.remember(discovery.token)
             refreshRememberedTokens()
             discoveredCertificates = discovery.certificates
+            refreshVisibleSignatureArtworkPreview()
         } catch {
             isLoadingCertificates = false
             signingActivityPhase = nil
@@ -253,6 +256,7 @@ final class WorkspaceModel {
                 return .failed
             }
             discoveredCertificates = discovery.certificates
+            refreshVisibleSignatureArtworkPreview()
             return .certificateSelectionRequired
         } catch {
             credentialError = error.localizedDescription
@@ -315,6 +319,7 @@ final class WorkspaceModel {
         } else if selection == nil {
             self.selection = items.first?.id
         }
+        updateVisibleSignatureDocument()
     }
 
     func configureVisibleAppearance(asset: SignatureAsset?, enabled: Bool, placement: VisibleSignaturePlacement?) {
@@ -340,7 +345,11 @@ final class WorkspaceModel {
         visibleSignatureAsset = asset
         refreshVisibleSignatureArtworkPreview()
         if visibleSignaturePlacement == nil {
-            visibleSignaturePlacement = VisibleSignaturePlacement(pageIndex: 0, pageRect: .zero, rotationDegrees: 0)
+            visibleSignaturePlacement = VisibleSignaturePlacement(
+                pageIndex: max(visibleSignaturePageCount - 1, 0),
+                pageRect: .zero,
+                rotationDegrees: 0
+            )
         }
         persistVisibleSignaturePreferences()
     }
@@ -360,6 +369,32 @@ final class WorkspaceModel {
     func updateVisibleSignaturePlacement(_ placement: VisibleSignaturePlacement?) {
         visibleSignaturePlacement = placement
         persistVisibleSignaturePreferences()
+    }
+
+    var visibleSignaturePageIndices: [Int] {
+        Array(0..<visibleSignaturePageCount)
+    }
+
+    func selectVisibleSignaturePage(_ pageIndex: Int) {
+        guard var placement = visibleSignaturePlacement,
+              visibleSignaturePageCount > 0 else {
+            return
+        }
+        placement.pageIndex = min(max(pageIndex, 0), visibleSignaturePageCount - 1)
+        updateVisibleSignaturePlacement(placement)
+    }
+
+    func updateVisibleSignatureDocument() {
+        guard let selected = items.first(where: { $0.id == selection }), selected.descriptor.isPDF else {
+            visibleSignaturePageCount = 0
+            return
+        }
+        visibleSignaturePageCount = PDFDocument(url: selected.descriptor.sourceURL)?.pageCount ?? 0
+        guard var placement = visibleSignaturePlacement, visibleSignaturePageCount > 0 else { return }
+        let clampedPageIndex = min(max(placement.pageIndex, 0), visibleSignaturePageCount - 1)
+        guard placement.pageIndex != clampedPageIndex else { return }
+        placement.pageIndex = clampedPageIndex
+        updateVisibleSignaturePlacement(placement)
     }
 
     func setVisibleSignatureError(_ error: Error) {
@@ -662,8 +697,28 @@ final class WorkspaceModel {
     }
 
     private func refreshVisibleSignatureArtworkPreview() {
-        visibleSignatureCardContent = nil
-        visibleSignatureCardPreview = visibleSignatureArtworkURL.flatMap(NSImage.init(contentsOf:))
+        guard let asset = visibleSignatureAsset else {
+            visibleSignatureCardContent = nil
+            visibleSignatureCardPreview = nil
+            return
+        }
+        let certificate = discoveredCertificates.first
+        let content = VisibleSignatureCardContent(
+            signerName: certificate?.displayName ?? "Certificate details pending",
+            certificateQualification: certificate?.certificateQualification
+        )
+        visibleSignatureCardContent = content
+        guard let previewURL = try? visibleSignatureRenderer.render(
+            asset: asset,
+            content: content,
+            signingTime: .now,
+            rotationDegrees: 0
+        ) else {
+            visibleSignatureCardPreview = nil
+            return
+        }
+        defer { try? FileManager.default.removeItem(at: previewURL) }
+        visibleSignatureCardPreview = NSImage(contentsOf: previewURL)
     }
 }
 

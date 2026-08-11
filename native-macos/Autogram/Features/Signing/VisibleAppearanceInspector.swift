@@ -31,7 +31,7 @@ struct VisibleAppearanceInspector: View {
                 }
                 .disabled(workspace.visibleSignatureAsset == nil)
             }
-            placementControls
+            pageSelector
             Button("Reset placement") {
                 workspace.resetVisibleSignaturePlacement()
             }
@@ -42,59 +42,16 @@ struct VisibleAppearanceInspector: View {
         }
     }
 
-    private var placementControls: some View {
-        Group {
-            placementField("Page", keyPath: \.pageIndex, offset: 1)
-            placementField("X", keyPath: \.pageRect.origin.x)
-            placementField("Y", keyPath: \.pageRect.origin.y)
-            placementField("Width", keyPath: \.pageRect.size.width)
-            placementField("Height", keyPath: \.pageRect.size.height)
-            placementField("Rotation", keyPath: \.rotationDegrees)
+    private var pageSelector: some View {
+        Picker("Page", selection: Binding(
+            get: { workspace.visibleSignaturePlacement?.pageIndex ?? 0 },
+            set: { workspace.selectVisibleSignaturePage($0) }
+        )) {
+            ForEach(workspace.visibleSignaturePageIndices, id: \.self) { pageIndex in
+                Text("Page \(pageIndex + 1)").tag(pageIndex)
+            }
         }
-        .disabled(workspace.visibleSignaturePlacement == nil)
-    }
-
-    private func placementField(
-        _ title: String,
-        keyPath: WritableKeyPath<VisibleSignaturePlacement, CGFloat>
-    ) -> some View {
-        TextField(title, value: Binding(
-            get: { Double(workspace.visibleSignaturePlacement?[keyPath: keyPath] ?? 0) },
-            set: { value in
-                guard var placement = workspace.visibleSignaturePlacement else { return }
-                placement[keyPath: keyPath] = CGFloat(value)
-                workspace.updateVisibleSignaturePlacement(placement)
-            }
-        ), format: .number)
-    }
-
-    private func placementField(
-        _ title: String,
-        keyPath: WritableKeyPath<VisibleSignaturePlacement, Double>
-    ) -> some View {
-        TextField(title, value: Binding(
-            get: { workspace.visibleSignaturePlacement?[keyPath: keyPath] ?? 0 },
-            set: { value in
-                guard var placement = workspace.visibleSignaturePlacement else { return }
-                placement[keyPath: keyPath] = value
-                workspace.updateVisibleSignaturePlacement(placement)
-            }
-        ), format: .number)
-    }
-
-    private func placementField(
-        _ title: String,
-        keyPath: WritableKeyPath<VisibleSignaturePlacement, Int>,
-        offset: Int
-    ) -> some View {
-        TextField(title, value: Binding(
-            get: { (workspace.visibleSignaturePlacement?[keyPath: keyPath] ?? 0) + offset },
-            set: { value in
-                guard var placement = workspace.visibleSignaturePlacement else { return }
-                placement[keyPath: keyPath] = value - offset
-                workspace.updateVisibleSignaturePlacement(placement)
-            }
-        ), format: .number)
+        .disabled(workspace.visibleSignaturePlacement == nil || workspace.visibleSignaturePageCount == 0)
     }
 
     private func chooseArtwork() {

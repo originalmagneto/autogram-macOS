@@ -121,6 +121,7 @@ import Testing
     )
     let detail = PDFDetailView(item: workspace.items[0], workspace: workspace)
     #expect(detail.cardPreview != nil)
+    #expect(detail.cardPreview?.size == NSSize(width: 420, height: 260))
     detail.visibleSignaturePlacement.wrappedValue = VisibleSignaturePlacement(
         pageIndex: 1,
         pageRect: CGRect(x: 72, y: 144, width: 216, height: 108),
@@ -147,6 +148,50 @@ import Testing
         signerName: "Test Certificate",
         certificateQualification: "QESIG"
     ))
+}
+
+@Test @MainActor func importedVisibleArtworkDefaultsToTheLastPageOfTheSelectedPDF() throws {
+    let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let source = directory.appending(path: "document.pdf")
+    let artwork = directory.appending(path: "artwork.png")
+    try writeWorkspaceFixturePDF(to: source)
+    try workspaceFixturePNG().write(to: artwork)
+    let preferencesSuite = "WorkspaceInspectionTests.\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: preferencesSuite))
+    defer { defaults.removePersistentDomain(forName: preferencesSuite) }
+
+    let workspace = WorkspaceModel(
+        items: [PDFItem(descriptor: PDFItemDescriptor(id: "document", sourceURL: source))],
+        signatureAssetStore: SignatureAssetStore(applicationSupportRoot: directory.appending(path: "Application Support")),
+        defaults: defaults
+    )
+
+    try workspace.importVisibleSignatureArtwork(from: artwork)
+
+    #expect(workspace.visibleSignaturePlacement?.pageIndex == 1)
+}
+
+@Test @MainActor func documentChangeClampsPersistedVisiblePlacementToItsPageRange() throws {
+    let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let source = directory.appending(path: "single-page.pdf")
+    try writeWorkspaceFixturePDF(to: source, pageCount: 1)
+    let preferencesSuite = "WorkspaceInspectionTests.\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: preferencesSuite))
+    defer { defaults.removePersistentDomain(forName: preferencesSuite) }
+    let workspace = WorkspaceModel(defaults: defaults)
+    workspace.configureVisibleAppearance(
+        asset: nil,
+        enabled: false,
+        placement: VisibleSignaturePlacement(pageIndex: 8, pageRect: .zero, rotationDegrees: 0)
+    )
+
+    workspace.setItems([PDFItem(descriptor: PDFItemDescriptor(id: "document", sourceURL: source))])
+
+    #expect(workspace.visibleSignaturePlacement?.pageIndex == 0)
 }
 
 @Test func failedWorkspaceItemDistinguishesInspectionFromSigningFailure() {
@@ -429,15 +474,15 @@ private func workspaceFixturePNG() throws -> Data {
     return png
 }
 
-private func writeWorkspaceFixturePDF(to url: URL) throws {
+private func writeWorkspaceFixturePDF(to url: URL, pageCount: Int = 2) throws {
     var mediaBox = CGRect(x: 0, y: 0, width: 612, height: 792)
     guard let context = CGContext(url as CFURL, mediaBox: &mediaBox, nil) else {
         throw WorkspaceFixtureError.unableToEncodePDF
     }
-    context.beginPDFPage(nil)
-    context.endPDFPage()
-    context.beginPDFPage(nil)
-    context.endPDFPage()
+    for _ in 0..<pageCount {
+        context.beginPDFPage(nil)
+        context.endPDFPage()
+    }
     context.closePDF()
 }
 
