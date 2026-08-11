@@ -106,13 +106,19 @@ Lokálny build používa ad-hoc podpis a nie je notarizovaným verejným release
 
 ## Finder Quick Action
 
+Spravovaný Finder Quick Action priamo podpíše jeden alebo viac vybraných PDF súborov. Vyžiada si podpisovú kartu, certifikát a PIN, potom pri každom zdrojovom PDF vytvorí PAdES Baseline T výstup. Neotvára workspace Autogram macOS ani nevyžaduje Terminal.
+
+Vyžaduje kompatibilný arm64 alebo universal PKCS#11 middleware. Pre I.CA kartu je potrebný SecureStore 8.3.1 alebo novší. Pre slovenský eID je potrebný aktuálny eID klient s arm64 knižnicou `libPkcs11.dylib`.
+
 1. V Autogram macOS otvor **Settings**.
 2. Vyber **Install Finder Quick Action**.
 3. Ak treba, zapni rozšírenie v **System Settings > General > Login Items & Extensions > Finder Extensions**.
-4. Vo Finderi označ podporované súbory.
+4. Vo Finderi označ jedno alebo viac PDF.
 5. Vyber **Quick Actions > Sign with Autogram macOS**.
 
-Quick Action neposiela PIN do skriptu a nepotrebuje Terminal. Starší samostatný CLI workflow je popísaný v [macOS CLI automation](docs/macos-cli-automation.md).
+Settings zobrazuje, či je pribalená verzia akcie aktuálna. Predtým nainštalovaná spravovaná akcia sa po aktualizácii aplikácie aktualizuje. Settings ponúka aj ovládanie Update, Reinstall a Remove. Odstránenie zabráni automatickej opätovnej inštalácii, kým znova nezvolíš Install.
+
+Quick Action neposiela PIN do skriptu. Starší samostatný CLI workflow je popísaný v [macOS CLI automation](docs/macos-cli-automation.md).
 
 ## Bezpečnosť a súkromie
 

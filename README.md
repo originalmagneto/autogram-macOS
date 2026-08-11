@@ -141,15 +141,19 @@ The local signing script applies an ad-hoc signature. It does not provide Apple 
 
 ## Finder Quick Action
 
-The Finder Quick Action is an explicit integration for sending selected documents to Autogram macOS.
+The managed Finder Quick Action directly signs one or more selected PDFs. It prompts for the signing card, certificate, and PIN, then creates PAdES Baseline T output beside each source PDF. It does not open the Autogram macOS workspace or require Terminal interaction.
+
+Compatible arm64 or universal PKCS#11 middleware is required. I.CA cards require SecureStore 8.3.1 or later, and Slovak eID cards require the current eID client with an arm64 `libPkcs11.dylib`.
 
 1. Open Autogram macOS Settings.
 2. Choose **Install Finder Quick Action**.
 3. If required, enable the action under **System Settings > General > Login Items & Extensions > Finder Extensions**.
 4. Select one or more supported files in Finder.
-5. Control-click and choose **Quick Actions > Sign with Autogram macOS**.
+5. Control-click one or more PDFs and choose **Quick Actions > Sign with Autogram macOS**.
 
-The action does not expose the PIN in a script and does not require Terminal interaction. Detailed setup and troubleshooting are in the [installation guide](docs/native-macos-installation.md).
+Settings shows whether the bundled action is current. A previously installed managed action is updated after an app update, and Settings also offers Update, Reinstall, and Remove controls. Removing it prevents automatic reinstallation until you choose Install again.
+
+The action does not expose the PIN in a script. Detailed setup and troubleshooting are in the [installation guide](docs/native-macos-installation.md).
 
 The repository also includes the older standalone CLI Quick Action. Its separate requirements and installation are documented in [macOS CLI automation](docs/macos-cli-automation.md).
 

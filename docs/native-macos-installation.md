@@ -53,15 +53,17 @@ Only public token and certificate identifiers are remembered. The PIN is never s
 
 ## Finder Quick Action
 
-The native Quick Action sends one or more Finder selections to Autogram macOS. It does not invoke Terminal or the JavaFX interface.
+The managed Quick Action directly signs one or more selected PDFs. It prompts for the signing card, certificate, and PIN, and writes a PAdES Baseline T output beside each source PDF. It does not invoke Terminal, the JavaFX interface, or the Autogram macOS workspace.
+
+The Quick Action uses the same signing requirements shown in Settings. Install compatible arm64 or universal PKCS#11 middleware before using it. I.CA cards require SecureStore 8.3.1 or later. Slovak eID cards require the current eID client with an arm64 `libPkcs11.dylib`.
 
 1. Open **Autogram macOS > Settings**.
 2. Choose **Install Finder Quick Action**.
 3. If macOS asks, enable it under **System Settings > General > Login Items & Extensions > Finder Extensions**.
-4. Select one or more supported files in Finder.
+4. Select one or more PDFs in Finder.
 5. Control-click and choose **Quick Actions > Sign with Autogram macOS**.
 
-The newly received file becomes active after loading. Multiple files remain available in the workspace sidebar.
+Settings reports whether the installed action matches the version bundled with the app. If a managed action is already installed, Autogram macOS maintains it after an app update. Use Update when Settings reports a newer bundled version, Reinstall to replace the current action manually, or Remove to uninstall it. A removed action stays removed until you choose Install again.
 
 ## Output behavior
 
@@ -97,7 +99,7 @@ Use the complete Autogram macOS application bundle. A copied Swift executable wi
 
 ### The Finder action is missing
 
-Confirm installation in Autogram Settings, enable the extension in System Settings, and relaunch Finder if its Quick Actions menu has not refreshed.
+Confirm installation in Autogram Settings, enable the extension in System Settings, and relaunch Finder if its Quick Actions menu has not refreshed. If Settings reports an update, choose Update. Use Reinstall if the action is current but Finder still does not show it.
 
 ### Timestamp qualification fails
 
