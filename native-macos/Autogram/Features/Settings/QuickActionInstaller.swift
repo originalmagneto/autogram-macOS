@@ -6,12 +6,9 @@ struct QuickActionInstaller {
     static let legacyCLIWorkflowName = "Sign PDFs with Autogram.workflow"
 
     enum Status: Equatable {
-        case nativeInstalled
-        case legacyCLIInstalled
         case notInstalled
-
-        static let updateRequired = Status.legacyCLIInstalled
-        static let current = Status.nativeInstalled
+        case updateRequired
+        case current
     }
 
     private let fileManager: FileManager
@@ -30,7 +27,7 @@ struct QuickActionInstaller {
     }
 
     var isInstalled: Bool {
-        status == .current
+        fileManager.fileExists(atPath: installedWorkflowURL.path)
     }
 
     var status: Status {
@@ -93,7 +90,8 @@ struct QuickActionInstaller {
         guard let marker = try? String(contentsOf: markerURL, encoding: .utf8) else {
             return nil
         }
-        return marker.trimmingCharacters(in: .whitespacesAndNewlines)
+        let version = marker.trimmingCharacters(in: .whitespacesAndNewlines)
+        return version.isEmpty ? nil : version
     }
 
     private func workflowSourceURL() throws -> URL {

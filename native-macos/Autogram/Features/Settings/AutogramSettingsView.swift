@@ -107,7 +107,7 @@ struct AutogramSettingsView: View {
             Section("Finder") {
                 Text("Install a Quick Action to open one or more selected PDFs in Autogram from Finder.")
                 HStack {
-                    if quickActionStatus == .nativeInstalled {
+                    if quickActionStatus == .current {
                         Button("Remove Finder Quick Action", role: .destructive) {
                             updateQuickAction(quickActionInstaller.remove)
                         }
@@ -418,10 +418,10 @@ struct AutogramSettingsView: View {
 private extension QuickActionInstaller.Status {
     var finderStatusText: String {
         switch self {
-        case .nativeInstalled:
+        case .current:
             "Installed"
-        case .legacyCLIInstalled:
-            "Native action not installed"
+        case .updateRequired:
+            "Update available"
         case .notInstalled:
             "Not installed"
         }

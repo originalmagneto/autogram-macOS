@@ -41,9 +41,58 @@ import Testing
         )
 
         #expect(installer.status == .updateRequired)
+        #expect(installer.isInstalled)
         try installer.maintainIfInstalled()
 
         #expect(installer.status == .current)
+    }
+}
+
+@Test func emptyBundledVersionMarkerRequiresAnUpdate() throws {
+    try withQuickActionDirectories { bundled, services in
+        try writeManagedVersion("   ", to: bundled)
+        try writeManagedVersion("1", to: installedWorkflow(in: services))
+        let installer = QuickActionInstaller(
+            fileManager: .default,
+            servicesURL: services,
+            bundledWorkflowURL: bundled
+        )
+
+        #expect(installer.status == .updateRequired)
+        #expect(installer.isInstalled)
+    }
+}
+
+@Test func emptyInstalledVersionMarkerRequiresAnUpdate() throws {
+    try withQuickActionDirectories { bundled, services in
+        try writeManagedVersion("   ", to: installedWorkflow(in: services))
+        let installer = QuickActionInstaller(
+            fileManager: .default,
+            servicesURL: services,
+            bundledWorkflowURL: bundled
+        )
+
+        #expect(installer.status == .updateRequired)
+        #expect(installer.isInstalled)
+    }
+}
+
+@Test func maintenanceLeavesCurrentWorkflowUntouched() throws {
+    try withQuickActionDirectories { bundled, services in
+        let installed = installedWorkflow(in: services)
+        try writeManagedVersion("1", to: installed)
+        let sentinel = installed.appending(path: "sentinel")
+        try Data("present".utf8).write(to: sentinel)
+        let installer = QuickActionInstaller(
+            fileManager: .default,
+            servicesURL: services,
+            bundledWorkflowURL: bundled
+        )
+
+        try installer.maintainIfInstalled()
+
+        #expect(installer.status == .current)
+        #expect(FileManager.default.fileExists(atPath: sentinel.path))
     }
 }
 
