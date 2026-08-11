@@ -1,14 +1,30 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+has_arm64_slice() {
+  file -Lb "$1" | /usr/bin/grep -q 'arm64'
+}
+
 resolve_helper() {
-  local candidate
+  local candidate file_description
+
+  if [[ -n "${AUTOGRAM_NATIVE_BIN:-}" ]]; then
+    candidate="${AUTOGRAM_NATIVE_BIN}"
+    [[ -x "$candidate" ]] || return 1
+    file_description="$(file -Lb "$candidate")"
+    if [[ "$file_description" == *Mach-O* ]] && ! has_arm64_slice "$candidate"; then
+      echo "Autogram macOS helper must contain an arm64 slice: $candidate" >&2
+      return 1
+    fi
+    printf '%s\n' "$candidate"
+    return 0
+  fi
+
   for candidate in \
-    "${AUTOGRAM_NATIVE_BIN:-}" \
     "/Applications/Autogram macOS.app/Contents/Helpers/AutogramCLI-arm64" \
     "$HOME/Applications/Autogram macOS.app/Contents/Helpers/AutogramCLI-arm64" \
     "$(cd "$(dirname "$0")/../.." && pwd)/build/native/Autogram macOS.app/Contents/Helpers/AutogramCLI-arm64"; do
-    if [[ -n "$candidate" && -x "$candidate" ]]; then
+    if [[ -x "$candidate" ]] && has_arm64_slice "$candidate"; then
       printf '%s\n' "$candidate"
       return 0
     fi
@@ -18,8 +34,19 @@ resolve_helper() {
 
 resolve_python() {
   local candidate
-  for candidate in "${AUTOGRAM_JSON_PYTHON:-}" /usr/bin/python3 /opt/homebrew/bin/python3 /usr/local/bin/python3; do
-    if [[ -n "$candidate" && -x "$candidate" ]]; then
+
+  if [[ -n "${AUTOGRAM_JSON_PYTHON:-}" ]]; then
+    candidate="${AUTOGRAM_JSON_PYTHON}"
+    if [[ ! -x "$candidate" ]] || ! has_arm64_slice "$candidate"; then
+      echo "Python 3 must contain an arm64 slice: $candidate" >&2
+      return 1
+    fi
+    printf '%s\n' "$candidate"
+    return 0
+  fi
+
+  for candidate in /usr/bin/python3 /opt/homebrew/bin/python3 /usr/local/bin/python3; do
+    if [[ -x "$candidate" ]] && has_arm64_slice "$candidate"; then
       printf '%s\n' "$candidate"
       return 0
     fi
@@ -42,7 +69,7 @@ run_machine_request() {
   local operation="$3"
   shift 3
 
-  "$python_bin" -c '
+  /usr/bin/arch -arm64 "$python_bin" -c '
 import json
 import selectors
 import subprocess
@@ -107,7 +134,7 @@ while selector.get_map():
         break
 process.wait()
 raise SystemExit(0 if terminal == "session.completed" else 1)
-' "$helper" "$operation" "$@"
+  ' "$helper" "$operation" "$@"
 }
 
 parse_certificates() {

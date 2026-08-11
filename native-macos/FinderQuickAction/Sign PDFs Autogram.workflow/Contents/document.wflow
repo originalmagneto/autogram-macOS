@@ -17,7 +17,7 @@
                     <string>workflow_resources="$HOME/Library/Services/Sign PDFs Autogram.workflow/Contents/Resources"
 exec "${workflow_resources}/autogram-quick-action.sh" "$@"</string>
                     <key>inputMethod</key>
-                    <integer>0</integer>
+                    <integer>1</integer>
                     <key>shell</key>
                     <string>/bin/bash</string>
                 </dict>

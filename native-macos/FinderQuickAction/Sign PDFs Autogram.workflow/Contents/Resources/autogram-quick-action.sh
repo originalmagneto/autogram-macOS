@@ -176,7 +176,7 @@ if [[ "$key_status" -ne 0 ]] && ! /usr/bin/grep -q $'^AUTOGRAM_KEY\t' "$key_outp
     'Nepodarilo sa načítať podpisové certifikáty. Skontrolujte pripojené úložisko a PIN.' \
     "$key_details")"
   show_alert "Autogram" "$key_message"
-  exit 0
+  exit 1
 fi
 
 declare -a key_selectors=()
@@ -234,7 +234,7 @@ for index in "${!pdfs[@]}"; do
     sign_message="$(printf 'Podpisovanie zlyhalo pri súbore: %s\n\n%s' \
       "${pdfs[$index]}" "$sign_details")"
     show_alert "Autogram" "$sign_message"
-    exit 0
+    exit 1
   fi
 done
 
