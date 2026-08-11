@@ -2,36 +2,48 @@ import AppKit
 import Foundation
 
 struct QuickActionInstaller {
-    static let workflowName = "Sign PDFs with Autogram.workflow"
-    static let legacyCLIWorkflowName = "Sign PDFs Autogram.workflow"
+    static let workflowName = "Sign PDFs Autogram.workflow"
+    static let legacyCLIWorkflowName = "Sign PDFs with Autogram.workflow"
 
-    enum Status {
+    enum Status: Equatable {
         case nativeInstalled
         case legacyCLIInstalled
         case notInstalled
+
+        static let updateRequired = Status.legacyCLIInstalled
+        static let current = Status.nativeInstalled
     }
 
     private let fileManager: FileManager
     private let servicesURL: URL
+    private let bundledWorkflowURL: URL?
 
-    init(fileManager: FileManager = .default, servicesURL: URL? = nil) {
+    init(
+        fileManager: FileManager = .default,
+        servicesURL: URL? = nil,
+        bundledWorkflowURL: URL? = nil
+    ) {
         self.fileManager = fileManager
         self.servicesURL = servicesURL ?? fileManager.urls(for: .libraryDirectory, in: .userDomainMask)[0]
             .appending(path: "Services", directoryHint: .isDirectory)
+        self.bundledWorkflowURL = bundledWorkflowURL
     }
 
     var isInstalled: Bool {
-        status == .nativeInstalled
+        status == .current
     }
 
     var status: Status {
-        if fileManager.fileExists(atPath: installedWorkflowURL.path) {
-            return .nativeInstalled
+        guard fileManager.fileExists(atPath: installedWorkflowURL.path) else {
+            return .notInstalled
         }
-        if fileManager.fileExists(atPath: legacyWorkflowURL.path) {
-            return .legacyCLIInstalled
+        guard let bundledWorkflowURL = try? workflowSourceURL(),
+              let installedVersion = managedVersion(at: installedWorkflowURL),
+              let bundledVersion = managedVersion(at: bundledWorkflowURL)
+        else {
+            return .updateRequired
         }
-        return .notInstalled
+        return installedVersion == bundledVersion ? .current : .updateRequired
     }
 
     var hasLegacyCLIWorkflow: Bool {
@@ -39,12 +51,20 @@ struct QuickActionInstaller {
     }
 
     func install() throws {
-        let sourceURL = try bundledWorkflowURL()
+        let sourceURL = try workflowSourceURL()
         try fileManager.createDirectory(at: servicesURL, withIntermediateDirectories: true)
+        let temporaryWorkflowURL = servicesURL.appending(
+            path: ".\(Self.workflowName).\(UUID().uuidString)",
+            directoryHint: .isDirectory
+        )
+        defer { try? fileManager.removeItem(at: temporaryWorkflowURL) }
+
+        try fileManager.copyItem(at: sourceURL, to: temporaryWorkflowURL)
         if fileManager.fileExists(atPath: installedWorkflowURL.path) {
-            try fileManager.removeItem(at: installedWorkflowURL)
+            _ = try fileManager.replaceItemAt(installedWorkflowURL, withItemAt: temporaryWorkflowURL)
+        } else {
+            try fileManager.moveItem(at: temporaryWorkflowURL, to: installedWorkflowURL)
         }
-        try fileManager.copyItem(at: sourceURL, to: installedWorkflowURL)
         NSUpdateDynamicServices()
     }
 
@@ -52,6 +72,12 @@ struct QuickActionInstaller {
         guard fileManager.fileExists(atPath: installedWorkflowURL.path) else { return }
         try fileManager.removeItem(at: installedWorkflowURL)
         NSUpdateDynamicServices()
+    }
+
+    func maintainIfInstalled() throws {
+        guard status != .notInstalled else { return }
+        guard status == .updateRequired else { return }
+        try install()
     }
 
     private var installedWorkflowURL: URL {
@@ -62,8 +88,19 @@ struct QuickActionInstaller {
         servicesURL.appending(path: Self.legacyCLIWorkflowName, directoryHint: .isDirectory)
     }
 
-    private func bundledWorkflowURL() throws -> URL {
-        guard let url = Bundle.main.url(forResource: "Sign PDFs with Autogram", withExtension: "workflow") else {
+    private func managedVersion(at workflowURL: URL) -> String? {
+        let markerURL = workflowURL.appending(path: "Contents/Resources/managed-version")
+        guard let marker = try? String(contentsOf: markerURL, encoding: .utf8) else {
+            return nil
+        }
+        return marker.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func workflowSourceURL() throws -> URL {
+        if let bundledWorkflowURL {
+            return bundledWorkflowURL
+        }
+        guard let url = Bundle.main.url(forResource: "Sign PDFs Autogram", withExtension: "workflow") else {
             throw QuickActionInstallerError.missingBundledWorkflow
         }
         return url

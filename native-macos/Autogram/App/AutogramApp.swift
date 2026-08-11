@@ -18,6 +18,8 @@ struct AutogramApp: App {
             engine: dependencies.engine,
             fixtureMode: dependencies.fixtureMode
         ))
+        let quickActionInstaller = QuickActionInstaller()
+        try? quickActionInstaller.maintainIfInstalled()
     }
 
     var body: some Scene {
