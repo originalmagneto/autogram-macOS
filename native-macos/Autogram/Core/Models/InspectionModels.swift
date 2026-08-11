@@ -10,6 +10,7 @@ enum SignatureValidationProgress: Sendable, Equatable {
     case provisional
     case validating
     case complete
+    case incomplete(String)
 }
 
 struct PDFInspection: Sendable, Equatable {

@@ -52,6 +52,55 @@ import Testing
     #expect(engine.validationCalls == [[descriptor]])
 }
 
+@Test @MainActor func previewResponseForDeselectedItemIsDiscarded() async throws {
+    let first = PDFItem(descriptor: PDFItemDescriptor(id: "first", sourceURL: URL(fileURLWithPath: "/tmp/first.asice")))
+    let second = PDFItem(descriptor: PDFItemDescriptor(id: "second", sourceURL: URL(fileURLWithPath: "/tmp/second.asice")))
+    let engine = DeferredPreviewEngine()
+    let workspace = WorkspaceModel(engine: engine, items: [first, second])
+
+    let previewTask = Task { await workspace.previewEmbeddedDocument(named: "first.pdf") }
+    await engine.waitForPreviewRequest()
+    workspace.selection = second.id
+    let previewURL = try await engine.completePreview(named: "first.pdf")
+    await previewTask.value
+
+    #expect(workspace.embeddedPreview == nil)
+    #expect(!FileManager.default.fileExists(atPath: previewURL.deletingLastPathComponent().path))
+}
+
+@Test @MainActor func staleValidationCannotReplaceAnItemWithTheSameIDAndNewSource() async {
+    let original = PDFItem(
+        descriptor: PDFItemDescriptor(id: "document", sourceURL: URL(fileURLWithPath: "/tmp/original.pdf"))
+    )
+    let replacement = PDFItem(
+        id: original.id,
+        descriptor: PDFItemDescriptor(id: "document", sourceURL: URL(fileURLWithPath: "/tmp/replacement.pdf"))
+    )
+    let engine = DeferredValidationEngine()
+    let workspace = WorkspaceModel(engine: engine, items: [original])
+
+    let validationTask = Task { await workspace.verifySelectedDocumentAgain() }
+    await engine.waitForValidationRequest()
+    workspace.setItems([replacement])
+    await engine.completeValidation(for: original.descriptor)
+    await validationTask.value
+
+    #expect(workspace.items[0].descriptor == replacement.descriptor)
+    #expect(workspace.items[0].inspection == .pending)
+}
+
+@Test @MainActor func incompleteValidationKeepsAReasonInsteadOfReportingAuthoritativeCompletion() async {
+    let descriptor = PDFItemDescriptor(id: "sample", sourceURL: URL(fileURLWithPath: "/tmp/sample.pdf"))
+    let workspace = WorkspaceModel(
+        engine: IncompleteValidationEngine(),
+        items: [PDFItem(descriptor: descriptor)]
+    )
+
+    await workspace.verifySelectedDocumentAgain()
+
+    #expect(workspace.signatureValidationProgress == .incomplete("Complete validation returned no result for sample.pdf."))
+}
+
 @Test @MainActor func staleAutomaticInspectionCannotOverwriteNewerResult() async {
     let descriptor = PDFItemDescriptor(id: "document", sourceURL: URL(fileURLWithPath: "/tmp/document.pdf"))
     let addedDescriptor = PDFItemDescriptor(id: "added", sourceURL: URL(fileURLWithPath: "/tmp/added.pdf"))
@@ -393,6 +442,140 @@ private final class PreviewAndValidationEngine: SigningEngine, @unchecked Sendab
                 )]
             )
         })]
+    }
+
+    func sign(request: SigningRequest) -> AsyncThrowingStream<SigningEvent, Error> {
+        AsyncThrowingStream { $0.finish() }
+    }
+
+    func cancel() async {}
+
+}
+
+private actor DeferredPreviewEngine: SigningEngine {
+    private var previewContinuation: CheckedContinuation<EmbeddedDocumentPreview, Error>?
+    private var previewRequestWaiter: CheckedContinuation<Void, Never>?
+
+    func capabilities() async throws -> EngineCapabilities {
+        EngineCapabilities(protocolVersion: 2, supportsQualifiedTimestamp: true)
+    }
+
+    func drivers() async throws -> [SigningDriver] { [] }
+
+    func certificates(driverID: String, pin: Secret?) async throws -> [SigningCertificate] { [] }
+
+    func certificateDiscovery(driverID: String, pin: Secret?) async throws -> CertificateDiscovery {
+        CertificateDiscovery(token: SigningToken(tokenKey: "test-token", providerName: "Test Token"), certificates: [])
+    }
+
+    func inspect(files: [PDFItemDescriptor]) async throws -> [PDFInspection] { [] }
+
+    func previewEmbeddedDocument(sourceURL: URL, named: String) async throws -> EmbeddedDocumentPreview {
+        try await withCheckedThrowingContinuation { continuation in
+            previewContinuation = continuation
+            previewRequestWaiter?.resume()
+            previewRequestWaiter = nil
+        }
+    }
+
+    nonisolated func sign(request: SigningRequest) -> AsyncThrowingStream<SigningEvent, Error> {
+        AsyncThrowingStream { $0.finish() }
+    }
+
+    func cancel() async {}
+
+    func waitForPreviewRequest() async {
+        guard previewContinuation == nil else { return }
+        await withCheckedContinuation { previewRequestWaiter = $0 }
+    }
+
+    func completePreview(named: String) throws -> URL {
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let url = directory.appending(path: named)
+        try Data().write(to: url)
+        previewContinuation?.resume(returning: EmbeddedDocumentPreview(
+            displayName: named,
+            mediaType: "application/pdf",
+            url: url
+        ))
+        previewContinuation = nil
+        return url
+    }
+}
+
+private actor DeferredValidationEngine: SigningEngine {
+    private var validationContinuation: CheckedContinuation<[PDFInspection], Error>?
+    private var validationRequestWaiter: CheckedContinuation<Void, Never>?
+
+    func capabilities() async throws -> EngineCapabilities {
+        EngineCapabilities(protocolVersion: 2, supportsQualifiedTimestamp: true)
+    }
+
+    func drivers() async throws -> [SigningDriver] { [] }
+
+    func certificates(driverID: String, pin: Secret?) async throws -> [SigningCertificate] { [] }
+
+    func certificateDiscovery(driverID: String, pin: Secret?) async throws -> CertificateDiscovery {
+        CertificateDiscovery(token: SigningToken(tokenKey: "test-token", providerName: "Test Token"), certificates: [])
+    }
+
+    func inspect(files: [PDFItemDescriptor]) async throws -> [PDFInspection] { [] }
+
+    func validate(files: [PDFItemDescriptor]) async throws -> [PDFInspection] {
+        try await withCheckedThrowingContinuation { continuation in
+            validationContinuation = continuation
+            validationRequestWaiter?.resume()
+            validationRequestWaiter = nil
+        }
+    }
+
+    nonisolated func sign(request: SigningRequest) -> AsyncThrowingStream<SigningEvent, Error> {
+        AsyncThrowingStream { $0.finish() }
+    }
+
+    func cancel() async {}
+
+    func waitForValidationRequest() async {
+        guard validationContinuation == nil else { return }
+        await withCheckedContinuation { validationRequestWaiter = $0 }
+    }
+
+    func completeValidation(for descriptor: PDFItemDescriptor) {
+        validationContinuation?.resume(returning: [PDFInspection(files: [InspectedPDF(
+            id: descriptor.id,
+            isSignable: true,
+            signatures: [ExistingPDFSignature(
+                id: "stale-signature",
+                signerDisplayName: "Stale Result",
+                validationState: .valid,
+                signingTime: nil,
+                format: "PAdES_BASELINE_T",
+                hasQualifiedTimestamp: true
+            )]
+        )])])
+        validationContinuation = nil
+    }
+}
+
+private struct IncompleteValidationEngine: SigningEngine {
+    func capabilities() async throws -> EngineCapabilities {
+        EngineCapabilities(protocolVersion: 2, supportsQualifiedTimestamp: true)
+    }
+
+    func drivers() async throws -> [SigningDriver] { [] }
+
+    func certificates(driverID: String, pin: Secret?) async throws -> [SigningCertificate] { [] }
+
+    func certificateDiscovery(driverID: String, pin: Secret?) async throws -> CertificateDiscovery {
+        CertificateDiscovery(token: SigningToken(tokenKey: "test-token", providerName: "Test Token"), certificates: [])
+    }
+
+    func inspect(files: [PDFItemDescriptor]) async throws -> [PDFInspection] { [] }
+
+    func validate(files: [PDFItemDescriptor]) async throws -> [PDFInspection] {
+        [PDFInspection(files: [])]
     }
 
     func sign(request: SigningRequest) -> AsyncThrowingStream<SigningEvent, Error> {

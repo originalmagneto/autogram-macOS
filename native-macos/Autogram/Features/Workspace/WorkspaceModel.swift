@@ -7,7 +7,12 @@ import UniformTypeIdentifiers
 @MainActor @Observable
 final class WorkspaceModel {
     private(set) var items: [PDFItem] = []
-    var selection: PDFItem.ID?
+    var selection: PDFItem.ID? {
+        didSet {
+            guard selection != oldValue else { return }
+            closeEmbeddedPreview()
+        }
+    }
     var selectedOutputFormat: SigningOutputFormat = .automatic
     var visibleSignatureAsset: SignatureAsset?
     var visibleSignatureEnabled = false
@@ -39,6 +44,7 @@ final class WorkspaceModel {
     @ObservationIgnored private var previewRequestGeneration = 0
     @ObservationIgnored private var embeddedPreviewSourceItemID: PDFItem.ID?
     @ObservationIgnored private var embeddedPreviewDirectory: URL?
+    @ObservationIgnored private var completeValidationTask: Task<Void, Never>?
 
     init(
         engine: any SigningEngine = FakeSigningEngine.launchEngine(),
@@ -103,6 +109,7 @@ final class WorkspaceModel {
         let descriptors = items.map(\.descriptor)
         guard !descriptors.isEmpty else { return }
 
+        cancelCompleteValidation()
         inspectionRequestGeneration += 1
         let requestGeneration = inspectionRequestGeneration
         signingActivityPhase = .inspectingDocuments
@@ -121,19 +128,20 @@ final class WorkspaceModel {
     }
 
     func previewEmbeddedDocument(named name: String) async {
-        guard let selectedItem else { return }
+        guard let item = selectedItem else { return }
         previewRequestGeneration += 1
         let requestGeneration = previewRequestGeneration
         discardEmbeddedPreview()
         do {
-            let preview = try await engine.previewEmbeddedDocument(sourceURL: selectedItem.descriptor.sourceURL, named: name)
+            let preview = try await engine.previewEmbeddedDocument(sourceURL: item.descriptor.sourceURL, named: name)
             guard requestGeneration == previewRequestGeneration,
-                  items.contains(where: { $0.id == selectedItem.id && $0.descriptor == selectedItem.descriptor }) else {
+                  selection == item.id,
+                  items.contains(where: { $0.id == item.id && $0.descriptor == item.descriptor }) else {
                 discardEmbeddedPreviewDirectory(for: preview)
                 return
             }
             embeddedPreview = preview
-            embeddedPreviewSourceItemID = selectedItem.id
+            embeddedPreviewSourceItemID = item.id
             embeddedPreviewDirectory = preview.url.deletingLastPathComponent()
         } catch {
             guard requestGeneration == previewRequestGeneration else { return }
@@ -147,6 +155,7 @@ final class WorkspaceModel {
 
     func verifySelectedDocumentAgain() async {
         guard let selectedItem else { return }
+        cancelCompleteValidation()
         inspectionRequestGeneration += 1
         await completeValidation(for: [selectedItem.descriptor], requestGeneration: inspectionRequestGeneration)
     }
@@ -355,6 +364,7 @@ final class WorkspaceModel {
     }
 
     func setItems(_ items: [PDFItem]) {
+        invalidateCompleteValidation()
         self.items = items
         discardEmbeddedPreviewIfSourceWasRemoved()
         if let selection, !items.contains(where: { $0.id == selection }) {
@@ -457,6 +467,7 @@ final class WorkspaceModel {
     }
 
     func updateSignedOutput(for fileID: String, to outputURL: URL) {
+        invalidateCompleteValidation()
         items = items.map { item in
             guard item.descriptor.id == fileID else { return item }
             return item.updatingDescriptor(to: PDFItemDescriptor(id: fileID, sourceURL: outputURL))
@@ -542,26 +553,36 @@ final class WorkspaceModel {
 
     private func startCompleteValidation(for descriptors: [PDFItemDescriptor], requestGeneration: Int) {
         signatureValidationProgress = .provisional
-        Task { [weak self] in
+        cancelCompleteValidation()
+        completeValidationTask = Task { [weak self] in
             await self?.completeValidation(for: descriptors, requestGeneration: requestGeneration)
         }
     }
 
     private func completeValidation(for descriptors: [PDFItemDescriptor], requestGeneration: Int) async {
-        guard requestGeneration == inspectionRequestGeneration else { return }
+        guard validationRequestIsCurrent(descriptors, requestGeneration: requestGeneration) else { return }
         signatureValidationProgress = .validating
         do {
             let inspections = try await engine.validate(files: descriptors)
-            guard requestGeneration == inspectionRequestGeneration else { return }
-            applyCompleteValidationResults(inspections, for: descriptors)
-            signatureValidationProgress = .complete
+            guard !Task.isCancelled,
+                  validationRequestIsCurrent(descriptors, requestGeneration: requestGeneration) else {
+                return
+            }
+            if applyCompleteValidationResults(inspections, for: descriptors) {
+                signatureValidationProgress = .complete
+            } else {
+                signatureValidationProgress = .incomplete(validationIncompleteReason(for: descriptors))
+            }
         } catch {
-            guard requestGeneration == inspectionRequestGeneration else { return }
-            signatureValidationProgress = .complete
+            guard !Task.isCancelled,
+                  validationRequestIsCurrent(descriptors, requestGeneration: requestGeneration) else {
+                return
+            }
+            signatureValidationProgress = .incomplete(error.localizedDescription)
         }
     }
 
-    private func applyCompleteValidationResults(_ inspections: [PDFInspection], for descriptors: [PDFItemDescriptor]) {
+    private func applyCompleteValidationResults(_ inspections: [PDFInspection], for descriptors: [PDFItemDescriptor]) -> Bool {
         let requestedIDs = Set(descriptors.map(\.id))
         let results = Dictionary(
             inspections.flatMap(\.files)
@@ -569,12 +590,41 @@ final class WorkspaceModel {
                 .map { ($0.id, $0) },
             uniquingKeysWith: { _, latest in latest }
         )
+        guard descriptors.allSatisfy({ descriptor in
+            results[descriptor.id]?.isSignable == true
+        }) else {
+            return false
+        }
         items = items.map { item in
-            guard let result = results[item.descriptor.id] else { return item }
+            guard descriptors.contains(item.descriptor), let result = results[item.descriptor.id] else { return item }
             return item
                 .updatingInspection(to: .completed(result))
                 .updatingStatus(to: .inspected)
         }
+        return true
+    }
+
+    private func validationRequestIsCurrent(_ descriptors: [PDFItemDescriptor], requestGeneration: Int) -> Bool {
+        requestGeneration == inspectionRequestGeneration
+            && descriptors.allSatisfy { descriptor in
+                items.contains(where: { $0.descriptor == descriptor })
+            }
+    }
+
+    private func validationIncompleteReason(for descriptors: [PDFItemDescriptor]) -> String {
+        let names = descriptors.map(\.redactedDisplayName).joined(separator: ", ")
+        return "Complete validation returned no result for \(names)."
+    }
+
+    private func cancelCompleteValidation() {
+        completeValidationTask?.cancel()
+        completeValidationTask = nil
+    }
+
+    private func invalidateCompleteValidation() {
+        cancelCompleteValidation()
+        inspectionRequestGeneration += 1
+        signatureValidationProgress = .provisional
     }
 
     private func discardEmbeddedPreviewIfSourceWasRemoved() {
@@ -632,14 +682,14 @@ final class WorkspaceModel {
         let newItems = validURLs.map {
             PDFItem(descriptor: PDFItemDescriptor(id: UUID().uuidString, sourceURL: $0))
         }
+        guard !newItems.isEmpty else { return false }
+        invalidateCompleteValidation()
         items.append(contentsOf: newItems)
         if selection == nil {
             selection = newItems.first?.id
         }
-        if !newItems.isEmpty {
-            Task { await refreshInspections() }
-        }
-        return !newItems.isEmpty
+        Task { await refreshInspections() }
+        return true
     }
 
     @discardableResult
@@ -652,6 +702,7 @@ final class WorkspaceModel {
     }
 
     func removeItems(atOffsets offsets: IndexSet) {
+        invalidateCompleteValidation()
         items.remove(atOffsets: offsets)
         discardEmbeddedPreviewIfSourceWasRemoved()
         if let selection, !items.contains(where: { $0.id == selection }) {
@@ -665,6 +716,7 @@ final class WorkspaceModel {
     }
 
     deinit {
+        completeValidationTask?.cancel()
         if let embeddedPreviewDirectory {
             try? FileManager.default.removeItem(at: embeddedPreviewDirectory)
         }
