@@ -138,6 +138,10 @@ struct SigningInspector: View {
     @ViewBuilder
     private var signatureInspection: some View {
         if let selectedItem {
+            if workspace.signatureValidationProgress == .validating {
+                ProgressView("Checking trust status")
+            }
+
             switch selectedItem.inspection {
             case .pending:
                 ProgressView("Inspecting signatures")
@@ -155,9 +159,30 @@ struct SigningInspector: View {
                     SignatureDisclosureRow(signature: signature)
                 }
             }
+
+            if case .incomplete(let reason) = workspace.signatureValidationProgress {
+                Label("Validation incomplete", systemImage: "exclamationmark.triangle")
+                    .foregroundStyle(.orange)
+                Text(reason)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            if shouldOfferVerificationRetry(for: selectedItem) {
+                Button("Verify Again") {
+                    Task { await workspace.verifySelectedDocumentAgain() }
+                }
+            }
         } else {
             ContentUnavailableView("No document selected", systemImage: "doc")
         }
+    }
+
+    private func shouldOfferVerificationRetry(for item: PDFItem) -> Bool {
+        if case .incomplete = workspace.signatureValidationProgress {
+            return true
+        }
+        return item.inspection.signatures.contains { $0.validationState == .indeterminate }
     }
 
     private func signatureSummary(for signatures: [ExistingPDFSignature]) -> String {
@@ -207,6 +232,12 @@ private struct SignatureDisclosureRow: View {
 
             ForEach(signature.documents, id: \.self) { document in
                 Label(document, systemImage: "doc")
+                    .foregroundStyle(.secondary)
+            }
+
+            if signature.validationState != .valid {
+                Text(signature.validationReason ?? signature.subIndication ?? "No further validation detail was provided.")
+                    .font(.caption)
                     .foregroundStyle(.secondary)
             }
         } label: {

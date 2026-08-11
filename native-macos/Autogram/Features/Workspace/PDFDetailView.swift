@@ -19,7 +19,23 @@ struct PDFDetailView: View {
     var body: some View {
         if let item {
             VStack(spacing: 0) {
-                if item.descriptor.isPDF {
+                if let preview = workspace.embeddedPreview {
+                    HStack {
+                        Button("Back to ASiC Contents") {
+                            workspace.closeEmbeddedPreview()
+                        }
+                        .buttonStyle(.bordered)
+
+                        Spacer()
+                    }
+                    .padding()
+
+                    PDFPreviewView(
+                        url: preview.url,
+                        placement: .constant(nil),
+                        cardPreview: nil
+                    )
+                } else if item.descriptor.isPDF {
                     PDFPreviewView(
                         url: item.descriptor.sourceURL,
                         placement: visibleSignaturePlacement,
@@ -48,6 +64,7 @@ struct PDFDetailView: View {
 
 private struct ASiCContentsView: View {
     let inspection: PDFItemInspection
+    let workspace: WorkspaceModel
 
     var body: some View {
         GroupBox("ASiC-E Contents") {
@@ -61,7 +78,16 @@ private struct ASiCContentsView: View {
                 )
             case .completed(let document):
                 ForEach(document.documents, id: \.self) { name in
-                    Label(name, systemImage: "doc")
+                    if URL(fileURLWithPath: name).pathExtension.lowercased() == "pdf" {
+                        Button {
+                            Task { await workspace.previewEmbeddedDocument(named: name) }
+                        } label: {
+                            Label(name, systemImage: "doc.richtext")
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        Label(name, systemImage: "doc")
+                    }
                 }
             }
         }
