@@ -110,7 +110,7 @@ struct QuickActionInstaller {
               let metadata = root["workflowMetaData"] as? [String: Any],
               metadata["workflowTypeIdentifier"] as? String == "com.apple.Automator.servicesMenu",
               metadata["serviceApplicationBundleID"] as? String == "com.apple.finder",
-              metadata["serviceInputTypeIdentifier"] as? String == "com.apple.Automator.fileSystemObject.PDF"
+              metadata["serviceInputTypeIdentifier"] as? String == "com.apple.Automator.fileSystemObject"
         else {
             throw QuickActionInstallerError.invalidFinderQuickAction
         }

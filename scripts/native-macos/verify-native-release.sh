@@ -128,12 +128,12 @@ done
 
 managed_workflow="${app_bundle}/Contents/Resources/Sign PDFs Autogram.workflow/Contents"
 stage "Finder Quick Action"
-[[ "$(cat "${managed_workflow}/Resources/managed-version")" == "4" ]] || fail "Managed workflow version is invalid"
+[[ "$(cat "${managed_workflow}/Resources/managed-version")" == "5" ]] || fail "Managed workflow version is invalid"
 plutil -lint "${managed_workflow}/Info.plist" >/dev/null
 plutil -lint "${managed_workflow}/document.wflow" >/dev/null
 [[ "$(plutil -extract workflowMetaData.workflowTypeIdentifier raw -o - "${managed_workflow}/document.wflow")" == "com.apple.Automator.servicesMenu" ]] || fail "Managed workflow is not a Finder Quick Action"
 [[ "$(plutil -extract workflowMetaData.serviceApplicationBundleID raw -o - "${managed_workflow}/document.wflow")" == "com.apple.finder" ]] || fail "Managed workflow is not scoped to Finder"
-[[ "$(plutil -extract workflowMetaData.serviceInputTypeIdentifier raw -o - "${managed_workflow}/document.wflow")" == "com.apple.Automator.fileSystemObject.PDF" ]] || fail "Managed workflow is not scoped to PDF files"
+[[ "$(plutil -extract workflowMetaData.serviceInputTypeIdentifier raw -o - "${managed_workflow}/document.wflow")" == "com.apple.Automator.fileSystemObject" ]] || fail "Managed workflow is not a Finder file Quick Action"
 [[ -x "${managed_workflow}/Resources/autogram-quick-action.sh" ]] || fail "Managed workflow launcher is not executable"
 [[ -x "${managed_workflow}/Resources/autogram-cli-sign.sh" ]] || fail "Managed workflow CLI signer is not executable"
 bash -n "${managed_workflow}/Resources/autogram-quick-action.sh"

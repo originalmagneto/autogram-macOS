@@ -214,7 +214,7 @@ private func writeFinderQuickActionDocument(to workflow: URL) throws {
         "workflowMetaData": [
             "workflowTypeIdentifier": "com.apple.Automator.servicesMenu",
             "serviceApplicationBundleID": "com.apple.finder",
-            "serviceInputTypeIdentifier": "com.apple.Automator.fileSystemObject.PDF"
+            "serviceInputTypeIdentifier": "com.apple.Automator.fileSystemObject"
         ]
     ]
     let data = try PropertyListSerialization.data(fromPropertyList: document, format: .xml, options: 0)
