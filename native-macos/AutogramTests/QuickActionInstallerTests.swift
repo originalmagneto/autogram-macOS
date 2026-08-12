@@ -17,16 +17,35 @@ import Testing
 
 @Test func installCopiesBundledWorkflowAndMarksItCurrent() throws {
     try withQuickActionDirectories { bundled, services in
+        var didRefreshServices = false
         let installer = QuickActionInstaller(
             fileManager: .default,
             servicesURL: services,
-            bundledWorkflowURL: bundled
+            bundledWorkflowURL: bundled,
+            refreshServices: { didRefreshServices = true }
         )
 
         try installer.install()
 
         #expect(installer.status == .current)
         #expect(FileManager.default.fileExists(atPath: installedWorkflow(in: services).path))
+        #expect(didRefreshServices)
+    }
+}
+
+@Test func installRejectsAWorkflowThatIsNotAFinderPDFQuickAction() throws {
+    try withQuickActionDirectories { bundled, services in
+        try FileManager.default.removeItem(at: bundled.appending(path: "Contents/document.wflow"))
+        let installer = QuickActionInstaller(
+            fileManager: .default,
+            servicesURL: services,
+            bundledWorkflowURL: bundled,
+            refreshServices: {}
+        )
+
+        #expect(throws: QuickActionInstallerError.invalidFinderQuickAction) {
+            try installer.install()
+        }
     }
 }
 
@@ -174,6 +193,7 @@ private func withQuickActionDirectories(
     let bundled = root.appending(path: "Sign PDFs Autogram.workflow", directoryHint: .isDirectory)
     let services = root.appending(path: "Services", directoryHint: .isDirectory)
     try writeManagedVersion("1", to: bundled)
+    try writeFinderQuickActionDocument(to: bundled)
     try body(bundled, services)
 }
 
@@ -185,4 +205,18 @@ private func writeManagedVersion(_ version: String, to workflow: URL) throws {
     let resources = workflow.appending(path: "Contents/Resources", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(at: resources, withIntermediateDirectories: true)
     try Data((version + "\n").utf8).write(to: resources.appending(path: "managed-version"))
+}
+
+private func writeFinderQuickActionDocument(to workflow: URL) throws {
+    let contents = workflow.appending(path: "Contents", directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(at: contents, withIntermediateDirectories: true)
+    let document: [String: Any] = [
+        "workflowMetaData": [
+            "workflowTypeIdentifier": "com.apple.Automator.servicesMenu",
+            "serviceApplicationBundleID": "com.apple.finder",
+            "serviceInputTypeIdentifier": "com.apple.Automator.fileSystemObject.PDF"
+        ]
+    ]
+    let data = try PropertyListSerialization.data(fromPropertyList: document, format: .xml, options: 0)
+    try data.write(to: contents.appending(path: "document.wflow"))
 }

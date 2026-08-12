@@ -1,6 +1,12 @@
+import AppKit
 import SwiftUI
 
 struct AutogramSettingsView: View {
+    private enum QuickActionOperation: Sendable {
+        case install
+        case remove
+    }
+
     let workspace: WorkspaceModel
     let quickActionMaintenance: QuickActionMaintenanceState
     @AppStorage("preferences.outputPolicy") private var outputPolicyRaw = OutputPolicy.signedSuffix.rawValue
@@ -11,6 +17,8 @@ struct AutogramSettingsView: View {
     @State private var quickActionStatus = QuickActionInstaller().status
     @State private var hasLegacyCLIQuickAction = QuickActionInstaller().hasLegacyCLIWorkflow
     @State private var quickActionError: String?
+    @State private var quickActionMessage: String?
+    @State private var isQuickActionOperationRunning = false
     @State private var defaultChangePIN = ""
     @State private var isDefaultChangePINPresented = false
     @State private var isDefaultCertificatePickerPresented = false
@@ -114,6 +122,17 @@ struct AutogramSettingsView: View {
                 LabeledContent("eID requirement", value: "ARM64 libPkcs11.dylib required")
                 LabeledContent("Quick Action version", value: quickActionStatus.finderStatusText)
                 quickActionControls
+                if isQuickActionOperationRunning {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("Installing Finder Quick Action…")
+                            .foregroundStyle(.secondary)
+                    }
+                } else if let quickActionMessage {
+                    Label(quickActionMessage, systemImage: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                }
                 if let maintenanceError = quickActionMaintenance.errorMessage {
                     Text("Automatic Quick Action maintenance needs repair: \(maintenanceError)")
                         .foregroundStyle(.secondary)
@@ -187,14 +206,32 @@ struct AutogramSettingsView: View {
         }
     }
 
-    private func updateQuickAction(_ action: () throws -> Void) {
-        do {
-            try action()
-            quickActionMaintenance.clearError()
-            quickActionStatus = quickActionInstaller.status
-            hasLegacyCLIQuickAction = quickActionInstaller.hasLegacyCLIWorkflow
-        } catch {
-            quickActionError = error.localizedDescription
+    private func updateQuickAction(_ operation: QuickActionOperation, successMessage: String) {
+        isQuickActionOperationRunning = true
+        quickActionMessage = nil
+        quickActionError = nil
+        Task {
+            let result = await Task.detached(priority: .userInitiated) {
+                Result {
+                    let installer = QuickActionInstaller()
+                    switch operation {
+                    case .install:
+                        try installer.install()
+                    case .remove:
+                        try installer.remove()
+                    }
+                }
+            }.value
+            isQuickActionOperationRunning = false
+            switch result {
+            case .success:
+                quickActionMaintenance.clearError()
+                quickActionStatus = quickActionInstaller.status
+                hasLegacyCLIQuickAction = quickActionInstaller.hasLegacyCLIWorkflow
+                quickActionMessage = successMessage
+            case let .failure(error):
+                quickActionError = error.localizedDescription
+            }
         }
     }
 
@@ -204,23 +241,33 @@ struct AutogramSettingsView: View {
             switch quickActionStatus {
             case .notInstalled:
                 Button("Install Finder Quick Action") {
-                    updateQuickAction(quickActionInstaller.install)
+                    updateQuickAction(.install, successMessage: "Finder Quick Action ready")
                 }
             case .updateRequired:
                 Button("Update Finder Quick Action") {
-                    updateQuickAction(quickActionInstaller.install)
+                    updateQuickAction(.install, successMessage: "Finder Quick Action ready")
                 }
                 Button("Remove Finder Quick Action", role: .destructive) {
-                    updateQuickAction(quickActionInstaller.remove)
+                    updateQuickAction(.remove, successMessage: "Finder Quick Action removed")
                 }
             case .current:
                 Button("Reinstall Finder Quick Action") {
-                    updateQuickAction(quickActionInstaller.install)
+                    updateQuickAction(.install, successMessage: "Finder Quick Action ready")
                 }
                 Button("Remove Finder Quick Action", role: .destructive) {
-                    updateQuickAction(quickActionInstaller.remove)
+                    updateQuickAction(.remove, successMessage: "Finder Quick Action removed")
                 }
             }
+        }
+        .disabled(isQuickActionOperationRunning)
+        if quickActionStatus != .notInstalled {
+            Button("Reveal Installed Quick Action") {
+                NSWorkspace.shared.activateFileViewerSelecting([
+                    FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask)[0]
+                        .appending(path: "Services/Sign PDFs Autogram.workflow", directoryHint: .isDirectory)
+                ])
+            }
+            .disabled(isQuickActionOperationRunning)
         }
     }
 

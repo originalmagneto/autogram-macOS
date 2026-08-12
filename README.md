@@ -27,6 +27,8 @@
 >
 > Autogram macOS is an active preview for macOS 27 or later on Apple silicon. Public releases still require Developer ID signing and notarization.
 
+Unsigned preview DMGs are available from [GitHub Releases](https://github.com/originalmagneto/autogram-macOS/releases). After copying the app to Applications, Control-click it and choose **Open** for the first launch. Preview DMGs are not Developer ID signed or notarized.
+
 Autogram macOS is a SwiftUI and AppKit workspace that supervises the established [Autogram](https://github.com/slovensko-digital/autogram) and European Commission DSS signing engine. It helps legal, business, and public-sector users inspect, sign, timestamp, and validate electronic documents without obscuring the certificate, signature, or validation state.
 
 ## At a glance

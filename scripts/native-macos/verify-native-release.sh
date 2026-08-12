@@ -116,7 +116,7 @@ while IFS= read -r -d '' candidate; do
 done < <(find "${app_bundle}" -type f -print0)
 
 [[ -z "$(find "${app_bundle}" \( -name '.git' -o -name '.hg' -o -name '.svn' -o -iname '*cache*' -o -iname '*.log' -o -iname '*.map' -o -iname '*.java' -o -iname '*.swift' -o -iname '*.c' -o -iname '*.h' -o -iname '*.m' -o -iname '*.mm' -o -iname '*.pem' -o -iname '*.key' -o -iname '*.p12' -o -iname '*.pfx' -o -iname '*.mobileprovision' -o -iname '*provisionprofile*' -o -iname '*x86_64*' -o -iname '*rosetta*' \) -print -quit)" ]] || fail "Forbidden source, map, log, cache, repository, private key, provisioning, Intel, or Rosetta artifact in bundle"
-[[ -z "$(rg -a -l -e '/Users/' -e '/home/' -e '/private/var/folders/' "${app_bundle}" 2>/dev/null || true)" ]] || fail "Personal absolute path found in bundle"
+[[ -z "$(grep -a -R -l -E '/Users/|/home/|/private/var/folders/' "${app_bundle}" 2>/dev/null || true)" ]] || fail "Personal absolute path found in bundle"
 
 managed_workflow="${app_bundle}/Contents/Resources/Sign PDFs Autogram.workflow/Contents"
 [[ "$(cat "${managed_workflow}/Resources/managed-version")" == "3" ]] || fail "Managed workflow version is invalid"
@@ -129,8 +129,8 @@ plutil -lint "${managed_workflow}/document.wflow" >/dev/null
 [[ -x "${managed_workflow}/Resources/autogram-cli-sign.sh" ]] || fail "Managed workflow CLI signer is not executable"
 bash -n "${managed_workflow}/Resources/autogram-quick-action.sh"
 bash -n "${managed_workflow}/Resources/autogram-cli-sign.sh"
-[[ -z "$(rg -a -l -e '/Users/' -e 'Intel' -e 'Rosetta' "${managed_workflow}" 2>/dev/null || true)" ]] || fail "Managed workflow contains a personal path, Intel, or Rosetta text"
-[[ -z "$(rg -a -l -e 'AUTOGRAM_NATIVE_BIN' -e 'AUTOGRAM_JSON_PYTHON' -e 'build/native' -e 'python3' "${managed_workflow}" 2>/dev/null || true)" ]] || fail "Managed workflow contains a development override, build fallback, or Python dependency"
+[[ -z "$(grep -a -R -l -E '/Users/|Intel|Rosetta' "${managed_workflow}" 2>/dev/null || true)" ]] || fail "Managed workflow contains a personal path, Intel, or Rosetta text"
+[[ -z "$(grep -a -R -l -E 'AUTOGRAM_NATIVE_BIN|AUTOGRAM_JSON_PYTHON|build/native|python3' "${managed_workflow}" 2>/dev/null || true)" ]] || fail "Managed workflow contains a development override, build fallback, or Python dependency"
 
 capabilities_response="$(printf '%s' '{"protocolVersion":1,"requestId":"native-release-audit","operation":"CAPABILITIES","payload":{}}' | "${helper_executable}" --cli --machine-readable --protocol-version 1 --operation CAPABILITIES)"
 CAPABILITIES_RESPONSE="${capabilities_response}" python3 - <<'PY'

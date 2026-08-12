@@ -1,4 +1,4 @@
-name: Native macOS Release
+name: Native macOS Unsigned Release
 
 on:
   workflow_dispatch:
@@ -11,17 +11,13 @@ permissions:
 
 jobs:
   release:
-    environment: packaging
-    # GitHub runner-images issue 14404: macOS 26, Xcode 27 beta by default, macOS 27 SDK.
     runs-on: xcode-27
 
     steps:
       - name: Check out source
-        # actions/checkout@v4
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
 
       - name: Set up Liberica JDK 25 with JavaFX
-        # actions/setup-java@v4
         uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3
         with:
           distribution: liberica
@@ -29,103 +25,63 @@ jobs:
           java-package: jdk+fx
           architecture: aarch64
 
-      - name: Confirm ARM64 runner, JDK, and default Xcode 27
+      - name: Confirm Apple silicon toolchain
         shell: bash
         run: |
           set -euo pipefail
           test "$(uname -m)" = arm64
           test "${RUNNER_ARCH}" = ARM64
-          file "${JAVA_HOME}/bin/java" | rg -q 'arm64'
+          file "${JAVA_HOME}/bin/java" | grep -q arm64
           java -version
           xcodebuild -version
 
-      - name: Import Developer ID certificate
-        shell: bash
-        env:
-          DEVELOPER_ID_CERTIFICATE_BASE64: ${{ secrets.DEVELOPER_ID_CERTIFICATE_BASE64 }}
-          DEVELOPER_ID_CERTIFICATE_PASSWORD: ${{ secrets.DEVELOPER_ID_CERTIFICATE_PASSWORD }}
-        run: |
-          set -euo pipefail
-          keychain_path="${RUNNER_TEMP}/autogram-native-signing.keychain-db"
-          certificate_path="${RUNNER_TEMP}/developer-id-application.p12"
-          keychain_password="$(openssl rand -base64 32)"
-          printf '%s' "${DEVELOPER_ID_CERTIFICATE_BASE64}" | base64 --decode >"${certificate_path}"
-          security create-keychain -p "${keychain_password}" "${keychain_path}"
-          security set-keychain-settings -lut 21600 "${keychain_path}"
-          security unlock-keychain -p "${keychain_password}" "${keychain_path}"
-          security import "${certificate_path}" -k "${keychain_path}" -P "${DEVELOPER_ID_CERTIFICATE_PASSWORD}" -T /usr/bin/codesign
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "${keychain_password}" "${keychain_path}"
-          security list-keychain -d user -s "${keychain_path}"
-          security default-keychain -s "${keychain_path}"
-          rm -f "${certificate_path}"
-          {
-            echo "NATIVE_KEYCHAIN_PATH=${keychain_path}"
-            echo "NATIVE_NOTARY_PROFILE=autogram-native-notary"
-          } >>"${GITHUB_ENV}"
-
-      - name: Create notarytool Keychain profile
-        shell: bash
-        env:
-          APP_STORE_CONNECT_API_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}
-          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
-        run: |
-          set -euo pipefail
-          api_key_path="${RUNNER_TEMP}/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
-          printf '%s' "${APP_STORE_CONNECT_API_KEY_BASE64}" | base64 --decode >"${api_key_path}"
-          xcrun notarytool store-credentials "${NATIVE_NOTARY_PROFILE}" \
-            --key "${api_key_path}" \
-            --key-id "${APP_STORE_CONNECT_KEY_ID}" \
-            --issuer "${APP_STORE_CONNECT_ISSUER_ID}" \
-            --keychain "${NATIVE_KEYCHAIN_PATH}"
-          rm -f "${api_key_path}"
-
-      - name: Build native app
+      - name: Build unsigned native app
         shell: bash
         run: scripts/native-macos/build-native-app.sh
 
-      - name: Sign native app
-        shell: bash
-        env:
-          DEVELOPER_ID_APPLICATION: ${{ secrets.DEVELOPER_ID_APPLICATION }}
-        run: scripts/native-macos/sign-native-app.sh
-
-      - name: Package DMG
-        shell: bash
-        run: scripts/native-macos/package-native-dmg.sh
-
-      - name: Notarize DMG
-        shell: bash
-        env:
-          NOTARYTOOL_PROFILE: ${{ env.NATIVE_NOTARY_PROFILE }}
-        run: scripts/native-macos/notarize-native-dmg.sh
-
-      - name: Verify signed and notarized release
-        shell: bash
-        run: scripts/native-macos/verify-native-release.sh --check-signature --check-notarization
-
-      - name: Upload signed release DMG and checksum
-        # actions/upload-artifact@v4
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: autogram-native-macos-release
-          path: |
-            build/native/Autogram-native-preview.dmg
-            build/native/Autogram-native-preview.dmg.sha256
-          if-no-files-found: error
-
-      - name: Publish GitHub release for version tag
-        if: startsWith(github.ref, 'refs/tags/native-v')
-        # softprops/action-gh-release@v2
-        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65
-        with:
-          files: |
-            build/native/Autogram-native-preview.dmg
-            build/native/Autogram-native-preview.dmg.sha256
-
-      - name: Remove temporary signing material
-        if: always()
+      - name: Package unsigned DMG
         shell: bash
         run: |
-          rm -f "${RUNNER_TEMP}/developer-id-application.p12" "${RUNNER_TEMP}"/AuthKey_*.p8
-          security delete-keychain "${NATIVE_KEYCHAIN_PATH:-${RUNNER_TEMP}/autogram-native-signing.keychain-db}" || true
+          set -euo pipefail
+          scripts/native-macos/package-native-dmg.sh
+          version="${GITHUB_REF_NAME#native-v}"
+          mv build/native/Autogram-native-preview.dmg "build/native/Autogram-macOS-${version}-unsigned.dmg"
+          shasum -a 256 "build/native/Autogram-macOS-${version}-unsigned.dmg" >"build/native/Autogram-macOS-${version}-unsigned.dmg.sha256"
+          rm -f build/native/Autogram-native-preview.dmg.sha256
+          echo "RELEASE_DMG=build/native/Autogram-macOS-${version}-unsigned.dmg" >>"${GITHUB_ENV}"
+
+      - name: Verify unsigned DMG
+        shell: bash
+        run: scripts/native-macos/verify-native-release.sh "${RELEASE_DMG}"
+
+      - name: Write release introduction
+        shell: bash
+        run: |
+          cat >"${RUNNER_TEMP}/release-intro.md" <<'EOF'
+          > [!WARNING]
+          > This preview is unsigned and not notarized because the project does not yet use a paid Apple Developer account. macOS may block the first launch.
+
+          ## Installation
+
+          1. Download the DMG and drag **Autogram macOS** to **Applications**.
+          2. In Applications, Control-click **Autogram macOS** and choose **Open**.
+          3. Confirm **Open** when macOS displays the security warning.
+
+          The release is Apple silicon only and requires macOS 27 or later. Verify the download with the attached SHA-256 checksum.
+
+          ## Changes
+          EOF
+
+      - name: Publish unsigned GitHub release
+        if: startsWith(github.ref, 'refs/tags/native-v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release create "${GITHUB_REF_NAME}" \
+            "${RELEASE_DMG}" "${RELEASE_DMG}.sha256" \
+            --title "Autogram macOS ${GITHUB_REF_NAME#native-v} Preview" \
+            --notes "$(cat "${RUNNER_TEMP}/release-intro.md")" \
+            --generate-notes \
+            --prerelease

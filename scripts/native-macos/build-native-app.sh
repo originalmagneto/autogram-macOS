@@ -35,8 +35,8 @@ resolve_java_home() {
     fi
 
     [[ -x "${candidate}/bin/java" && -x "${candidate}/bin/jlink" && -d "${candidate}/jmods" ]] || fail "JDK is incomplete: ${candidate}"
-    "${candidate}/bin/java" -version 2>&1 | rg -q 'version "25\.' || fail "JDK 25 is required: ${candidate}"
-    file "${candidate}/bin/java" | rg -q 'arm64' || fail "An ARM64 JDK is required: ${candidate}"
+    "${candidate}/bin/java" -version 2>&1 | grep -q 'version "25\.' || fail "JDK 25 is required: ${candidate}"
+    file "${candidate}/bin/java" | grep -q 'arm64' || fail "An ARM64 JDK is required: ${candidate}"
     for module in javafx.base javafx.controls javafx.fxml javafx.graphics javafx.web jdk.crypto.cryptoki; do
         [[ -f "${candidate}/jmods/${module}.jmod" ]] || fail "JDK is missing required module ${module}: ${candidate}"
     done
@@ -47,8 +47,8 @@ resolve_java_home() {
 assert_arm64_macho() {
     local candidate
     while IFS= read -r -d '' candidate; do
-        if file "${candidate}" | rg -q 'Mach-O'; then
-            file "${candidate}" | rg -q 'arm64' || fail "Non-arm64 Mach-O in bundle: ${candidate}"
+        if file "${candidate}" | grep -q 'Mach-O'; then
+            file "${candidate}" | grep -q 'arm64' || fail "Non-arm64 Mach-O in bundle: ${candidate}"
         fi
     done < <(find "${app_bundle}" -type f -print0)
 }
@@ -67,7 +67,7 @@ assert_clean_bundle() {
         fail "Unexpected helper artifact in bundle"
     [[ -z "$(find "${app_bundle}" \( -iname '*x86_64*' -o -iname '*rosetta*' -o -iname '*.log' -o -iname '*.java' -o -iname '*.swift' -o -iname '*.c' -o -iname '*.h' -o -iname '*cache*' -o -name '.git' -o -name '.hg' -o -name '.svn' -o -iname '*test*' \) -print -quit)" ]] || \
         fail "Forbidden source, test, log, cache, repository, Intel, or Rosetta artifact in bundle"
-    [[ -z "$(rg -a -l '/Users/' "${app_bundle}" 2>/dev/null || true)" ]] || fail "Personal absolute path found in bundle"
+    [[ -z "$(grep -a -R -l '/Users/' "${app_bundle}" 2>/dev/null || true)" ]] || fail "Personal absolute path found in bundle"
 }
 
 java_home="$(resolve_java_home)"

@@ -50,7 +50,7 @@ jobs:
           set -euo pipefail
           test "$(uname -m)" = arm64
           test "${RUNNER_ARCH}" = ARM64
-          file "${JAVA_HOME}/bin/java" | rg -q 'arm64'
+          file "${JAVA_HOME}/bin/java" | grep -q 'arm64'
           java -version
           xcodebuild -version
 
