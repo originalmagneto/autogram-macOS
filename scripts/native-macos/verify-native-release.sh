@@ -128,7 +128,7 @@ done
 
 managed_workflow="${app_bundle}/Contents/Resources/Sign PDFs Autogram.workflow/Contents"
 stage "Finder Quick Action"
-[[ "$(cat "${managed_workflow}/Resources/managed-version")" == "3" ]] || fail "Managed workflow version is invalid"
+[[ "$(cat "${managed_workflow}/Resources/managed-version")" == "4" ]] || fail "Managed workflow version is invalid"
 plutil -lint "${managed_workflow}/Info.plist" >/dev/null
 plutil -lint "${managed_workflow}/document.wflow" >/dev/null
 [[ "$(plutil -extract workflowMetaData.workflowTypeIdentifier raw -o - "${managed_workflow}/document.wflow")" == "com.apple.Automator.servicesMenu" ]] || fail "Managed workflow is not a Finder Quick Action"

@@ -27,13 +27,11 @@
             <key>NSRequiredContext</key>
             <dict>
                 <key>NSApplicationIdentifier</key>
-                <array>
-                    <string>com.apple.finder</string>
-                </array>
+                <string>com.apple.finder</string>
             </dict>
             <key>NSSendFileTypes</key>
             <array>
-                <string>com.adobe.pdf</string>
+                <string>public.item</string>
             </array>
         </dict>
     </array>
