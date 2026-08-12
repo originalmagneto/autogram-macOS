@@ -67,7 +67,7 @@ assert_clean_bundle() {
         fail "Unexpected helper artifact in bundle"
     [[ -z "$(find "${app_bundle}" \( -iname '*x86_64*' -o -iname '*rosetta*' -o -iname '*.log' -o -iname '*.java' -o -iname '*.swift' -o -iname '*.c' -o -iname '*.h' -o -iname '*cache*' -o -name '.git' -o -name '.hg' -o -name '.svn' -o -iname '*test*' \) -print -quit)" ]] || \
         fail "Forbidden source, test, log, cache, repository, Intel, or Rosetta artifact in bundle"
-    [[ -z "$(grep -a -R -l '/Users/' "${app_bundle}" 2>/dev/null || true)" ]] || fail "Personal absolute path found in bundle"
+    "${script_dir}/assert-no-byte-patterns.py" "${app_bundle}" '/Users/' || fail "Personal absolute path found in bundle"
 }
 
 java_home="$(resolve_java_home)"
