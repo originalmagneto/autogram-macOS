@@ -22,6 +22,8 @@ def main() -> int:
         return 64
     root = Path(sys.argv[1])
     patterns = [value.encode() for value in sys.argv[2:]]
+    if root.is_file():
+        return 1 if contains_pattern(root, patterns) else 0
     for directory, _, filenames in os.walk(root):
         for filename in filenames:
             path = Path(directory, filename)

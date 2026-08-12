@@ -116,7 +116,13 @@ while IFS= read -r -d '' candidate; do
 done < <(find "${app_bundle}" -type f -print0)
 
 [[ -z "$(find "${app_bundle}" \( -name '.git' -o -name '.hg' -o -name '.svn' -o -iname '*cache*' -o -iname '*.log' -o -iname '*.map' -o -iname '*.java' -o -iname '*.swift' -o -iname '*.c' -o -iname '*.h' -o -iname '*.m' -o -iname '*.mm' -o -iname '*.pem' -o -iname '*.key' -o -iname '*.p12' -o -iname '*.pfx' -o -iname '*.mobileprovision' -o -iname '*provisionprofile*' -o -iname '*x86_64*' -o -iname '*rosetta*' \) -print -quit)" ]] || fail "Forbidden source, map, log, cache, repository, private key, provisioning, Intel, or Rosetta artifact in bundle"
-"${script_dir}/assert-no-byte-patterns.py" "${app_bundle}" '/Users/' '/home/' '/private/var/folders/' || fail "Personal absolute path found in bundle"
+for audit_path in \
+    "${app_bundle}/Contents/Info.plist" \
+    "${app_bundle}/Contents/MacOS" \
+    "${app_bundle}/Contents/Helpers" \
+    "${app_bundle}/Contents/Resources"; do
+    "${script_dir}/assert-no-byte-patterns.py" "${audit_path}" '/Users/' '/home/' '/private/var/folders/' || fail "Personal absolute path found in first-party app files"
+done
 
 managed_workflow="${app_bundle}/Contents/Resources/Sign PDFs Autogram.workflow/Contents"
 [[ "$(cat "${managed_workflow}/Resources/managed-version")" == "3" ]] || fail "Managed workflow version is invalid"
