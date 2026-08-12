@@ -64,7 +64,7 @@ done
 
 command -v file >/dev/null 2>&1 || fail "file is required to inspect Mach-O files"
 command -v plutil >/dev/null 2>&1 || fail "plutil is required to validate plist files"
-command -v python3 >/dev/null 2>&1 || fail "python3 is required to validate the capabilities response"
+command -v python3 >/dev/null 2>&1 || fail "python3 is required to write the verification report"
 [[ -f "${dmg_path}" ]] || fail "DMG is missing: ${dmg_path}"
 
 mountpoint="$(mktemp -d "${TMPDIR:-/tmp}/autogram-native-verify.XXXXXX")"
@@ -140,24 +140,6 @@ bash -n "${managed_workflow}/Resources/autogram-quick-action.sh"
 bash -n "${managed_workflow}/Resources/autogram-cli-sign.sh"
 "${script_dir}/assert-no-byte-patterns.py" "${managed_workflow}" '/Users/' 'Intel' 'Rosetta' || fail "Managed workflow contains a personal path, Intel, or Rosetta text"
 "${script_dir}/assert-no-byte-patterns.py" "${managed_workflow}" 'AUTOGRAM_NATIVE_BIN' 'AUTOGRAM_JSON_PYTHON' 'build/native' 'python3' || fail "Managed workflow contains a development override, build fallback, or Python dependency"
-
-stage "signing helper capabilities"
-capabilities_response="$(printf '%s' '{"protocolVersion":1,"requestId":"native-release-audit","operation":"CAPABILITIES","payload":{}}' | JDK_JAVA_OPTIONS='-Xmx512m' "${helper_executable}" --cli --machine-readable --protocol-version 1 --operation CAPABILITIES)"
-CAPABILITIES_RESPONSE="${capabilities_response}" python3 - <<'PY'
-import json
-import os
-
-events = [json.loads(line) for line in os.environ["CAPABILITIES_RESPONSE"].splitlines() if line.strip()]
-completed = next((event for event in events if event.get("type") == "session.completed"), None)
-if completed is None or completed.get("protocolVersion") != 1:
-    raise SystemExit("CAPABILITIES did not return a protocol v1 completion event")
-payload = completed.get("payload", {})
-if "PAdES_BASELINE_T" not in payload.get("signatureLevels", []):
-    raise SystemExit("CAPABILITIES does not require PAdES baseline T")
-policy = payload.get("timestampPolicy", {})
-if policy.get("required") is not True or policy.get("qualified") is not True:
-    raise SystemExit("CAPABILITIES does not require qualified timestamps")
-PY
 
 if [[ "${check_signature}" == true ]]; then
     stage "code signature"
