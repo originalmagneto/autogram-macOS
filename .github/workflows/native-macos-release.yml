@@ -59,7 +59,10 @@ jobs:
         run: |
           cat >"${RUNNER_TEMP}/release-intro.md" <<'EOF'
           > [!WARNING]
-          > This preview is unsigned and not notarized because the project does not yet use a paid Apple Developer account. macOS may block the first launch.
+          > This beta is unsigned and not notarized because the project does not yet use a paid Apple Developer account. macOS may block the first launch.
+
+          > [!IMPORTANT]
+          > eID card support is not implemented yet. This beta currently supports signing with I.CA SecureStore.
 
           ## Installation
 
@@ -81,7 +84,7 @@ jobs:
           set -euo pipefail
           gh release create "${GITHUB_REF_NAME}" \
             "${RELEASE_DMG}" "${RELEASE_DMG}.sha256" \
-            --title "Autogram macOS ${GITHUB_REF_NAME#native-v} Preview" \
+            --title "Autogram macOS 0.1.1 Beta" \
             --notes "$(cat "${RUNNER_TEMP}/release-intro.md")" \
             --generate-notes \
-            --prerelease
+            --latest
