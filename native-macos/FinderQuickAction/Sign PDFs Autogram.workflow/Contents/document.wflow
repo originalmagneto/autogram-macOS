@@ -72,21 +72,37 @@ exec "${workflow_resources}/autogram-quick-action.sh" "$@"</string>
     <string>2.10</string>
     <key>workflowMetaData</key>
     <dict>
+        <key>applicationBundleID</key>
+        <string>com.apple.finder</string>
         <key>applicationBundleIDsByPath</key>
         <dict>
+            <key>/System/Library/CoreServices/Finder.app</key>
+            <string>com.apple.finder</string>
             <key>/System/Library/Automator/Run Shell Script.action</key>
             <string>com.apple.Automator.RunShellScript</string>
         </dict>
         <key>inputTypeIdentifier</key>
-        <string>com.adobe.pdf</string>
+        <string>com.apple.Automator.fileSystemObject.PDF</string>
         <key>outputTypeIdentifier</key>
-        <string>com.adobe.pdf</string>
+        <string>com.apple.Automator.nothing</string>
         <key>presentationMode</key>
         <integer>15</integer>
         <key>processesInput</key>
         <false/>
         <key>serviceApplicationBundleID</key>
         <string>com.apple.finder</string>
+        <key>serviceApplicationPath</key>
+        <string>/System/Library/CoreServices/Finder.app</string>
+        <key>serviceInputTypeIdentifier</key>
+        <string>com.apple.Automator.fileSystemObject.PDF</string>
+        <key>serviceOutputTypeIdentifier</key>
+        <string>com.apple.Automator.nothing</string>
+        <key>serviceProcessesInput</key>
+        <false/>
+        <key>useAutomaticInputType</key>
+        <false/>
+        <key>workflowTypeIdentifier</key>
+        <string>com.apple.Automator.servicesMenu</string>
     </dict>
 </dict>
 </plist>
