@@ -9,9 +9,12 @@ final class ConversionPipelineIntegrationTests: XCTestCase {
         let document = try XCTUnwrap(PDFDocument(data: sourceData))
 
         let engine = PDFAnalysisEngine()
-        let analysis = engine.analyze(document: document)
+        let doc = TestUncheckedSendable(document)
+        let analysis = await Task.detached(priority: .userInitiated) { [doc] in
+            engine.analyze(document: doc.value)
+        }.value
         let provider = BuiltInVisionProvider()
-        let elements = await provider.detect(in: document, pageAnalyses: analysis.pageAnalyses)
+        let elements = await provider.detect(in: doc.value, pageAnalyses: analysis.pageAnalyses)
 
         XCTAssertGreaterThanOrEqual(analysis.totalPages, 3)
         XCTAssertGreaterThanOrEqual(elements.count, 1)

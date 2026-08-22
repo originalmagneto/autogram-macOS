@@ -8,13 +8,8 @@ final class SecurityElementsDetectorTests: XCTestCase {
         let analysis = PDFAnalysisEngine().analyze(document: document)
         let provider = BuiltInVisionProvider()
 
-        let expectation = expectation(description: "detect")
-        var elements: [SecurityElement] = []
-        Task {
-            elements = await provider.detect(in: document, pageAnalyses: analysis.pageAnalyses)
-            expectation.fulfill()
-        }
-        wait(for: [expectation], timeout: 30)
+        let doc = TestUncheckedSendable(document)
+        let elements = awaitAsync { await provider.detect(in: doc.value, pageAnalyses: analysis.pageAnalyses) }
 
         let stamps = elements.filter { $0.kind == .officialStamp && $0.pageIndex == 0 }
         XCTAssertGreaterThanOrEqual(stamps.count, 1,
@@ -35,13 +30,8 @@ final class SecurityElementsDetectorTests: XCTestCase {
         let analysis = PDFAnalysisEngine().analyze(document: document)
         let provider = BuiltInVisionProvider()
 
-        let expectation = expectation(description: "detect")
-        var elements: [SecurityElement] = []
-        Task {
-            elements = await provider.detect(in: document, pageAnalyses: analysis.pageAnalyses)
-            expectation.fulfill()
-        }
-        wait(for: [expectation], timeout: 20)
+        let doc = TestUncheckedSendable(document)
+        let elements = awaitAsync { await provider.detect(in: doc.value, pageAnalyses: analysis.pageAnalyses) }
 
         XCTAssertTrue(elements.isEmpty)
     }
@@ -69,4 +59,16 @@ final class SecurityElementsDetectorTests: XCTestCase {
         XCTAssertTrue(description.contains("strane 2"))
         XCTAssertTrue(description.contains("dolnej"))
     }
+}
+
+
+func awaitAsync<T: Sendable>(_ body: @escaping @Sendable () async -> T) -> T {
+    let exp = XCTestExpectation(description: "async")
+    nonisolated(unsafe) var result: T?
+    Task {
+        result = await body()
+        exp.fulfill()
+    }
+    _ = XCTWaiter.wait(for: [exp], timeout: 60)
+    return result!
 }

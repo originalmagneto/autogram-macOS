@@ -131,7 +131,7 @@ public struct AttestationClauseGenerator: Sendable {
         SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
     }
 
-    public static let isoFormatter: ISO8601DateFormatter = {
+    public nonisolated(unsafe) static let isoFormatter: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter()
         f.formatOptions = [.withInternetDateTime]
         return f

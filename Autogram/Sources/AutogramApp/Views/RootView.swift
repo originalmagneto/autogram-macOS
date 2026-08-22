@@ -56,11 +56,12 @@ struct RootView: View {
             }
             .listStyle(.sidebar)
             .navigationTitle("Autogram")
-            .frame(minWidth: 230)
+            .navigationSplitViewColumnWidth(min: 210, ideal: 230, max: 300)
         } detail: {
             detailView
                 .navigationTitle(selection.rawValue)
                 .navigationSubtitle(subtitle)
+                .backgroundExtensionEffect()
         }
     }
 

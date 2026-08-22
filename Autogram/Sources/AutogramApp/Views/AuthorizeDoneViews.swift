@@ -169,7 +169,7 @@ struct AuthorizeView: View {
             .padding(.horizontal, 10)
             .padding(.vertical, 4)
         }
-        .buttonStyle(.borderedProminent)
+        .buttonStyle(.glassProminent)
         .controlSize(.large)
         .tint(Color.accentColor)
         .disabled(!store.analysisProgressText.isEmpty)
@@ -277,14 +277,14 @@ struct DoneView: View {
                     } label: {
                         Label("Uložiť ako…", systemImage: "square.and.arrow.up")
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.glassProminent)
 
                     Button {
                         startNewConversion()
                     } label: {
                         Label("Nová konverzia", systemImage: "plus")
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.glass)
                 }
             }
             Spacer()

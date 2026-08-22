@@ -9,5 +9,6 @@ struct AutogramApp: App {
                 .frame(idealWidth: 1320, idealHeight: 860)
         }
         .windowStyle(.automatic)
+        .defaultSize(width: 1320, height: 860)
     }
 }

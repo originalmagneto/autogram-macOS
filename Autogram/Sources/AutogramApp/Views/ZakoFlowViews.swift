@@ -28,8 +28,6 @@ struct ZakoFlowView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            stepperBar
-            Divider()
             stepContent
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -39,6 +37,20 @@ struct ZakoFlowView: View {
         }
         .onDrop(of: [UTType.pdf, .jpeg, .png, .tiff], isTargeted: $isTargeted) { providers in
             handleDrop(providers)
+        }
+        .toolbar {
+            ToolbarItem(placement: .principal) { stepperBar }
+            ToolbarItemGroup(placement: .primaryAction) {
+                if store.isAnalyzing {
+                    HStack(spacing: 6) {
+                        ProgressView().controlSize(.small)
+                        Text(store.analysisProgressText)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                }
+            }
         }
     }
 
@@ -51,9 +63,8 @@ struct ZakoFlowView: View {
     }
 
     private var stepperBar: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 12) {
-                ForEach(Array(ZakoSessionStore.Step.allCases.enumerated()), id: \.element) { _, stepCase in
+        HStack(spacing: 12) {
+            ForEach(Array(ZakoSessionStore.Step.allCases.enumerated()), id: \.element) { _, stepCase in
                 StepperPill(
                     index: stepCase.rawValue,
                     title: title(for: stepCase),
@@ -65,20 +76,7 @@ struct ZakoFlowView: View {
                         .foregroundStyle(.quaternary)
                 }
             }
-            Spacer()
-                if store.isAnalyzing {
-                    HStack(spacing: 8) {
-                        ProgressView().controlSize(.small)
-                        Text(store.analysisProgressText)
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(.bar)
     }
 
     private func title(for step: ZakoSessionStore.Step) -> String {
@@ -191,14 +189,14 @@ struct IntakeView: View {
                         .frame(minWidth: 140)
                 }
                 .keyboardShortcut(.defaultAction)
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.glassProminent)
 
                 Button {
                     store.resetSession(keepingProfile: true)
                 } label: {
                     Label("Nová konverzia", systemImage: "arrow.counterclockwise")
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(.glass)
             }
             if let error = store.lastError {
                 Text(error)

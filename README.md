@@ -6,7 +6,7 @@
 
 **Natívna SwiftUI aplikácia na elektronické podpisovanie dokumentov** — so štandardným režimom podpisovania (KEP + kvalifikovaná časová pečiatka) a **advanced režimom Zaručená konverzia** podľa § 35–39 zákona č. 305/2013 Z. z. o e-Governmente a vyhlášky MIRRI č. 70/2021 Z. z.
 
-`macOS 14+` · `SwiftUI + @Observable` · `0 externých závislostí` · `~6 400 LOC Swift` · `40/40 testov ✅`
+`macOS 26+` (Liquid Glass) · `SwiftUI + @Observable` · `0 externých závislostí` · `~6 400 LOC Swift` · `40/40 testov ✅`
 
 ---
 

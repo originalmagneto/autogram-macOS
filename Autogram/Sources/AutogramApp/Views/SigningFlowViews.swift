@@ -13,10 +13,11 @@ struct SigningFlowView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            headerBar
-            Divider()
             stepContent
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .toolbar {
+            ToolbarItem(placement: .principal) { headerBar }
         }
         .background(Color(nsColor: .windowBackgroundColor))
         .overlay {
@@ -50,19 +51,8 @@ struct SigningFlowView: View {
                         .foregroundStyle(.quaternary)
                 }
             }
-            Spacer()
-            if store.isSigning || store.isAnalyzing {
-                HStack(spacing: 8) {
-                    ProgressView().controlSize(.small)
-                    Text(store.statusText.isEmpty ? "Spracovávam…" : store.statusText)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-            }
         }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 12)
-        .background(.bar)
+        .padding(.horizontal, 8)
     }
 
     private func title(for step: SigningSessionStore.Step) -> String {
@@ -166,7 +156,7 @@ struct SigningIntakeView: View {
                     .frame(minWidth: 140)
             }
             .keyboardShortcut(.defaultAction)
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.glassProminent)
 
             if let error = store.lastError {
                 Text(error)
@@ -353,7 +343,7 @@ struct SigningPrepareView: View {
             }
             .padding(.horizontal, 10)
         }
-        .buttonStyle(.borderedProminent)
+        .buttonStyle(.glassProminent)
         .controlSize(.large)
         .disabled(!store.canSign)
     }
@@ -404,7 +394,7 @@ struct SigningDoneView: View {
                     } label: {
                         Label("Nový podpis", systemImage: "plus")
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.glassProminent)
                 }
             }
             Spacer()

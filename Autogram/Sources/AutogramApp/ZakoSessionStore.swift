@@ -124,15 +124,16 @@ final class ZakoSessionStore {
         guard let document else { return }
         isAnalyzing = true
         analysisProgressText = "Analyzujem stránky…"
-        let engine = analysisEngine
+        let doc = UncheckedSendable(document)
         let baseAnalysis = await Task.detached(priority: .userInitiated) {
-            engine.analyze(document: document)
-        }.value
+            let engine = PDFAnalysisEngine()
+            return engine.analyze(document: doc.value)
+        }.value ?? .empty()
 
         analysisProgressText = "Detegujem bezpečnostné prvky…"
         let pipeline = detectionPipeline
-        let detected = await Task.detached(priority: .userInitiated) {
-            await pipeline.detect(in: document, pageAnalyses: baseAnalysis.pageAnalyses)
+        let detected = await Task.detached(priority: .userInitiated) { [doc, pipeline] in
+            await pipeline.detect(in: doc.value, pageAnalyses: baseAnalysis.pageAnalyses)
         }.value
 
         let manualElements = securityElements.filter { !$0.detectedByAI }

@@ -48,7 +48,7 @@ struct AnalysisCanvasView: View {
                     Text("Pokračovať na doložku")
                     Image(systemName: "chevron.right")
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.glassProminent)
                 .disabled(store.isAnalyzing || store.securityElements.isEmpty)
             }
         }
@@ -87,7 +87,7 @@ struct AnalysisCanvasView: View {
                     Label("Ukončiť pridávanie", systemImage: "xmark.circle.fill")
                         .font(.callout)
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(.glass)
             }
 
             Spacer()
@@ -203,7 +203,7 @@ struct AnalysisCanvasView: View {
                         Label("Vrátiť odstránený prvok", systemImage: "arrow.uturn.backward")
                             .font(.callout)
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.glass)
                 }
 
                 let pageElements = store.securityElements
@@ -299,7 +299,7 @@ struct FlowChips: View {
                         Text("Str. \(pageIndex + 1)")
                             .font(.caption.weight(.medium))
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.glass)
                     .tint(.orange)
                 }
             }

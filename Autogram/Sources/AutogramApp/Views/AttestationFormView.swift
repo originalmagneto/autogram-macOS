@@ -146,7 +146,7 @@ struct AttestationFormView: View {
                         Text("Pokračovať na autorizáciu")
                         Image(systemName: "chevron.right")
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.glassProminent)
                 }
                 .padding(.top, 6)
             }
@@ -177,7 +177,7 @@ struct AttestationFormView: View {
                     } label: {
                         Label("Uložiť ako môj profil", systemImage: "externaldrive.badge.checkmark")
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.glass)
                 }
 
                 HStack(spacing: 12) {

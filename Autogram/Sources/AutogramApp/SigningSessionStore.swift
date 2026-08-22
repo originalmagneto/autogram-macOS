@@ -48,10 +48,11 @@ final class SigningSessionStore {
         self.sourceURL = url
         step = .prepare
         isAnalyzing = true
-        let engine = PDFAnalysisEngine()
+        let doc = UncheckedSendable(document)
         analysis = await Task.detached(priority: .userInitiated) {
-            engine.analyze(document: document)
-        }.value
+            let engine = PDFAnalysisEngine()
+            return engine.analyze(document: doc.value)
+        }.value ?? .empty()
         signaturePage = max(analysis.totalPages - 1, 0)
         isAnalyzing = false
         await refreshIdentities()
@@ -76,8 +77,9 @@ final class SigningSessionStore {
         statusText = includeVisibleSignature ? "Pripravujem vizuálny podpis…" : "Podpisujem…"
 
         do {
+            let doc = UncheckedSendable(document)
             var pdfData = try await Task.detached(priority: .userInitiated) {
-                document.dataRepresentation()
+                doc.value.dataRepresentation()
             }.get() ?? Data()
 
             if includeVisibleSignature, !pdfData.isEmpty {
@@ -88,13 +90,18 @@ final class SigningSessionStore {
                     pageIndex: min(signaturePage, analysis.totalPages - 1),
                     normalizedRect: signatureRect)
                 let includeStamp = includeQualifiedTimestamp
-                if let stampedData = await Task.detached(priority: .userInitiated) { [stamper] in
-                    stamper.stamp(document: PDFDocument(data: pdfData) ?? document,
-                                  stamp: stamp,
-                                  includeTimestamp: includeStamp)
-                }.get(), let stampedDoc = PDFDocument(data: stampedData),
-                   let finalData = stampedDoc.dataRepresentation() {
-                    pdfData = finalData
+                if let stampedSource = PDFDocument(data: pdfData) {
+                    let stampedDoc = UncheckedSendable(stampedSource)
+                    let stampedData = await Task.detached(priority: .userInitiated) { [stamper, stampedDoc] in
+                        stamper.stamp(document: stampedDoc.value,
+                                      stamp: stamp,
+                                      includeTimestamp: includeStamp)
+                    }.get()
+                    if let finalData = stampedData,
+                       let reopened = PDFDocument(data: finalData),
+                       let normalized = reopened.dataRepresentation() {
+                        pdfData = normalized
+                    }
                 }
             }
 
