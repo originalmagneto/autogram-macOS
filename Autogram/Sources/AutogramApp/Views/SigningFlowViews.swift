@@ -22,7 +22,7 @@ struct SigningFlowView: View {
         .overlay {
             if isTargeted { targetedOverlay }
         }
-        .onDrop(of: [UTType.pdf], isTargeted: $isTargeted) { providers in
+        .onDrop(of: [UTType.pdf, .jpeg, .png, .tiff], isTargeted: $isTargeted) { providers in
             handleDrop(providers)
         }
         .task { await store.refreshIdentities() }
@@ -100,20 +100,37 @@ struct SigningFlowView: View {
     }
 
     private func handleDrop(_ providers: [NSItemProvider]) -> Bool {
-        guard let provider = providers.first(where: { $0.hasItemConformingToTypeIdentifier(UTType.pdf.identifier) }) else {
-            return false
-        }
-        provider.loadDataRepresentation(forTypeIdentifier: UTType.pdf.identifier) { data, _ in
+        let pdfProvider = providers.first { $0.hasItemConformingToTypeIdentifier(UTType.pdf.identifier) }
+        let imageTypes = [UTType.jpeg, .png, .tiff, .heic]
+        let imageProvider = imageTypes.compactMap { type in
+            providers.first { $0.hasItemConformingToTypeIdentifier(type.identifier) } != nil ? type : nil
+        }.first
+
+        guard pdfProvider != nil || imageProvider != nil else { return false }
+
+        let isPDF = pdfProvider != nil
+        let typeIdentifier = isPDF ? UTType.pdf.identifier : (imageProvider?.identifier ?? UTType.png.identifier)
+        let provider = (pdfProvider ?? providers.first)!
+
+        provider.loadDataRepresentation(forTypeIdentifier: typeIdentifier) { data, _ in
             guard let data else { return }
-            let tempURL = FileManager.default.temporaryDirectory
-                .appendingPathComponent("sign-import-\(UUID().uuidString).pdf")
-            try? data.write(to: tempURL)
             Task { @MainActor in
+                let tempURL = FileManager.default.temporaryDirectory
+                    .appendingPathComponent("sign-import-\(UUID().uuidString).pdf")
+
+                if isPDF || data.starts(with: Data("%PDF".utf8)) {
+                    try? data.write(to: tempURL)
+                } else if let converted = ImageToPDFConverter.pdf(fromImageData: data) {
+                    try? converted.write(to: tempURL)
+                } else {
+                    return
+                }
                 await store.loadDocument(at: tempURL)
             }
         }
         return true
     }
+
 }
 
 struct SigningIntakeView: View {

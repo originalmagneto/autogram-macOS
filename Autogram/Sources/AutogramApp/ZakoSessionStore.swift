@@ -26,6 +26,11 @@ final class ZakoSessionStore {
     var evidenceNumberRequested = false
     var fetchingEvidenceNumber = false
 
+    var activeTool: SecurityElement.Kind?
+    var previewPageIndex: Int = 0
+    var lastDeletedElement: (SecurityElement, Int)?
+    var selectedElementID: UUID?
+
     var validationErrors: [AttestationValidationError] = []
     var result: SignedConversionResult?
     var outputDirectory: URL?
@@ -51,7 +56,7 @@ final class ZakoSessionStore {
          evidenceStore: LocalEvidenceStore) {
         self.settings = settings
         self.analysisEngine = PDFAnalysisEngine()
-        self.detectionPipeline = DetectionPipeline(builtin: BuiltInVisionProvider())
+        self.detectionPipeline = Self.buildPipeline(settings: settings)
         self.pdfaConverter = PDFAConverter()
         self.clauseGenerator = AttestationClauseGenerator()
         self.embeddedFileService = EmbeddedFileService()
@@ -60,6 +65,31 @@ final class ZakoSessionStore {
         self.signingProvider = signingProvider
         self.evidenceStore = evidenceStore
         self.currentRecordID = UUID()
+    }
+
+    static func buildPipeline(settings: AppSettings) -> DetectionPipeline {
+        let llmProvider: (any SecurityElementsProviding)?
+        switch settings.aiMode {
+        case .ollamaLocal:
+            llmProvider = OllamaVisionProvider(
+                endpoint: URL(string: settings.ollamaURL) ?? URL(string: "http://localhost:11434")!,
+                model: settings.ollamaModel,
+                promptOverride: settings.aiPrompt)
+        case .customAPIKey:
+            if let apiKey = KeychainStore.load(account: "ai.apikey"), !apiKey.isEmpty {
+                llmProvider = OpenAIVisionProvider(
+                    baseURL: URL(string: settings.openAICompatibleBaseURL)
+                        ?? URL(string: "https://api.openai.com/v1")!,
+                    model: settings.openAICompatibleModel,
+                    apiKey: apiKey,
+                    promptOverride: settings.aiPrompt)
+            } else {
+                llmProvider = nil
+            }
+        case .builtInOnDevice, .disabled:
+            llmProvider = nil
+        }
+        return DetectionPipeline(builtin: BuiltInVisionProvider(), llmProvider: llmProvider)
     }
 
     var effectiveSheetCount: Int {
@@ -100,19 +130,25 @@ final class ZakoSessionStore {
 
         analysisProgressText = "Detegujem bezpečnostné prvky…"
         let pipeline = detectionPipeline
-        let elements = await Task.detached(priority: .userInitiated) {
+        let detected = await Task.detached(priority: .userInitiated) {
             await pipeline.detect(in: document, pageAnalyses: baseAnalysis.pageAnalyses)
         }.value
+
+        let manualElements = securityElements.filter { !$0.detectedByAI }
+        var merged = enrich(detected)
+        for manual in manualElements where !merged.contains(where: { $0.id == manual.id }) {
+            merged.append(manual)
+        }
 
         analysis = DocumentAnalysis(
             totalPages: baseAnalysis.totalPages,
             nonEmptyPages: baseAnalysis.nonEmptyPages,
             estimatedSheetsDuplex: baseAnalysis.estimatedSheetsDuplex,
             pageAnalyses: baseAnalysis.pageAnalyses,
-            securityElements: elements,
+            securityElements: merged,
             suggestedTitle: baseAnalysis.suggestedTitle,
             analyzedAt: Date())
-        securityElements = enrich(elements)
+        securityElements = merged
         sheetMethod = .duplexEstimate
         manualSheetCount = nil
         prepareAttestationPrefill()
@@ -177,10 +213,86 @@ final class ZakoSessionStore {
             verbalDescription: "",
             detectedByAI: false)
         securityElements.append(enrich([element]).first!)
+        selectedElementID = element.id
+    }
+
+    @discardableResult
+    func duplicateElement(id: UUID) -> UUID? {
+        guard let source = securityElements.first(where: { $0.id == id }),
+              let index = securityElements.firstIndex(where: { $0.id == id }) else { return nil }
+        var copy = source
+        copy.id = UUID()
+        copy.detectedByAI = false
+        copy.boundingBox = ElementGeometry.moved(copy.boundingBox, center:
+            NormalizedPoint(x: copy.boundingBox.midX + 0.04,
+                            y: copy.boundingBox.midY + 0.06))
+        securityElements.insert(copy, at: index + 1)
+        selectedElementID = copy.id
+        return copy.id
     }
 
     func removeSecurityElement(id: UUID) {
+        if lastDeletedElement == nil, let removed = securityElements.first(where: { $0.id == id }) {
+            lastDeletedElement = (removed, securityElements.firstIndex(where: { $0.id == id }) ?? 0)
+        }
         securityElements.removeAll { $0.id == id }
+    }
+
+    func undoDelete() {
+        guard let (element, index) = lastDeletedElement else { return }
+        var restored = element
+        if !securityElements.contains(where: { $0.id == restored.id }) {
+            let insertAt = min(index, securityElements.count)
+            securityElements.insert(restored, at: insertAt)
+        }
+        lastDeletedElement = nil
+    }
+
+    func placeElement(kind: SecurityElement.Kind, at center: NormalizedPoint, pageIndex: Int? = nil) -> UUID {
+        let targetPage = pageIndex ?? previewPageIndex
+        let element = SecurityElement(
+            kind: kind,
+            pageIndex: targetPage,
+            boundingBox: ElementGeometry.clampedCentered(center: center),
+            confidence: 1.0,
+            verbalDescription: "",
+            detectedByAI: false)
+        securityElements.append(enrich([element]).first!)
+        selectedElementID = element.id
+        return element.id
+    }
+
+    func drawElement(id: UUID, from anchor: NormalizedPoint, to corner: NormalizedPoint) {
+        guard let index = securityElements.firstIndex(where: { $0.id == id }) else { return }
+        securityElements[index].boundingBox = ElementGeometry.resized(from: anchor, to: corner)
+    }
+
+    func moveElement(id: UUID, center: NormalizedPoint) {
+        guard let index = securityElements.firstIndex(where: { $0.id == id }) else { return }
+        securityElements[index].boundingBox =
+            ElementGeometry.moved(securityElements[index].boundingBox, center: center)
+        securityElements[index].verbalDescription = securityElements[index]
+            .locationDescription(pageSizePt: .zero) + "."
+    }
+
+    func elementID(at point: NormalizedPoint, pageIndex: Int) -> UUID? {
+        ElementGeometry.hitTest(
+            elements: securityElements.map { ($0.id, $0.pageIndex, $0.boundingBox) },
+            point: point,
+            pageIndex: pageIndex)
+    }
+
+    func isResizeHandle(_ id: UUID, at point: NormalizedPoint) -> Bool {
+        guard let element = securityElements.first(where: { $0.id == id }) else { return false }
+        return ElementGeometry.isInResizeHandle(element.boundingBox, point)
+    }
+
+    func updateElementPage(id: UUID, pageIndex: Int) {
+        if let index = securityElements.firstIndex(where: { $0.id == id }) {
+            securityElements[index].pageIndex = pageIndex
+            securityElements[index].verbalDescription = securityElements[index]
+                .locationDescription(pageSizePt: .zero) + "."
+        }
     }
 
     func updateElementKind(id: UUID, kind: SecurityElement.Kind) {
@@ -373,13 +485,24 @@ final class ZakoSessionStore {
         return settings.profiles.first ?? .empty
     }
 
-    func resetSession(keepingProfile: Bool) {
+        var unconfirmedNonEmptyPages: [Int] {
+        analysis.pageAnalyses.filter { page in
+            !page.isEmpty &&
+            !securityElements.contains(where: { $0.pageIndex == page.pageIndex })
+        }.map(\.pageIndex)
+    }
+
+func resetSession(keepingProfile: Bool) {
         let profile = keepingProfile ? attestation.performingPerson : AdvocateProfile.empty
         step = .intake
         sourceURL = nil
         document = nil
         analysis = .empty()
         securityElements = []
+        activeTool = nil
+        previewPageIndex = 0
+        lastDeletedElement = nil
+        selectedElementID = nil
         attestation = AttestationData(performingPerson: profile)
         sheetMethod = .duplexEstimate
         manualSheetCount = nil

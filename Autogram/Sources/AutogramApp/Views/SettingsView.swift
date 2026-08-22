@@ -24,6 +24,39 @@ struct SettingsView: View {
             }
             .pickerStyle(.radioGroup)
 
+            Text("Vstavaná on-device detekcia beží vždy a jej výsledky sa nedajú vypnúť — zvolený AI režim len pridáva ďalšie nálezy (IoU deduplikácia). Všetky prvky je možné kedykoľvek upraviť, presunúť alebo vymazať ručne.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            GroupBox("Klasifikačný prompt pre LLM") {
+                VStack(alignment: .leading, spacing: 8) {
+                    TextEditor(text: Binding(
+                        get: { settingsStore.settings.aiPrompt ?? "" },
+                        set: { newValue in
+                            settingsStore.settings.aiPrompt =
+                                newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                                    ? nil : newValue
+                        }))
+                        .font(.system(size: 11, design: .monospaced))
+                        .frame(width: 560, height: 130)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6)
+                                .strokeBorder(Color.primary.opacity(0.12)))
+
+                    HStack {
+                        Text("Prázdne = predvolený prompt. Vlastný text nahradí klasifikačné inštrukcie; formát JSON odpovede je vynútený automaticky.")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Button("Obnoviť predvolený") {
+                            settingsStore.settings.aiPrompt = nil
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                }
+                .padding(4)
+            }
+
             GroupBox("Lokálny model (Ollama)") {
                 VStack(alignment: .leading, spacing: 8) {
                     LabeledRow(label: "Server") {

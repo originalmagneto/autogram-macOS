@@ -27,7 +27,7 @@ struct ZakoFlowView: View {
         .overlay {
             if isTargeted { targetedOverlay }
         }
-        .onDrop(of: [UTType.pdf], isTargeted: $isTargeted) { providers in
+        .onDrop(of: [UTType.pdf, .jpeg, .png, .tiff], isTargeted: $isTargeted) { providers in
             handleDrop(providers)
         }
     }
@@ -112,15 +112,31 @@ struct ZakoFlowView: View {
     }
 
     private func handleDrop(_ providers: [NSItemProvider]) -> Bool {
-        guard let provider = providers.first(where: { $0.hasItemConformingToTypeIdentifier(UTType.pdf.identifier) }) else {
+        let pdfProvider = providers.first { $0.hasItemConformingToTypeIdentifier(UTType.pdf.identifier) }
+        let imageTypes = [UTType.jpeg, .png, .tiff, .heic]
+        let imageProvider = imageTypes.first { type in
+            providers.contains { $0.hasItemConformingToTypeIdentifier(type.identifier) }
+        }
+
+        let isPDF = pdfProvider != nil
+        let typeIdentifier = isPDF ? UTType.pdf.identifier : (imageProvider?.identifier ?? UTType.png.identifier)
+        guard let provider = pdfProvider ?? providers.first else {
             return false
         }
-        provider.loadDataRepresentation(forTypeIdentifier: UTType.pdf.identifier) { data, _ in
+
+        provider.loadDataRepresentation(forTypeIdentifier: typeIdentifier) { data, _ in
             guard let data else { return }
-            let tempURL = FileManager.default.temporaryDirectory
-                .appendingPathComponent("zako-import-\(UUID().uuidString).pdf")
-            try? data.write(to: tempURL)
             Task { @MainActor in
+                let tempURL = FileManager.default.temporaryDirectory
+                    .appendingPathComponent("zako-import-\(UUID().uuidString).pdf")
+
+                if isPDF || data.starts(with: Data("%PDF".utf8)) {
+                    try? data.write(to: tempURL)
+                } else if let converted = ImageToPDFConverter.pdf(fromImageData: data) {
+                    try? converted.write(to: tempURL)
+                } else {
+                    return
+                }
                 await store.loadDocument(at: tempURL)
             }
         }

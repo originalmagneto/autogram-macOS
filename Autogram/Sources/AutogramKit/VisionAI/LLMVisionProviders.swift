@@ -52,13 +52,40 @@ public enum AIProviderError: LocalizedError, Equatable, Sendable {
 
 public enum LLMVisionParser {
     public static let systemPrompt = """
-    Si expert na analýzu naskenovaných právnych dokumentov. Na obrázku strany dokumentu identifikuj \
-    bezpečnostné prvky: úradné pečiatky (okrúhle), vlastnoručné podpisy, parfy a reliéfne slepotlače. \
-    Odpovedaj VÝHRADNE JSON poľom bez ďalšieho textu v tvare:
+    Analyzuj naskenovanú stranu právneho dokumentu a identifikuj bezpečnostné prvky podľa § 37 \
+    zákona č. 305/2013 Z. z. Klasifikuj VÝHRADNE tieto typy:
+    - "officialStamp" — okrúhla pečiatka (modrá, fialová, červená), zvyčajne so štátnym znakom, \
+    názvom inštitúcie alebo advokátskej kancelárie; aj neúplný otlačok.
+    - "handwrittenSignature" — vlastnoručný podpis: rukou písané stopy perom alebo guľôčkovým \
+    pisom, typicky v dolnej časti strany alebo pri paragrafoch.
+    - "embossedSeal" — reliéfna slepotlač: bezfarebný vtláčok viditeľný len ako tieň/relief.
+    - "initial" — parafa: krátka značka jednej alebo dvoch iniciál.
+    - "other" — iný bezpečnostný prvok (notárska pripojka, holografická poznámka, úradná nálepka).
+    Pravidlá:
+    1. Každý výskyt = jeden objekt poľa.
+    2. Odpovedaj VÝHRADNE JSON poľom, bez akéhokoľvek iného textu:
     [{"kind":"officialStamp","page":1,"box":[x,y,w,h],"confidence":0.9,"description_sk":"Úradná pečiatka ..."}]
-    kind ∈ officialStamp | handwrittenSignature | embossedSeal | initial | other.
-    box sú normalizované súradnice 0..1 s počiatkom v ľavom hornom rohu strany.
+    3. kind ∈ officialStamp | handwrittenSignature | embossedSeal | initial | other
+    4. box je [x,y,w,h] normalizované na 0..1, počiatok v ľavom hornom rohu strany; \
+    box musí tesne obklopiť prvok.
+    5. confidence ∈ 0..1 — reálne odhadni istotu, pri pochybnostiach < 0.6.
+    6. description_sk — krátky slovný opis po slovensky vrátane polohy (napr. „v pravej dolnej časti“).
+    7. Ak sa na strane nenachádza žiadny prvok, odpovedaj [].
     """
+
+    public static func effectivePrompt(_ override: String?) -> String {
+        guard let override, !override.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return systemPrompt
+        }
+        return """
+        \(override)
+
+        Formát odpovede musí zostať JSON pole:
+        [{"kind":"...","page":1,"box":[x,y,w,h],"confidence":0.9,"description_sk":"..."}]
+        kind ∈ officialStamp | handwrittenSignature | embossedSeal | initial | other,
+        box normalizované 0..1 s počiatkom v ľavom hornom rohu.
+        """
+    }
 
     public static func extractJSONArray(from text: String) -> Data? {
         guard let start = text.firstIndex(of: "["), let end = text.lastIndex(of: "]"),
@@ -80,24 +107,44 @@ public enum LLMVisionParser {
         }
 
         let kindMap: [String: SecurityElement.Kind] = [
-            "officialStamp": .officialStamp,
-            "handwrittenSignature": .handwrittenSignature,
-            "embossedSeal": .embossedSeal,
+            "officialstamp": .officialStamp,
+            "official_stamp": .officialStamp,
+            "stamp": .officialStamp,
+            "pečiatka": .officialStamp,
+            "peciatka": .officialStamp,
+            "handwrittensignature": .handwrittenSignature,
+            "handwritten_signature": .handwrittenSignature,
+            "signature": .handwrittenSignature,
+            "podpis": .handwrittenSignature,
+            "embossedseal": .embossedSeal,
+            "embossed_seal": .embossedSeal,
+            "slepotlač": .embossedSeal,
+            "slepotlac": .embossedSeal,
             "initial": .initial,
+            "parafa": .initial,
             "other": .other
         ]
 
         return raws.compactMap { raw in
-            guard let kindRaw = raw.kind,
-                  let kind = kindMap[kindRaw.lowercased()] ?? kindMap[String(kindRaw.lowercased().prefix(20))],
-                  let box = raw.box, box.count == 4 else { return nil }
+            guard let kindRaw = raw.kind else { return nil }
+            let normalized = kindRaw.lowercased().trimmingCharacters(in: .whitespaces)
+            let kind = kindMap[normalized]
+                ?? kindMap[normalized.replacingOccurrences(of: " ", with: "_")]
+                ?? (normalized.contains("stamp") || normalized.contains("pečiat")
+                    ? SecurityElement.Kind.officialStamp : nil)
+                ?? (normalized.contains("signat") || normalized.contains("podpis")
+                    ? SecurityElement.Kind.handwrittenSignature : nil)
+                ?? (normalized.contains("seal") || normalized.contains("slepotl")
+                    ? SecurityElement.Kind.embossedSeal : nil)
+            guard let box = raw.box, box.count == 4 else { return nil }
+            let resolvedKind = kind ?? .other
             let page = max((raw.page ?? 1) - 1, 0)
             let rect = NormalizedRect(x: min(max(box[0], 0), 1),
                                       y: min(max(box[1], 0), 1),
                                       width: min(max(box[2], 0), 1),
                                       height: min(max(box[3], 0), 1))
             return SecurityElement(
-                kind: kind,
+                kind: resolvedKind,
                 pageIndex: page,
                 boundingBox: rect,
                 confidence: min(max(raw.confidence ?? 0.7, 0), 1),
@@ -112,13 +159,16 @@ public struct OllamaVisionProvider: SecurityElementsProviding {
 
     public let endpoint: URL
     public let model: String
+    public let promptOverride: String?
     public let transport: any LLMTransport
 
     public init(endpoint: URL = URL(string: "http://localhost:11434")!,
                 model: String = "llava",
+                promptOverride: String? = nil,
                 transport: any LLMTransport = URLSessionLLMTransport()) {
         self.endpoint = endpoint
         self.model = model
+        self.promptOverride = promptOverride
         self.transport = transport
     }
 
@@ -133,7 +183,8 @@ public struct OllamaVisionProvider: SecurityElementsProviding {
             do {
                 let payload: [String: Any] = [
                     "model": model,
-                    "prompt": LLMVisionParser.systemPrompt + "\nToto je strana č. \(pageIndex + 1).",
+                    "prompt": LLMVisionParser.effectivePrompt(promptOverride)
+                        + "\nToto je strana č. \(pageIndex + 1).",
                     "images": [jpeg.base64EncodedString()],
                     "stream": false
                 ]
@@ -162,15 +213,18 @@ public struct OpenAIVisionProvider: SecurityElementsProviding {
     public let baseURL: URL
     public let model: String
     public let apiKey: String
+    public let promptOverride: String?
     public let transport: any LLMTransport
 
     public init(baseURL: URL = URL(string: "https://api.openai.com/v1")!,
                 model: String = "gpt-4o-mini",
                 apiKey: String,
+                promptOverride: String? = nil,
                 transport: any LLMTransport = URLSessionLLMTransport()) {
         self.baseURL = baseURL
         self.model = model
         self.apiKey = apiKey
+        self.promptOverride = promptOverride
         self.transport = transport
     }
 
@@ -189,8 +243,8 @@ public struct OpenAIVisionProvider: SecurityElementsProviding {
                     "messages": [[
                         "role": "user",
                         "content": [
-                            ["type": "text", "text": LLMVisionParser.systemPrompt +
-                                "\nToto je strana č. \(pageIndex + 1)."],
+                            ["type": "text", "text": LLMVisionParser.effectivePrompt(promptOverride)
+                                + "\nToto je strana č. \(pageIndex + 1)."],
                             ["type": "image_url", "image_url": ["url": "data:image/jpeg;base64,\(b64)"]]
                         ]
                     ]],

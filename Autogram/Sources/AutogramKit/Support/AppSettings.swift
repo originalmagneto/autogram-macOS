@@ -53,6 +53,7 @@ public struct AppSettings: Codable, Sendable {
     }
 
     public var aiMode: AIMode
+    public var aiPrompt: String?
     public var ollamaURL: String
     public var ollamaModel: String
     public var openAICompatibleBaseURL: String
@@ -67,6 +68,7 @@ public struct AppSettings: Codable, Sendable {
     public var ezzkEdeskAddress: String
 
     public init(aiMode: AIMode = .builtInOnDevice,
+                aiPrompt: String? = nil,
                 ollamaURL: String = "http://localhost:11434",
                 ollamaModel: String = "llava",
                 openAICompatibleBaseURL: String = "https://api.openai.com/v1",
@@ -80,6 +82,7 @@ public struct AppSettings: Codable, Sendable {
                 ezzkNotificationEmail: String = "",
                 ezzkEdeskAddress: String = "") {
         self.aiMode = aiMode
+        self.aiPrompt = aiPrompt
         self.ollamaURL = ollamaURL
         self.ollamaModel = ollamaModel
         self.openAICompatibleBaseURL = openAICompatibleBaseURL
