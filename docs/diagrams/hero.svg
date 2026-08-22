@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1160" height="240" viewBox="0 0 1160 240" role="img" aria-labelledby="hero-title hero-desc">
+  <title id="hero-title">Autogram macOS</title>
+  <desc id="hero-desc">Nativna SwiftUI aplikacia pre zaručenu konverziu dokumentov — advokátsky nástroj podľa zákona č. 305/2013 Z. z.</desc>
+  <rect width="1160" height="240" fill="#2d3142"/>
+
+  <text x="56" y="86" font-family="Georgia, 'Times New Roman', serif" font-size="44" fill="#f5f5f5">Autogram <tspan font-style="italic" fill="#eb6c36">macOS</tspan></text>
+  <text x="58" y="118" font-family="-apple-system, 'Helvetica Neue', Arial, sans-serif" font-size="15" fill="#bfc0c0">Zaručená konverzia dokumentov pre advokátov — § 35–39 zákona č. 305/2013 Z. z.</text>
+
+  <line x1="56" y1="140" x2="1104" y2="140" stroke="rgba(245,245,245,0.14)" stroke-width="1"/>
+
+  <g font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="10" letter-spacing="1.5" fill="#7a8399">
+    <text x="56" y="172" fill="#bfc0c0">SWIFTUI</text>
+    <text x="160" y="172" fill="#bfc0c0">@OBSERVABLE</text>
+    <text x="300" y="172" fill="#bfc0c0">PDF/A-2B ENGINE</text>
+    <text x="476" y="172" fill="#bfc0c0">AI VISION</text>
+    <text x="600" y="172" fill="#bfc0c0">ASiC-E</text>
+    <text x="700" y="172" fill="#bfc0c0">IS EZZK</text>
+    <text x="804" y="172" fill="#bfc0c0">24/24 TESTS</text>
+  </g>
+
+  <!-- seal motif -->
+  <circle cx="1052" cy="120" r="52" fill="none" stroke="#eb6c36" stroke-width="2"/>
+  <circle cx="1052" cy="120" r="42" fill="none" stroke="rgba(235,108,54,0.35)" stroke-width="1"/>
+  <text x="1052" y="114" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="13" fill="#f5f5f5">ZARUČENÁ</text>
+  <text x="1052" y="132" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="13" fill="#f5f5f5">KONVERZIA</text>
+
+  <text x="56" y="212" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="9.5" letter-spacing="1.2" fill="#7a8399">MACOS 14+ · ZERO EXTERNAL DEPENDENCIES · ~5 900 RIADKOV SWIFTU · UNIT + INTEGRATION TESTED</text>
+</svg>

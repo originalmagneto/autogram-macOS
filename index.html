@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Autogram macOS SwiftUI Master Blueprint</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    /* Native macOS Dynamic System Color Scheme (Automatic Light & Dark Mode) */
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --app-bg: rgba(26, 30, 38, 0.82);
+        --glass-card: rgba(255, 255, 255, 0.05);
+        --glass-border: rgba(255, 255, 255, 0.1);
+        --text-main: #f5f5f7;
+        --text-muted: #8e8e93;
+        --accent-blue: #0a84ff;
+        --accent-green: #30d158;
+        --accent-orange: #ff9f0a;
+        --accent-red: #ff453a;
+        --pdf-bg: #1c1c1e;
+        --pdf-paper: #ffffff;
+        --pdf-text: #1c1c1e;
+        --input-bg: rgba(0, 0, 0, 0.35);
+        --shadow-app: 0 30px 90px rgba(0, 0, 0, 0.75);
+      }
+    }
+
+    @media (prefers-color-scheme: light) {
+      :root {
+        --app-bg: rgba(245, 245, 247, 0.88);
+        --glass-card: rgba(255, 255, 255, 0.7);
+        --glass-border: rgba(0, 0, 0, 0.08);
+        --text-main: #1c1c1e;
+        --text-muted: #6e6e73;
+        --accent-blue: #007aff;
+        --accent-green: #34c759;
+        --accent-orange: #ff9500;
+        --accent-red: #ff3b30;
+        --pdf-bg: #e5e5ea;
+        --pdf-paper: #ffffff;
+        --pdf-text: #1c1c1e;
+        --input-bg: rgba(255, 255, 255, 0.85);
+        --shadow-app: 0 25px 70px rgba(0, 0, 0, 0.15);
+      }
+    }
+
+    /* Fallback default variables */
+    :root {
+      --app-bg: rgba(26, 30, 38, 0.82);
+      --glass-card: rgba(255, 255, 255, 0.05);
+      --glass-border: rgba(255, 255, 255, 0.1);
+      --text-main: #f5f5f7;
+      --text-muted: #8e8e93;
+      --accent-blue: #0a84ff;
+      --accent-green: #30d158;
+      --accent-orange: #ff9f0a;
+      --accent-red: #ff453a;
+      --pdf-bg: #1c1c1e;
+      --pdf-paper: #ffffff;
+      --pdf-text: #1c1c1e;
+      --input-bg: rgba(0, 0, 0, 0.35);
+      --shadow-app: 0 30px 90px rgba(0, 0, 0, 0.75);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: #0d0f12;
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .sf-icon {
+      width: 16px;
+      height: 16px;
+      fill: currentColor;
+      display: inline-block;
+      vertical-align: middle;
+    }
+
+    /* macOS Window Shell */
+    .app-window {
+      width: 96%;
+      max-width: 1420px;
+      height: 92vh;
+      margin: 20px auto;
+      background: var(--app-bg);
+      backdrop-filter: blur(50px) saturate(190%);
+      -webkit-backdrop-filter: blur(50px) saturate(190%);
+      border: 1px solid var(--glass-border);
+      border-radius: 18px;
+      box-shadow: var(--shadow-app);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Window Header Bar */
+    .window-header {
+      height: 52px;
+      background: rgba(150, 150, 150, 0.04);
+      border-bottom: 1px solid var(--glass-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+    }
+
+    .window-controls {
+      display: flex;
+      gap: 8px;
+    }
+
+    .dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
+    .dot-close { background: #ff5f56; }
+    .dot-min { background: #ffbd2e; }
+    .dot-max { background: #27c93f; }
+
+    .window-tabs {
+      display: flex;
+      background: rgba(0, 0, 0, 0.15);
+      padding: 3px;
+      border-radius: 10px;
+      gap: 2px;
+    }
+
+    .tab-btn {
+      padding: 6px 14px;
+      border-radius: 7px;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .tab-btn:hover {
+      color: var(--text-main);
+      background: rgba(150, 150, 150, 0.1);
+    }
+
+    .tab-btn.active {
+      background: var(--glass-card);
+      color: var(--text-main);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      font-weight: 600;
+    }
+
+    .eid-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--accent-green);
+      background: rgba(48, 209, 88, 0.12);
+      padding: 5px 12px;
+      border-radius: 20px;
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--accent-green);
+    }
+
+    /* Content Area */
+    .content-area {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px;
+    }
+
+    .screen-view {
+      display: none;
+      height: 100%;
+      flex-direction: column;
+    }
+
+    .screen-view.active {
+      display: flex;
+    }
+
+    /* AI CONFIG & REŽIMY */
+    .ai-config-container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+
+    .glass-card {
+      background: var(--glass-card);
+      border: 1px solid var(--glass-border);
+      border-radius: 14px;
+      padding: 24px;
+    }
+
+    .provider-card {
+      border: 1px solid var(--glass-border);
+      border-radius: 12px;
+      padding: 16px;
+      background: rgba(150, 150, 150, 0.04);
+      margin-bottom: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .provider-card.active {
+      border-color: var(--accent-blue);
+      background: rgba(10, 132, 255, 0.08);
+    }
+
+    .form-input {
+      background: var(--input-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      color: var(--text-main);
+      font-size: 13px;
+      outline: none;
+      width: 100%;
+      font-family: 'JetBrains Mono', monospace;
+      margin-top: 8px;
+    }
+
+    .btn-native-primary {
+      background: var(--accent-blue);
+      color: #ffffff;
+      border: none;
+      border-radius: 10px;
+      padding: 12px 24px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="app-window">
+    <!-- Window Header Controls -->
+    <div class="window-header">
+      <div class="window-controls">
+        <div class="dot dot-close"></div>
+        <div class="dot dot-min"></div>
+        <div class="dot dot-max"></div>
+      </div>
+
+      <div class="window-tabs">
+        <button class="tab-btn active" onclick="switchTab('signing')">
+          <svg class="sf-icon" viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
+          Autogram Podpisovanie
+        </button>
+
+        <button class="tab-btn" onclick="switchTab('zako')">
+          <svg class="sf-icon" viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-5.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/></svg>
+          ZaKo Advokát
+        </button>
+
+        <button class="tab-btn" onclick="switchTab('ai-providers')">
+          <svg class="sf-icon" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+          AI Vision Integrácia (4 Režimy)
+        </button>
+      </div>
+
+      <div class="eid-badge">
+        <div class="status-dot"></div>
+        <span>eID SK Pripojená</span>
+      </div>
+    </div>
+
+    <!-- Content Area -->
+    <div class="content-area">
+
+      <!-- MODULE 1: SIGNING -->
+      <div id="tab-signing" class="screen-view active">
+        <div class="glass-card">
+          <h3>Autogram Natívne Podpisovanie</h3>
+          <p style="font-size: 13px; color: var(--text-muted); margin-top: 8px;">
+            Plne natívna macOS SwiftUI aplikácia. Podporuje PAdES Baseline-T, KEP, XAdES a PKCS#11 karty.
+          </p>
+        </div>
+      </div>
+
+      <!-- MODULE 2: ZAKO -->
+      <div id="tab-zako" class="screen-view">
+        <div class="glass-card">
+          <h3>Zaručená Konverzia (ZaKo Advokát Studio)</h3>
+          <p style="font-size: 13px; color: var(--text-muted); margin-top: 8px;">
+            Vizuálne oddelený modul pre advokátov a notárov podľa § 35-39 Zákona č. 305/2013 Z. z. o e-Governmente.
+          </p>
+        </div>
+      </div>
+
+      <!-- MODULE 3: AI PROVIDER INTEGRATION OPTIONS -->
+      <div id="tab-ai-providers" class="screen-view">
+        <div class="ai-config-container">
+          <div class="glass-card">
+            <h3 style="margin-bottom: 6px;">Nastavenie AI Vision Poskytovateľa</h3>
+            <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 20px;">
+              Vyberte, ako má AI Vision Asistent spracovávať dokumenty a detegovať pečiatky / podpisy.
+            </p>
+
+            <!-- Režim 1: Interný Režim -->
+            <div class="provider-card active">
+              <strong style="font-size: 13px; display: block; color: var(--accent-green);">✓ Režim 1: Interný Režim (Bez konfigurácie)</strong>
+              <p style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
+                Predvolený spustený režim priamo pre Vás. Všetky AI vision funkcie sú automaticky aktívne bez poplatkov a kľúčov.
+              </p>
+            </div>
+
+            <!-- Režim 2: Vlastné Predplatné -->
+            <div class="provider-card">
+              <strong style="font-size: 13px; display: block;">Režim 2: Vlastné Predplatné (ChatGPT Plus / Claude Pro)</strong>
+              <p style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
+                Pripojte sa priamo cez Vaše existujúce predplatné ChatGPT Plus/Team/Enterprise alebo Claude Pro. AI beží cez Vaše predplatné (nie cez API).
+              </p>
+            </div>
+
+            <!-- Režim 3: Lokálny Model (Ollama) -->
+            <div class="provider-card">
+              <strong style="font-size: 13px; display: block;">Režim 3: Lokálny Model (Ollama / Local Vision)</strong>
+              <p style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
+                100% súkromné a offline spracovanie priamo na Vašom Macu cez Ollama (LLaVA / Llama-3.2-Vision / Qwen2-VL).
+              </p>
+              <input class="form-input" value="http://localhost:11434">
+            </div>
+
+            <!-- Režim 4: Custom API Key -->
+            <div class="provider-card">
+              <strong style="font-size: 13px; display: block;">Režim 4: Vlastný API Kľúč (OpenAI / Gemini / Claude)</strong>
+              <p style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
+                Tradičné pripojenie cez API Kľúč s uložením v macOS Kľúčence (Keychain).
+              </p>
+              <input class="form-input" placeholder="sk-proj-..." value="">
+            </div>
+          </div>
+
+          <div class="glass-card" style="display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+              <h3>Status Bezpečnosti AI</h3>
+              <p style="font-size: 12px; color: var(--text-muted); margin-top: 10px; line-height: 1.5;">
+                Všetky vybrané režimy spĺňajú vysoké štandardy ochrany osobných údajov a advokátskeho tajomstva. Pri lokálnom režime Ollama žiadne dáta neopustia Váš Mac.
+              </p>
+            </div>
+            <button class="btn-native-primary" style="width: 100%;">Uložiť Konfiguráciu AI</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.screen-view').forEach(view => view.classList.remove('active'));
+
+      event.currentTarget.classList.add('active');
+      document.getElementById('tab-' + tabId).classList.add('active');
+    }
+  </script>
+</body>
+</html>
