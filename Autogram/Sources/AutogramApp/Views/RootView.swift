@@ -1,66 +1,10 @@
 import SwiftUI
 import AutogramKit
-import PDFKit
-
-@MainActor
-@Observable
-final class AppSettingsStore {
-    var settings: AppSettings {
-        didSet {
-            settings.save()
-            rebuildServices()
-        }
-    }
-    var ezzkPassword: String
-
-    private(set) var ezzkService: any EZZKServicing
-    private(set) var signingProvider: any QualifiedSigningProviding
-    private(set) var evidenceStore: LocalEvidenceStore
-
-    init() {
-        let loaded = AppSettings.load()
-        let storedPassword = KeychainStore.load(account: "ezzk.password") ?? ""
-        self.settings = loaded
-        self.ezzkPassword = storedPassword
-        self.evidenceStore = LocalEvidenceStore()
-        let credentials = EZZKCredentials(ico: loaded.ezzkICO,
-                                         username: loaded.ezzkUsername,
-                                         password: storedPassword,
-                                         notificationEmail: loaded.ezzkNotificationEmail,
-                                         edeskAddress: loaded.ezzkEdeskAddress)
-        if credentials.isConfigured {
-            self.ezzkService = HTTPSEZZKService(credentials: credentials)
-        } else {
-            self.ezzkService = MockEZZKService()
-        }
-        self.signingProvider = DemoSigningProvider()
-    }
-
-    func saveEZZKPassword() {
-        if ezzkPassword.isEmpty {
-            KeychainStore.delete(account: "ezzk.password")
-        } else {
-            _ = KeychainStore.save(secret: ezzkPassword, account: "ezzk.password")
-        }
-        rebuildServices()
-    }
-
-    private func rebuildServices() {
-        let credentials = EZZKCredentials(ico: settings.ezzkICO,
-                                         username: settings.ezzkUsername,
-                                         password: ezzkPassword,
-                                         notificationEmail: settings.ezzkNotificationEmail,
-                                         edeskAddress: settings.ezzkEdeskAddress)
-        ezzkService = credentials.isConfigured
-            ? HTTPSEZZKService(credentials: credentials)
-            : MockEZZKService()
-    }
-}
 
 struct RootView: View {
     enum SidebarSection: String, CaseIterable, Identifiable, Hashable {
-        case zako = "Zaručená konverzia"
         case signing = "Podpisovanie"
+        case zako = "Zaručená konverzia"
         case evidence = "Evidencia konverzií"
         case settings = "Nastavenia"
 
@@ -68,24 +12,41 @@ struct RootView: View {
 
         var symbol: String {
             switch self {
-            case .zako: return "building.columns.fill"
             case .signing: return "signature"
+            case .zako: return "building.columns.fill"
             case .evidence: return "archivebox.fill"
             case .settings: return "gearshape.fill"
             }
         }
+
+        var isAdvancedMode: Bool { self == .zako }
     }
 
-    @State private var selection: SidebarSection = .zako
+    @State private var selection: SidebarSection = .signing
     @State private var settingsStore = AppSettingsStore()
 
     var body: some View {
         NavigationSplitView {
             List(selection: $selection) {
                 Section("Autogram") {
-                    ForEach([SidebarSection.zako, SidebarSection.signing, SidebarSection.evidence]) { section in
-                        Label(section.rawValue, systemImage: section.symbol)
-                            .tag(section)
+                    Label(SidebarSection.signing.rawValue, systemImage: SidebarSection.signing.symbol)
+                        .tag(SidebarSection.signing)
+                }
+                Section("Pokročilé") {
+                    ForEach([SidebarSection.zako, SidebarSection.evidence]) { section in
+                        HStack {
+                            Label(section.rawValue, systemImage: section.symbol)
+                            if section.isAdvancedMode {
+                                Text("ADVANCED")
+                                    .font(.system(size: 8.5, weight: .bold))
+                                    .tracking(0.6)
+                                    .padding(.horizontal, 5)
+                                    .padding(.vertical, 2)
+                                    .background(Color.orange.opacity(0.16), in: Capsule())
+                                    .foregroundStyle(.orange)
+                            }
+                        }
+                        .tag(section)
                     }
                 }
                 Section {
@@ -95,39 +56,40 @@ struct RootView: View {
             }
             .listStyle(.sidebar)
             .navigationTitle("Autogram")
+            .frame(minWidth: 230)
         } detail: {
             detailView
+                .navigationTitle(selection.rawValue)
+                .navigationSubtitle(subtitle)
+        }
+    }
+
+    private var subtitle: String {
+        switch selection {
+        case .signing:
+            return settingsStore.signingProvider is DemoSigningProvider
+                ? "štandardný režim · demo podpis (spustite Autogram službu pre KEP)"
+                : "štandardný režim · kvalifikované podpisovanie"
+        case .zako:
+            return "advanced mode · § 35–39 zákona č. 305/2013 Z. z."
+        case .evidence:
+            return "lokálny register zaručených konverzií"
+        case .settings:
+            return "konfigurácia aplikácie"
         }
     }
 
     @ViewBuilder
     private var detailView: some View {
         switch selection {
+        case .signing:
+            SigningFlowView(signingProvider: settingsStore.signingProvider)
         case .zako:
             ZakoFlowView(settingsStore: settingsStore)
-        case .signing:
-            SigningPlaceholderView()
         case .evidence:
             EvidenceDashboardView(store: settingsStore.evidenceStore)
-        case .settings:            SettingsView(settingsStore: settingsStore)
+        case .settings:
+            SettingsView(settingsStore: settingsStore)
         }
-    }
-}
-
-struct SigningPlaceholderView: View {
-    var body: some View {
-        VStack(spacing: 14) {
-            Image(systemName: "signature")
-                .font(.system(size: 44))
-                .foregroundStyle(.secondary)
-            Text("Modul podpisovania")
-                .font(.title2.weight(.semibold))
-            Text("KEP/PAdES podpisovanie bude pripojené v ďalšej fáze. Modul Zaručená konverzia už obsahuje kompletný autorizačný tok vrátane časovej pečiatky.")
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: 420)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }

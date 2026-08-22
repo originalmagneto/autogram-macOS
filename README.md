@@ -4,15 +4,19 @@
 
 # Autogram macOS
 
-**Natívna SwiftUI aplikácia pre zaručenú konverziu dokumentov** — advokátsky nástroj podľa § 35–39 zákona č. 305/2013 Z. z. o e-Governmente a vyhlášky MIRRI č. 70/2021 Z. z.
+**Natívna SwiftUI aplikácia na elektronické podpisovanie dokumentov** — so štandardným režimom podpisovania (KEP + kvalifikovaná časová pečiatka) a **advanced režimom Zaručená konverzia** podľa § 35–39 zákona č. 305/2013 Z. z. o e-Governmente a vyhlášky MIRRI č. 70/2021 Z. z.
 
 `macOS 14+` · `SwiftUI + @Observable` · `0 externých závislostí` · `~5 900 LOC Swift` · `24/24 testov ✅`
 
 ---
 
-## Prehľad
+## Prehľad — jeden nástroj, dva režimy
 
-Zaručená konverzia je slovenský ekvivalent osvedčovania listín u notára: papierový dokument sa prevedie do elektronickej podoby tak, že nový dokument má **právne účinky osvedčenej kópie**. Advokát na to potrebuje mandátny certifikát a kvalifikované časové pečiatky — appka sa postará o všetko ostatné.
+### ✍️ Štandardný režim · Podpisovanie
+Klasická autorizácia dokumentov v štýle pôvodného Autogramu: vlož PDF, pozri náhľad, voliteľne umiestni vizuálny podpis rámček priamo do stránky, podpíš KEP s kvalifikovanou časovou pečiatkou. Bez zbytočných krokov.
+
+### 🏛️ Advanced režim · Zaručená konverzia
+Zaručená konverzia je slovenský ekvivalent osvedčovania listín u notára: papierový dokument sa prevedie do elektronickej podoby tak, že nový dokument má **právne účinky osvedčenej kópie**. Advokát na to potrebuje mandátny certifikát a kvalifikované časové pečiatky — appka sa postará o všetko ostatné. V tomto režime sa nepoužívajú grafické podpisy; autorizáciou je KEP s mandátnym atribútom nad celým balíkom.
 
 Kým existujúce nástroje (Podpisuj.sk, D.Convert) sú Java monštrá s desiatkami manuálne vypĺňaných polí, Autogram robí z konverzie **2–3 kliky**: automaticky rozpozná strany, listy aj bezpečnostné prvky, stiahne evidenčné číslo z EZZK, vygeneruje XML doložku a celé to zapečatí.
 
@@ -69,7 +73,13 @@ On-device počítačové videnie (farebné/tmavé masky → connected components
 
 ## Funkcie
 
-### 🏛️ Modul Zaručená konverzia
+### ✍️ Modul Podpisovanie (štandard)
+- Drag & drop PDF, plnohodnotný PDFKit náhľad
+- Voliteľný **vizuálny podpis** — rámček potiahni priamo v náhľade, vyber stranu
+- KEP podpis + QTS, identity z Keychainu s detekciou mandátneho certifikátu
+- Výstup: podpísané PDF (+ ASiC-E kontajner), uložené do Output priečinka
+
+### 🏛️ Modul Zaručená konverzia (advanced)
 - 5-krokový workflow stepper s vizuálne oddeleným „advokátskym“ režimom
 - Automatické počítadlá: strany / neprázdné strany / listy / veľkosť listiny (A4·A3·Letter × výška·šírka)
 - Detekcia prázdnych strán (grayscale ink coverage + absolútne pixely)
