@@ -6,7 +6,7 @@
 
 **Natívna SwiftUI aplikácia na elektronické podpisovanie dokumentov** — so štandardným režimom podpisovania (KEP + kvalifikovaná časová pečiatka) a **advanced režimom Zaručená konverzia** podľa § 35–39 zákona č. 305/2013 Z. z. o e-Governmente a vyhlášky MIRRI č. 70/2021 Z. z.
 
-`macOS 14+` · `SwiftUI + @Observable` · `0 externých závislostí` · `~6 000 LOC Swift` · `26/26 testov ✅`
+`macOS 14+` · `SwiftUI + @Observable` · `0 externých závislostí` · `~6 400 LOC Swift` · `40/40 testov ✅`
 
 ---
 
@@ -84,7 +84,7 @@ On-device počítačové videnie (farebné/tmavé masky → connected components
 ## Funkcie
 
 ### ✍️ Modul Podpisovanie (štandard)
-- Drag & drop PDF, plnohodnotný PDFKit náhľad
+- Drag & drop **PDF aj obrázkové skeny** (JPEG/PNG/TIFF/HEIC → auto-konverzia do PDF)
 - Voliteľný **vizuálny podpis** — rámček potiahni priamo v náhľade, vyber stranu
 - KEP podpis + QTS, identity z Keychainu s detekciou mandátneho certifikátu
 - Výstup: podpísané PDF (+ ASiC-E kontajner), uložené do Output priečinka
@@ -93,9 +93,21 @@ On-device počítačové videnie (farebné/tmavé masky → connected components
 - 5-krokový workflow stepper s vizuálne oddeleným „advokátskym“ režimom
 - Automatické počítadlá: strany / neprázdné strany / listy / veľkosť listiny (A4·A3·Letter × výška·šírka)
 - Detekcia prázdnych strán (grayscale ink coverage + absolútne pixely)
-- Bounding-box overlay nad PDF canvasom, editovateľné prvky, manuálne doplnenie
+- **Manuálna klasifikácia prvotriedna**: klik/ťahanie priamo v náhľade strany vytvára box,
+  drag presúva, rukoväť mení veľkosť; duplikovanie, page stepper per prvok, undo zmazania
+- Warning chips „strany X bez potvrdených prvkov" — jeden klik preskočí na danú stranu
+- AI nálezy sa mergujú s manuálnymi (manuálne prežívajú re-analýzu)
 - Live-validovaná doložka s predvyplnením ~95 % polí z certifikátu, profilu a analýzy
 - Šablóny doložiek, profily advokáta/kancelárie (SAK reg. č., IČO)
+
+### 🤖 Modul AI Vision (voliteľný boost)
+- **On-device detekcia beží vždy** (farebné/tmavé masky → connected components → radial coverage)
+- **Lokálny LLM:** Ollama (`llava`, `llama3.2-vision`, `qwen2-vl`) — 100% offline
+- **API:** ľubovoľný OpenAI-compatible endpoint, kľúč v Keychain
+- **Editovateľný klasifikačný prompt** — default pokrýva § 37 typy (pečiatka so znakom, slepotlač,
+  parafa, notárska pripojka); JSON schéma odpovede vynútená automaticky
+- IoU deduplikácia: LLM môže len pridať nálezy, nikdy neodobrať built-in výsledky
+- Case-insensitive parser s heuristikami — netypické kindy padajú do „Iný prvok"
 
 ### 🔐 Bezpečnosť a autorizácia
 - Keychain identity scanner s detekciou **mandátneho atribútu** certifikátu
@@ -118,7 +130,7 @@ cd Autogram
 # knižnica + appka (debug)
 swift build
 
-# testy — 26 (unit + full-pipeline integration)
+# testy — 40 (unit + full-pipeline integration)
 DEVELOPER_DIR=/Applications/Xcode-26.5.app/Contents/Developer swift test
 
 # .app bundle (release)
@@ -143,6 +155,9 @@ Interaktívna galéria diagramov: [`docs/gallery.html`](docs/gallery.html) *(otv
 | `PDFAConverterTests` | hlavička 1.7, pdfaid markery, zachovanie textu, raster mód, EmbeddedFile round-trip |
 | `EvidenceAndPackagingTests` | perzistencia registra, CSV escaping, ZIP/ASiC-E štruktúra, Mock EZZK, demo podpis |
 | `VisibleSignatureStamperTests` | FreeText anotácia vizuálneho podpisu, obsah s menom/dátumom, variant bez časovej pečiatky |
+| `ElementGeometryTests` | klik-to-place clamping, drag move, resize obojsmerne, hit-test najmenšieho boxu, aspect-fit mapovanie |
+| `LLMVisionParserTests` | JSON extrakcia z noisy odpovede, case-insensitive kind mapping, custom prompt fallback, § 37 pokrytie |
+| `ImageToPDFConverterTests` | JPEG→PDF, multi-page TIFF→PDF, odmietnutie ne-obrázkových dát |
 | `ConversionPipelineIntegrationTests` | **celý tok**: sken → analýza → detekcia → PDF/A → doložka → embed → sign → EZZK |
 
 ---
