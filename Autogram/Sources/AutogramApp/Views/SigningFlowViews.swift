@@ -247,6 +247,23 @@ struct SigningPrepareView: View {
         .padding(14)
     }
 
+    private var tokenStatusLine: some View {
+        let tokens = KeychainIdentityScanner.connectedTokenNames()
+        return Group {
+            if tokens.isEmpty {
+                Label("Karta nedetekovaná cez CryptoTokenKit — hľadám v Keychainu.",
+                      systemImage: "creditcard.and.123")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            } else {
+                Label("Karty: \(tokens.joined(separator: ", "))",
+                      systemImage: "creditcard.fill")
+                    .font(.caption2)
+                    .foregroundStyle(.green)
+            }
+        }
+    }
+
     private var settingsColumn: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
@@ -255,6 +272,8 @@ struct SigningPrepareView: View {
 
                 GroupBox("Certifikát") {
                     VStack(alignment: .leading, spacing: 8) {
+                        tokenStatusLine
+
                         if store.identities.isEmpty {
                             ProgressView("Vyhľadávam certifikáty…")
                         } else {

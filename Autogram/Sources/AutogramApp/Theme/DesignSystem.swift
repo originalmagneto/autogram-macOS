@@ -38,6 +38,8 @@ struct StatChip: View {
                 Text(value)
                     .font(.system(.title3, design: .rounded, weight: .bold))
                     .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
                 Text(title)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
@@ -104,9 +106,11 @@ struct StepperPill: View {
             Text(title)
                 .font(.callout.weight(state == .active ? .semibold : .regular))
                 .foregroundStyle(state == .pending ? Color.secondary : Color.primary)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
         .background {
             if state == .active {
                 Capsule().fill(.regularMaterial)

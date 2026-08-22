@@ -11,9 +11,17 @@ struct AuthorizeView: View {
                 Label("Pred autorizáciou — kontrolný zoznam", systemImage: "checklist")
                     .font(.headline)
 
-                HStack(spacing: 14) {
-                    checklistCard
-                    certificateCard
+                tokenStatusRow
+
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .top, spacing: 14) {
+                        checklistCard
+                        certificateCard
+                    }
+                    VStack(alignment: .leading, spacing: 14) {
+                        checklistCard
+                        certificateCard
+                    }
                 }
 
                 if let error = store.lastError {
@@ -48,6 +56,23 @@ struct AuthorizeView: View {
             .padding(22)
         }
         .task { await store.refreshIdentities() }
+    }
+
+    private var tokenStatusRow: some View {
+        let tokens = KeychainIdentityScanner.connectedTokenNames()
+        return Group {
+            if tokens.isEmpty {
+                Label("Žiadna karta nie je pripojená cez CryptoTokenKit — certifikáty sa hľadajú v Keychainu.",
+                      systemImage: "creditcard.and.123")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                Label("Pripojené karty/tokeny: \(tokens.joined(separator: ", "))",
+                      systemImage: "creditcard.fill")
+                    .font(.caption)
+                    .foregroundStyle(.green)
+            }
+        }
     }
 
     private var checklistItems: [(Bool, String, String)] {
@@ -170,6 +195,11 @@ struct IdentityRow: View {
                     .lineLimit(1)
             }
             Spacer()
+            if !identity.hasPrivateKey {
+                Text("vyžaduje PIN/BOK na karte")
+                    .font(.caption2)
+                    .foregroundStyle(.orange)
+            }
             if identity.isMandateCertificate {
                 badge("MANDÁTNY", tint: .green)
             }

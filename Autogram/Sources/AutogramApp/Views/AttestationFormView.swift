@@ -3,29 +3,44 @@ import AutogramKit
 
 struct AttestationFormView: View {
     @Bindable var store: ZakoSessionStore
+    @State private var savedTemplateHint = false
+    @State private var profileSavedHint = false
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 HStack {
-                    Label("Osvedčovacia doložka — automaticky predvyplnené", systemImage: "building.columns.fill")
+                    Label("Osvedčovacia doložka — automaticky predvyplnená", systemImage: "building.columns.fill")
                         .font(.headline)
                     Spacer()
                     Button {
                         store.loadLatestTemplate()
                     } label: {
-                        Label("Načítať šablónu", systemImage: "square.and.arrow.down")
+                        Label("Načítať šablónu údajov", systemImage: "square.and.arrow.down")
                     }
+                    .help("Načíta naposledy uloženú sadu údajov doložky — hodí sa pri opakovaných dokumentoch rovnakého typu (napr. plné mocnosti).")
+
                     Button {
                         store.saveTemplate()
+                        savedTemplateHint = true
                     } label: {
-                        Label("Uložiť šablónu", systemImage: "tray.and.arrow.down")
+                        Label("Uložiť ako šablónu", systemImage: "tray.and.arrow.down")
                     }
+                    .help("Uloží aktuálne vyplnené údaje (názvy, druh dokumentu, profil) ako šablónu pre budúce konverzie rovnakých dokumentov.")
+                }
+
+                if savedTemplateHint {
+                    Text("Šablóna uložená — pri ďalšej konverzii rovnakého typu dokumentu ju načítaš tlačidlom „Načítať šablónu údajov“.")
+                        .font(.caption)
+                        .foregroundStyle(.green)
                 }
 
                 if !store.validationErrors.isEmpty {
                     errorCard
                 }
+
+                profileCard
+
 
                 section("Pôvodný listinný dokument", symbol: "doc.text") {
                     LabeledRow(label: "Názov dokumentu") {
@@ -145,6 +160,54 @@ struct AttestationFormView: View {
         }
     }
 
+    private var profileCard: some View {
+        GroupBox {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Label("Tvoje údaje (predvyplnenie)", systemImage: "person.crop.circle.badge.checkmark")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button {
+                        store.saveProfileFromForm()
+                        profileSavedHint = true
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+                            profileSavedHint = false
+                        }
+                    } label: {
+                        Label("Uložiť ako môj profil", systemImage: "externaldrive.badge.checkmark")
+                    }
+                    .buttonStyle(.bordered)
+                }
+
+                HStack(spacing: 12) {
+                    TextField("Titul Meno Priezvisko",
+                              text: $store.attestation.performingPerson.fullName)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(minWidth: 220)
+                    TextField("Funkcia (advokát)",
+                              text: $store.attestation.performingPerson.position)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 140)
+                    TextField("SAK č.",
+                              text: $store.attestation.performingPerson.registrationNumber)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 90)
+                    TextField("IČO kancelárie",
+                              text: $store.attestation.performingPerson.ico)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 110)
+                }
+
+                if profileSavedHint {
+                    Text("Profil uložený — pri ďalších konverziách sa automaticky predvyplní.")
+                        .font(.caption)
+                        .foregroundStyle(.green)
+                }
+            }
+        }
+    }
+
     private var errorCard: some View {
         VStack(alignment: .leading, spacing: 6) {
             Label("Doložku nie je možné autorizovať — doplňte údaje:", systemImage: "exclamationmark.triangle.fill")
@@ -182,7 +245,7 @@ struct LabeledRow<Value: View>: View {
             Text(label)
                 .font(.callout)
                 .foregroundStyle(.secondary)
-                .frame(width: 250, alignment: .leading)
+                .frame(minWidth: 190, idealWidth: 230, alignment: .leading)
             value
             Spacer(minLength: 0)
         }

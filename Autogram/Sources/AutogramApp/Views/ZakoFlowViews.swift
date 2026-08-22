@@ -9,11 +9,21 @@ struct ZakoFlowView: View {
     @State private var isTargeted = false
 
     init(settingsStore: AppSettingsStore) {
-        _store = State(initialValue: ZakoSessionStore(
+        let created = ZakoSessionStore(
             settings: settingsStore.settings,
             ezzkService: settingsStore.ezzkService,
             signingProvider: settingsStore.signingProvider,
-            evidenceStore: settingsStore.evidenceStore))
+            evidenceStore: settingsStore.evidenceStore)
+        created.profilePersister = { [weak settingsStore] profile in
+            guard let settingsStore else { return }
+            if let index = settingsStore.settings.profiles.firstIndex(where: { $0.id == profile.id }) {
+                settingsStore.settings.profiles[index] = profile
+            } else {
+                settingsStore.settings.profiles.append(profile)
+                settingsStore.settings.activeProfileID = profile.id
+            }
+        }
+        _store = State(initialValue: created)
     }
 
     var body: some View {
@@ -41,8 +51,9 @@ struct ZakoFlowView: View {
     }
 
     private var stepperBar: some View {
-        HStack(spacing: 14) {
-            ForEach(Array(ZakoSessionStore.Step.allCases.enumerated()), id: \.element) { _, stepCase in
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 12) {
+                ForEach(Array(ZakoSessionStore.Step.allCases.enumerated()), id: \.element) { _, stepCase in
                 StepperPill(
                     index: stepCase.rawValue,
                     title: title(for: stepCase),
@@ -55,17 +66,18 @@ struct ZakoFlowView: View {
                 }
             }
             Spacer()
-            if store.isAnalyzing {
-                HStack(spacing: 8) {
-                    ProgressView().controlSize(.small)
-                    Text(store.analysisProgressText)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+                if store.isAnalyzing {
+                    HStack(spacing: 8) {
+                        ProgressView().controlSize(.small)
+                        Text(store.analysisProgressText)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
         }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 12)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
         .background(.bar)
     }
 

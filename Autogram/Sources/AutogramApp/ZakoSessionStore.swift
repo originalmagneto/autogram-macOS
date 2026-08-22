@@ -48,6 +48,7 @@ final class ZakoSessionStore {
     let signingProvider: any QualifiedSigningProviding
     let evidenceStore: LocalEvidenceStore
 
+    var profilePersister: ((AdvocateProfile) -> Void)?
     private(set) var currentRecordID = UUID()
 
     init(settings: AppSettings,
@@ -475,6 +476,11 @@ final class ZakoSessionStore {
         attestation = template
         attestation.evidenceNumber = nil
         evidenceNumberRequested = false
+    }
+
+    func saveProfileFromForm() {
+        let profile = attestation.performingPerson
+        profilePersister?(profile)
     }
 
     func activeProfile() -> AdvocateProfile {
