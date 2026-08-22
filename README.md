@@ -1,12 +1,12 @@
 <p align="center">
-  <img src="docs/diagrams/hero.svg" alt="Autogram macOS — Zaručená konverzia" width="100%">
+  <img src="docs/diagrams/hero.svg" alt="Autogram macOS — Podpisovanie a Zaručená konverzia" width="100%">
 </p>
 
 # Autogram macOS
 
 **Natívna SwiftUI aplikácia na elektronické podpisovanie dokumentov** — so štandardným režimom podpisovania (KEP + kvalifikovaná časová pečiatka) a **advanced režimom Zaručená konverzia** podľa § 35–39 zákona č. 305/2013 Z. z. o e-Governmente a vyhlášky MIRRI č. 70/2021 Z. z.
 
-`macOS 14+` · `SwiftUI + @Observable` · `0 externých závislostí` · `~5 900 LOC Swift` · `24/24 testov ✅`
+`macOS 14+` · `SwiftUI + @Observable` · `0 externých závislostí` · `~6 000 LOC Swift` · `26/26 testov ✅`
 
 ---
 
@@ -26,7 +26,7 @@ Kým existujúce nástroje (Podpisuj.sk, D.Convert) sú Java monštrá s desiatk
 
 <img src="docs/diagrams/architecture.svg" alt="Architektúra Autogram macOS" width="100%">
 
-Tri vrstvy: natívna SwiftUI prezentácia (`AutogramApp`), reaktívny `@Observable ZakoSessionStore` a čisto testovateľná knižnica `AutogramKit` — enginy, dokumentové služby a infraštruktúra. Nula externých závislostí; PDF/A zápis, XML generátor aj ZIP/ASiC-E packager sú vlastná implementácia.
+Tri vrstvy: natívna SwiftUI prezentácia (`AutogramApp`) s dvoma reaktívnymi session store (`@Observable SigningSessionStore` pre štandardný podpis a `ZakoSessionStore` pre advanced režim) a čisto testovateľná knižnica `AutogramKit` — enginy, dokumentové služby a infraštruktúra. Nula externých závislostí; PDF/A zápis, XML generátor aj ZIP/ASiC-E packager sú vlastná implementácia.
 
 ---
 
@@ -71,6 +71,16 @@ On-device počítačové videnie (farebné/tmavé masky → connected components
 
 ---
 
+## Ako začať (advokát)
+
+1. **Podpísať bežný dokument?** → sidebar *Podpisovanie*: pretiahni PDF, potiahni rámček vizuálneho podpisu na správne miesto, klikni **Podpísať KEP**.
+2. **Previesť papierový originál do elektronickej podoby?** → sidebar *Pokročilé › Zaručená konverzia*: pretiahni sken originálu, schvál AI-detekované prvky a počty listov, získaj evidenčné číslo z EZZK, klikni **Autorizovať konverziu**.
+3. **Vyúčtovať klientovi úkony?** → *Evidencia* → export CSV.
+
+> Bez nastaveného EZZK beží evidencia v DEMO režime; bez pripojeného kvalifikovaného podpisového modulu podpisuje DEMO podpisovač (jasne označený).
+
+---
+
 ## Funkcie
 
 ### ✍️ Modul Podpisovanie (štandard)
@@ -108,7 +118,7 @@ cd Autogram
 # knižnica + appka (debug)
 swift build
 
-# testy — 24 (unit + full-pipeline integration)
+# testy — 26 (unit + full-pipeline integration)
 DEVELOPER_DIR=/Applications/Xcode-26.5.app/Contents/Developer swift test
 
 # .app bundle (release)
@@ -132,6 +142,7 @@ Interaktívna galéria diagramov: [`docs/gallery.html`](docs/gallery.html) *(otv
 | `AttestationXMLTests` | elementy schémy, escaping, LegalSubject varianta, SHA-256 golden vector, validátory |
 | `PDFAConverterTests` | hlavička 1.7, pdfaid markery, zachovanie textu, raster mód, EmbeddedFile round-trip |
 | `EvidenceAndPackagingTests` | perzistencia registra, CSV escaping, ZIP/ASiC-E štruktúra, Mock EZZK, demo podpis |
+| `VisibleSignatureStamperTests` | FreeText anotácia vizuálneho podpisu, obsah s menom/dátumom, variant bez časovej pečiatky |
 | `ConversionPipelineIntegrationTests` | **celý tok**: sken → analýza → detekcia → PDF/A → doložka → embed → sign → EZZK |
 
 ---
@@ -152,7 +163,7 @@ Dizajnové špecifikácie: [`AUTOGRAM_MASTER_UI_UX_SPEC.md`](AUTOGRAM_MASTER_UI_
 | Oblast | Stav | Ďalší krok |
 |---|---|---|
 | EZZK API | Mock + HTTP kostra | oficiálna OpenAPI špecifikácia od MIRRI/IOMO |
-| KEP podpis | DEMO podpisovač (ASiC-E manifest) | EU DSS helper / PKCS#11 most pre reálny mandátny certifikát + RFC 3161 QTS |
+| KEP podpis | signing flow hotový, DEMO podpisovač (ASiC-E manifest) | EU DSS helper / PKCS#11 most pre reálny mandátny certifikát + RFC 3161 QTS |
 | Smery E→P, E→E | architektúra pripravená | formuláre príloh č. 1 a 5 |
 | veraPDF validácia | nie je integrovaná | voliteľné via bundled CLI |
 | Formuláre v1.2 (2027) | verziovaný placeholder | auto-update artefaktov z formulare.slovensko.sk |
