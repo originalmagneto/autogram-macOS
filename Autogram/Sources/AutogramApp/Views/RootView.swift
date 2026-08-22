@@ -32,21 +32,11 @@ struct RootView: View {
                     Label(SidebarSection.signing.rawValue, systemImage: SidebarSection.signing.symbol)
                         .tag(SidebarSection.signing)
                 }
-                Section("Pokročilé") {
+                Section("Pokročilé · Advanced") {
                     ForEach([SidebarSection.zako, SidebarSection.evidence]) { section in
-                        HStack {
-                            Label(section.rawValue, systemImage: section.symbol)
-                            if section.isAdvancedMode {
-                                Text("ADVANCED")
-                                    .font(.system(size: 8.5, weight: .bold))
-                                    .tracking(0.6)
-                                    .padding(.horizontal, 5)
-                                    .padding(.vertical, 2)
-                                    .background(Color.orange.opacity(0.16), in: Capsule())
-                                    .foregroundStyle(.orange)
-                            }
-                        }
-                        .tag(section)
+                        Label(section.rawValue, systemImage: section.symbol)
+                            .lineLimit(1)
+                            .tag(section)
                     }
                 }
                 Section {
@@ -56,7 +46,7 @@ struct RootView: View {
             }
             .listStyle(.sidebar)
             .navigationTitle("Autogram")
-            .navigationSplitViewColumnWidth(min: 210, ideal: 230, max: 300)
+            .navigationSplitViewColumnWidth(min: 220, ideal: 250, max: 320)
         } detail: {
             detailView
                 .navigationTitle(selection.rawValue)
@@ -69,14 +59,14 @@ struct RootView: View {
         switch selection {
         case .signing:
             return settingsStore.signingProvider is DemoSigningProvider
-                ? "štandardný režim · demo podpis (spustite Autogram službu pre KEP)"
-                : "štandardný režim · kvalifikované podpisovanie"
+                ? "demo podpis"
+                : "kvalifikované podpisovanie"
         case .zako:
-            return "advanced mode · § 35–39 zákona č. 305/2013 Z. z."
+            return "advanced · § 35–39 Zz"
         case .evidence:
-            return "lokálny register zaručených konverzií"
+            return "register konverzií"
         case .settings:
-            return "konfigurácia aplikácie"
+            return "konfigurácia"
         }
     }
 

@@ -63,6 +63,27 @@ struct ZakoFlowView: View {
     }
 
     private var stepperBar: some View {
+        HStack(spacing: 10) {
+            ForEach(Array(ZakoSessionStore.Step.allCases.enumerated()), id: \.element) { _, stepCase in
+                StepperPill(
+                    index: stepCase.rawValue,
+                    title: shortTitle(for: stepCase),
+                    symbol: symbol(for: stepCase),
+                    state: pillState(stepCase))
+                if stepCase != .done {
+                    Image(systemName: "chevron.right")
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(.quaternary)
+                }
+            }
+        }
+        .lineLimit(1)
+        .allowsTightening(true)
+        .minimumScaleFactor(0.72)
+        .fixedSize()
+    }
+
+    private var stepperBarFull: some View {
         HStack(spacing: 12) {
             ForEach(Array(ZakoSessionStore.Step.allCases.enumerated()), id: \.element) { _, stepCase in
                 StepperPill(
@@ -76,6 +97,16 @@ struct ZakoFlowView: View {
                         .foregroundStyle(.quaternary)
                 }
             }
+        }
+    }
+
+    private func shortTitle(for step: ZakoSessionStore.Step) -> String {
+        switch step {
+        case .intake: return "Dokument"
+        case .analysis: return "Overenie"
+        case .attestation: return "Doložka"
+        case .authorize: return "Autorizácia"
+        case .done: return "Hotovo"
         }
     }
 

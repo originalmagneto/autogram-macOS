@@ -126,6 +126,10 @@ struct SigningFlowView: View {
 struct SigningIntakeView: View {
     let store: SigningSessionStore
 
+    private var isDemoProvider: Bool {
+        store.signingProvider is DemoSigningProvider
+    }
+
     var body: some View {
         VStack(spacing: 22) {
             Spacer()
@@ -157,6 +161,13 @@ struct SigningIntakeView: View {
             }
             .keyboardShortcut(.defaultAction)
             .buttonStyle(.glassProminent)
+
+            if isDemoProvider {
+                Label("Demo režim podpisu — pre KEP pripojte Autogram službu alebo kartu",
+                      systemImage: "info.circle")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
 
             if let error = store.lastError {
                 Text(error)
