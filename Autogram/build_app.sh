@@ -39,9 +39,9 @@ cat > "$CONTENTS/Info.plist" <<'PLIST'
     <key>CFBundleIdentifier</key>
     <string>sk.autogram.Autogram</string>
     <key>CFBundleVersion</key>
-    <string>1.0.0</string>
+    <string>0.2.0</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.0.0</string>
+    <string>0.2.0</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleExecutable</key>
