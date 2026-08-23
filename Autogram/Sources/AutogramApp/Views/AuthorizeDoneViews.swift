@@ -59,7 +59,7 @@ struct AuthorizeView: View {
     }
 
     private var tokenStatusRow: some View {
-        let tokens = KeychainIdentityScanner.connectedTokenNames()
+        let tokens = CardPresenceMonitor.shared.connectedTokens
         return Group {
             if tokens.isEmpty {
                 Label("Žiadna karta nie je pripojená cez CryptoTokenKit — certifikáty sa hľadajú v Keychainu.",
@@ -73,6 +73,11 @@ struct AuthorizeView: View {
                     .foregroundStyle(.green)
             }
         }
+        .task {
+            CardPresenceMonitor.shared.onTokensChanged = { [weak store] in
+                await store?.refreshIdentities()
+            }
+        }
     }
 
     private var checklistItems: [(Bool, String, String)] {
@@ -83,7 +88,10 @@ struct AuthorizeView: View {
             (store.effectiveSheetCount > 0, "Počet listov určený (\(store.effectiveSheetCount))", "rectangle.stack"),
             ((store.attestation.evidenceNumber ?? "").isEmpty == false, "Evidenčné číslo z EZZK", "number.square.fill"),
             (!store.attestation.performingPerson.fullName.isEmpty, "Identita osvedčujúcej osoby", "person.crop.circle"),
-            (!store.attestation.performingPerson.registrationNumber.isEmpty, "Evidenčné číslo advokáta", "building.columns")
+            (!store.attestation.performingPerson.registrationNumber.isEmpty, "Evidenčné číslo advokáta", "building.columns"),
+            (store.mandateRequirementSatisfied || store.allowNonMandateOverride,
+             store.mandateRequirementSatisfied ? "Mandátny certifikát SAK vybraný" : "Mandátny certifikát SAK chýba",
+             "checkmark.seal")
         ]
     }
 
@@ -130,6 +138,24 @@ struct AuthorizeView: View {
             }
             .toggleStyle(.switch)
             .controlSize(.small)
+
+            if store.requiresMandateOverride {
+                VStack(alignment: .leading, spacing: 6) {
+                    Label("Zvolený certifikát nie je mandátnym certifikátom pre zaručenú konverziu.",
+                          systemImage: "exclamationmark.triangle.fill")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.orange)
+                    Toggle(isOn: $store.allowNonMandateOverride) {
+                        Text("Rozumiem — pokračovať s ne-mandátnym certifikátom (zápis do CEZZK by mohol byť zamietnutý)")
+                            .font(.caption)
+                    }
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                }
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+            }
 
             Divider()
 

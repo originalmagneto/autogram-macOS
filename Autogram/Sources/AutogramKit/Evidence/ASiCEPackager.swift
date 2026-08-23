@@ -11,9 +11,61 @@ public struct ASiCEPackager: Sendable {
             self.data = data
             self.storeUncompressed = storeUncompressed
         }
+
+        var asStored: Entry {
+            Entry(path: path, data: data, storeUncompressed: true)
+        }
     }
 
     public init() {}
+
+    public static let asicMimeType = "application/vnd.etsi.asic-e+zip"
+    public static let xdcfMimeType = "application/vnd.gov.sk.xmldatacontainer+xml"
+
+    public static func mediaType(forPath path: String) -> String {
+        switch (path as NSString).pathExtension.lowercased() {
+        case "pdf": return "application/pdf"
+        case "xdcf", "xml": return xdcfMimeType
+        default: return "application/octet-stream"
+        }
+    }
+
+    public static func manifestXML(entries: [(path: String, mediaType: String)]) -> String {
+        var lines = [
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+            "<manifest:manifest xmlns:manifest=\"urn:oasis:names:tc:opendocument:xmlns:manifest:1.0\" manifest:version=\"1.2\">",
+            "  <manifest:file-entry manifest:full-path=\"/\" manifest:media-type=\"\(asicMimeType)\"/>"
+        ]
+        for entry in entries.sorted(by: { $0.path < $1.path }) {
+            lines.append("  <manifest:file-entry manifest:full-path=\"\(escapeXML(entry.path))\" " +
+                         "manifest:media-type=\"\(escapeXML(entry.mediaType))\"/>")
+        }
+        lines.append("</manifest:manifest>")
+        return lines.joined(separator: "\n") + "\n"
+    }
+
+    public static func sanitizedFileName(_ name: String) -> String {
+        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_. "))
+        let cleaned = name.components(separatedBy: allowed.inverted).joined(separator: "-")
+        return cleaned.trimmingCharacters(in: CharacterSet(charactersIn: "-. "))
+    }
+
+    public func zakoContainer(pdfData: Data,
+                              pdfFileName: String,
+                              dolozkaXML: Data,
+                              dolozkaFileName: String) -> [Entry] {
+        var entries: [Entry] = [
+            Entry(path: "mimetype", data: Data(Self.asicMimeType.utf8), storeUncompressed: true),
+            Entry(path: pdfFileName, data: pdfData),
+            Entry(path: dolozkaFileName, data: dolozkaXML)
+        ]
+        let manifestEntries = entries
+            .filter { $0.path != "mimetype" }
+            .map { (path: $0.path, mediaType: Self.mediaType(forPath: $0.path)) }
+        entries.append(Entry(path: "META-INF/manifest.xml",
+                             data: Data(Self.manifestXML(entries: manifestEntries).utf8)))
+        return entries
+    }
 
     public func package(files: [Entry]) throws -> Data {
         var out = Data()
@@ -85,6 +137,13 @@ public struct ASiCEPackager: Sendable {
         out.appendLE(UInt16(0))
 
         return out
+    }
+
+    private static func escapeXML(_ s: String) -> String {
+        s.replacingOccurrences(of: "&", with: "&amp;")
+            .replacingOccurrences(of: "<", with: "&lt;")
+            .replacingOccurrences(of: ">", with: "&gt;")
+            .replacingOccurrences(of: "\"", with: "&quot;")
     }
 
     private var dosTime: UInt16 {

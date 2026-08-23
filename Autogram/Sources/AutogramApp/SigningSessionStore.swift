@@ -19,6 +19,8 @@ final class SigningSessionStore {
 
     var includeQualifiedTimestamp = true
     var includeVisibleSignature = true
+    var convertToPDFA = false
+    var outputFormat: SigningOutputFormat = .attachedASIC
     var signaturePage: Int = 0
     var signatureRect = NormalizedRect(x: 0.58, y: 0.80, width: 0.30, height: 0.09)
 
@@ -29,10 +31,12 @@ final class SigningSessionStore {
     var lastError: String?
 
     let signingProvider: any QualifiedSigningProviding
+    let settings: AppSettings
     let stamper = VisibleSignatureStamper()
 
-    init(signingProvider: any QualifiedSigningProviding) {
+    init(signingProvider: any QualifiedSigningProviding, settings: AppSettings = .standard) {
         self.signingProvider = signingProvider
+        self.settings = settings
     }
 
     func loadDocument(at url: URL) async {
@@ -82,6 +86,13 @@ final class SigningSessionStore {
                 doc.value.dataRepresentation()
             }.get() ?? Data()
 
+            if convertToPDFA, !pdfData.isEmpty {
+                statusText = "Konvertujem do PDF/A…"
+                pdfData = try PDFAConverter().convert(document: document,
+                                                      mode: settings.pdfaMode,
+                                                      title: sourceURL?.deletingPathExtension().lastPathComponent ?? "")
+            }
+
             if includeVisibleSignature, !pdfData.isEmpty {
                 statusText = "Vkladám vizuálny podpis…"
                 let stamp = VisibleSignatureStamper.StampData(
@@ -109,9 +120,12 @@ final class SigningSessionStore {
             guard let identityID = selectedIdentityID else {
                 throw SigningError.identityUnavailable
             }
-            let signed = try await signingProvider.sign(pdf: pdfData,
-                                                        identityID: identityID,
-                                                        includeTimestamp: includeQualifiedTimestamp)
+            let request = SigningRequest(pdfData: pdfData,
+                                         identityID: identityID,
+                                         includeTimestamp: includeQualifiedTimestamp,
+                                         tsaURL: includeQualifiedTimestamp ? settings.selectedTSAURL : nil,
+                                         outputFormat: outputFormat)
+            let signed = try await signingProvider.sign(request)
 
             statusText = "Ukladám…"
             let directory = Self.outputDirectoryURL()

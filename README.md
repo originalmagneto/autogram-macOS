@@ -6,7 +6,9 @@
 
 **Natívna SwiftUI aplikácia na elektronické podpisovanie dokumentov** — so štandardným režimom podpisovania (KEP + kvalifikovaná časová pečiatka) a **advanced režimom Zaručená konverzia** podľa § 35–39 zákona č. 305/2013 Z. z. o e-Governmente a vyhlášky MIRRI č. 70/2021 Z. z.
 
-`macOS 26+` (Liquid Glass) · `SwiftUI + @Observable` · `0 externých závislostí` · `~6 400 LOC Swift` · `40/40 testov ✅`
+`macOS 26+` (Liquid Glass) · `SwiftUI + @Observable` · `0 externých závislostí` · `Swift 6 strict concurrency` · `62/62 testov ✅`
+
+> 📋 Implementačná dokumentácia fáz 1–4 vrátane validácií a limitov: [`docs/PHASES.md`](docs/PHASES.md)
 
 ---
 
@@ -110,14 +112,24 @@ On-device počítačové videnie (farebné/tmavé masky → connected components
 - Case-insensitive parser s heuristikami — netypické kindy padajú do „Iný prvok"
 
 ### 🔐 Bezpečnosť a autorizácia
-- Keychain identity scanner s detekciou **mandátneho atribútu** certifikátu
+- **Reálny KEP podpis**: XAdES-B/T v ASiC-E alebo PAdES-B/T priamo v PDF — natívne cez SecIdentity (Keychain / CryptoTokenKit karty), bez externých knižníc
+- **RFC 3161 klient** s vlastnou DER implementáciou; TSA zoznam podľa originálneho Autogramu (Sectigo, Belgian TSA) + CA Disig SK, vlastné servery, test spojenia
+- **Live detekcia karty** cez TKTokenWatcher — vloženie SAK karty okamžite refreshuje certifikáty
+- **Mandátna brána**: ZaKo vyžaduje mandátny certifikát; pokračovanie bez neho len výslovným override
 - Gate „QTS čas ≥ čas konverzie“ — CEZZK by inak zápis zamietla
 - Serverový čas EZZK (nie lokálne hodiny), zhoda identity certifikát ↔ doložka
-- ASiC-E packager (ETSI EN 319 162), demo podpisovač jasne označený ako nezáväzný
+
+### ✅ Validačné vrstvy (hard gates)
+- `PDFAValidator` — PDF/A-2b štruktúra (XMP pdfaid, OutputIntent GTS_PDFA1 + ICC, žiadne šifrovanie/JS)
+- `AttestationXMLValidator` — kompletnosť doložky (fingerprint == base64 SHA-256, evidenčné číslo ako URI, prvky/strany/listy, ISO8601 čas)
+- `ASiCEContainerVerifier` — manifest úplnosť + **prepočet SHA-256 každého objektu proti digestom v XAdES signatúre**
+- Všetky bežia automaticky pred dokončením konverzie; zlyhanie blokuje výstup so zoznamom problémov
 
 ### 🗂️ Evidencia
 - Lokálny register konverzií (JSON, Application Support) so stavmi a CSV exportom
-- Dashboard s hľadaním, frontou odoslania do CEZZK a alarmom lehoty 24 h
+- Dashboard: summary karty, filtre podľa stavu, status timeline (číslo → KEP → CEZZK),
+  pulsujúci indikátor prehorených záznamov (>24 h), detail s XML náhľadom a URI záznamu
+- Hromadné odosielanie čakajúcich záznamov do IS EZZK priamo z dashboardu
 - Fakturovateľný prehľad úkonov pre vyúčtovanie klientovi (sadzobník)
 
 ---
@@ -153,7 +165,10 @@ Interaktívna galéria diagramov: [`docs/gallery.html`](docs/gallery.html) *(otv
 | `SecurityElementsDetectorTests` | pečiatka + podpis na syntetickom skene, prázdna strana = 0 prvkov, IoU merger |
 | `AttestationXMLTests` | elementy schémy, escaping, LegalSubject varianta, SHA-256 golden vector, validátory |
 | `PDFAConverterTests` | hlavička 1.7, pdfaid markery, zachovanie textu, raster mód, EmbeddedFile round-trip |
-| `EvidenceAndPackagingTests` | perzistencia registra, CSV escaping, ZIP/ASiC-E štruktúra, Mock EZZK, demo podpis |
+| `EvidenceAndPackagingTests` | perzistencia registra, CSV escaping, ZIP/ASiC-E štruktúra, ZaKo kontajner layout + manifest, Mock EZZK ({registry}-{YYMMDD}-{seq}), demo podpis |
+| `TimestampClientTests` | RFC 3161 DER golden vektory (request bajt-po-bajte, odpoveď s genTime), zamietnuté stavy, TSA migrácia nastavení, pečiatka v ASiC-E |
+| `SigningInfrastructureTests` | X.509 parser (veľké sériové čísla, RFC2253 issuer), výber reálneho providera |
+| `ValidationAndPAdESTests` | PDF/A validátor na konvertovanom aj čistom PDF, XML validátor (korupcia fingerprint/evidence/UsedDevice), ASiC-E verifier (digest mismatch detekcia), PAdES ByteRange == CMS messageDigest |
 | `VisibleSignatureStamperTests` | FreeText anotácia vizuálneho podpisu, obsah s menom/dátumom, variant bez časovej pečiatky |
 | `ElementGeometryTests` | klik-to-place clamping, drag move, resize obojsmerne, hit-test najmenšieho boxu, aspect-fit mapovanie |
 | `LLMVisionParserTests` | JSON extrakcia z noisy odpovede, case-insensitive kind mapping, custom prompt fallback, § 37 pokrytie |
@@ -177,13 +192,15 @@ Dizajnové špecifikácie: [`AUTOGRAM_MASTER_UI_UX_SPEC.md`](AUTOGRAM_MASTER_UI_
 
 | Oblast | Stav | Ďalší krok |
 |---|---|---|
-| EZZK API | Mock + HTTP kostra | oficiálna OpenAPI špecifikácia od MIRRI/IOMO |
-| KEP podpis | signing flow hotový, DEMO podpisovač (ASiC-E manifest) | EU DSS helper / PKCS#11 most pre reálny mandátny certifikát + RFC 3161 QTS |
+| KEP podpis | ✅ reálny XAdES-B/T + PAdES-B/T natívne cez SecIdentity | cert chain do KeyInfo, PAdES B-LT archivácia |
+| Časové pečiatky | ✅ RFC 3161 klient + TSA zoznam/custom + test spojenia | autodetekcia kvalifikovanosti TSA z EU Trusted List |
+| Validácie | ✅ PDFAValidator + AttestationXMLValidator + ASiCEVerifier ako hard gates | voliteľná plná veraPDF schémová validácia via bundled CLI |
+| Mandátny atribút | heuristika CN/issuer | presný OID mandátu z reálneho SAK certifikátu |
+| EZZK API | Mock + HTTP kostra, hromadné odoslanie z UI | oficiálna OpenAPI špecifikácia od MIRRI/IOMO |
 | Smery E→P, E→E | architektúra pripravená | formuláre príloh č. 1 a 5 |
-| veraPDF validácia | nie je integrovaná | voliteľné via bundled CLI |
-| Formuláre v1.2 (2027) | verziovaný placeholder | auto-update artefaktov z formulare.slovensko.sk |
+| Formuláre v1.2 (2027) | verziovaný placeholder (`ZakoCodelists`) | auto-update artefaktov z formulare.slovensko.sk |
 
-> ⚠️ **Právna poznámka:** aplikácia je vo vývoji. DEMO režim podpisu negarantuje právne účinky kvalifikovaného elektronického podpisu — pred produkčným nasadením pripojte reálny mandátny certifikát cez kvalifikovaný podpisový modul a overte integráciu s IS EZZK.
+> ⚠️ **Právna poznámka:** aplikácia je vo vývoji. Keď je v Keychaini dostupná identita s privátnym kľúčom (napr. advokátsky preukaz SAK cez CryptoTokenKit), appka vytvára reálny KEP (XAdES/PAdES) s RFC 3161 QTS. Ak identita nie je dostupná, beží DEMO podpisovač — jeho výstupy nemajú právne účinky kvalifikovaného elektronického podpisu. Integráciu s IS EZZK overte pred produkčným nasadením.
 
 ---
 

@@ -2,7 +2,9 @@ import XCTest
 @testable import AutogramKit
 
 final class AttestationXMLTests: XCTestCase {
-    private func sampleInput(fingerprint: String = "aabbcc") -> AttestationClauseGenerator.Input {
+    private func sampleInput(fingerprintHex: String =
+        "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad")
+        -> AttestationClauseGenerator.Input {
         let profile = AdvocateProfile(fullName: "JUDr. Ján Advokát",
                                       position: "advokát",
                                       registrationNumber: "1234",
@@ -16,24 +18,24 @@ final class AttestationXMLTests: XCTestCase {
             sheetCountingMethod: .duplexEstimate,
             nonEmptyPageCount: 5,
             paperSizeBreakdown: [.init(sizeClass: .a4Portrait, sheets: 3)],
-            newDocumentName: "Zmluva o dielo (PDF/A)",
-            newDocumentFormatLabel: "PDF",
+            newDocumentName: "Zmluva o dielo.pdf",
+            newDocumentFormatLabel: "PDF/A-2",
             conversionExecutionDateTime: Date(timeIntervalSince1970: 1_700_000_000),
-            evidenceNumber: "2026/000042",
-            performingPerson: profile)
+            evidenceNumber: "1563-231114-42",
+            performingPerson: profile,
+            usedDeviceDescription: "Skenovanie / import do aplikácie Autogram")
         let elements = [
             SecurityElement(kind: .officialStamp, pageIndex: 0,
                             boundingBox: NormalizedRect(x: 0.7, y: 0.1, width: 0.2, height: 0.2),
                             confidence: 0.93,
                             verbalDescription: "Úradná pečiatka v pravej dolnej časti."),
-            SecurityElement(kind: .handwrittenSignature, pageIndex: 0,
+            SecurityElement(kind: .handwrittenSignature, pageIndex: 4,
                             boundingBox: NormalizedRect(x: 0.12, y: 0.82, width: 0.4, height: 0.08),
                             confidence: 0.71)
         ]
         return AttestationClauseGenerator.Input(attestation: attestation,
                                                 securityElements: elements,
-                                                newDocumentFingerprintSHA256Hex: fingerprint,
-                                                qualifiedTimestampTime: nil)
+                                                newDocumentFingerprintSHA256Hex: fingerprintHex)
     }
 
     func testXMLContainsRequiredSchemaElements() throws {
@@ -44,17 +46,69 @@ final class AttestationXMLTests: XCTestCase {
                        "<OriginalDocumentInfo>",
                        "<OriginalDocumentNumberOfSheets>3</OriginalDocumentNumberOfSheets>",
                        "<OriginalDocumentNonEmptyPageCount>5</OriginalDocumentNonEmptyPageCount>",
-                       "<PaperSize>A4 na výšku</PaperSize>",
+                       "<CodelistCode>12</CodelistCode>",
+                       "<ItemCode>A4</ItemCode>",
+                       "<PaperSizeNumberOfSheets>3</PaperSizeNumberOfSheets>",
+                       "<CodelistCode>15</CodelistCode>",
+                       "<ItemCode>okrúhla pečiatka so štátnym znakom</ItemCode>",
+                       "<SecurityElementVerbalDescription>Úradná pečiatka",
+                       "<OriginalDocumentSecurityElementsPage>1</OriginalDocumentSecurityElementsPage>",
+                       "<OriginalDocumentSecurityElementsSheet>1</OriginalDocumentSecurityElementsSheet>",
+                       "<OriginalDocumentSecurityElementsPage>5</OriginalDocumentSecurityElementsPage>",
+                       "<OriginalDocumentSecurityElementsSheet>3</OriginalDocumentSecurityElementsSheet>",
+                       "<CodelistCode>11</CodelistCode>",
+                       "<ItemCode>Right down</ItemCode>",
                        "<NewDocumentInfo>",
-                       "<ElectronicFingerprintValue algorithm=\"sha-256\">aabbcc</ElectronicFingerprintValue>",
+                       "<NewDocumentName>Zmluva o dielo.pdf</NewDocumentName>",
+                       "<CodelistCode>53</CodelistCode>",
+                       "<ItemCode>PDFA2</ItemCode>",
+                       "<ElectronicFingerprintValue>ungWv48Bz+pBQUDeXa4iI7ADYaOWF3qctBD/YfIAFa0=</ElectronicFingerprintValue>",
+                       "<ElectronicFingerprintCalculationMethod>",
+                       "<CodelistCode>14</CodelistCode>",
+                       "<ItemCode>SHA-256</ItemCode>",
                        "<GivenName>Ján</GivenName>",
                        "<FamilyName>Advokát</FamilyName>",
                        "<Position>advokát</Position>",
+                       "<LegalSubject>",
+                       "<Name>Advokátska kancelária Test</Name>",
+                       "<IdentifierValue>ico://sk/35764102</IdentifierValue>",
+                       "<UsedDevice>Skenovanie / import do aplikácie Autogram</UsedDevice>",
                        "<ConversionExecutionDateTime>",
-                       "<ConversionRecordEvidenceNumber>2026/000042</ConversionRecordEvidenceNumber>",
+                       "<ConversionRecordEvidenceNumber>https://data.gov.sk/id/egov/conversion-record/1563-231114-42</ConversionRecordEvidenceNumber>",
                        "</ConversionRecord>"] {
             XCTAssertTrue(xml.contains(marker), "Chýba fragment: \(marker)\n---\n\(xml)")
         }
+    }
+
+    func testLocationAndSheetMapping() {
+        XCTAssertEqual(SecurityElement.Kind.handwrittenSignature.codelist15Item.code,
+                       "vlastnoručný podpis")
+
+        let bottomRight = SecurityElement(kind: .officialStamp, pageIndex: 0,
+                                          boundingBox: NormalizedRect(x: 0.8, y: 0.05,
+                                                                      width: 0.15, height: 0.15),
+                                          confidence: 1)
+        XCTAssertEqual(bottomRight.locationCodelist11Item.code, "Right down")
+
+        let topCenter = SecurityElement(kind: .embossedSeal, pageIndex: 0,
+                                        boundingBox: NormalizedRect(x: 0.45, y: 0.85,
+                                                                    width: 0.1, height: 0.1),
+                                        confidence: 1)
+        XCTAssertEqual(topCenter.locationCodelist11Item.code, "Up")
+
+        XCTAssertEqual(bottomRight.sheetNumber(sheetMethod: .duplexEstimate), 1)
+        XCTAssertEqual(topCenter.sheetNumber(sheetMethod: .duplexEstimate), 1)
+
+        var pageFive = topCenter
+        pageFive.pageIndex = 4
+        XCTAssertEqual(pageFive.sheetNumber(sheetMethod: .duplexEstimate), 3)
+        XCTAssertEqual(pageFive.sheetNumber(sheetMethod: .oneSheetPerPage), 5)
+    }
+
+    func testFingerprintBase64KnownVector() {
+        XCTAssertEqual(AttestationClauseGenerator.fingerprintBase64(
+            hex: "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"),
+            "ungWv48Bz+pBQUDeXa4iI7ADYaOWF3qctBD/YfIAFa0=")
     }
 
     func testXMLEscapesSpecialCharacters() {
@@ -63,7 +117,7 @@ final class AttestationXMLTests: XCTestCase {
         XCTAssertTrue(xml.contains("&lt;verzia 2&gt;"))
     }
 
-    func testLegalSubjectVariant() {
+    func testLegalSubjectOnlyVariantForLegalEntity() {
         var input = sampleInput()
         input.attestation.performingPerson.isLegalEntity = true
         input.attestation.performingPerson.fullName = ""
@@ -71,6 +125,7 @@ final class AttestationXMLTests: XCTestCase {
         let xml = AttestationClauseGenerator().generateXML(input: input)
         XCTAssertTrue(xml.contains("<LegalSubject>"))
         XCTAssertTrue(xml.contains("AK &amp; Partners s.r.o."))
+        XCTAssertFalse(xml.contains("<PhysicalPerson>"))
     }
 
     func testSHA256HexMatchesKnownVector() {
@@ -89,7 +144,7 @@ final class AttestationXMLTests: XCTestCase {
         data.originalDocumentName = "x"
         data.newDocumentName = "y"
         data.numberOfSheets = 2
-        data.evidenceNumber = "2026/001"
+        data.evidenceNumber = "1563-231114-1"
         data.performingPerson = AdvocateProfile(fullName: "JUDr. A B", registrationNumber: "1")
         let element = SecurityElement(kind: .officialStamp, pageIndex: 0,
                                       boundingBox: .zero, confidence: 0.9)

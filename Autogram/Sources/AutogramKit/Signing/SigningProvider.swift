@@ -47,20 +47,68 @@ public struct SignedConversionResult: Sendable {
     public var signedAt: Date
     public var signatureLabel: String
     public var isLegallyBinding: Bool
+    public var timestampGenTime: Date?
+    public var timestampToken: Data?
 
     public init(pdfData: Data, asicData: Data?, signedAt: Date,
-                signatureLabel: String, isLegallyBinding: Bool) {
+                signatureLabel: String, isLegallyBinding: Bool,
+                timestampGenTime: Date? = nil, timestampToken: Data? = nil) {
         self.pdfData = pdfData
         self.asicData = asicData
         self.signedAt = signedAt
         self.signatureLabel = signatureLabel
         self.isLegallyBinding = isLegallyBinding
+        self.timestampGenTime = timestampGenTime
+        self.timestampToken = timestampToken
+    }
+}
+
+public enum SigningOutputFormat: String, Codable, CaseIterable, Identifiable, Sendable {
+    case attachedASIC = "ASiC-E kontajner (XAdES)"
+    case embeddedPAdES = "PAdES podpis v PDF"
+
+    public var id: String { rawValue }
+}
+
+public struct SigningRequest: Sendable {
+    public var pdfData: Data
+    public var identityID: String
+    public var includeTimestamp: Bool
+    public var tsaURL: String?
+    public var outputFormat: SigningOutputFormat
+    public var extraFiles: [ASiCEPackager.Entry]
+
+    public init(pdfData: Data, identityID: String,
+                includeTimestamp: Bool, tsaURL: String? = nil,
+                outputFormat: SigningOutputFormat = .attachedASIC,
+                extraFiles: [ASiCEPackager.Entry] = []) {
+        self.pdfData = pdfData
+        self.identityID = identityID
+        self.includeTimestamp = includeTimestamp
+        self.tsaURL = tsaURL
+        self.outputFormat = outputFormat
+        self.extraFiles = extraFiles
     }
 }
 
 public protocol QualifiedSigningProviding: Sendable {
     func availableIdentities() async -> [SigningIdentityInfo]
-    func sign(pdf: Data, identityID: String, includeTimestamp: Bool) async throws -> SignedConversionResult
+    func sign(_ request: SigningRequest) async throws -> SignedConversionResult
+}
+
+extension QualifiedSigningProviding {
+    public func sign(pdf: Data, identityID: String,
+                     includeTimestamp: Bool) async throws -> SignedConversionResult {
+        try await sign(SigningRequest(pdfData: pdf, identityID: identityID,
+                                      includeTimestamp: includeTimestamp))
+    }
+
+    public func sign(pdf: Data, identityID: String, includeTimestamp: Bool,
+                     extraFiles: [ASiCEPackager.Entry]) async throws -> SignedConversionResult {
+        try await sign(SigningRequest(pdfData: pdf, identityID: identityID,
+                                      includeTimestamp: includeTimestamp,
+                                      extraFiles: extraFiles))
+    }
 }
 
 public final class DemoSigningProvider: QualifiedSigningProviding, @unchecked Sendable {
@@ -82,22 +130,36 @@ public final class DemoSigningProvider: QualifiedSigningProviding, @unchecked Se
         return result
     }
 
-    public func sign(pdf: Data, identityID: String, includeTimestamp: Bool) async throws -> SignedConversionResult {
+    public func sign(_ request: SigningRequest) async throws -> SignedConversionResult {
         let n = counter.withLock { state -> Int in
             state += 1
             return state
         }
 
-        let digest = SHA256.hash(data: pdf).map { String(format: "%02x", $0) }.joined()
+        var timestampGenTime: Date?
+        var timestampTokenData: Data?
+        if request.includeTimestamp {
+            guard let tsaURLString = request.tsaURL, !tsaURLString.isEmpty,
+                  let tsaURL = URL(string: tsaURLString), tsaURL.scheme != nil else {
+                throw SigningError.timestampFailed
+            }
+            let reply = try await RFC3161TimestampClient().requestToken(for: request.pdfData,
+                                                                        tsaURL: tsaURL)
+            timestampGenTime = reply.genTime
+            timestampTokenData = reply.token
+        }
+
+        let digest = SHA256.hash(data: request.pdfData).map { String(format: "%02x", $0) }.joined()
         let manifest = """
         {
           "type": "autogram-demo-signature",
           "legallyBinding": false,
           "note": "Vývojový podpis — nenahrádza KEP s mandátnym certifikátom.",
           "sequence": \(n),
-          "identity": "\(identityID)",
+          "identity": "\(request.identityID)",
           "sha256": "\(digest)",
-          "timestampRequested": \(includeTimestamp),
+          "timestampRequested": \(request.includeTimestamp),
+          "timestampGenTimeISO": \(timestampGenTime.map { "\"\(AttestationClauseGenerator.isoFormatter.string(from: $0))\"" } ?? "null"),
           "signedAtISO": "\(AttestationClauseGenerator.isoFormatter.string(from: Date()))"
         }
         """
@@ -105,20 +167,52 @@ public final class DemoSigningProvider: QualifiedSigningProviding, @unchecked Se
             throw SigningError.signingFailed("Interná chyba manifestu.")
         }
 
-        let asic = try ASiCEPackager().package(files: [
-            ASiCEPackager.Entry(path: "mimetype",
-                                data: Data("application/vnd.etsi.asic-e+zip".utf8),
-                                storeUncompressed: true),
-            ASiCEPackager.Entry(path: "META-INF/demo-signature.json", data: manifestData),
-            ASiCEPackager.Entry(path: "document.pdf", data: pdf)
-        ])
+        var merged: [String: ASiCEPackager.Entry] = [:]
+        merged["mimetype"] = ASiCEPackager.Entry(
+            path: "mimetype",
+            data: Data(ASiCEPackager.asicMimeType.utf8),
+            storeUncompressed: true)
+        for entry in request.extraFiles where entry.path != "META-INF/demo-signature.json" {
+            if entry.path == "mimetype" {
+                merged["mimetype"] = entry.storeUncompressed ? entry : entry.asStored
+            } else {
+                merged[entry.path] = entry
+            }
+        }
+        merged["META-INF/demo-signature.json"] =
+            ASiCEPackager.Entry(path: "META-INF/demo-signature.json", data: manifestData)
+        if let tokenData = timestampTokenData {
+            merged["META-INF/timestamp.tsr"] =
+                ASiCEPackager.Entry(path: "META-INF/timestamp.tsr", data: tokenData)
+        }
+        merged["document.pdf"] = ASiCEPackager.Entry(path: "document.pdf", data: request.pdfData)
+
+        if merged["META-INF/manifest.xml"] == nil {
+            let dataEntries = merged.values
+                .filter { $0.path != "mimetype" && !$0.path.hasPrefix("META-INF/") }
+                .map { (path: $0.path, mediaType: ASiCEPackager.mediaType(forPath: $0.path)) }
+            merged["META-INF/manifest.xml"] = ASiCEPackager.Entry(
+                path: "META-INF/manifest.xml",
+                data: Data(ASiCEPackager.manifestXML(entries: dataEntries).utf8))
+        }
+
+        let asic = try ASiCEPackager().package(files: Array(merged.values))
 
         return SignedConversionResult(
-            pdfData: pdf,
+            pdfData: request.pdfData,
             asicData: asic,
             signedAt: Date(),
             signatureLabel: "Demo podpis #\(n) (SHA-256 potvrdený)",
-            isLegallyBinding: false)
+            isLegallyBinding: false,
+            timestampGenTime: timestampGenTime,
+            timestampToken: timestampTokenData)
+    }
+}
+
+public enum SigningProviderFactory {
+    public static func makeDefault() -> any QualifiedSigningProviding {
+        let hasRealIdentity = KeychainIdentityScanner.scanAll().contains { $0.hasPrivateKey }
+        return hasRealIdentity ? KeychainXAdESSigningProvider() : DemoSigningProvider()
     }
 }
 
@@ -166,6 +260,30 @@ public enum KeychainIdentityScanner {
                 isMandateCertificate: Self.looksMandate(summary),
                 isQualified: Self.looksQualified(summary))
         }
+    }
+
+    public static func resolveIdentity(id: String) -> (identity: SecIdentity, summary: String)? {
+        guard id.hasPrefix("identity:") else { return nil }
+        let wanted = String(id.dropFirst("identity:".count))
+
+        var query = [String: Any]()
+        query[kSecClass as String] = kSecClassIdentity
+        query[kSecMatchLimit as String] = kSecMatchLimitAll
+        query[kSecReturnRef as String] = true
+
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        guard status == errSecSuccess, let refs = result as? [SecIdentity] else { return nil }
+
+        for identity in refs {
+            var certificate: SecCertificate?
+            guard SecIdentityCopyCertificate(identity, &certificate) == errSecSuccess,
+                  let cert = certificate,
+                  let summary = SecCertificateCopySubjectSummary(cert) as String?,
+                  summary == wanted else { continue }
+            return (identity, summary)
+        }
+        return nil
     }
 
     public static func scanTokenCertificates() -> [SigningIdentityInfo] {

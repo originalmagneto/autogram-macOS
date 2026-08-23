@@ -21,6 +21,17 @@ public struct EvidenceRecord: Codable, Identifiable, Sendable {
             case .submissionFailed: return "exclamationmark.triangle.fill"
             }
         }
+
+        public var progressIndex: Int {
+            switch self {
+            case .draft: return 0
+            case .awaitingNumber: return 1
+            case .readyToSign: return 2
+            case .signed: return 3
+            case .queuedForSubmission, .submissionFailed: return 4
+            case .submitted: return 5
+            }
+        }
     }
 
     public var id: UUID
@@ -39,6 +50,37 @@ public struct EvidenceRecord: Codable, Identifiable, Sendable {
     public var totalPages: Int
     public var totalSheets: Int
     public var pdfFileName: String?
+
+    public var evidenceURI: String? {
+        guard let evidenceNumber, !evidenceNumber.isEmpty else { return nil }
+        let uri = ZakoCodelists.conversionRecordURI(evidenceNumber: evidenceNumber)
+        return uri.isEmpty ? nil : uri
+    }
+
+    public static let submissionDeadlineInterval: TimeInterval = 24 * 3600
+
+    public var submissionDeadline: Date {
+        conversionTime.addingTimeInterval(Self.submissionDeadlineInterval)
+    }
+
+    public var isSubmissionPending: Bool {
+        status == .signed || status == .queuedForSubmission || status == .submissionFailed
+    }
+
+    public var isOverdue: Bool {
+        isSubmissionPending && Date() > submissionDeadline
+    }
+
+    public func envelope() -> ConversionRecordEnvelope {
+        ConversionRecordEnvelope(
+            evidenceNumber: evidenceNumber ?? "",
+            direction: direction,
+            originalName: originalName,
+            newDocumentName: newDocumentName,
+            attestationXML: attestationXML,
+            fingerprintSHA256Hex: fingerprintSHA256Hex,
+            conversionTime: conversionTime)
+    }
 
     public init(id: UUID = UUID(), createdAt: Date = Date(), status: Status,
                 direction: ConversionDirection, originalName: String,

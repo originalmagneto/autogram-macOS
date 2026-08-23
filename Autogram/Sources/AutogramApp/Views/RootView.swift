@@ -73,11 +73,12 @@ struct RootView: View {
     private var detailView: some View {
         switch selection {
         case .signing:
-            SigningFlowView(signingProvider: settingsStore.signingProvider)
+            SigningFlowView(signingProvider: settingsStore.signingProvider,
+                            settings: settingsStore.settings)
         case .zako:
             ZakoFlowView(settingsStore: settingsStore)
         case .evidence:
-            EvidenceDashboardView(store: settingsStore.evidenceStore)
+            EvidenceDashboardView(settingsStore: settingsStore)
         case .settings:
             SettingsView(settingsStore: settingsStore)
         }

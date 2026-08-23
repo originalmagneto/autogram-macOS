@@ -7,8 +7,9 @@ struct SigningFlowView: View {
     @Bindable var store: SigningSessionStore
     @State private var isTargeted = false
 
-    init(signingProvider: any QualifiedSigningProviding) {
-        _store = Bindable(wrappedValue: SigningSessionStore(signingProvider: signingProvider))
+    init(signingProvider: any QualifiedSigningProviding, settings: AppSettings = .standard) {
+        _store = Bindable(wrappedValue: SigningSessionStore(signingProvider: signingProvider,
+                                                            settings: settings))
     }
 
     var body: some View {
@@ -295,10 +296,28 @@ struct SigningPrepareView: View {
                         Toggle(isOn: $store.includeQualifiedTimestamp) {
                             Label("Kvalifikovaná časová pečiatka (QTS)", systemImage: "clock.badge.checkmark")
                         }
+                        Toggle(isOn: $store.convertToPDFA) {
+                            Label("Konvertovať do PDF/A pred podpisom", systemImage: "doc.badge.arrow.up")
+                        }
+                        if store.convertToPDFA {
+                            Text("Dokument sa pred podpisom prevedie do PDF/A-2b (\(store.settings.pdfaMode.rawValue)). Režim konverzie zmeníš v Nastavenia › Konverzia PDF/A.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                         Toggle(isOn: $store.includeVisibleSignature) {
                             Label("Vizuálny podpis v dokumente", systemImage: "rectangle.and.pencil.and.ellipsis")
                         }
                         .toggleStyle(.switch)
+
+                        LabeledRow(label: "Formát výstupu") {
+                            Picker("", selection: $store.outputFormat) {
+                                ForEach(SigningOutputFormat.allCases) { format in
+                                    Text(format.rawValue).tag(format)
+                                }
+                            }
+                            .labelsHidden()
+                            .frame(width: 220)
+                        }
 
                         if store.includeVisibleSignature {
                             LabeledRow(label: "Strana") {

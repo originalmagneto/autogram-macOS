@@ -53,14 +53,49 @@ final class EvidenceAndPackagingTests: XCTestCase {
         } || tail.contains(eocdSignature[0]) , "EOCD musí existovať")
     }
 
+    func testZakoContainerLayoutAndManifest() throws {
+        let packager = ASiCEPackager()
+        let pdf = TestPDFBuilder.typicalContractPDF()
+        let files = packager.zakoContainer(pdfData: pdf,
+                                           pdfFileName: "Zmluva o dielo.pdf",
+                                           dolozkaXML: Data("<ConversionRecord/>".utf8),
+                                           dolozkaFileName: "1563-231114-1.xml.xdcf")
+        let paths = files.map(\.path)
+        XCTAssertTrue(paths.contains("mimetype"))
+        XCTAssertTrue(paths.contains("Zmluva o dielo.pdf"))
+        XCTAssertTrue(paths.contains("1563-231114-1.xml.xdcf"))
+        XCTAssertTrue(paths.contains("META-INF/manifest.xml"))
+
+        let asic = try packager.package(files: files)
+        let listing = String(decoding: asic, as: UTF8.self)
+        XCTAssertTrue(listing.contains("application/vnd.gov.sk.xmldatacontainer+xml"))
+        XCTAssertTrue(listing.contains("manifest:file-entry"))
+
+        let mimetypeEntry = try XCTUnwrap(files.first { $0.path == "mimetype" })
+        XCTAssertTrue(mimetypeEntry.storeUncompressed)
+
+        let manifestXML = String(
+            decoding: try XCTUnwrap(files.first { $0.path == "META-INF/manifest.xml" }).data,
+            as: UTF8.self)
+        XCTAssertTrue(manifestXML.contains(
+            "<manifest:file-entry manifest:full-path=\"/\" " +
+            "manifest:media-type=\"application/vnd.etsi.asic-e+zip\"/>"))
+        XCTAssertTrue(manifestXML.contains("Zmluva o dielo.pdf"))
+    }
+
     func testMockEZZKAssignsSequentialNumbers() async throws {
         let service = MockEZZKService(startingNumber: 5)
         let numbers = try await service.requestEvidenceNumbers(count: 3)
         XCTAssertEqual(numbers.count, 3)
         XCTAssertNotEqual(numbers[0], numbers[1])
 
-        let year = Calendar.current.component(.year, from: Date())
-        XCTAssertTrue(numbers[0].hasPrefix("\(year)/"))
+        for number in numbers {
+            XCTAssertTrue(number.hasPrefix("1563-"), "Neočakávaný formát: \(number)")
+            let parts = number.split(separator: "-")
+            XCTAssertEqual(parts.count, 3, "Formát má byť {registry}-{YYMMDD}-{seq}: \(number)")
+        }
+        XCTAssertEqual(numbers.map { $0.split(separator: "-").last.map(String.init) },
+                       ["5", "6", "7"])
 
         let envelope = ConversionRecordEnvelope(
             evidenceNumber: numbers[0],
@@ -85,7 +120,7 @@ final class EvidenceAndPackagingTests: XCTestCase {
         let pdf = TestPDFBuilder.typicalContractPDF()
         let result = try await provider.sign(pdf: pdf,
                                              identityID: identities[0].id,
-                                             includeTimestamp: true)
+                                             includeTimestamp: false)
         XCTAssertFalse(result.isLegallyBinding)
         XCTAssertEqual(result.pdfData, pdf)
 

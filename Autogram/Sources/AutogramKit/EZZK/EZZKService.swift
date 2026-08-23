@@ -60,19 +60,24 @@ public final class MockEZZKService: EZZKServicing, @unchecked Sendable {
         var submitted: [ConversionRecordEnvelope] = []
     }
     private let state = OSAllocatedUnfairLock(initialState: State(counter: 0))
+    public let registryCode: String
 
-    public init(startingNumber: Int = 1) {
+    public init(registryCode: String = "1563", startingNumber: Int = 1) {
+        self.registryCode = registryCode
         _ = state.withLock { $0.counter = startingNumber }
     }
 
     public func serverTime() async throws -> Date { Date() }
 
     public func requestEvidenceNumbers(count: Int) async throws -> [String] {
-        let year = Calendar.current.component(.year, from: Date())
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyMMdd"
+        let dayStamp = formatter.string(from: Date())
         return state.withLock { st -> [String] in
             var numbers: [String] = []
             for _ in 0..<count {
-                numbers.append(String(format: "%d/%06d", year, st.counter))
+                numbers.append(String(format: "%@-%@-%d", registryCode, dayStamp, st.counter))
                 st.counter += 1
             }
             return numbers

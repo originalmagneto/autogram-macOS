@@ -31,7 +31,7 @@ final class AppSettingsStore {
         ezzkService = credentials.isConfigured
             ? HTTPSEZZKService(credentials: credentials)
             : MockEZZKService()
-        signingProvider = DemoSigningProvider()
+        signingProvider = SigningProviderFactory.makeDefault()
     }
 
     func saveEZZKPassword() {

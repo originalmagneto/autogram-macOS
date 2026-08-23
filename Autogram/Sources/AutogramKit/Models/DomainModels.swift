@@ -67,6 +67,22 @@ public struct SecurityElement: Codable, Hashable, Identifiable, Sendable {
             case .other: return "questionmark.circle"
             }
         }
+
+        public var codelist15Item: ZakoCodelistItem {
+            switch self {
+            case .handwrittenSignature:
+                return ZakoCodelistItem(code: "vlastnoručný podpis", skName: "Vlastnoručný podpis")
+            case .officialStamp:
+                return ZakoCodelistItem(code: "okrúhla pečiatka so štátnym znakom",
+                                        skName: "Okrúhla pečiatka so štátnym znakom")
+            case .embossedSeal:
+                return ZakoCodelistItem(code: "reliéfna pečiatka", skName: "Reliéfna pečiatka")
+            case .initial:
+                return ZakoCodelistItem(code: "parafa", skName: "Parafa")
+            case .other:
+                return ZakoCodelistItem(code: "iný prvok", skName: "Iný prvok")
+            }
+        }
     }
 
     public var id: UUID
@@ -95,6 +111,42 @@ public struct SecurityElement: Codable, Hashable, Identifiable, Sendable {
         let verticalZone = boundingBox.midY < 0.33 ? "v dolnej časti" :
                            boundingBox.midY < 0.67 ? "v strede výšky" : "v hornej časti"
         return "\(kind.rawValue) na strane \(pageIndex + 1), \(verticalZone), \(horizontalZone)"
+    }
+
+    public var locationCodelist11Item: ZakoCodelistItem {
+        let vertical: String
+        switch boundingBox.midY {
+        case ..<0.33: vertical = "down"
+        case ..<0.67: vertical = "middle"
+        default: vertical = "up"
+        }
+        let horizontal: String
+        switch boundingBox.midX {
+        case ..<0.33: horizontal = "left"
+        case ..<0.67: horizontal = "center"
+        default: horizontal = "right"
+        }
+        switch (vertical, horizontal) {
+        case ("down", "left"): return ZakoCodelistItem(code: "Left down", skName: "Dole vľavo")
+        case ("down", "center"): return ZakoCodelistItem(code: "Down", skName: "Dole")
+        case ("down", "right"): return ZakoCodelistItem(code: "Right down", skName: "Dole vpravo")
+        case ("middle", "left"): return ZakoCodelistItem(code: "Left", skName: "Vľavo")
+        case ("middle", "center"): return ZakoCodelistItem(code: "Center", skName: "V strede")
+        case ("middle", "right"): return ZakoCodelistItem(code: "Right", skName: "Vpravo")
+        case ("up", "left"): return ZakoCodelistItem(code: "Left up", skName: "Hore vľavo")
+        case ("up", "center"): return ZakoCodelistItem(code: "Up", skName: "Hore")
+        default: return ZakoCodelistItem(code: "Right up", skName: "Hore vpravo")
+        }
+    }
+
+    public func sheetNumber(sheetMethod: SheetCountingMethod) -> Int {
+        let page = pageIndex + 1
+        switch sheetMethod {
+        case .oneSheetPerPage:
+            return page
+        case .duplexEstimate, .manual:
+            return (page + 1) / 2
+        }
     }
 }
 

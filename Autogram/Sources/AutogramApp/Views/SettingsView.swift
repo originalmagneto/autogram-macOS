@@ -4,6 +4,9 @@ import AutogramKit
 struct SettingsView: View {
     @Bindable var settingsStore: AppSettingsStore
     @State private var newProfileName = ""
+    @State private var newTSAURL = ""
+    @State private var tsaTestStatus: String?
+    @State private var isTestingTSA = false
 
     var body: some View {
         TabView {
@@ -120,10 +123,83 @@ struct SettingsView: View {
             }
             .pickerStyle(.radioGroup)
 
-            LabeledRow(label: "Časová pečiatka (TSA)") {
-                TextField("URL kvalifikovanej TSA", text: $settingsStore.settings.tsaURL)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: 360)
+            GroupBox("Časová pečiatka (RFC 3161 TSA)") {
+                VStack(alignment: .leading, spacing: 10) {
+                    Picker("Aktívna TSA", selection: $settingsStore.settings.selectedTSAURL) {
+                        ForEach(settingsStore.settings.availableTSAServers) { server in
+                            Text("\(server.name) — \(server.url)").tag(server.url)
+                        }
+                    }
+                    .frame(width: 520)
+
+                    Text("Predvolené servery zodpovedajú originálnej aplikácii Autogram (Sectigo Qualified, Belgian TSA) a slovenskej kvalifikovanej TSA CA Disig. Vlastné servery môžeš pridať nižšie.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    if !settingsStore.settings.customTSAServers.isEmpty {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Vlastné servery").font(.subheadline.weight(.semibold))
+                            ForEach(settingsStore.settings.customTSAServers, id: \.self) { server in
+                                HStack {
+                                    Image(systemName: "globe")
+                                        .foregroundStyle(.secondary)
+                                    Text(server)
+                                        .font(.caption.monospaced())
+                                        .textSelection(.enabled)
+                                    Spacer()
+                                    Button {
+                                        settingsStore.settings.customTSAServers.removeAll { $0 == server }
+                                        if settingsStore.settings.selectedTSAURL == server {
+                                            settingsStore.settings.selectedTSAURL =
+                                                TimestampAuthority.legacyDefaultURL
+                                        }
+                                    } label: {
+                                        Image(systemName: "minus.circle.fill")
+                                            .foregroundStyle(.red)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
+                    }
+
+                    HStack(spacing: 8) {
+                        TextField("https://vasa-tsa.example.com/tsp", text: $newTSAURL)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 340)
+                        Button("Pridať vlastnú TSA") {
+                            let trimmed = newTSAURL.trimmingCharacters(in: .whitespacesAndNewlines)
+                            guard !trimmed.isEmpty,
+                                  !settingsStore.settings.customTSAServers.contains(trimmed) else { return }
+                            settingsStore.settings.customTSAServers.append(trimmed)
+                            newTSAURL = ""
+                        }
+                        .disabled(newTSAURL.trimmingCharacters(in: .whitespaces).isEmpty)
+                    }
+
+                    HStack(spacing: 10) {
+                        Button {
+                            testTSAConnection()
+                        } label: {
+                            HStack(spacing: 6) {
+                                if isTestingTSA {
+                                    ProgressView().controlSize(.small)
+                                } else {
+                                    Image(systemName: "bolt.horizontal.circle")
+                                }
+                                Text("Otestovať spojenie")
+                            }
+                        }
+                        .disabled(isTestingTSA || settingsStore.settings.selectedTSAURL.isEmpty)
+
+                        if let status = tsaTestStatus {
+                            Text(status)
+                                .font(.caption)
+                                .foregroundStyle(status.hasPrefix("✓") ? Color.green : Color.red)
+                        }
+                    }
+                }
+                .padding(4)
             }
 
             Text("Vektorová konverzia zachováva text a vektorovú grafiku; rasterizovaná garancia vykreslí stránky do 300 dpi obrazu — vhodné pre problematické skeny. Výstup je v oboch prípadoch doplnený o XMP metadáta pdfaid (PDF/A-2b) a sRGB OutputIntent.")
@@ -131,6 +207,30 @@ struct SettingsView: View {
                 .foregroundStyle(.secondary)
         }
         .formStyle(.grouped)
+    }
+
+    private func testTSAConnection() {
+        isTestingTSA = true
+        tsaTestStatus = nil
+        let urlString = settingsStore.settings.selectedTSAURL
+        Task {
+            defer { isTestingTSA = false }
+            guard let url = URL(string: urlString), url.scheme != nil else {
+                tsaTestStatus = "✗ Neplatná adresa TSA."
+                return
+            }
+            do {
+                let reply = try await RFC3161TimestampClient()
+                    .requestToken(for: Data("autogram-tsa-connectivity-test".utf8), tsaURL: url)
+                if let time = reply.genTime {
+                    tsaTestStatus = "✓ Pečiatka prijatá (\(AttestationClauseGenerator.isoFormatter.string(from: time)))"
+                } else {
+                    tsaTestStatus = "✓ Token prijatý (\(reply.token.count) B)."
+                }
+            } catch {
+                tsaTestStatus = "✗ \(error.localizedDescription)"
+            }
+        }
     }
 
     private var ezzkTab: some View {

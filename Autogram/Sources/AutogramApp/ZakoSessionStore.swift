@@ -23,6 +23,7 @@ final class ZakoSessionStore {
     var identities: [SigningIdentityInfo] = []
     var selectedIdentityID: String?
     var includeQualifiedTimestamp = true
+    var allowNonMandateOverride = false
     var evidenceNumberRequested = false
     var fetchingEvidenceNumber = false
 
@@ -43,7 +44,6 @@ final class ZakoSessionStore {
     let pdfaConverter: PDFAConverter
     let clauseGenerator: AttestationClauseGenerator
     let embeddedFileService: EmbeddedFileService
-    let clauseRenderer: ClausePDFRenderer
     let ezzkService: any EZZKServicing
     let signingProvider: any QualifiedSigningProviding
     let evidenceStore: LocalEvidenceStore
@@ -61,7 +61,6 @@ final class ZakoSessionStore {
         self.pdfaConverter = PDFAConverter()
         self.clauseGenerator = AttestationClauseGenerator()
         self.embeddedFileService = EmbeddedFileService()
-        self.clauseRenderer = ClausePDFRenderer()
         self.ezzkService = ezzkService
         self.signingProvider = signingProvider
         self.evidenceStore = evidenceStore
@@ -175,12 +174,12 @@ final class ZakoSessionStore {
         data.originalDocumentOrder = 1
         data.originalDocumentName = sourceURL?.deletingPathExtension().lastPathComponent
             ?? analysis.suggestedTitle ?? ""
-        data.newDocumentName = (data.originalDocumentName.isEmpty ? "dokument" : data.originalDocumentName)
+        data.newDocumentName = (data.originalDocumentName.isEmpty ? "dokument" : data.originalDocumentName) + ".pdf"
         data.numberOfSheets = effectiveSheetCount
         data.sheetCountingMethod = sheetMethod
         data.nonEmptyPageCount = analysis.nonEmptyPages
         data.originalDocumentTypeLabel = "Iný dokument"
-        data.newDocumentFormatLabel = "PDF"
+        data.newDocumentFormatLabel = "PDF/A-2"
         data.usedDeviceDescription = "Skenovanie / import do aplikácie Autogram"
         var breakdown: [AttestationData.PaperSizeGroup] = []
         for (sizeClass, pages) in analysis.paperSizeSummary.sorted(by: { $0.key.rawValue < $1.key.rawValue }) {
@@ -317,6 +316,24 @@ final class ZakoSessionStore {
         }
     }
 
+    var selectedIdentity: SigningIdentityInfo? {
+        identities.first(where: { $0.id == selectedIdentityID })
+    }
+
+    var mandateRequirementSatisfied: Bool {
+        guard let identity = selectedIdentity else { return false }
+        return identity.isMandateCertificate && identity.isQualified && identity.hasPrivateKey
+    }
+
+    var requiresMandateOverride: Bool {
+        guard !signingProviderIsDemo else { return !allowNonMandateOverride }
+        return !mandateRequirementSatisfied && !allowNonMandateOverride
+    }
+
+    var signingProviderIsDemo: Bool {
+        signingProvider is DemoSigningProvider
+    }
+
     func fetchEvidenceNumber() async {
         guard !fetchingEvidenceNumber else { return }
         fetchingEvidenceNumber = true
@@ -364,44 +381,78 @@ final class ZakoSessionStore {
                                                      mode: settings.pdfaMode,
                                                      title: attestation.newDocumentName)
 
-            analysisProgressText = "Pripájam osvedčovaciu doložku…"
-            let withClausePage = Self.appendClausePage(to: pdfaData, using: clauseRenderer,
-                                                       attestation: attestation,
-                                                       elements: securityElements)
+            let pdfaCheck = PDFAValidator().validate(pdfaData)
+            guard pdfaCheck.isValid else {
+                throw ComplianceValidationError(domain: "PDF/A-2b", issues: pdfaCheck.issues)
+            }
 
-            let fingerprint = AttestationClauseGenerator.sha256Hex(of: withClausePage)
+            let fingerprint = AttestationClauseGenerator.sha256Hex(of: pdfaData)
             let xmlInput = AttestationClauseGenerator.Input(
                 attestation: attestation,
                 securityElements: securityElements,
-                newDocumentFingerprintSHA256Hex: fingerprint,
-                qualifiedTimestampTime: nil)
+                newDocumentFingerprintSHA256Hex: fingerprint)
             let xml = clauseGenerator.generateXML(input: xmlInput)
+
+            let xmlIssues = AttestationXMLValidator().validate(
+                xml,
+                context: .init(fingerprintSHA256Hex: fingerprint,
+                               securityElementCount: securityElements.count))
+            guard xmlIssues.isEmpty else {
+                throw ComplianceValidationError(domain: "Osvedčovacia doložka", issues: xmlIssues)
+            }
 
             analysisProgressText = "Vkladám XML doložku do dokumentu…"
             let finalPDF = try embeddedFileService.embed(
                 .init(fileName: "osvedcovacia-dolozka.xml",
-                      mimeType: "text+xml",
+                      mimeType: "application#2Fxml",
                       data: Data(xml.utf8)),
-                into: withClausePage)
+                into: pdfaData)
 
             analysisProgressText = "Autorizujem kvalifikovaným podpisom…"
             guard let identityID = selectedIdentityID else {
                 throw SigningError.identityUnavailable
             }
-            let signed = try await signingProvider.sign(pdf: finalPDF,
-                                                        identityID: identityID,
-                                                        includeTimestamp: includeQualifiedTimestamp)
+            if requiresMandateOverride {
+                lastError = "Zvolený certifikát nie je mandátnym certifikátom pre zaručenú konverziu. Pokračovanie je možné len s výslovným override (audit záznam)."
+                analysisProgressText = ""
+                return
+            }
+            if includeQualifiedTimestamp,
+               settings.selectedTSAURL.trimmingCharacters(in: .whitespaces).isEmpty {
+                throw SigningError.timestampFailed
+            }
+            let packager = ASiCEPackager()
+            let docFileName = outputPDFFileName()
+            let xdcfFileName = Self.outputXDCFFileName(evidenceNumber: attestation.evidenceNumber,
+                                                       fallbackDocBase: docFileName)
+            let containerFiles = packager.zakoContainer(pdfData: finalPDF,
+                                                        pdfFileName: docFileName,
+                                                        dolozkaXML: Data(xml.utf8),
+                                                        dolozkaFileName: xdcfFileName)
+            let signed = try await signingProvider.sign(SigningRequest(
+                pdfData: finalPDF,
+                identityID: identityID,
+                includeTimestamp: includeQualifiedTimestamp,
+                tsaURL: includeQualifiedTimestamp ? settings.selectedTSAURL : nil,
+                extraFiles: containerFiles))
+
+            if let asic = signed.asicData {
+                let containerCheck = ASiCEContainerVerifier().verify(asic)
+                guard containerCheck.isValid else {
+                    throw ComplianceValidationError(domain: "ASiC-E kontajner",
+                                                    issues: containerCheck.issues)
+                }
+            }
 
             analysisProgressText = "Ukladám a zapisujem do evidencie…"
             let directory = Self.outputDirectoryURL()
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-            let baseName = sanitizedBaseName()
-            let pdfTarget = directory.appendingPathComponent("\(baseName)-pdfa.pdf")
+            let pdfTarget = directory.appendingPathComponent(docFileName)
             try signed.pdfData.write(to: pdfTarget, options: [.atomic])
-            let xmlTarget = directory.appendingPathComponent("\(baseName)-dolozka.xml")
+            let xmlTarget = directory.appendingPathComponent(xdcfFileName)
             try Data(xml.utf8).write(to: xmlTarget, options: [.atomic])
             if let asic = signed.asicData {
-                try asic.write(to: directory.appendingPathComponent("\(baseName).asice"),
+                try asic.write(to: directory.appendingPathComponent("\(xdcfFileName).asice"),
                                options: [.atomic])
             }
             outputDirectory = directory
@@ -515,6 +566,7 @@ func resetSession(keepingProfile: Bool) {
         manualSheetCount = nil
         identities = []
         selectedIdentityID = nil
+        allowNonMandateOverride = false
         evidenceNumberRequested = false
         validationErrors = []
         result = nil
@@ -525,61 +577,27 @@ func resetSession(keepingProfile: Bool) {
     }
 
     private func sanitizedBaseName() -> String {
-        let raw = attestation.evidenceNumber ?? attestation.originalDocumentName
-        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_"))
-        let cleaned = raw.components(separatedBy: allowed.inverted).joined(separator: "-")
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyyMMdd-HHmmss"
-        return "\(formatter.string(from: Date()))-\(cleaned.isEmpty ? "konverzia" : cleaned)"
+        let raw = attestation.newDocumentName.isEmpty
+            ? attestation.originalDocumentName
+            : attestation.newDocumentName
+        let cleaned = ASiCEPackager.sanitizedFileName(raw)
+        return cleaned.isEmpty ? "konverzia" : cleaned
     }
 
-    static func appendClausePage(to pdfData: Data, using renderer: ClausePDFRenderer,
-                                 attestation: AttestationData,
-                                 elements: [SecurityElement]) -> Data {
-        guard let mainDoc = PDFDocument(data: pdfData) else {
-            return pdfData
+    func outputPDFFileName() -> String {
+        var base = sanitizedBaseName()
+        if (base as NSString).pathExtension.lowercased() == "pdf" {
+            base = (base as NSString).deletingPathExtension
         }
-        let clauseData = renderer.render(
-            title: "OSVEDČOVACIA DOLOŽKA ZARUČENEJ KONVERZIE",
-            subtitle: "Podľa § 37 zákona č. 305/2013 Z. z. o e-Governmente a vyhlášky č. 70/2021 Z. z.",
-            sections: [
-                    .init(heading: "Pôvodný dokument v listinnej podobe", lines: [
-                        ("Názov", attestation.originalDocumentName),
-                        ("Druh", attestation.originalDocumentTypeLabel),
-                        ("Počet listov", "\(attestation.numberOfSheets) (\(attestation.sheetCountingMethod.rawValue))"),
-                        ("Počet neprázdnych strán", "\(attestation.nonEmptyPageCount)")
-                    ]),
-                    .init(heading: "Bezpečnostné prvky pôvodného dokumentu", lines:
-                            elements.enumerated().map { index, element in
-                                ("Prvek \(index + 1)", "\(element.kind.rawValue) — strana \(element.pageIndex + 1). \(element.verbalDescription)")
-                            }),
-                    .init(heading: "Novovzniknutý elektronický dokument", lines: [
-                        ("Názov", attestation.newDocumentName),
-                        ("Formát", attestation.newDocumentFormatLabel)
-                    ]),
-                    .init(heading: "Osoba vykonávajúca konverziu", lines: [
-                        ("Meno", attestation.performingPerson.fullName),
-                        ("Funkcia", attestation.performingPerson.position),
-                        ("Evidenčné číslo advokáta", attestation.performingPerson.registrationNumber),
-                        ("IČO kancelárie", attestation.performingPerson.ico)
-                    ]),
-                    .init(heading: "Evidencia konverzie", lines: [
-                        ("Čas konverzie", AttestationClauseGenerator.isoFormatter.string(from: attestation.conversionExecutionDateTime)),
-                        ("Evidenčné číslo", attestation.evidenceNumber ?? "—"),
-                        ("Zariadenie", attestation.usedDeviceDescription)
-                    ])
-                ])
+        return "\(base).pdf"
+    }
 
-        guard let clauseDoc = PDFDocument(data: clauseData) else {
-            return pdfData
+    static func outputXDCFFileName(evidenceNumber: String?, fallbackDocBase: String) -> String {
+        let cleanedEvidence = evidenceNumber.map { ASiCEPackager.sanitizedFileName($0) } ?? ""
+        if !cleanedEvidence.isEmpty {
+            return "\(cleanedEvidence).xml.xdcf"
         }
-
-        for index in 0..<clauseDoc.pageCount {
-            if let page = clauseDoc.page(at: index) {
-                mainDoc.insert(page, at: mainDoc.pageCount)
-            }
-        }
-        return mainDoc.dataRepresentation() ?? pdfData
+        return "\((fallbackDocBase as NSString).deletingPathExtension)-dolozka.xml.xdcf"
     }
 
     static func outputDirectoryURL() -> URL {

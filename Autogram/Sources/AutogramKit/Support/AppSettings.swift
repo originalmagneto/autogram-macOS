@@ -58,7 +58,8 @@ public struct AppSettings: Codable, Sendable {
     public var ollamaModel: String
     public var openAICompatibleBaseURL: String
     public var openAICompatibleModel: String
-    public var tsaURL: String
+    public var customTSAServers: [String]
+    public var selectedTSAURL: String
     public var pdfaMode: PDFAConversionMode
     public var profiles: [AdvocateProfile]
     public var activeProfileID: UUID?
@@ -67,13 +68,22 @@ public struct AppSettings: Codable, Sendable {
     public var ezzkNotificationEmail: String
     public var ezzkEdeskAddress: String
 
+    private enum CodingKeys: String, CodingKey {
+        case aiMode, aiPrompt, ollamaURL, ollamaModel
+        case openAICompatibleBaseURL, openAICompatibleModel
+        case customTSAServers, selectedTSAURL, legacyTSAURL = "tsaURL"
+        case pdfaMode, profiles, activeProfileID
+        case ezzkICO, ezzkUsername, ezzkNotificationEmail, ezzkEdeskAddress
+    }
+
     public init(aiMode: AIMode = .builtInOnDevice,
                 aiPrompt: String? = nil,
                 ollamaURL: String = "http://localhost:11434",
                 ollamaModel: String = "llava",
                 openAICompatibleBaseURL: String = "https://api.openai.com/v1",
                 openAICompatibleModel: String = "gpt-4o-mini",
-                tsaURL: String = "http://tsa.disig.sk/qts",
+                customTSAServers: [String] = [],
+                selectedTSAURL: String = TimestampAuthority.legacyDefaultURL,
                 pdfaMode: PDFAConversionMode = .vectorPreserving,
                 profiles: [AdvocateProfile] = [],
                 activeProfileID: UUID? = nil,
@@ -87,7 +97,8 @@ public struct AppSettings: Codable, Sendable {
         self.ollamaModel = ollamaModel
         self.openAICompatibleBaseURL = openAICompatibleBaseURL
         self.openAICompatibleModel = openAICompatibleModel
-        self.tsaURL = tsaURL
+        self.customTSAServers = customTSAServers
+        self.selectedTSAURL = selectedTSAURL
         self.pdfaMode = pdfaMode
         self.profiles = profiles
         self.activeProfileID = activeProfileID
@@ -95,6 +106,73 @@ public struct AppSettings: Codable, Sendable {
         self.ezzkUsername = ezzkUsername
         self.ezzkNotificationEmail = ezzkNotificationEmail
         self.ezzkEdeskAddress = ezzkEdeskAddress
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.aiMode = try container.decodeIfPresent(AIMode.self, forKey: .aiMode) ?? .builtInOnDevice
+        self.aiPrompt = try container.decodeIfPresent(String.self, forKey: .aiPrompt)
+        self.ollamaURL = try container.decodeIfPresent(String.self, forKey: .ollamaURL) ?? "http://localhost:11434"
+        self.ollamaModel = try container.decodeIfPresent(String.self, forKey: .ollamaModel) ?? "llava"
+        self.openAICompatibleBaseURL = try container.decodeIfPresent(String.self, forKey: .openAICompatibleBaseURL)
+            ?? "https://api.openai.com/v1"
+        self.openAICompatibleModel = try container.decodeIfPresent(String.self, forKey: .openAICompatibleModel) ?? "gpt-4o-mini"
+
+        let legacy = try container.decodeIfPresent(String.self, forKey: .legacyTSAURL)
+        var customs = try container.decodeIfPresent([String].self, forKey: .customTSAServers) ?? []
+        if let legacy, !legacy.isEmpty,
+           !TimestampAuthority.builtIn.contains(where: { $0.url.caseInsensitiveCompare(legacy) == .orderedSame }),
+           !customs.contains(where: { $0.caseInsensitiveCompare(legacy) == .orderedSame }) {
+            customs.append(legacy)
+        }
+        self.customTSAServers = customs
+
+        let storedSelection = try container.decodeIfPresent(String.self, forKey: .selectedTSAURL)
+        if let storedSelection, !storedSelection.isEmpty {
+            self.selectedTSAURL = storedSelection
+        } else if let legacy, !legacy.isEmpty {
+            self.selectedTSAURL = legacy
+        } else {
+            self.selectedTSAURL = TimestampAuthority.legacyDefaultURL
+        }
+
+        self.pdfaMode = try container.decodeIfPresent(PDFAConversionMode.self, forKey: .pdfaMode) ?? .vectorPreserving
+        self.profiles = try container.decodeIfPresent([AdvocateProfile].self, forKey: .profiles) ?? []
+        self.activeProfileID = try container.decodeIfPresent(UUID.self, forKey: .activeProfileID)
+        self.ezzkICO = try container.decodeIfPresent(String.self, forKey: .ezzkICO) ?? ""
+        self.ezzkUsername = try container.decodeIfPresent(String.self, forKey: .ezzkUsername) ?? ""
+        self.ezzkNotificationEmail = try container.decodeIfPresent(String.self, forKey: .ezzkNotificationEmail) ?? ""
+        self.ezzkEdeskAddress = try container.decodeIfPresent(String.self, forKey: .ezzkEdeskAddress) ?? ""
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(aiMode, forKey: .aiMode)
+        try container.encodeIfPresent(aiPrompt, forKey: .aiPrompt)
+        try container.encode(ollamaURL, forKey: .ollamaURL)
+        try container.encode(ollamaModel, forKey: .ollamaModel)
+        try container.encode(openAICompatibleBaseURL, forKey: .openAICompatibleBaseURL)
+        try container.encode(openAICompatibleModel, forKey: .openAICompatibleModel)
+        try container.encode(customTSAServers, forKey: .customTSAServers)
+        try container.encode(selectedTSAURL, forKey: .selectedTSAURL)
+        try container.encode(pdfaMode, forKey: .pdfaMode)
+        try container.encode(profiles, forKey: .profiles)
+        try container.encodeIfPresent(activeProfileID, forKey: .activeProfileID)
+        try container.encode(ezzkICO, forKey: .ezzkICO)
+        try container.encode(ezzkUsername, forKey: .ezzkUsername)
+        try container.encode(ezzkNotificationEmail, forKey: .ezzkNotificationEmail)
+        try container.encode(ezzkEdeskAddress, forKey: .ezzkEdeskAddress)
+    }
+
+    public var availableTSAServers: [TimestampAuthority] {
+        TimestampAuthority.resolveSelected(customServers: customTSAServers,
+                                           selectedTSAURL: selectedTSAURL)
+    }
+
+    public var activeTSA: TimestampAuthority {
+        availableTSAServers.first { $0.url == selectedTSAURL }
+            ?? availableTSAServers.first
+            ?? TimestampAuthority.builtIn[0]
     }
 
     public static let standard = AppSettings()
