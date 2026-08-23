@@ -241,8 +241,10 @@ struct SigningPrepareView: View {
                 Text(store.sourceURL?.lastPathComponent ?? "")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                    .lineLimit(2)
                     .truncationMode(.middle)
+                    .multilineTextAlignment(.trailing)
+                    .help(store.sourceURL?.lastPathComponent ?? "")
             }
         }
         .padding(14)

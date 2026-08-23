@@ -188,11 +188,11 @@ struct IdentityRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(identity.label)
                     .font(.callout.weight(.medium))
-                    .lineLimit(1)
+                    .lineLimit(2)
                 Text(identity.issuerSummary)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                    .lineLimit(2)
             }
             Spacer()
             if !identity.hasPrivateKey {

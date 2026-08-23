@@ -80,7 +80,6 @@ struct ZakoFlowView: View {
         .lineLimit(1)
         .allowsTightening(true)
         .minimumScaleFactor(0.72)
-        .fixedSize()
     }
 
     private var stepperBarFull: some View {

@@ -31,6 +31,7 @@ struct EvidenceDashboardView: View {
 
                 TableColumn("Pôvodný dokument") { record in
                     Text(record.originalName).lineLimit(1)
+                        .help(record.originalName)
                 }
 
                 TableColumn("Strany / Listy") { record in

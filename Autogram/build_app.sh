@@ -23,12 +23,15 @@ rm -rf "$APP_DIR"
 mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources"
 
 cp "$BIN_DIR/Autogram" "$CONTENTS/MacOS/Autogram"
+cp "Assets/Autogram.icns" "$CONTENTS/Resources/Autogram.icns"
 
 cat > "$CONTENTS/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+    <key>CFBundleIconFile</key>
+    <string>Autogram</string>
     <key>CFBundleName</key>
     <string>Autogram</string>
     <key>CFBundleDisplayName</key>

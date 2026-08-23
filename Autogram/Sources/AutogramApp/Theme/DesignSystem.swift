@@ -107,7 +107,8 @@ struct StepperPill: View {
                 .font(.callout.weight(state == .active ? .semibold : .regular))
                 .foregroundStyle(state == .pending ? Color.secondary : Color.primary)
                 .lineLimit(1)
-                .fixedSize(horizontal: true, vertical: false)
+                .minimumScaleFactor(0.7)
+                .allowsTightening(true)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 5)

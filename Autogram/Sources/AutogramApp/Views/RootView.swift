@@ -35,7 +35,6 @@ struct RootView: View {
                 Section("Pokročilé · Advanced") {
                     ForEach([SidebarSection.zako, SidebarSection.evidence]) { section in
                         Label(section.rawValue, systemImage: section.symbol)
-                            .lineLimit(1)
                             .tag(section)
                     }
                 }
