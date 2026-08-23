@@ -220,17 +220,36 @@ public enum KeychainIdentityScanner {
     static let qualifiedIssuerHints = ["i.ca", "ica", "disig", "eid", "e-id", "nase", "nácionalna",
                                        "národná", "slovensko", "qcp", "qualified", "certum", "bok"]
 
+    static let junkPatterns = ["apple development", "apple id", "apple webauthn", "kerberos",
+                               "systemdefault", ".home", ".local", "codesigning",
+                               "com.apple", "mac-studio", "macbook", "imac"]
+
+    public static func isJunk(_ summary: String) -> Bool {
+        let lowered = summary.lowercased()
+        return junkPatterns.contains { lowered.contains($0) }
+    }
+
+    public static func hasConnectedToken() -> Bool {
+        let watcher = TKTokenWatcher()
+        return watcher.tokenIDs.contains { !$0.lowercased().hasPrefix("apple.") && !$0.lowercased().hasPrefix("com.apple") }
+    }
+
     public static func scanAll() -> [SigningIdentityInfo] {
+        let tokensConnected = hasConnectedToken()
+
         var seen = Set<String>()
         var result: [SigningIdentityInfo] = []
-
         for identity in scanCodeSigningIdentities() where seen.insert(identity.label).inserted {
             result.append(identity)
         }
         for cert in scanTokenCertificates() where seen.insert(cert.label).inserted {
             result.append(cert)
         }
-        return result.sorted { lhs, rhs in
+
+        return result.filter { info in
+            guard !isJunk(info.label) else { return false }
+            return tokensConnected || info.isQualified || info.isMandateCertificate
+        }.sorted { lhs, rhs in
             if lhs.hasPrivateKey != rhs.hasPrivateKey { return lhs.hasPrivateKey }
             return lhs.label < rhs.label
         }
@@ -319,14 +338,16 @@ public enum KeychainIdentityScanner {
 
     public static func connectedTokenNames() -> [String] {
         let watcher = TKTokenWatcher()
-        return watcher.tokenIDs.map { tokenID in
-            let cleaned = tokenID
-                .replacingOccurrences(of: "com.", with: "")
-                .replacingOccurrences(of: ".tokenextension", with: "")
-                .replacingOccurrences(of: ".pkcs11", with: "")
-                .replacingOccurrences(of: ".token", with: "")
-            return cleaned.capitalized
-        }.sorted()
+        return watcher.tokenIDs
+            .filter { !$0.lowercased().hasPrefix("apple.") && !$0.lowercased().hasPrefix("com.apple") }
+            .map { tokenID in
+                let cleaned = tokenID
+                    .replacingOccurrences(of: "com.", with: "")
+                    .replacingOccurrences(of: ".tokenextension", with: "")
+                    .replacingOccurrences(of: ".pkcs11", with: "")
+                    .replacingOccurrences(of: ".token", with: "")
+                return cleaned.capitalized
+            }.sorted()
     }
 
     static func looksMandate(_ text: String) -> Bool {

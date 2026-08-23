@@ -38,11 +38,12 @@ final class CardPresenceMonitor {
     }
 
     private static func cleaned(_ ids: [String]) -> [String] {
-        ids.map { tokenID in
-            tokenID.replacingOccurrences(of: "com.", with: "")
-                .replacingOccurrences(of: ".tokenextension", with: "")
-                .replacingOccurrences(of: ".pkcs11", with: "")
-                .replacingOccurrences(of: ".token", with: "")
-        }.sorted()
+        ids.filter { !$0.lowercased().hasPrefix("apple.") && !$0.lowercased().hasPrefix("com.apple") }
+            .map { tokenID in
+                tokenID.replacingOccurrences(of: "com.", with: "")
+                    .replacingOccurrences(of: ".tokenextension", with: "")
+                    .replacingOccurrences(of: ".pkcs11", with: "")
+                    .replacingOccurrences(of: ".token", with: "")
+            }.sorted()
     }
 }

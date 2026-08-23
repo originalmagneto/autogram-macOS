@@ -197,11 +197,12 @@ struct SigningPrepareView: View {
     @Bindable var store: SigningSessionStore
 
     var body: some View {
-        HSplitView {
+        HStack(alignment: .top, spacing: 0) {
             previewColumn
-                .frame(minWidth: 460, maxWidth: .infinity, maxHeight: .infinity)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             settingsColumn
-                .frame(minWidth: 320, idealWidth: 350, maxWidth: 400)
+                .frame(width: 340)
+                .background(Color(nsColor: .windowBackgroundColor).opacity(0.6))
         }
     }
 
