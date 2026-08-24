@@ -18,7 +18,7 @@ final class SigningSessionStore {
     var selectedIdentityID: String?
 
     var includeQualifiedTimestamp = true
-    var includeVisibleSignature = true
+    var includeVisibleSignature = false
     var convertToPDFA = false
     var outputFormat: SigningOutputFormat = .attachedASIC
     var signaturePage: Int = 0

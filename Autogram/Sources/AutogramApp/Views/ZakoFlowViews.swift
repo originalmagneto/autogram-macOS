@@ -264,14 +264,12 @@ struct PDFKitPreview: NSViewRepresentable {
         view.minScaleFactor = 0.4
         view.maxScaleFactor = 4.0
         view.document = document
-        view.scaleFactor = view.scaleFactorForSizeToFit
         return view
     }
 
     func updateNSView(_ nsView: PDFView, context: Context) {
         if nsView.document !== document {
             nsView.document = document
-            nsView.scaleFactor = nsView.scaleFactorForSizeToFit
         }
     }
 }

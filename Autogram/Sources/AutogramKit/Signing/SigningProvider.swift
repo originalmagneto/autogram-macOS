@@ -224,9 +224,18 @@ public enum KeychainIdentityScanner {
                                "systemdefault", ".home", ".local", "codesigning",
                                "com.apple", "mac-studio", "macbook", "imac"]
 
+    static let rootCAPatterns = ["certificate services", "content certificate", "certification authority",
+                                 "worldwide developer", "public primary", "root ca", " root", " root ",
+                                 " g2", " r2", " r3", " r2i3", " ca - ", "client authentication and secure"]
+
     public static func isJunk(_ summary: String) -> Bool {
         let lowered = summary.lowercased()
         return junkPatterns.contains { lowered.contains($0) }
+    }
+
+    public static func looksLikeRootCA(_ summary: String) -> Bool {
+        let lowered = " " + summary.lowercased() + " "
+        return rootCAPatterns.contains { lowered.contains($0) }
     }
 
     public static func hasConnectedToken() -> Bool {
@@ -235,7 +244,7 @@ public enum KeychainIdentityScanner {
     }
 
     public static func scanAll() -> [SigningIdentityInfo] {
-        let tokensConnected = hasConnectedToken()
+        guard hasConnectedToken() else { return [] }
 
         var seen = Set<String>()
         var result: [SigningIdentityInfo] = []
@@ -247,8 +256,7 @@ public enum KeychainIdentityScanner {
         }
 
         return result.filter { info in
-            guard !isJunk(info.label) else { return false }
-            return tokensConnected || info.isQualified || info.isMandateCertificate
+            !isJunk(info.label) && !looksLikeRootCA(info.label)
         }.sorted { lhs, rhs in
             if lhs.hasPrivateKey != rhs.hasPrivateKey { return lhs.hasPrivateKey }
             return lhs.label < rhs.label

@@ -202,7 +202,10 @@ struct SigningPrepareView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             settingsColumn
                 .frame(width: 340)
-                .background(Color(nsColor: .windowBackgroundColor).opacity(0.6))
+                .background(.bar)
+                .overlay(alignment: .leading) {
+                    Rectangle().fill(Color.primary.opacity(0.08)).frame(width: 1)
+                }
         }
     }
 
@@ -256,10 +259,10 @@ struct SigningPrepareView: View {
         let tokens = KeychainIdentityScanner.connectedTokenNames()
         return Group {
             if tokens.isEmpty {
-                Label("Karta nedetekovaná cez CryptoTokenKit — hľadám v Keychainu.",
-                      systemImage: "creditcard.and.123")
+                Label("Nie je vložená žiadna karta s certifikátmi.",
+                      systemImage: "creditcard")
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.tertiary)
             } else {
                 Label("Karty: \(tokens.joined(separator: ", "))",
                       systemImage: "creditcard.fill")
@@ -269,6 +272,32 @@ struct SigningPrepareView: View {
         }
     }
 
+    private var certificateSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            tokenStatusLine
+
+            if store.identities.isEmpty {
+                Label("Žiadny certifikát k dispozícii — pripojte kartu (eID alebo advokátsky preukaz).",
+                      systemImage: "info.circle")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                if store.signingProvider is DemoSigningProvider {
+                    Label("Bez karty beží DEMO režim — podpis nie je právne záväzný.",
+                          systemImage: "info.circle")
+                        .font(.caption2)
+                        .foregroundStyle(.orange)
+                }
+                ForEach(store.identities) { identity in
+                    IdentityRow(identity: identity,
+                                isSelected: store.selectedIdentityID == identity.id,
+                                onSelect: { store.selectedIdentityID = identity.id })
+                }
+            }
+        }
+        .padding(4)
+    }
+
     private var settingsColumn: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
@@ -276,20 +305,7 @@ struct SigningPrepareView: View {
                     .font(.headline)
 
                 GroupBox("Certifikát") {
-                    VStack(alignment: .leading, spacing: 8) {
-                        tokenStatusLine
-
-                        if store.identities.isEmpty {
-                            ProgressView("Vyhľadávam certifikáty…")
-                        } else {
-                            ForEach(store.identities) { identity in
-                                IdentityRow(identity: identity,
-                                            isSelected: store.selectedIdentityID == identity.id,
-                                            onSelect: { store.selectedIdentityID = identity.id })
-                            }
-                        }
-                    }
-                    .padding(4)
+                    certificateSection
                 }
 
                 GroupBox("Parametre") {
