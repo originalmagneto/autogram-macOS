@@ -218,14 +218,15 @@ struct IdentityRow: View {
                 Text(identity.issuerSummary)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                    .lineLimit(2)
+                    .lineLimit(1)
+                if !identity.hasPrivateKey {
+                    Text("vyžaduje PIN/BOK na karte")
+                        .font(.caption2)
+                        .foregroundStyle(.orange)
+                        .lineLimit(1)
+                }
             }
-            Spacer()
-            if !identity.hasPrivateKey {
-                Text("vyžaduje PIN/BOK na karte")
-                    .font(.caption2)
-                    .foregroundStyle(.orange)
-            }
+            Spacer(minLength: 6)
             if identity.isMandateCertificate {
                 badge("MANDÁTNY", tint: .green)
             }

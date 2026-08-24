@@ -229,6 +229,7 @@ struct SigningPrepareView: View {
                                          with: .color(.accentColor.opacity(0.12)))
                         }
                     }
+                    .allowsHitTesting(store.includeVisibleSignature)
                     .gesture(DragGesture().onChanged { value in
                         guard store.includeVisibleSignature else { return }
                         let w = store.signatureRect.width
@@ -326,18 +327,24 @@ struct SigningPrepareView: View {
                         }
                         .toggleStyle(.switch)
 
-                        LabeledRow(label: "Formát výstupu") {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Formát výstupu")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                             Picker("", selection: $store.outputFormat) {
                                 ForEach(SigningOutputFormat.allCases) { format in
                                     Text(format.rawValue).tag(format)
                                 }
                             }
                             .labelsHidden()
-                            .frame(width: 220)
+                            .frame(width: 276)
                         }
 
                         if store.includeVisibleSignature {
-                            LabeledRow(label: "Strana") {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Strana vizuálneho podpisu")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
                                 Stepper("\(store.signaturePage + 1)",
                                         value: $store.signaturePage,
                                         in: 0...max(store.analysis.totalPages - 1, 0))
@@ -372,7 +379,8 @@ struct SigningPrepareView: View {
                 }
                 .padding(.top, 6)
             }
-            .padding(16)
+            .frame(width: 308)
+            .padding(.vertical, 16)
         }
     }
 
