@@ -309,6 +309,17 @@ struct SigningPrepareView: View {
                     certificateSection
                 }
 
+                if let selected = store.identities.first(where: { $0.id == store.selectedIdentityID }),
+                   selected.requiresPIN {
+                    GroupBox("PIN karty") {
+                        SecureField("PIN", text: $store.signingPIN)
+                            .textFieldStyle(.roundedBorder)
+                        Text("PIN sa používa len na toto podpisovanie a neukladá sa.")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+
                 GroupBox("Parametre") {
                     VStack(alignment: .leading, spacing: 12) {
                         Toggle(isOn: $store.includeQualifiedTimestamp) {

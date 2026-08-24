@@ -21,6 +21,7 @@ final class SigningSessionStore {
     var includeVisibleSignature = false
     var convertToPDFA = false
     var outputFormat: SigningOutputFormat = .attachedASIC
+    var signingPIN = ""
     var signaturePage: Int = 0
     var signatureRect = NormalizedRect(x: 0.58, y: 0.80, width: 0.30, height: 0.09)
 
@@ -124,7 +125,8 @@ final class SigningSessionStore {
                                          identityID: identityID,
                                          includeTimestamp: includeQualifiedTimestamp,
                                          tsaURL: includeQualifiedTimestamp ? settings.selectedTSAURL : nil,
-                                         outputFormat: outputFormat)
+                                         outputFormat: outputFormat,
+                                         pin: signingPIN.isEmpty ? nil : signingPIN)
             let signed = try await signingProvider.sign(request)
 
             statusText = "Ukladám…"

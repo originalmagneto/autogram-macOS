@@ -1,29 +1,18 @@
 import Foundation
 import Security
+import CryptoKit
 
 public final class KeychainXAdESSigningProvider: QualifiedSigningProviding, @unchecked Sendable {
     public init() {}
 
     public func availableIdentities() async -> [SigningIdentityInfo] {
-        KeychainIdentityScanner.scanAll().filter { $0.hasPrivateKey }
+        KeychainIdentityScanner.scanAll()
     }
 
     public func sign(_ request: SigningRequest) async throws -> SignedConversionResult {
-        guard let resolved = KeychainIdentityScanner.resolveIdentity(id: request.identityID) else {
+        let identities = await availableIdentities()
+        guard let identity = identities.first(where: { $0.id == request.identityID }) else {
             throw SigningError.identityUnavailable
-        }
-
-        var certificateRef: SecCertificate?
-        guard SecIdentityCopyCertificate(resolved.identity, &certificateRef) == errSecSuccess,
-              let certificate = certificateRef else {
-            throw XAdESError.certificateUnavailable
-        }
-        let certificateDER = Data(SecCertificateCopyData(certificate) as Data)
-
-        var privateKey: SecKey?
-        guard SecIdentityCopyPrivateKey(resolved.identity, &privateKey) == errSecSuccess,
-              let key = privateKey else {
-            throw XAdESError.keyUnavailable
         }
 
         var tsaURL: URL?
@@ -33,31 +22,57 @@ public final class KeychainXAdESSigningProvider: QualifiedSigningProviding, @unc
             if tsaURL?.scheme == nil { throw SigningError.timestampFailed }
         }
 
+        let signer: RawSigner
+        let certificateDER: Data
+        let summary = identity.label
+
+        if let certHex = identity.pkcs11CertSHA256Hex {
+            let pin = request.pin ?? ""
+            guard !pin.isEmpty else { throw PKCS11Error.loginFailed(0xA0) }
+            guard let remote = PKCS11BridgeClient.listIdentities().first(where: { $0.certSHA256Hex == certHex }) else {
+                throw SigningError.identityUnavailable
+            }
+            guard let cert = SecCertificateCreateWithData(nil, remote.certificateDER as CFData) else {
+                throw XAdESError.certificateUnavailable
+            }
+            certificateDER = remote.certificateDER
+            signer = .pkcs11(certSHA256Hex: certHex,
+                             isRSA: remote.isRSA,
+                             pin: pin)
+            _ = identity.pkcs11IsRSA
+        } else {
+            guard let resolved = KeychainIdentityScanner.resolveIdentityPair(id: request.identityID) else {
+                throw SigningError.identityUnavailable
+            }
+            certificateDER = Data(SecCertificateCopyData(resolved.certificate) as Data)
+            signer = .secKey(resolved.privateKey)
+        }
+
         switch request.outputFormat {
         case .embeddedPAdES:
             let signedPDF = try await PAdESSigner().sign(
                 pdf: request.pdfData,
                 certificateDER: certificateDER,
-                privateKey: key,
+                signer: signer,
                 includeTimestamp: request.includeTimestamp,
                 tsaURL: tsaURL)
             return SignedConversionResult(
                 pdfData: signedPDF,
                 asicData: nil,
                 signedAt: Date(),
-                signatureLabel: "PAdES-B/T — \(resolved.summary)",
+                signatureLabel: "PAdES-B/T — \(summary)",
                 isLegallyBinding: true)
         case .attachedASIC:
             return try await signASIC(request: request,
-                                      identity: resolved.identity,
-                                      summary: resolved.summary,
-                                      certificateDER: certificateDER,
+                                      certificate: certificateDER,
+                                      signer: signer,
+                                      summary: summary,
                                       tsaURL: tsaURL)
         }
     }
 
-    private func signASIC(request: SigningRequest, identity: SecIdentity, summary: String,
-                          certificateDER: Data, tsaURL: URL?) async throws -> SignedConversionResult {
+    private func signASIC(request: SigningRequest, certificate: Data, signer: RawSigner,
+                          summary: String, tsaURL: URL?) async throws -> SignedConversionResult {
         let payload = request.extraFiles
             .filter { $0.path != "mimetype" && !$0.path.hasPrefix("META-INF/") }
             .sorted { $0.path < $1.path }
@@ -71,8 +86,13 @@ public final class KeychainXAdESSigningProvider: QualifiedSigningProviding, @unc
             throw SigningError.signingFailed("Kontajner neobsahuje žiadne dáta na podpis.")
         }
 
+        guard let certificate = SecCertificateCreateWithData(nil, certificate as CFData) else {
+            throw XAdESError.certificateUnavailable
+        }
+
         let result = try await XAdESSigner().sign(dataObjects: dataObjects,
-                                                  identity: identity,
+                                                  certificate: certificate,
+                                                  signer: signer,
                                                   includeTimestamp: request.includeTimestamp,
                                                   tsaURL: tsaURL)
 

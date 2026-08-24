@@ -46,19 +46,11 @@ public struct XAdESSigner: Sendable {
     static let excC14N = "http://www.w3.org/2001/10/xml-exc-c14n#"
 
     public func sign(dataObjects: [DataObject],
-                     identity: SecIdentity,
+                     certificate: SecCertificate,
+                     signer: RawSigner,
                      includeTimestamp: Bool,
                      tsaURL: URL?) async throws -> XAdESResult {
-        var certificateRef: SecCertificate?
-        guard SecIdentityCopyCertificate(identity, &certificateRef) == errSecSuccess,
-              let certificate = certificateRef else { throw XAdESError.certificateUnavailable }
-
-        var privateKey: SecKey?
-        guard SecIdentityCopyPrivateKey(identity, &privateKey) == errSecSuccess,
-              let key = privateKey else { throw XAdESError.keyUnavailable }
-
-        let algorithm = try Self.signingAlgorithm(for: key)
-        let signatureMethod = Self.signatureMethod(for: algorithm)
+        let signatureMethod = signer.signatureMethodURI
 
         let certificateDER = Data(SecCertificateCopyData(certificate) as Data)
         guard let facts = X509Inspector.facts(certificateData: certificateDER) else {
@@ -133,7 +125,7 @@ public struct XAdESSigner: Sendable {
               </ds:SignedInfo>
             """.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        let signatureValue = try Self.sign(data: Data(canonicalSignedInfo.utf8), with: key, algorithm: algorithm)
+        let signatureValue = try signer.sign(Data(canonicalSignedInfo.utf8))
 
         var unsignedBlock = ""
         var timestampGenTime: Date?
@@ -192,33 +184,4 @@ public struct XAdESSigner: Sendable {
             .replacingOccurrences(of: "\"", with: "&quot;")
     }
 
-    static func signingAlgorithm(for key: SecKey) throws -> SecKeyAlgorithm {
-        if SecKeyIsAlgorithmSupported(key, .sign, .rsaSignatureMessagePKCS1v15SHA256) {
-            return .rsaSignatureMessagePKCS1v15SHA256
-        }
-        if SecKeyIsAlgorithmSupported(key, .sign, .ecdsaSignatureMessageX962SHA256) {
-            return .ecdsaSignatureMessageX962SHA256
-        }
-        throw XAdESError.unsupportedKeyType
-    }
-
-    static func signatureMethod(for algorithm: SecKeyAlgorithm) -> String {
-        algorithm == .ecdsaSignatureMessageX962SHA256
-            ? "http://www.w3.org/2001/04/xmldsig-more#ecdsa-sha256"
-            : "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"
-    }
-
-    static func sign(data: Data, with key: SecKey, algorithm: SecKeyAlgorithm) throws -> Data {
-        var error: Unmanaged<CFError>?
-        guard let result = SecKeyCreateSignature(key, algorithm, data as CFData, &error) else {
-            let detail = error?.takeRetainedValue().localizedDescription ?? "neznáma chyba"
-            throw XAdESError.signingFailed(detail)
-        }
-        return result as Data
-    }
-
-    static func signStatic(data: Data, with key: SecKey) throws -> Data {
-        let algorithm = try signingAlgorithm(for: key)
-        return try sign(data: data, with: key, algorithm: algorithm)
-    }
 }

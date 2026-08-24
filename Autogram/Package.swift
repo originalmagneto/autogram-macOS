@@ -17,6 +17,10 @@ let package = Package(
             name: "AutogramApp",
             dependencies: ["AutogramKit"]
         ),
+        .executableTarget(
+            name: "pkcs11-helper",
+            dependencies: ["AutogramKit"]
+        ),
         .testTarget(
             name: "AutogramKitTests",
             dependencies: ["AutogramKit"]

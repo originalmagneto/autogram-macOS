@@ -213,9 +213,10 @@ final class ValidationAndPAdESTests: XCTestCase {
         let pageCount = PDFDocument(data: source)?.pageCount ?? -1
 
         let signer = PAdESSigner()
+        let rawSigner = RawSigner.secKey(privateKey)
         let signed = try await signer.sign(pdf: source,
                                            certificateDER: fakeCertificate,
-                                           privateKey: privateKey,
+                                           signer: rawSigner,
                                            includeTimestamp: false,
                                            tsaURL: nil)
 

@@ -24,7 +24,7 @@ public struct PAdESSigner: Sendable {
 
     public func sign(pdf: Data,
                      certificateDER: Data,
-                     privateKey: SecKey,
+                     signer: RawSigner,
                      reason: String = "Autorizácia dokumentu — Autogram",
                      includeTimestamp: Bool,
                      tsaURL: URL?) async throws -> Data {
@@ -118,7 +118,7 @@ public struct PAdESSigner: Sendable {
 
         let cms = try await Self.buildCMS(digest: digest,
                                           certificateDER: certificateDER,
-                                          privateKey: privateKey,
+                                          signer: signer,
                                           includeTimestamp: includeTimestamp,
                                           tsaURL: tsaURL)
         let hex = cms.map { String(format: "%02X", $0) }.joined()
@@ -132,7 +132,7 @@ public struct PAdESSigner: Sendable {
 
     static func buildCMS(digest: Data,
                          certificateDER: Data,
-                         privateKey: SecKey,
+                         signer: RawSigner,
                          includeTimestamp: Bool,
                          tsaURL: URL?) async throws -> Data {
         let contentTypeAttr = DER.tlv(0x30, DER.oid("1.2.840.113549.1.9.3") +
@@ -149,7 +149,8 @@ public struct PAdESSigner: Sendable {
         let signedAttrsContent = contentTypeAttr + messageDigestAttr + signingTimeAttr + scvAttr
         let signedAttrs = DER.tlv(0xA0, signedAttrsContent)
 
-        let signature = try XAdESSigner.signStatic(data: signedAttrs, with: privateKey)
+        guard signer.isRSA else { throw XAdESError.unsupportedKeyType }
+        let signature = try signer.sign(signedAttrs)
 
         var unsignedAttrs = Data()
         if includeTimestamp {

@@ -24,6 +24,7 @@ final class ZakoSessionStore {
     var selectedIdentityID: String?
     var includeQualifiedTimestamp = true
     var allowNonMandateOverride = false
+    var signingPIN = ""
     var evidenceNumberRequested = false
     var fetchingEvidenceNumber = false
 
@@ -434,6 +435,7 @@ final class ZakoSessionStore {
                 identityID: identityID,
                 includeTimestamp: includeQualifiedTimestamp,
                 tsaURL: includeQualifiedTimestamp ? settings.selectedTSAURL : nil,
+                pin: signingPIN.isEmpty ? nil : signingPIN,
                 extraFiles: containerFiles))
 
             if let asic = signed.asicData {
@@ -566,6 +568,7 @@ func resetSession(keepingProfile: Bool) {
         manualSheetCount = nil
         identities = []
         selectedIdentityID = nil
+        signingPIN = ""
         allowNonMandateOverride = false
         evidenceNumberRequested = false
         validationErrors = []

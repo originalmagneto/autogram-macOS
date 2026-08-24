@@ -1,6 +1,6 @@
 # Autogram macOS — Implementačná dokumentácia fáz 1–4
 
-> Stav: august 2026 · 62/62 testov · Swift 6 strict concurrency · 0 externých závislostí
+> Stav: august 2026 · 63/63 testov · Swift 6 strict concurrency · 0 externých závislostí
 
 Tento dokument popisuje, čo presne implementujú jednotlivé fázy modulu Zaručená konverzia
 (ZaKo) a štandardného podpisovania, aké rozhodnutia boli prijaté a kde sú limity.
@@ -116,6 +116,19 @@ issuer/subject → RFC 2253 (vrátane hex-formy pre neznáme typy a escapingu).
 `CardPresenceMonitor` (TKTokenWatcher + KVO na `tokenIDs`) — vloženie/vytiahnutie karty
 okamžite refreshuje zoznam certifikátov v autorizačnom kroku.
 
+### eID / CryptoTokenKit
+Slovenská eID (Cosmo 9.2, `eID_klient` 5.4) neexportuje `kSecClassIdentity` spoľahlivo
+a hromadný `SecItemCopyMatching` s `kSecReturnRef` na všetky certifikáty **visí**.
+Scanner preto:
+1. zoberie `TKTokenWatcher.tokenIDs` (mimo Apple tokenov),
+2. na každom tokene načíta certifikáty cez `kSecReturnData` a privátny kľúč cez
+   `kSecReturnRef` filtrovaný `kSecAttrTokenID`,
+3. spáruje ich podľa verejného kľúča.
+
+PIN zadáva CryptoTokenKit / eID_klient vo vlastnom dialógu (`SecKeyCreateSignature`).
+PKCS#11 (`libPkcs11.dylib`, OpenSC, AWP) ostáva fallback, ak token SecKey nevráti.
+Oficiálny PKCS#11 modul eID klienta aktuálne hlási 0 slotov; AWP je iba x86_64.
+
 ### Výber providera
 `SigningProviderFactory.makeDefault()`: ak existuje identita s privátnym kľúčom →
 reálny provider (výstup označený ako právne záväzný), inak DEMO podpisovač
@@ -154,6 +167,7 @@ Všetky tri bežajú automaticky v `ZakoSessionStore.authorizeAndSign()`; zlyhan
 | EZZK API | Mock + HTTP kostra | oficiálna OpenAPI od MIRRI nie je publikovaná (špec § 11.1); endpointy `portal/api/*` sú best-effort |
 | Cert chain v XAdES | len podpisový cert | chain/LTA (B-LT archivácia) je V2 |
 | veraPDF | nahradené vlastným `PDFAValidator` | štrukturálna validácia; plná schémová validácia ostáva voliteľná via bundled CLI |
+| eID PKCS#11 | natívny SecKey funguje | oficiálny `libPkcs11.dylib` má 0 slotov; pri uviaznutom CTK reštartovať eID_klient |
 | Mandát atribút | heuristika CN/issuer strings | presný OID mandátu doplniť po analýze reálneho SAK certifikátu |
 | Formuláre 1.2 (2027) | verziované konštanty v `ZakoCodelists` | auto-update artefaktov z formulare.slovensko.sk (FormularyRepository) |
 | XAdES_ZEP | netvorí sa | zakázaný podľa eIDAS IR 2015/1506 |

@@ -1,5 +1,5 @@
 import Foundation
-import Security
+@preconcurrency import Security
 import CryptoKit
 import os
 import CryptoTokenKit
@@ -12,10 +12,15 @@ public struct SigningIdentityInfo: Identifiable, Hashable, Sendable {
     public var isMandateCertificate: Bool
     public var isQualified: Bool
     public var hasPrivateKey: Bool
+    public var pkcs11CertSHA256Hex: String?
+    public var pkcs11IsRSA: Bool
+    public var requiresPIN: Bool
 
     public init(id: String, label: String, issuerSummary: String,
                 validUntil: Date? = nil, isMandateCertificate: Bool = false,
-                isQualified: Bool = false, hasPrivateKey: Bool = true) {
+                isQualified: Bool = false, hasPrivateKey: Bool = true,
+                pkcs11CertSHA256Hex: String? = nil, pkcs11IsRSA: Bool = true,
+                requiresPIN: Bool = false) {
         self.id = id
         self.label = label
         self.issuerSummary = issuerSummary
@@ -23,6 +28,65 @@ public struct SigningIdentityInfo: Identifiable, Hashable, Sendable {
         self.isMandateCertificate = isMandateCertificate
         self.isQualified = isQualified
         self.hasPrivateKey = hasPrivateKey
+        self.pkcs11CertSHA256Hex = pkcs11CertSHA256Hex
+        self.pkcs11IsRSA = pkcs11IsRSA
+        self.requiresPIN = requiresPIN
+    }
+}
+
+public struct RawSigner: @unchecked Sendable {
+    public var signatureMethodURI: String
+    public var isRSA: Bool
+    public var sign: @Sendable (Data) throws -> Data
+
+    public static let rsaMethod = "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"
+    public static let ecdsaMethod = "http://www.w3.org/2001/04/xmldsig-more#ecdsa-sha256"
+
+    public static func secKey(_ key: SecKey) -> RawSigner {
+        let algorithm: SecKeyAlgorithm
+        let method: String
+        if SecKeyIsAlgorithmSupported(key, .sign, .rsaSignatureMessagePKCS1v15SHA256) {
+            algorithm = .rsaSignatureMessagePKCS1v15SHA256
+            method = RawSigner.rsaMethod
+        } else {
+            algorithm = .ecdsaSignatureMessageX962SHA256
+            method = RawSigner.ecdsaMethod
+        }
+        return RawSigner(signatureMethodURI: method,
+                         isRSA: algorithm == .rsaSignatureMessagePKCS1v15SHA256) { data in
+            var error: Unmanaged<CFError>?
+            guard let signature = SecKeyCreateSignature(key, algorithm, data as CFData, &error) else {
+                let detail = error?.takeRetainedValue().localizedDescription ?? "neznáma chyba"
+                throw XAdESError.signingFailed(detail)
+            }
+            return signature as Data
+        }
+    }
+
+    public static func pkcs11(certSHA256Hex: String, isRSA: Bool, pin: String) -> RawSigner {
+        RawSigner(signatureMethodURI: isRSA ? RawSigner.rsaMethod : RawSigner.ecdsaMethod,
+                  isRSA: isRSA) { data in
+            let digest = Data(SHA256.hash(data: data))
+            let raw = try PKCS11BridgeClient.sign(certSHA256Hex: certSHA256Hex,
+                                                  pin: pin, digest: digest)
+            return isRSA ? raw : Self.derECDSA(fromConcatenated: raw)
+        }
+    }
+
+    static func derECDSA(fromConcatenated raw: Data) -> Data {
+        guard raw.count >= 2, raw.count % 2 == 0 else { return raw }
+        let half = raw.count / 2
+        func integer(_ bytes: ArraySlice<UInt8>) -> Data {
+            var b = Array(bytes)
+            while b.count > 1 && b.first == 0 { b.removeFirst() }
+            if b.first ?? 0 >= 0x80 { b.insert(0x00, at: 0) }
+            return DER.integerFromRaw(b)
+        }
+        let bytes = Array(raw)
+        return DER.sequence([
+            integer(bytes[0..<half]),
+            integer(bytes[half...])
+        ])
     }
 }
 
@@ -76,17 +140,20 @@ public struct SigningRequest: Sendable {
     public var includeTimestamp: Bool
     public var tsaURL: String?
     public var outputFormat: SigningOutputFormat
+    public var pin: String?
     public var extraFiles: [ASiCEPackager.Entry]
 
     public init(pdfData: Data, identityID: String,
                 includeTimestamp: Bool, tsaURL: String? = nil,
                 outputFormat: SigningOutputFormat = .attachedASIC,
+                pin: String? = nil,
                 extraFiles: [ASiCEPackager.Entry] = []) {
         self.pdfData = pdfData
         self.identityID = identityID
         self.includeTimestamp = includeTimestamp
         self.tsaURL = tsaURL
         self.outputFormat = outputFormat
+        self.pin = pin
         self.extraFiles = extraFiles
     }
 }
@@ -243,24 +310,296 @@ public enum KeychainIdentityScanner {
         return watcher.tokenIDs.contains { !$0.lowercased().hasPrefix("apple.") && !$0.lowercased().hasPrefix("com.apple") }
     }
 
+    public static func connectedTokenIDs() -> [String] {
+        TKTokenWatcher().tokenIDs.filter { id in
+            let lowered = id.lowercased()
+            return !lowered.hasPrefix("apple.") && !lowered.hasPrefix("com.apple")
+        }
+    }
+
     public static func scanAll() -> [SigningIdentityInfo] {
         guard hasConnectedToken() else { return [] }
+        var result = scanTokenIdentities()
+        var existing = Set(result.map(\.label))
+        for pair in certificateKeyPairs() where existing.insert(pair.label).inserted {
+            result.append(pair)
+        }
+        if result.contains(where: \.hasPrivateKey) {
+            return result.sorted { $0.label < $1.label }
+        }
+        existing = Set(result.map(\.label))
+        for identity in PKCS11BridgeClient.listIdentities() {
+            guard existing.insert(identity.subjectSummary).inserted,
+                  !identity.certificateDER.isEmpty else { continue }
+            result.append(SigningIdentityInfo(
+                id: "pkcs11:\(identity.subjectSummary)",
+                label: identity.subjectSummary,
+                issuerSummary: identity.issuerSummary,
+                isMandateCertificate: identity.isMandateCertificate,
+                isQualified: identity.isQualified,
+                hasPrivateKey: true,
+                pkcs11CertSHA256Hex: identity.certSHA256Hex,
+                pkcs11IsRSA: identity.isRSA,
+                requiresPIN: true))
+        }
+        return result.sorted { $0.label < $1.label }
+    }
 
+    public static func scanTokenIdentities() -> [SigningIdentityInfo] {
         var seen = Set<String>()
         var result: [SigningIdentityInfo] = []
-        for identity in scanCodeSigningIdentities() where seen.insert(identity.label).inserted {
-            result.append(identity)
+        for tokenID in connectedTokenIDs() {
+            result.append(contentsOf: identities(onToken: tokenID, seen: &seen))
         }
-        for cert in scanTokenCertificates() where seen.insert(cert.label).inserted {
-            result.append(cert)
+        return result
+    }
+
+    static func identities(onToken tokenID: String, seen: inout Set<String>) -> [SigningIdentityInfo] {
+        let ders = certificateDERs(tokenID: tokenID)
+        let tokenKey = privateKey(tokenID: tokenID)
+        var infos: [SigningIdentityInfo] = []
+        for der in ders {
+            guard let cert = SecCertificateCreateWithData(nil, der as CFData),
+                  let summary = SecCertificateCopySubjectSummary(cert) as String?,
+                  !summary.isEmpty,
+                  !isJunk(summary),
+                  !looksLikeRootCA(summary),
+                  seen.insert(summary).inserted else { continue }
+            let key = privateKey(for: cert) ?? tokenKey.flatMap { candidate in
+                keysMatch(candidate, certificate: cert) ? candidate : nil
+            }
+            guard key != nil else { continue }
+            infos.append(info(for: cert, summary: summary))
+        }
+        return infos
+    }
+
+    static func certificateDERs(tokenID: String) -> [Data] {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassCertificate,
+            kSecAttrTokenID as String: tokenID,
+            kSecMatchLimit as String: kSecMatchLimitAll,
+            kSecReturnData as String: true
+        ]
+        var result: AnyObject?
+        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess else { return [] }
+        if let items = result as? [Data] { return items }
+        if let data = result as? Data { return [data] }
+        if let dicts = result as? [[String: Any]] {
+            return dicts.compactMap { $0[kSecValueData as String] as? Data }
+        }
+        return []
+    }
+
+    static func privateKey(tokenID: String) -> SecKey? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassKey,
+            kSecAttrKeyClass as String: kSecAttrKeyClassPrivate,
+            kSecAttrTokenID as String: tokenID,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+            kSecReturnRef as String: true
+        ]
+        var result: AnyObject?
+        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
+              let object = result, CFGetTypeID(object) == SecKeyGetTypeID() else { return nil }
+        return (object as! SecKey)
+    }
+
+    static func keysMatch(_ privateKey: SecKey, certificate: SecCertificate) -> Bool {
+        guard let certPublic = SecCertificateCopyKey(certificate),
+              let keyPublic = SecKeyCopyPublicKey(privateKey) else { return true }
+        var firstError: Unmanaged<CFError>?
+        var secondError: Unmanaged<CFError>?
+        guard let left = SecKeyCopyExternalRepresentation(certPublic, &firstError) as Data?,
+              let right = SecKeyCopyExternalRepresentation(keyPublic, &secondError) as Data? else {
+            return true
+        }
+        return left == right
+    }
+
+    static func info(for certificate: SecCertificate, summary: String) -> SigningIdentityInfo {
+        let issuerText = X509Inspector.facts(certificateData: SecCertificateCopyData(certificate) as Data)?
+            .issuerRFC2253 ?? ""
+        let searchable = summary + " " + issuerText
+        return SigningIdentityInfo(
+            id: "certificate:\(summary)",
+            label: summary,
+            issuerSummary: issuerCN(fromRFC2253: issuerText) ?? Self.issuerHint(from: searchable),
+            isMandateCertificate: Self.looksMandate(searchable),
+            isQualified: Self.looksQualified(searchable) || !issuerText.isEmpty,
+            hasPrivateKey: true)
+    }
+
+    public struct IdentityPair: @unchecked Sendable {
+        public let certificate: SecCertificate
+        public let privateKey: SecKey
+        public let summary: String
+    }
+
+    public static func certificateKeyPairs() -> [SigningIdentityInfo] {
+        var query = [String: Any]()
+        query[kSecClass as String] = kSecClassCertificate
+        query[kSecMatchLimit as String] = kSecMatchLimitAll
+        query[kSecReturnData as String] = true
+
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        guard status == errSecSuccess else { return [] }
+        let blobs: [Data]
+        if let items = result as? [Data] {
+            blobs = items
+        } else if let dicts = result as? [[String: Any]] {
+            blobs = dicts.compactMap { $0[kSecValueData as String] as? Data }
+        } else {
+            return []
         }
 
-        return result.filter { info in
-            !isJunk(info.label) && !looksLikeRootCA(info.label)
-        }.sorted { lhs, rhs in
-            if lhs.hasPrivateKey != rhs.hasPrivateKey { return lhs.hasPrivateKey }
-            return lhs.label < rhs.label
+        var seen = Set<String>()
+        var pairs: [SigningIdentityInfo] = []
+        for blob in blobs {
+            guard let cert = SecCertificateCreateWithData(nil, blob as CFData),
+                  let summary = SecCertificateCopySubjectSummary(cert) as String?,
+                  !summary.isEmpty,
+                  !isJunk(summary),
+                  !looksLikeRootCA(summary),
+                  seen.insert(summary).inserted,
+                  privateKey(for: cert) != nil else { continue }
+            pairs.append(info(for: cert, summary: summary))
         }
+        return pairs.sorted { $0.label < $1.label }
+    }
+
+    static func issuerCN(fromRFC2253 issuer: String) -> String? {
+        for part in issuer.split(separator: ",") {
+            let trimmed = part.trimmingCharacters(in: .whitespaces)
+            if trimmed.hasPrefix("CN=") {
+                return String(trimmed.dropFirst(3))
+            }
+        }
+        return nil
+    }
+
+    public static func privateKey(for certificate: SecCertificate) -> SecKey? {
+        guard let publicKey = SecCertificateCopyKey(certificate),
+              let label = publicKeyHash(for: publicKey) else { return nil }
+        var query = [String: Any]()
+        query[kSecClass as String] = kSecClassKey
+        query[kSecAttrApplicationLabel as String] = label
+        query[kSecAttrKeyClass as String] = kSecAttrKeyClassPrivate
+        query[kSecReturnRef as String] = true
+        var item: AnyObject?
+        guard SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess,
+              let key = item else { return nil }
+        return key as! SecKey
+    }
+
+    static func publicKeyHash(for publicKey: SecKey) -> Data? {
+        var error: Unmanaged<CFError>?
+        guard let external = SecKeyCopyExternalRepresentation(publicKey, &error) as Data? else { return nil }
+
+        var query = [String: Any]()
+        query[kSecClass as String] = kSecClassKey
+        query[kSecValueRef as String] = publicKey
+        query[kSecReturnAttributes as String] = true
+        var attrResult: AnyObject?
+        var keyType = kSecAttrKeyTypeRSA as String
+        if SecItemCopyMatching(query as CFDictionary, &attrResult) == errSecSuccess,
+           let attrs = attrResult as? [String: Any],
+           let type = attrs[kSecAttrKeyType as String] as? String {
+            keyType = type
+        }
+
+        let algorithmOID: String
+        let params: Data
+        if keyType == (kSecAttrKeyTypeECSECPrimeRandom as String) {
+            algorithmOID = "1.2.840.10045.2.1"
+            let curveOID: String
+            switch SecKeyGetBlockSize(publicKey) {
+            case 32: curveOID = "1.2.840.10045.3.1.7"
+            case 48: curveOID = "1.3.132.0.34"
+            case 66: curveOID = "1.3.132.0.35"
+            default: curveOID = "1.2.840.10045.3.1.7"
+            }
+            params = DER.oid(curveOID)
+        } else {
+            algorithmOID = "1.2.840.113549.1.1.1"
+            params = DER.tlv(0x05, Data())
+        }
+
+        let spki = DER.sequence([
+            DER.sequence([DER.oid(algorithmOID), params]),
+            DER.tlv(0x03, Data([0x00]) + external)
+        ])
+        return Data(Insecure.SHA1.hash(data: spki))
+    }
+
+    public static func resolveIdentityPair(id: String) -> IdentityPair? {
+        guard id.hasPrefix("certificate:") || id.hasPrefix("identity:") else { return nil }
+        let wanted = id.split(separator: ":", maxSplits: 1).last.map(String.init) ?? ""
+
+        for tokenID in connectedTokenIDs() {
+            if let pair = resolveTokenPair(tokenID: tokenID, summary: wanted) {
+                return pair
+            }
+        }
+
+        var query = [String: Any]()
+        query[kSecClass as String] = kSecClassCertificate
+        query[kSecMatchLimit as String] = kSecMatchLimitAll
+        query[kSecReturnData as String] = true
+        var result: AnyObject?
+        if SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess {
+            let blobs: [Data]
+            if let items = result as? [Data] {
+                blobs = items
+            } else if let dicts = result as? [[String: Any]] {
+                blobs = dicts.compactMap { $0[kSecValueData as String] as? Data }
+            } else {
+                blobs = []
+            }
+            for blob in blobs {
+                guard let cert = SecCertificateCreateWithData(nil, blob as CFData),
+                      let summary = SecCertificateCopySubjectSummary(cert) as String?,
+                      summary == wanted,
+                      let privateKey = privateKey(for: cert) else { continue }
+                return IdentityPair(certificate: cert, privateKey: privateKey, summary: summary)
+            }
+        }
+
+        var identityQuery = [String: Any]()
+        identityQuery[kSecClass as String] = kSecClassIdentity
+        identityQuery[kSecMatchLimit as String] = kSecMatchLimitAll
+        identityQuery[kSecReturnRef as String] = true
+        guard SecItemCopyMatching(identityQuery as CFDictionary, &result) == errSecSuccess,
+              let identities = result as? [SecIdentity] else { return nil }
+        for identity in identities {
+            var cert: SecCertificate?
+            var key: SecKey?
+            guard SecIdentityCopyCertificate(identity, &cert) == errSecSuccess,
+                  let certificate = cert,
+                  let summary = SecCertificateCopySubjectSummary(certificate) as String?,
+                  summary == wanted,
+                  SecIdentityCopyPrivateKey(identity, &key) == errSecSuccess,
+                  let privateKey = key else { continue }
+            return IdentityPair(certificate: certificate, privateKey: privateKey, summary: summary)
+        }
+        return nil
+    }
+
+    static func resolveTokenPair(tokenID: String, summary wanted: String) -> IdentityPair? {
+        let tokenKey = privateKey(tokenID: tokenID)
+        for der in certificateDERs(tokenID: tokenID) {
+            guard let cert = SecCertificateCreateWithData(nil, der as CFData),
+                  let summary = SecCertificateCopySubjectSummary(cert) as String?,
+                  summary == wanted else { continue }
+            if let key = privateKey(for: cert) {
+                return IdentityPair(certificate: cert, privateKey: key, summary: summary)
+            }
+            if let key = tokenKey, keysMatch(key, certificate: cert) {
+                return IdentityPair(certificate: cert, privateKey: key, summary: summary)
+            }
+        }
+        return nil
     }
 
     public static func scanCodeSigningIdentities() -> [SigningIdentityInfo] {

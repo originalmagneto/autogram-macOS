@@ -23,6 +23,9 @@ rm -rf "$APP_DIR"
 mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources"
 
 cp "$BIN_DIR/Autogram" "$CONTENTS/MacOS/Autogram"
+if [[ -x "$BIN_DIR/pkcs11-helper" ]]; then
+    cp "$BIN_DIR/pkcs11-helper" "$CONTENTS/MacOS/pkcs11-helper"
+fi
 cp "Assets/Autogram.icns" "$CONTENTS/Resources/Autogram.icns"
 
 cat > "$CONTENTS/Info.plist" <<'PLIST'
