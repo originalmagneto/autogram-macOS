@@ -17,11 +17,16 @@ public protocol LLMTransport: Sendable {
 }
 
 public struct URLSessionLLMTransport: LLMTransport {
-    public init() {}
+    var timeout: TimeInterval
+
+    public init(timeout: TimeInterval = 90) {
+        self.timeout = timeout
+    }
+
     public func post(url: URL, headers: [String: String], body: Data) async throws -> Data {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        request.timeoutInterval = 90
+        request.timeoutInterval = timeout
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         for (key, value) in headers { request.setValue(value, forHTTPHeaderField: key) }
         request.httpBody = body

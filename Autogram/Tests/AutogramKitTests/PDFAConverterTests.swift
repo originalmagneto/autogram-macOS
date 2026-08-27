@@ -35,6 +35,48 @@ final class PDFAConverterTests: XCTestCase {
         XCTAssertTrue(String(decoding: output, as: UTF8.self).contains("pdfaid"))
     }
 
+    func testRasterModeKeepsUprightOrientation() throws {
+        let source = try XCTUnwrap(PDFDocument(data: TestPDFBuilder.typicalContractPDF()))
+        let rasterized = try PDFAConverter().convert(document: source, mode: .rasterGuaranteed)
+        let output = try XCTUnwrap(PDFDocument(data: rasterized))
+        let page = try XCTUnwrap(output.page(at: 0))
+        let image = try XCTUnwrap(renderToImage(page: page))
+        let width = image.width, height = image.height
+        var topDark = 0, bottomDark = 0
+        for x in stride(from: 0, to: width, by: 4) {
+            for y in stride(from: 0, to: height, by: 4) {
+                if y < height * 4 / 10, Self.isDark(image, x: x, y: y) { topDark += 1 }
+                if y > height * 6 / 10, Self.isDark(image, x: x, y: y) { bottomDark += 1 }
+            }
+        }
+        XCTAssertGreaterThan(topDark, bottomDark,
+                             "Rasterizovaná strana je prevrátená — text musí ostať hore (top=\(topDark), bottom=\(bottomDark)).")
+    }
+
+    private func renderToImage(page: PDFPage) -> CGImage? {
+        let bounds = page.bounds(for: .mediaBox)
+        let scale: CGFloat = 1.5
+        guard bounds.width > 1, bounds.height > 1,
+              let ctx = CGContext(data: nil, width: Int(bounds.width * scale), height: Int(bounds.height * scale),
+                                  bitsPerComponent: 8, bytesPerRow: Int(bounds.width * scale) * 4,
+                                  space: CGColorSpaceCreateDeviceRGB(),
+                                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+        ctx.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: 1))
+        ctx.fill(CGRect(x: 0, y: 0, width: bounds.width * scale, height: bounds.height * scale))
+        ctx.scaleBy(x: scale, y: scale)
+        if let ref = page.pageRef {
+            ctx.drawPDFPage(ref)
+        }
+        return ctx.makeImage()
+    }
+
+    private static func isDark(_ image: CGImage, x: Int, y: Int) -> Bool {
+        guard let data = image.dataProvider?.data, let bytes = CFDataGetBytePtr(data) else { return false }
+        let offset = y * image.bytesPerRow + x * 4
+        guard offset + 3 < CFDataGetLength(data) else { return false }
+        return (Int(bytes[offset]) + Int(bytes[offset + 1]) + Int(bytes[offset + 2])) < 300
+    }
+
     func testIncrementalUpdateKeepsOriginalObjectsReadable() throws {
         let source = try XCTUnwrap(PDFDocument(data: TestPDFBuilder.typicalContractPDF()))
         let converter = PDFAConverter()

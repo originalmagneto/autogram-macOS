@@ -132,7 +132,7 @@ struct SettingsView: View {
                     }
                     .frame(width: 520)
 
-                    Text("Predvolené servery zodpovedajú originálnej aplikácii Autogram (Sectigo Qualified, Belgian TSA) a slovenskej kvalifikovanej TSA CA Disig. Vlastné servery môžeš pridať nižšie.")
+                    Text("Kvalifikované TSA: Belgium BOSA a CA Disig. DigiCert/Sectigo sú len nekvalifikované. Vlastnú TSA pridáš nižšie alebo priamo pri podpisovaní.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
 

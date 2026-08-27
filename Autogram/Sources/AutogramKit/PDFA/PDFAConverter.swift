@@ -1,6 +1,7 @@
 import Foundation
 import PDFKit
 import CoreGraphics
+import AppKit
 
 public enum PDFAConversionMode: String, Codable, CaseIterable, Identifiable, Sendable {
     case vectorPreserving = "Vektorová zachovávajúca"
@@ -40,8 +41,7 @@ public struct PDFAConverter: Sendable {
                         mode: PDFAConversionMode = .vectorPreserving,
                         title: String = "") throws -> Data {
         guard document.pageCount > 0 else { throw PDFAError.emptyDocument }
-
-        var baseData: Data
+        let baseData: Data
         switch mode {
         case .vectorPreserving:
             guard let data = document.dataRepresentation() else { throw PDFAError.serializationFailed }
@@ -49,9 +49,58 @@ public struct PDFAConverter: Sendable {
         case .rasterGuaranteed:
             baseData = try Self.rasterize(document: document)
         }
+        return try convertData(baseData, mode: mode, title: title)
+    }
 
-        baseData = Self.forceVersionHeader(baseData)
+    /// Konverzia na PDF/A-2B: čistý rewrite cez PDFBox v Java engine (PdfaNormalize).
+    /// Fallback: pôvodný ručný incremental append, keď engine nie je dostupný.
+    public func convertData(_ data: Data, mode: PDFAConversionMode, title: String) throws -> Data {
+        if let normalized = Self.normalizeWithEngine(data, title: title),
+           PDFAValidator().validate(normalized).isValid {
+            return normalized
+        }
+        var baseData = Self.forceVersionHeader(data)
         return try injectPDFACompliance(into: baseData, title: title)
+    }
+
+    /// Zavolá PdfaNormalize z Autogram macOS 2 enginu (PDFBox 3, čistý rewrite s /ID a XMP).
+    static func normalizeWithEngine(_ data: Data, title: String) -> Data? {
+        guard let installation = JavaEngineLocator().locate(),
+              FileManager.default.isExecutableFile(atPath: installation.javaExecutableURL.path),
+              FileManager.default.fileExists(atPath: Self.sRGBProfileSystemPath) else {
+            return nil
+        }
+        let work = FileManager.default.temporaryDirectory
+            .appendingPathComponent("pdfa-normalize-\(UUID().uuidString)", isDirectory: true)
+        do {
+            try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
+            let input = work.appendingPathComponent("in.pdf")
+            let output = work.appendingPathComponent("out.pdf")
+            try data.write(to: input, options: [.atomic])
+            defer { try? FileManager.default.removeItem(at: work) }
+
+            let process = Process()
+            process.executableURL = installation.javaExecutableURL
+            let contents = installation.jarFileURL.deletingLastPathComponent()
+            let classpath = "\(contents)/autogram.jar:\(contents)/dependency-jars/*"
+            process.arguments = [
+                "-cp", classpath,
+                "digital.slovensko.autogram.core.PdfaNormalize",
+                input.path, output.path, Self.sRGBProfileSystemPath,
+                title.isEmpty ? "Dokument" : title
+            ]
+            process.standardOutput = FileHandle.nullDevice
+            process.standardError = FileHandle.nullDevice
+            try process.run()
+            process.waitUntilExit()
+            guard process.terminationStatus == 0,
+                  FileManager.default.fileExists(atPath: output.path) else {
+                return nil
+            }
+            return try Data(contentsOf: output)
+        } catch {
+            return nil
+        }
     }
 
     static func forceVersionHeader(_ data: Data) -> Data {
@@ -63,31 +112,84 @@ public struct PDFAConverter: Sendable {
         return out
     }
 
-    static func rasterize(document: PDFDocument, dpi: CGFloat = 300) throws -> Data {
+    static func rasterize(document: PDFDocument, dpi: CGFloat = 200) throws -> Data {
         let scale = dpi / 72.0
-        var pageDatas: [Data] = []
+        var pageImages: [(image: CGImage, widthPt: CGFloat, heightPt: CGFloat)] = []
 
         for index in 0..<document.pageCount {
             guard let page = document.page(at: index),
                   let image = Self.renderPageImage(page: page, scale: scale) else { continue }
             let width = ceil(CGFloat(image.width) / scale)
             let height = ceil(CGFloat(image.height) / scale)
-            var box = CGRect(x: 0, y: 0, width: width, height: height)
-
-            let pdfData = NSMutableData()
-            guard let consumer = CGDataConsumer(data: pdfData as CFMutableData),
-                  let ctx = CGContext(consumer: consumer, mediaBox: &box, nil) else { continue }
-            ctx.beginPDFPage(nil)
-            ctx.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: 1))
-            ctx.fill(box)
-            ctx.interpolationQuality = .high
-            ctx.draw(image, in: box)
-            ctx.endPDFPage()
-            ctx.closePDF()
-            pageDatas.append(pdfData as Data)
+            pageImages.append((image, width, height))
         }
 
-        return Self.mergePageDatas(pageDatas)
+        return Self.buildJPEGPDF(pages: pageImages, quality: 0.82)
+    }
+
+    /// PDF s JPEG (DCTDecode) stránkami — raster PDF/A má tak desiatky KB, nie desiatky MB.
+    static func buildJPEGPDF(pages: [(image: CGImage, widthPt: CGFloat, heightPt: CGFloat)],
+                             quality: CGFloat) -> Data {
+        precondition(!pages.isEmpty, "Žiadne stránky na rasterizáciu")
+        var out = Data([0x25, 0x50, 0x44, 0x46, 0x2D, 0x31, 0x2E, 0x37, 0x0A,
+                        0x25, 0xF6, 0xE4, 0xFC, 0xDF, 0x0A])
+        var offsets: [Int] = []
+        func append(_ objectNumber: Int, _ body: String, stream: Data? = nil) {
+            offsets.append(out.count)
+            out.append(Data("\(objectNumber) 0 obj\n".utf8))
+            out.append(Data(body.utf8))
+            if let stream {
+                out.append(Data("\nstream\n".utf8))
+                out.append(stream)
+                out.append(Data("\nendstream\n".utf8))
+            }
+            out.append(Data("\nendobj\n".utf8))
+        }
+
+        let firstPageObject = 3
+        let objectsPerPage = 3
+        let kids = (0..<pages.count).map { "\(firstPageObject + $0 * objectsPerPage) 0 R" }
+
+        append(1, "<< /Type /Catalog /Pages 2 0 R >>")
+        append(2, "<< /Type /Pages /Kids [\(kids.joined(separator: " "))] /Count \(pages.count) >>")
+
+        for (index, page) in pages.enumerated() {
+            let pageObject = firstPageObject + index * objectsPerPage
+            let contentObject = pageObject + 1
+            let imageObject = pageObject + 2
+
+            let jpeg = Self.jpegData(from: page.image, quality: quality) ?? Data()
+            let content = "q\n\(page.widthPt) 0 0 \(page.heightPt) 0 0 cm\n/Im0 Do\nQ"
+            let pageBody = "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 \(page.widthPt) \(page.heightPt)]"
+                + " /Resources << /XObject << /Im0 \(imageObject) 0 R >> >>"
+                + " /Contents \(contentObject) 0 R >>"
+            append(pageObject, pageBody)
+            append(contentObject, "<< /Length \(content.utf8.count) >>", stream: Data(content.utf8))
+            let imageBody = "<< /Type /XObject /Subtype /Image /Width \(page.image.width)"
+                + " /Height \(page.image.height) /ColorSpace /DeviceRGB /BitsPerComponent 8"
+                + " /Filter /DCTDecode /Length \(jpeg.count) >>"
+            append(imageObject, imageBody, stream: jpeg)
+        }
+
+        let xrefOffset = out.count
+        let objectCount = firstPageObject + pages.count * objectsPerPage - 1
+        out.append(Data("xref\n0 \(objectCount + 1)\n".utf8))
+        out.append(Data("0000000000 65535 f \n".utf8))
+        for offset in offsets {
+            out.append(Data(String(format: "%010d 00000 n \n", offset).utf8))
+        }
+        let trailer = "trailer\n<< /Size \(objectCount + 1) /Root 1 0 R"
+            + " /ID [<0123456789abcdef0123456789abcdef> <0123456789abcdef0123456789abcdef>] >>\n"
+            + "startxref\n\(xrefOffset)\n%%EOF\n"
+        out.append(Data(trailer.utf8))
+        return out
+    }
+
+    static func jpegData(from image: CGImage, quality: CGFloat) -> Data? {
+        let rep = NSBitmapImageRep(cgImage: image)
+        rep.size = NSSize(width: image.width, height: image.height)
+        return rep.representation(using: .jpeg,
+                                  properties: [.compressionFactor: quality])
     }
 
     static func mergePageDatas(_ datas: [Data]) -> Data {
@@ -125,8 +227,6 @@ public struct PDFAConverter: Sendable {
         ctx.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: 1))
         ctx.fill(CGRect(x: 0, y: 0, width: width, height: height))
         ctx.scaleBy(x: scale, y: scale)
-        ctx.translateBy(x: 0, y: bounds.height)
-        ctx.scaleBy(x: 1, y: -1)
         if let ref = page.pageRef {
             ctx.drawPDFPage(ref)
         }
@@ -251,7 +351,7 @@ public enum PDFObjectScanner {
     }
 
     public static func rootObjectNumber(in data: Data) -> RootRef? {
-        let tailText = String(decoding: data.suffix(min(data.count, 4096)), as: UTF8.self)
+        let tailText = String(decoding: data.suffix(min(data.count, 16_384)), as: UTF8.self)
         guard let xrefRange = tailText.range(of: "startxref") else { return nil }
         let afterStart = tailText[xrefRange.upperBound...]
         let tokens = afterStart.split(whereSeparator: { $0 == " " || $0 == "\n" || $0 == "\r" })
@@ -270,8 +370,7 @@ public enum PDFObjectScanner {
     }
 
     public static func catalogDictionary(number: Int, in data: Data) -> String? {
-        let pattern = Data("\(number) 0 obj".utf8)
-        guard let found = data.range(of: pattern, options: .backwards) else { return nil }
+        guard let found = lastObjectHeader(number: number, in: data) else { return nil }
 
         let headEnd = min(found.lowerBound + 128, data.count)
         let head = String(decoding: data.subdata(in: found.lowerBound..<headEnd), as: UTF8.self)
@@ -308,6 +407,69 @@ public enum PDFObjectScanner {
             i += 1
         }
         return nil
+    }
+
+    public static func integerReference(named name: String, in dictionary: String) -> Int? {
+        guard let regex = try? NSRegularExpression(pattern: "/\(name)\\s+(\\d+)\\s+0\\s+R"),
+              let match = regex.firstMatch(in: dictionary, range: NSRange(dictionary.startIndex..., in: dictionary)),
+              let range = Range(match.range(at: 1), in: dictionary) else { return nil }
+        return Int(dictionary[range])
+    }
+
+    public static func lastObjectHeader(number: Int, in data: Data) -> Range<Data.Index>? {
+        let pattern = Data("\(number) 0 obj".utf8)
+        var searchEnd = data.endIndex
+        while searchEnd > data.startIndex,
+              let found = data.range(of: pattern, options: .backwards, in: data.startIndex..<searchEnd) {
+            let before = found.lowerBound
+            if before == data.startIndex || !isDigit(data[before - 1]) {
+                return found
+            }
+            searchEnd = found.lowerBound
+        }
+        return nil
+    }
+
+    static func isDigit(_ byte: UInt8) -> Bool { byte >= 0x30 && byte <= 0x39 }
+
+    public static func firstPageObjectNumber(catalog: String, in data: Data) -> Int? {
+        if let pagesNumber = integerReference(named: "Pages", in: catalog),
+           let pagesDict = catalogDictionary(number: pagesNumber, in: data),
+           let page = firstKidPage(in: pagesDict, data: data) {
+            return page
+        }
+        return firstUncompressedPageObject(in: data)
+    }
+
+    static func firstUncompressedPageObject(in data: Data) -> Int? {
+        let text = String(decoding: data, as: UTF8.self)
+        guard let regex = try? NSRegularExpression(pattern: "(?m)^(\\d+)\\s+0\\s+obj\\s*<<[^>]* /Type /Page(?:\\s|/)") else {
+            return nil
+        }
+        let ns = text as NSString
+        let match = regex.firstMatch(in: text, range: NSRange(location: 0, length: ns.length))
+        guard let match, let range = Range(match.range(at: 1), in: text) else { return nil }
+        return Int(text[range])
+    }
+
+    static func firstKidPage(in pagesDict: String, data: Data) -> Int? {
+        guard let regex = try? NSRegularExpression(pattern: "/Kids\\s*\\[\\s*(\\d+)\\s+0\\s+R"),
+              let match = regex.firstMatch(in: pagesDict, range: NSRange(pagesDict.startIndex..., in: pagesDict)),
+              let range = Range(match.range(at: 1), in: pagesDict),
+              let number = Int(pagesDict[range]),
+              let child = catalogDictionary(number: number, in: data) else { return nil }
+        if child.contains("/Kids") { return firstKidPage(in: child, data: data) }
+        return number
+    }
+
+    public static func pageWithAnnotation(pageDict: String, widgetNumber: Int) -> String {
+        if let annots = pageDict.range(of: "/Annots"),
+           let bracket = pageDict.range(of: "[", range: annots.upperBound..<pageDict.endIndex) {
+            var updated = pageDict
+            updated.insert(contentsOf: "\(widgetNumber) 0 R ", at: bracket.upperBound)
+            return updated
+        }
+        return augmentDictionary(pageDict, appending: "/Annots [\(widgetNumber) 0 R]")
     }
 
     public static func augmentDictionary(_ dict: String, appending suffix: String) -> String {

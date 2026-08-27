@@ -55,7 +55,8 @@ public final class KeychainXAdESSigningProvider: QualifiedSigningProviding, @unc
                 certificateDER: certificateDER,
                 signer: signer,
                 includeTimestamp: request.includeTimestamp,
-                tsaURL: tsaURL)
+                tsaURL: tsaURL,
+                stamp: request.visualStamp)
             return SignedConversionResult(
                 pdfData: signedPDF,
                 asicData: nil,
@@ -73,9 +74,12 @@ public final class KeychainXAdESSigningProvider: QualifiedSigningProviding, @unc
 
     private func signASIC(request: SigningRequest, certificate: Data, signer: RawSigner,
                           summary: String, tsaURL: URL?) async throws -> SignedConversionResult {
-        let payload = request.extraFiles
+        var payload = request.extraFiles
             .filter { $0.path != "mimetype" && !$0.path.hasPrefix("META-INF/") }
             .sorted { $0.path < $1.path }
+        if payload.isEmpty, !request.pdfData.isEmpty {
+            payload = [ASiCEPackager.Entry(path: "dokument.pdf", data: request.pdfData)]
+        }
 
         let dataObjects = payload.map { entry in
             XAdESSigner.DataObject(uri: entry.path,

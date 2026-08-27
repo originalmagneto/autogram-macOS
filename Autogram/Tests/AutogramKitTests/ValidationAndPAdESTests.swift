@@ -233,15 +233,15 @@ final class ValidationAndPAdESTests: XCTestCase {
         let (o1, l1, o2, l2) = (group(1), group(2), group(3), group(4))
         XCTAssertEqual(o1, 0)
         XCTAssertEqual(o2 + l2, signed.count, "ByteRange pokrýva celý súbor až po EOF.")
-        XCTAssertEqual(o2, l1 + PAdESSigner.contentsHexCapacity + 1,
-                       "Medzera musí presne zodpovedať hex obsahu /Contents <…>.")
+        XCTAssertEqual(o2, l1 + PAdESSigner.contentsHexCapacity + 2,
+                       "Medzera musí zodpovedať <hex> vrátane hranatých zátvoriek.")
 
         let covered = signed.subdata(in: 0..<l1) + signed.subdata(in: o2..<(o2 + l2))
         let recomputedDigest = Data(SHA256.hash(data: covered))
 
         let hexStart = try XCTUnwrap(PAdESSigner.indexOf(signed, ascii: "/Contents <"))
             + "/Contents <".utf8.count
-        XCTAssertEqual(o2 - l1 - 1, PAdESSigner.contentsHexCapacity)
+        XCTAssertEqual(o2 - l1 - 2, PAdESSigner.contentsHexCapacity)
         let cmsHex = String(decoding: signed.subdata(in: hexStart..<(o2 - 1)), as: UTF8.self)
         XCTAssertTrue(cmsHex.allSatisfy(\.isHexDigit))
         let cms = Data(hexEncoded: String(cmsHex.prefix(4096 * 2))) ?? Data()
@@ -249,6 +249,110 @@ final class ValidationAndPAdESTests: XCTestCase {
         let extracted = Self.messageDigest(fromCMS: cms)
         XCTAssertEqual(extracted, recomputedDigest,
                        "messageDigest v CMS sa musí zhodovať s SHA-256 nad ByteRange rozsahmi.")
+        XCTAssertTrue(text.contains("/Annots"), "Widget musí byť pripojený na stránku cez /Annots.")
+        XCTAssertTrue(text.contains("/Subtype /Widget"), "PAdES musí obsahovať podpisový widget.")
+        XCTAssertTrue(text.contains("/AP << /N"), "Widget musí mať vzhľad /AP, inak Preview podpis neukáže.")
+        XCTAssertEqual(cms.first, 0x30)
+        let cmsBytes = [UInt8](cms)
+        // ContentInfo → [0] SignedData → last child before end must be SET OF SignerInfos (0x31)
+        if let root = DERNode.firstTLV(bytes: cmsBytes, at: 0),
+           let explicit = DERNode.children(bytes: cmsBytes, in: root.contentRange).dropFirst().first,
+           let signedData = DERNode.children(bytes: cmsBytes, in: explicit.contentRange).first {
+            let kids = DERNode.children(bytes: cmsBytes, in: signedData.contentRange)
+            XCTAssertTrue(kids.contains(where: { $0.tag == 0x31 && $0.offset > signedData.offset + 20 }),
+                          "signerInfos musí byť SET (0x31), nie SEQUENCE.")
+        }
+
+        let xrefStart = try XCTUnwrap(PAdESSigner.indexOf(signed, ascii: "xref\n", from: source.count))
+        let xrefText = String(decoding: signed.subdata(in: xrefStart..<signed.count), as: UTF8.self)
+        let offsetRegex = try NSRegularExpression(pattern: #"(?m)^(\d{10}) 00000 n $"#)
+        let offsetMatches = offsetRegex.matches(in: xrefText, range: NSRange(xrefText.startIndex..., in: xrefText))
+        XCTAssertFalse(offsetMatches.isEmpty)
+        for match in offsetMatches {
+            let offset = Int(xrefText[Range(match.range(at: 1), in: xrefText)!])!
+            let header = String(decoding: signed.subdata(in: offset..<min(offset + 12, signed.count)), as: UTF8.self)
+            XCTAssertTrue(header.contains("0 obj"), "xref offset \(offset) musí ukazovať na objekt, nie na nový riadok: \(header)")
+        }
+
+        let png = Self.makeTestPNG(width: 40, height: 20)
+        let stamped = try await signer.sign(pdf: source,
+                                            certificateDER: fakeCertificate,
+                                            signer: rawSigner,
+                                            includeTimestamp: false,
+                                            tsaURL: nil,
+                                            stamp: VisualStampSpec(fullName: "Marián Čuprík",
+                                                                   timestamp: Date(),
+                                                                   pageIndex: 0,
+                                                                   normalizedRect: NormalizedRect(x: 0.6, y: 0.8, width: 0.3, height: 0.09),
+                                                                   imagePNG: png))
+        let stampedText = String(decoding: stamped, as: UTF8.self)
+        XCTAssertTrue(stampedText.contains("/Subtype /Image"), "PNG musí byť vložené ako image XObject.")
+        XCTAssertTrue(stampedText.contains("/SMask"), "PNG transparentnosť musí ísť cez /SMask.")
+        XCTAssertTrue(stampedText.contains("/Im0 Do"), "Appearance musí kresliť vložený obraz.")
+
+        let rendered = try XCTUnwrap(PDFDocument(data: stamped))
+        XCTAssertEqual(rendered.pageCount, pageCount)
+        let stampPage = try XCTUnwrap(rendered.page(at: 0))
+        let norm = NormalizedRect(x: 0.6, y: 0.8, width: 0.3, height: 0.09)
+        let widgetRect = CGRect(x: norm.x * 595,
+                                y: (1 - norm.y - norm.height) * 842,
+                                width: max(norm.width * 595, 90),
+                                height: max(norm.height * 842, 30))
+        let ink = Self.inkPixels(in: stampPage, pdfRect: widgetRect)
+        XCTAssertGreaterThan(ink, 50, "Widget appearance sa musí vykresliť (ink=\(ink)) — BBox/obsah musia byť validné pre CoreGraphics.")
+    }
+
+    static func inkPixels(in page: PDFPage, pdfRect: CGRect) -> Int {
+        let nsimg = page.thumbnail(of: CGSize(width: 595, height: 842), for: .mediaBox)
+        var rect = CGRect(origin: .zero, size: nsimg.size)
+        guard let cg = nsimg.cgImage(forProposedRect: &rect, context: nil, hints: nil) else { return 0 }
+        let scale = CGFloat(cg.width) / 595.0
+        let rep = NSBitmapImageRep(cgImage: cg)
+        var ink = 0
+        var py = Int(pdfRect.minY)
+        while py < Int(pdfRect.maxY) {
+            let row = Int(842.0 - Double(py) - 1.0)
+            var x = Int(pdfRect.minX)
+            while x < Int(pdfRect.maxX) {
+                if let c = rep.colorAt(x: Int(Double(x) * scale), y: Int(Double(row) * scale)),
+                   c.brightnessComponent < 0.92 {
+                    ink += 1
+                }
+                x += 2
+            }
+            py += 1
+        }
+        return ink
+    }
+
+    static func makeTestPNG(width: Int, height: Int) -> Data {
+        let image = NSImage(size: NSSize(width: width, height: height))
+        image.lockFocus()
+        NSColor(calibratedRed: 0.1, green: 0.3, blue: 0.7, alpha: 1).setFill()
+        NSBezierPath(rect: NSRect(x: 0, y: 0, width: width, height: height)).fill()
+        image.unlockFocus()
+        let tiff = image.tiffRepresentation!
+        let rep = NSBitmapImageRep(data: tiff)!
+        return rep.representation(using: .png, properties: [:])!
+    }
+
+    func testRootScannerUsesAbsoluteStartxrefOnLargePDF() throws {
+        let original = TestPDFBuilder.typicalContractPDF()
+        guard let root = PDFObjectScanner.rootObjectNumber(in: original) else {
+            return XCTFail("pôvodný PDF musí mať čitateľný katalóg")
+        }
+        var padded = Data(repeating: 0x20, count: 400_000)
+        padded.append(original)
+        let shifted = PDFObjectScanner.rootObjectNumber(in: padded)
+        XCTAssertNil(shifted, "štartxref je absolútny — padding pred súborom ho zneplatní")
+
+        var commentPadded = original
+        if commentPadded.last != UInt8(ascii: "\n") { commentPadded.append(0x0A) }
+        commentPadded.append(Data(repeating: 0x25, count: 300_000))
+        commentPadded.append(Data("\nstartxref\n\(root.xrefOffset)\n%%EOF\n".utf8))
+        let found = try XCTUnwrap(PDFObjectScanner.rootObjectNumber(in: commentPadded))
+        XCTAssertEqual(found.objectNumber, root.objectNumber)
+        XCTAssertEqual(found.xrefOffset, root.xrefOffset)
     }
 
     static func messageDigest(fromCMS cms: Data) -> Data? {
@@ -256,7 +360,12 @@ final class ValidationAndPAdESTests: XCTestCase {
         guard let root = DERNode.firstTLV(bytes: bytes, at: 0),
               let explicitContent = DERNode.children(bytes: bytes, in: root.contentRange).dropFirst().first,
               let signedData = DERNode.children(bytes: bytes, in: explicitContent.contentRange).first else { return nil }
-        for node in DERNode.children(bytes: bytes, in: signedData.contentRange) where node.tag == 0x30 && node.offset > signedData.offset + 20 {
+        var signerInfos = DERNode.children(bytes: bytes, in: signedData.contentRange)
+            .filter { $0.tag == 0x30 && $0.offset > signedData.offset + 20 }
+        for setNode in DERNode.children(bytes: bytes, in: signedData.contentRange) where setNode.tag == 0x31 && setNode.offset > signedData.offset + 20 {
+            signerInfos.append(contentsOf: DERNode.children(bytes: bytes, in: setNode.contentRange).filter { $0.tag == 0x30 })
+        }
+        for node in signerInfos {
             let children = DERNode.children(bytes: bytes, in: node.contentRange)
             if let signedAttrs = children.first(where: { $0.tag == 0xA0 }) {
                 for attributeRaw in DERNode.children(bytes: bytes, in: signedAttrs.contentRange) {

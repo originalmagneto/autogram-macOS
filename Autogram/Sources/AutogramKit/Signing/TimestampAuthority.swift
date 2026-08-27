@@ -3,21 +3,33 @@ import Foundation
 public struct TimestampAuthority: Codable, Hashable, Identifiable, Sendable {
     public var name: String
     public var url: String
+    public var isQualified: Bool
 
-    public init(name: String, url: String) {
+    public init(name: String, url: String, isQualified: Bool = false) {
         self.name = name
         self.url = url
+        self.isQualified = isQualified
     }
 
     public var id: String { url }
 
-    public static let legacyDefaultURL = "http://tsa.disig.sk/qts"
+    public static let legacyDefaultURL = "http://tsa.belgium.be/connect"
 
     public static let builtIn: [TimestampAuthority] = [
-        TimestampAuthority(name: "CA Disig (SK)", url: "http://tsa.disig.sk/qts"),
-        TimestampAuthority(name: "Sectigo Qualified", url: "http://timestamp.sectigo.com/qualified"),
-        TimestampAuthority(name: "Belgian Federal Government TSA", url: "http://tsa.belgium.be/connect")
+        TimestampAuthority(name: "Belgium BOSA (kvalifikovaná)", url: "http://tsa.belgium.be/connect", isQualified: true),
+        TimestampAuthority(name: "Certum (PL)", url: "http://time.certum.pl", isQualified: true),
+        TimestampAuthority(name: "CA Disig (SK, kvalifikovaná)", url: "http://tsa.disig.sk/qts", isQualified: true),
+        TimestampAuthority(name: "DigiCert (nekvalifikovaná)", url: "http://timestamp.digicert.com", isQualified: false),
+        TimestampAuthority(name: "Sectigo (nekvalifikovaná)", url: "http://timestamp.sectigo.com", isQualified: false)
     ]
+
+    public static var fallbackURLs: [URL] {
+        qualifiedURLs
+    }
+
+    public static var qualifiedURLs: [URL] {
+        builtIn.filter(\.isQualified).compactMap { URL(string: $0.url) }
+    }
 
     public static func resolveSelected(customServers: [String], selectedTSAURL: String)
         -> [TimestampAuthority] {

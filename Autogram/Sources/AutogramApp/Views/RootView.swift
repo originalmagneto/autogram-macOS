@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 import AutogramKit
 
 struct RootView: View {
@@ -23,7 +24,18 @@ struct RootView: View {
     }
 
     @State private var selection: SidebarSection = .signing
-    @State private var settingsStore = AppSettingsStore()
+    @State private var settingsStore: AppSettingsStore
+    @State private var signingStore: SigningSessionStore
+    @State private var zakoStore: ZakoSessionStore
+
+    init() {
+        let settings = AppSettingsStore()
+        _settingsStore = State(initialValue: settings)
+        _signingStore = State(initialValue: SigningSessionStore(
+            signingProvider: settings.signingProvider,
+            settingsStore: settings))
+        _zakoStore = State(initialValue: ZakoSessionStore(settingsStore: settings))
+    }
 
     var body: some View {
         NavigationSplitView {
@@ -42,6 +54,47 @@ struct RootView: View {
                     Label(SidebarSection.settings.rawValue, systemImage: SidebarSection.settings.symbol)
                         .tag(SidebarSection.settings)
                 }
+                if !signingStore.queue.isEmpty {
+                    Section("Otvorené súbory") {
+                        ForEach(signingStore.queue) { item in
+                            Label {
+                                Text(item.displayName).lineLimit(1)
+                            } icon: {
+                                Image(systemName: queueIcon(item.status))
+                                    .foregroundStyle(queueColor(item.status))
+                            }
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                selection = .signing
+                                Task { await signingStore.selectQueueItem(item.id) }
+                            }
+                            .listRowBackground(
+                                signingStore.selectedQueueID == item.id
+                                    ? Color.accentColor.opacity(0.14)
+                                    : Color.clear
+                            )
+                            .contextMenu {
+                                Button("Odstrániť zo zoznamu", role: .destructive) {
+                                    signingStore.removeQueueItem(item.id)
+                                }
+                            }
+                        }
+                        Label("Pridať súbory…", systemImage: "plus")
+                            .foregroundStyle(.secondary)
+                            .contentShape(Rectangle())
+                            .onTapGesture { openMoreFiles() }
+                        if signingStore.unsignedQueueItems.count > 1 {
+                            Label("Podpísať všetky (\(signingStore.unsignedQueueItems.count))",
+                                  systemImage: "signature")
+                                .foregroundStyle(.secondary)
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    selection = .signing
+                                    Task { await signingStore.signAllUnsigned() }
+                                }
+                        }
+                    }
+                }
             }
             .listStyle(.sidebar)
             .navigationTitle("Autogram")
@@ -50,7 +103,7 @@ struct RootView: View {
             detailView
                 .navigationTitle(selection.rawValue)
                 .navigationSubtitle(subtitle)
-                .backgroundExtensionEffect()
+                .toolbarBackgroundVisibility(.visible, for: .windowToolbar)
         }
     }
 
@@ -73,14 +126,44 @@ struct RootView: View {
     private var detailView: some View {
         switch selection {
         case .signing:
-            SigningFlowView(signingProvider: settingsStore.signingProvider,
-                            settings: settingsStore.settings)
+            SigningFlowView(store: signingStore)
         case .zako:
-            ZakoFlowView(settingsStore: settingsStore)
+            ZakoFlowView(store: zakoStore)
         case .evidence:
             EvidenceDashboardView(settingsStore: settingsStore)
         case .settings:
             SettingsView(settingsStore: settingsStore)
+        }
+    }
+
+    private func queueIcon(_ status: SigningSessionStore.SigningQueueItem.Status) -> String {
+        switch status {
+        case .ready: "doc.richtext"
+        case .signing: "hourglass"
+        case .signed: "checkmark.seal.fill"
+        case .failed: "exclamationmark.triangle.fill"
+        }
+    }
+
+    private func queueColor(_ status: SigningSessionStore.SigningQueueItem.Status) -> Color {
+        switch status {
+        case .ready: .secondary
+        case .signing: .orange
+        case .signed: .green
+        case .failed: .red
+        }
+    }
+
+    private func openMoreFiles() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.pdf]
+        panel.allowsMultipleSelection = true
+        panel.begin { response in
+            guard response == .OK else { return }
+            Task { @MainActor in
+                selection = .signing
+                await signingStore.addDocuments(at: panel.urls)
+            }
         }
     }
 }

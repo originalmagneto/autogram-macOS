@@ -43,17 +43,61 @@ public struct RawSigner: @unchecked Sendable {
     public static let ecdsaMethod = "http://www.w3.org/2001/04/xmldsig-more#ecdsa-sha256"
 
     public static func secKey(_ key: SecKey) -> RawSigner {
-        let algorithm: SecKeyAlgorithm
-        let method: String
-        if SecKeyIsAlgorithmSupported(key, .sign, .rsaSignatureMessagePKCS1v15SHA256) {
-            algorithm = .rsaSignatureMessagePKCS1v15SHA256
-            method = RawSigner.rsaMethod
-        } else {
-            algorithm = .ecdsaSignatureMessageX962SHA256
-            method = RawSigner.ecdsaMethod
+        let rsa = SecKeyIsAlgorithmSupported(key, .sign, .rsaSignatureMessagePKCS1v15SHA256)
+            || SecKeyIsAlgorithmSupported(key, .sign, .rsaSignatureDigestPKCS1v15SHA256)
+            || SecKeyIsAlgorithmSupported(key, .sign, .rsaSignatureRaw)
+        if rsa {
+            return RawSigner(signatureMethodURI: RawSigner.rsaMethod, isRSA: true) { data in
+                try signRSA(key: key, message: data)
+            }
         }
-        return RawSigner(signatureMethodURI: method,
-                         isRSA: algorithm == .rsaSignatureMessagePKCS1v15SHA256) { data in
+        return RawSigner(signatureMethodURI: RawSigner.ecdsaMethod, isRSA: false) { data in
+            try createSignature(key: key, algorithm: .ecdsaSignatureMessageX962SHA256, data: data)
+        }
+    }
+
+    static func signRSA(key: SecKey, message: Data) throws -> Data {
+        let digest = Data(SHA256.hash(data: message))
+        let digestInfo = sha256DigestInfo(digest)
+        let attempts: [(SecKeyAlgorithm, Data)] = [
+            (.rsaSignatureMessagePKCS1v15SHA256, message),
+            (.rsaSignatureDigestPKCS1v15SHA256, digest),
+            (.rsaSignatureRaw, digestInfo)
+        ]
+        var lastError = "neznáma chyba"
+        for (algorithm, payload) in attempts {
+            if !SecKeyIsAlgorithmSupported(key, .sign, algorithm) { continue }
+            do {
+                return try createSignature(key: key, algorithm: algorithm, data: payload)
+            } catch let error as XAdESError {
+                if case .signingFailed(let detail) = error {
+                    lastError = detail
+                    if detail.localizedCaseInsensitiveContains("cancel")
+                        || detail.localizedCaseInsensitiveContains("zruš") {
+                        throw error
+                    }
+                } else {
+                    throw error
+                }
+            }
+        }
+        if lastError.localizedCaseInsensitiveContains("code state")
+            || lastError.localizedCaseInsensitiveContains("Invalid") {
+            throw XAdESError.signingFailed(
+                "Karta je v neplatnom stave. Otvorte eID_klient, zadajte BOK a skúste znova (prípadne kartu vyberte a vložte).")
+        }
+        throw XAdESError.signingFailed(lastError)
+    }
+
+    static func sha256DigestInfo(_ digest: Data) -> Data {
+        DER.sequence([
+            DER.sequence([DER.oid("2.16.840.1.101.3.4.2.1"), DER.tlv(0x05, Data())]),
+            DER.octetString(digest)
+        ])
+    }
+
+    static func createSignature(key: SecKey, algorithm: SecKeyAlgorithm, data: Data) throws -> Data {
+        try runOnMain {
             var error: Unmanaged<CFError>?
             guard let signature = SecKeyCreateSignature(key, algorithm, data as CFData, &error) else {
                 let detail = error?.takeRetainedValue().localizedDescription ?? "neznáma chyba"
@@ -61,6 +105,11 @@ public struct RawSigner: @unchecked Sendable {
             }
             return signature as Data
         }
+    }
+
+    static func runOnMain<T>(_ work: () throws -> T) rethrows -> T {
+        if Thread.isMainThread { return try work() }
+        return try DispatchQueue.main.sync(execute: work)
     }
 
     public static func pkcs11(certSHA256Hex: String, isRSA: Bool, pin: String) -> RawSigner {
@@ -134,6 +183,33 @@ public enum SigningOutputFormat: String, Codable, CaseIterable, Identifiable, Se
     public var id: String { rawValue }
 }
 
+public struct VisualStampSpec: Sendable {
+    public var fullName: String
+    public var timestamp: Date
+    public var pageIndex: Int
+    public var normalizedRect: NormalizedRect
+    public var imagePNG: Data?
+    public var pdfPageRect: CGRect?
+    public var rotationDegrees: Double
+    public var qualification: String?
+
+    public init(fullName: String, timestamp: Date,
+                pageIndex: Int, normalizedRect: NormalizedRect,
+                imagePNG: Data? = nil,
+                pdfPageRect: CGRect? = nil,
+                rotationDegrees: Double = 0,
+                qualification: String? = nil) {
+        self.fullName = fullName
+        self.timestamp = timestamp
+        self.pageIndex = pageIndex
+        self.normalizedRect = normalizedRect
+        self.imagePNG = imagePNG
+        self.pdfPageRect = pdfPageRect
+        self.rotationDegrees = rotationDegrees
+        self.qualification = qualification
+    }
+}
+
 public struct SigningRequest: Sendable {
     public var pdfData: Data
     public var identityID: String
@@ -142,12 +218,14 @@ public struct SigningRequest: Sendable {
     public var outputFormat: SigningOutputFormat
     public var pin: String?
     public var extraFiles: [ASiCEPackager.Entry]
+    public var visualStamp: VisualStampSpec?
 
     public init(pdfData: Data, identityID: String,
                 includeTimestamp: Bool, tsaURL: String? = nil,
                 outputFormat: SigningOutputFormat = .attachedASIC,
                 pin: String? = nil,
-                extraFiles: [ASiCEPackager.Entry] = []) {
+                extraFiles: [ASiCEPackager.Entry] = [],
+                visualStamp: VisualStampSpec? = nil) {
         self.pdfData = pdfData
         self.identityID = identityID
         self.includeTimestamp = includeTimestamp
@@ -155,15 +233,52 @@ public struct SigningRequest: Sendable {
         self.outputFormat = outputFormat
         self.pin = pin
         self.extraFiles = extraFiles
+        self.visualStamp = visualStamp
+    }
+}
+
+public struct DocumentSignatureInfo: Sendable, Identifiable, Equatable {
+    public var id: String
+    public var signerDisplayName: String
+    public var format: String?
+    public var signingTime: Date?
+    public var hasQualifiedTimestamp: Bool
+    public var state: State
+    public var detail: String?
+
+    public enum State: String, Sendable, Equatable {
+        case valid
+        case invalid
+        case indeterminate
+        case unknown
+    }
+
+    public init(id: String, signerDisplayName: String, format: String? = nil,
+                signingTime: Date? = nil, hasQualifiedTimestamp: Bool = false,
+                state: State = .unknown, detail: String? = nil) {
+        self.id = id
+        self.signerDisplayName = signerDisplayName
+        self.format = format
+        self.signingTime = signingTime
+        self.hasQualifiedTimestamp = hasQualifiedTimestamp
+        self.state = state
+        self.detail = detail
     }
 }
 
 public protocol QualifiedSigningProviding: Sendable {
     func availableIdentities() async -> [SigningIdentityInfo]
+    func resolveIdentities(pin: String) async -> [SigningIdentityInfo]?
     func sign(_ request: SigningRequest) async throws -> SignedConversionResult
+    func inspectSignatures(in fileURL: URL) async -> [DocumentSignatureInfo]
 }
 
 extension QualifiedSigningProviding {
+    public func inspectSignatures(in fileURL: URL) async -> [DocumentSignatureInfo] { [] }
+
+    /// Načíta reálne certifikáty z vloženej karty ešte pred podpisom.
+    public func resolveIdentities(pin: String) async -> [SigningIdentityInfo]? { nil }
+
     public func sign(pdf: Data, identityID: String,
                      includeTimestamp: Bool) async throws -> SignedConversionResult {
         try await sign(SigningRequest(pdfData: pdf, identityID: identityID,
@@ -278,6 +393,10 @@ public final class DemoSigningProvider: QualifiedSigningProviding, @unchecked Se
 
 public enum SigningProviderFactory {
     public static func makeDefault() -> any QualifiedSigningProviding {
+        if let installation = JavaEngineLocator().locate(),
+           FileManager.default.isExecutableFile(atPath: installation.helperURL.path) {
+            return EngineBridgeSigningProvider()
+        }
         let hasRealIdentity = KeychainIdentityScanner.scanAll().contains { $0.hasPrivateKey }
         return hasRealIdentity ? KeychainXAdESSigningProvider() : DemoSigningProvider()
     }
@@ -407,7 +526,7 @@ public enum KeychainIdentityScanner {
 
     static func keysMatch(_ privateKey: SecKey, certificate: SecCertificate) -> Bool {
         guard let certPublic = SecCertificateCopyKey(certificate),
-              let keyPublic = SecKeyCopyPublicKey(privateKey) else { return true }
+              let keyPublic = SecKeyCopyPublicKey(privateKey) else { return false }
         var firstError: Unmanaged<CFError>?
         var secondError: Unmanaged<CFError>?
         guard let left = SecKeyCopyExternalRepresentation(certPublic, &firstError) as Data?,

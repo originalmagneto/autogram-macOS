@@ -39,33 +39,37 @@ final class ZakoSessionStore {
     var lastError: String?
     var serverTimeUsed: Date?
 
-    let settings: AppSettings
+    let settingsStore: AppSettingsStore
+    var settings: AppSettings { settingsStore.settings }
     let analysisEngine: PDFAnalysisEngine
     let detectionPipeline: DetectionPipeline
     let pdfaConverter: PDFAConverter
     let clauseGenerator: AttestationClauseGenerator
     let embeddedFileService: EmbeddedFileService
-    let ezzkService: any EZZKServicing
-    let signingProvider: any QualifiedSigningProviding
-    let evidenceStore: LocalEvidenceStore
+    var ezzkService: any EZZKServicing { settingsStore.ezzkService }
+    var signingProvider: any QualifiedSigningProviding { settingsStore.signingProvider }
+    var evidenceStore: LocalEvidenceStore { settingsStore.evidenceStore }
 
     var profilePersister: ((AdvocateProfile) -> Void)?
     private(set) var currentRecordID = UUID()
 
-    init(settings: AppSettings,
-         ezzkService: any EZZKServicing,
-         signingProvider: any QualifiedSigningProviding,
-         evidenceStore: LocalEvidenceStore) {
-        self.settings = settings
+    init(settingsStore: AppSettingsStore) {
+        self.settingsStore = settingsStore
         self.analysisEngine = PDFAnalysisEngine()
-        self.detectionPipeline = Self.buildPipeline(settings: settings)
+        self.detectionPipeline = Self.buildPipeline(settings: settingsStore.settings)
         self.pdfaConverter = PDFAConverter()
         self.clauseGenerator = AttestationClauseGenerator()
         self.embeddedFileService = EmbeddedFileService()
-        self.ezzkService = ezzkService
-        self.signingProvider = signingProvider
-        self.evidenceStore = evidenceStore
         self.currentRecordID = UUID()
+        self.profilePersister = { [weak settingsStore] profile in
+            guard let settingsStore else { return }
+            if let index = settingsStore.settings.profiles.firstIndex(where: { $0.id == profile.id }) {
+                settingsStore.settings.profiles[index] = profile
+            } else {
+                settingsStore.settings.profiles.append(profile)
+                settingsStore.settings.activeProfileID = profile.id
+            }
+        }
     }
 
     static func buildPipeline(settings: AppSettings) -> DetectionPipeline {
@@ -311,10 +315,20 @@ final class ZakoSessionStore {
 
     func refreshIdentities() async {
         identities = await signingProvider.availableIdentities()
+        if identities.isEmpty {
+            if !signingPIN.isEmpty { signingPIN = "" }
+            selectedIdentityID = nil
+            return
+        }
         if selectedIdentityID == nil || !identities.contains(where: { $0.id == selectedIdentityID }) {
             selectedIdentityID = identities.first(where: { $0.isMandateCertificate })?.id
                 ?? identities.first?.id
         }
+    }
+
+    /// Synthetic identita = typ certifikátu ešte nie je overený (čaká na PIN).
+    var isCertificateTypePending: Bool {
+        selectedIdentity?.id.hasPrefix("engine:") == true
     }
 
     var selectedIdentity: SigningIdentityInfo? {
@@ -328,6 +342,7 @@ final class ZakoSessionStore {
 
     var requiresMandateOverride: Bool {
         guard !signingProviderIsDemo else { return !allowNonMandateOverride }
+        if isCertificateTypePending { return false }
         return !mandateRequirementSatisfied && !allowNonMandateOverride
     }
 

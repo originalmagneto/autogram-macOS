@@ -59,29 +59,45 @@ struct AuthorizeView: View {
     }
 
     private var tokenStatusRow: some View {
-        let tokens = CardPresenceMonitor.shared.connectedTokens
-        return Group {
-            if tokens.isEmpty {
-                Label("Žiadna karta nie je pripojená cez CryptoTokenKit — certifikáty sa hľadajú v Keychainu.",
+        Group {
+            if store.signingProvider is DemoSigningProvider {
+                Label("Demo režim — kvalifikovaná karta nie je pripojená.",
                       systemImage: "creditcard.and.123")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            } else if store.identities.isEmpty {
+                Label("Karta nie je detegovaná — vložte eID alebo advokátsky preukaz.",
+                      systemImage: "creditcard.and.123")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else if store.isCertificateTypePending {
+                Label("Karta je pripojená. Typ certifikátu sa overí po zadaní PIN.",
+                      systemImage: "creditcard.fill")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             } else {
-                Label("Pripojené karty/tokeny: \(tokens.joined(separator: ", "))",
+                Label("Karta je pripojená, certifikáty načítané.",
                       systemImage: "creditcard.fill")
                     .font(.caption)
                     .foregroundStyle(.green)
             }
         }
-        .task {
-            CardPresenceMonitor.shared.onTokensChanged = { [weak store] in
-                await store?.refreshIdentities()
-            }
-        }
     }
 
     private var checklistItems: [(Bool, String, String)] {
-        [
+        let mandateSatisfied = store.mandateRequirementSatisfied || store.allowNonMandateOverride
+            || (store.isCertificateTypePending && !store.signingPIN.isEmpty)
+        let mandateLabel: String
+        if store.mandateRequirementSatisfied {
+            mandateLabel = "Mandátny certifikát SAK vybraný"
+        } else if store.isCertificateTypePending {
+            mandateLabel = store.signingPIN.isEmpty
+                ? "Mandátny certifikát SAK — overí sa po zadaní PIN"
+                : "Mandátny certifikát SAK — prebieha overenie na karte"
+        } else {
+            mandateLabel = "Mandátny certifikát SAK chýba"
+        }
+        return [
             (store.document != nil, "Dokument načítaný", "doc.fill"),
             (!store.attestation.originalDocumentName.isEmpty, "Názov pôvodného dokumentu vyplnený", "text.badge.checkmark"),
             (store.securityElements.count > 0, "Bezpečnostné prvky potvrdené (\(store.securityElements.count))", "shield.checkerboard"),
@@ -89,9 +105,7 @@ struct AuthorizeView: View {
             ((store.attestation.evidenceNumber ?? "").isEmpty == false, "Evidenčné číslo z EZZK", "number.square.fill"),
             (!store.attestation.performingPerson.fullName.isEmpty, "Identita osvedčujúcej osoby", "person.crop.circle"),
             (!store.attestation.performingPerson.registrationNumber.isEmpty, "Evidenčné číslo advokáta", "building.columns"),
-            (store.mandateRequirementSatisfied || store.allowNonMandateOverride,
-             store.mandateRequirementSatisfied ? "Mandátny certifikát SAK vybraný" : "Mandátny certifikát SAK chýba",
-             "checkmark.seal")
+            (mandateSatisfied, mandateLabel, "checkmark.seal")
         ]
     }
 
@@ -133,6 +147,15 @@ struct AuthorizeView: View {
                 }
             }
 
+            if !store.signingProviderIsDemo {
+                SecureField("PIN karty", text: $store.signingPIN)
+                    .textFieldStyle(.roundedBorder)
+                Label("Certifikát sa vyberie pri autorizácii. eID klient zobrazí natívny BOK dialóg až pri podpise.",
+                      systemImage: "key.horizontal")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             Toggle(isOn: $store.includeQualifiedTimestamp) {
                 Label("Pripojiť kvalifikovanú časovú pečiatku (QTS)", systemImage: "clock.badge.checkmark")
             }
@@ -232,6 +255,8 @@ struct IdentityRow: View {
             }
             if identity.isQualified {
                 badge("QCP", tint: .blue)
+            } else if !identity.id.hasPrefix("demo") {
+                badge("KOMERČNÝ", tint: .orange)
             }
         }
         .padding(9)

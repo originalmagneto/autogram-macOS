@@ -103,14 +103,14 @@ final class TimestampClientTests: XCTestCase {
 
         let fresh = AppSettings()
         XCTAssertEqual(fresh.selectedTSAURL, TimestampAuthority.legacyDefaultURL)
-        XCTAssertTrue(fresh.availableTSAServers.contains { $0.url == "http://timestamp.sectigo.com/qualified" })
         XCTAssertTrue(fresh.availableTSAServers.contains { $0.url == "http://tsa.belgium.be/connect" })
+        XCTAssertTrue(fresh.availableTSAServers.contains { $0.url == "http://tsa.disig.sk/qts" })
         XCTAssertEqual(fresh.activeTSA.url, TimestampAuthority.legacyDefaultURL)
 
         var custom = AppSettings(customTSAServers: ["https://internal.tsa/x"],
                                  selectedTSAURL: "https://internal.tsa/x")
         XCTAssertEqual(custom.activeTSA.url, "https://internal.tsa/x")
-        XCTAssertEqual(custom.availableTSAServers.count, 4)
+        XCTAssertEqual(custom.availableTSAServers.count, TimestampAuthority.builtIn.count + 1)
 
         let reencoded = try JSONEncoder().encode(custom)
         let roundTrip = try JSONDecoder().decode(AppSettings.self, from: reencoded)

@@ -13,24 +13,32 @@ final class CardPresenceMonitor {
 
     private let watcher = TKTokenWatcher()
     private var tokenIDsObservation: NSKeyValueObservation?
+    private var pollTimer: Timer?
 
     private init() {
         connectedTokens = Self.cleaned(watcher.tokenIDs)
         watcher.setInsertionHandler { [weak self] _ in
             Task { @MainActor in
-                self?.refresh()
+                self?.refresh(force: true)
             }
         }
         tokenIDsObservation = watcher.observe(\.tokenIDs, options: [.new]) { [weak self] _, _ in
             Task { @MainActor in
+                self?.refresh(force: true)
+            }
+        }
+        let timer = Timer(timeInterval: 2.0, repeats: true) { [weak self] _ in
+            Task { @MainActor in
                 self?.refresh()
             }
         }
+        RunLoop.main.add(timer, forMode: .common)
+        pollTimer = timer
     }
 
-    func refresh() {
+    func refresh(force: Bool = false) {
         let cleaned = Self.cleaned(watcher.tokenIDs)
-        guard cleaned != connectedTokens else { return }
+        guard force || cleaned != connectedTokens else { return }
         connectedTokens = cleaned
         lastChangeAt = Date()
         let callback = onTokensChanged

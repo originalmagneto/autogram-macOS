@@ -6,7 +6,7 @@
 
 **Natívna SwiftUI aplikácia na elektronické podpisovanie dokumentov** — so štandardným režimom podpisovania (KEP + kvalifikovaná časová pečiatka) a **advanced režimom Zaručená konverzia** podľa § 35–39 zákona č. 305/2013 Z. z. o e-Governmente a vyhlášky MIRRI č. 70/2021 Z. z.
 
-`macOS 26+` (Liquid Glass) · `SwiftUI + @Observable` · `0 externých závislostí` · `Swift 6 strict concurrency` · `63/63 testov ✅`
+`macOS 26+` (Liquid Glass) · `SwiftUI + @Observable` · `0 Swift package závislostí` · `Swift 6 strict concurrency` · `86 testov (83 prešlo, 3 live skipped) ✅`
 
 > 📋 Implementačná dokumentácia fáz 1–4 vrátane validácií a limitov: [`docs/PHASES.md`](docs/PHASES.md)
 
@@ -28,7 +28,7 @@ Kým existujúce nástroje (Podpisuj.sk, D.Convert) sú Java monštrá s desiatk
 
 <img src="docs/diagrams/architecture.svg" alt="Architektúra Autogram macOS" width="100%">
 
-Tri vrstvy: natívna SwiftUI prezentácia (`AutogramApp`) s dvoma reaktívnymi session store (`@Observable SigningSessionStore` pre štandardný podpis a `ZakoSessionStore` pre advanced režim) a čisto testovateľná knižnica `AutogramKit` — enginy, dokumentové služby a infraštruktúra. Nula externých závislostí; PDF/A zápis, XML generátor aj ZIP/ASiC-E packager sú vlastná implementácia.
+Tri vrstvy: natívna SwiftUI prezentácia (`AutogramApp`) s dvoma reaktívnymi session store (`@Observable SigningSessionStore` pre štandardný podpis a `ZakoSessionStore` pre advanced režim) a čisto testovateľná knižnica `AutogramKit` — enginy, dokumentové služby a infraštruktúra. Bez Swift package závislostí; PDF/A zápis, XML generátor aj ZIP/ASiC-E packager sú vlastná implementácia. Reálne tokenové podpisovanie môže použiť natívny CryptoTokenKit alebo EngineBridge s Java/DSS engine pre PKCS#11 tokeny.
 
 ---
 
@@ -88,7 +88,7 @@ On-device počítačové videnie (farebné/tmavé masky → connected components
 ### ✍️ Modul Podpisovanie (štandard)
 - Drag & drop **PDF aj obrázkové skeny** (JPEG/PNG/TIFF/HEIC → auto-konverzia do PDF)
 - Voliteľný **vizuálny podpis** — rámček potiahni priamo v náhľade, vyber stranu
-- KEP podpis + QTS, identity z Keychainu / eID karty (CryptoTokenKit) s detekciou mandátneho certifikátu
+- KEP podpis + QTS, identity z Keychainu / eID karty (CryptoTokenKit) alebo PKCS#11 tokenu cez EngineBridge, s detekciou mandátneho certifikátu
 - Výstup: podpísané PDF (+ ASiC-E kontajner), uložené do Output priečinka
 
 ### 🏛️ Modul Zaručená konverzia (advanced)
@@ -112,8 +112,10 @@ On-device počítačové videnie (farebné/tmavé masky → connected components
 - Case-insensitive parser s heuristikami — netypické kindy padajú do „Iný prvok"
 
 ### 🔐 Bezpečnosť a autorizácia
-- **Reálny KEP podpis**: XAdES-B/T v ASiC-E alebo PAdES-B/T priamo v PDF — natívne cez SecKey (Keychain / CryptoTokenKit), bez externých knižníc
+- **Reálny KEP podpis**: XAdES-B/T v ASiC-E alebo PAdES-B/T priamo v PDF — cez SecKey (Keychain / CryptoTokenKit) alebo EngineBridge s Java/DSS engine pre PKCS#11 tokeny
 - **Slovenská eID karta** (Cosmo 9.2 / eID_klient 5.4): certifikát + privátny kľúč sa čítajú z tokenu cez CryptoTokenKit; PIN zadáš v systémovom dialógu eID klienta. Ak sa identita neobjaví, reštartuj **eID_klient** alebo kartu vyber a vlož znova (CTK session vie uviaznuť).
+- **I.CA SecureStore / Starcos**: kvalifikovaný certifikát a podpis cez PKCS#11 EngineBridge; overené s kartou Starcos 3.7. PIN sa používa iba na načítanie identity a aktuálne podpisovanie, do aplikácie sa neukladá.
+- **Java/DSS engine**: automaticky sa hľadá v `/Applications/Autogram macOS 2.app/Contents` alebo `/Applications/Autogram macOS.app/Contents`; umiestnenie možno prepísať premennou `AUTOGRAM_JAVA_ENGINE_ROOT`.
 - **PKCS#11 fallback** (oficiálny `libPkcs11.dylib`, OpenSC, AWP) — použije sa len keď token neposkytne SecKey
 - **RFC 3161 klient** s vlastnou DER implementáciou; TSA zoznam podľa originálneho Autogramu (Sectigo, Belgian TSA) + CA Disig SK, vlastné servery, test spojenia
 - **Live detekcia karty** cez TKTokenWatcher — vloženie eID / SAK karty okamžite refreshuje certifikáty
@@ -144,7 +146,7 @@ cd Autogram
 # knižnica + appka (debug)
 swift build
 
-# testy — 63 (unit + full-pipeline integration)
+# testy — 86 (83 prejde, 3 live testy sú voliteľné a bez hardvéru sa preskočia)
 DEVELOPER_DIR=/Applications/Xcode-26.5.app/Contents/Developer swift test
 
 # .app bundle (release)
@@ -170,6 +172,7 @@ Interaktívna galéria diagramov: [`docs/gallery.html`](docs/gallery.html) *(otv
 | `EvidenceAndPackagingTests` | perzistencia registra, CSV escaping, ZIP/ASiC-E štruktúra, ZaKo kontajner layout + manifest, Mock EZZK ({registry}-{YYMMDD}-{seq}), demo podpis |
 | `TimestampClientTests` | RFC 3161 DER golden vektory (request bajt-po-bajte, odpoveď s genTime), zamietnuté stavy, TSA migrácia nastavení, pečiatka v ASiC-E |
 | `SigningInfrastructureTests` | X.509 parser (veľké sériové čísla, RFC2253 issuer), výber reálneho providera |
+| `EngineBridgeTests` | protokol v2, výber certifikátu, PIN/error mapping, PKCS#11 signing flow, vizuálny podpis a geometria |
 | `TokenIdentityScannerTests` | scanAll nesmie visieť na token certifikátoch; Apple tokeny sú odfiltrované |
 | `ValidationAndPAdESTests` | PDF/A validátor na konvertovanom aj čistom PDF, XML validátor (korupcia fingerprint/evidence/UsedDevice), ASiC-E verifier (digest mismatch detekcia), PAdES ByteRange == CMS messageDigest |
 | `VisibleSignatureStamperTests` | FreeText anotácia vizuálneho podpisu, obsah s menom/dátumom, variant bez časovej pečiatky |
@@ -195,7 +198,7 @@ Dizajnové špecifikácie: [`AUTOGRAM_MASTER_UI_UX_SPEC.md`](AUTOGRAM_MASTER_UI_
 
 | Oblast | Stav | Ďalší krok |
 |---|---|---|
-| KEP podpis | ✅ reálny XAdES-B/T + PAdES-B/T cez SecKey; eID Cosmo 9.2 cez CryptoTokenKit | cert chain do KeyInfo, PAdES B-LT archivácia |
+| KEP podpis | ✅ reálny XAdES-B/T + PAdES-B/T cez SecKey/CryptoTokenKit aj EngineBridge/PKCS#11; eID a I.CA Starcos overené | cert chain do KeyInfo, PAdES B-LT archivácia |
 | Časové pečiatky | ✅ RFC 3161 klient + TSA zoznam/custom + test spojenia | autodetekcia kvalifikovanosti TSA z EU Trusted List |
 | Validácie | ✅ PDFAValidator + AttestationXMLValidator + ASiCEVerifier ako hard gates | voliteľná plná veraPDF schémová validácia via bundled CLI |
 | Mandátny atribút | heuristika CN/issuer | presný OID mandátu z reálneho SAK certifikátu |
@@ -203,7 +206,7 @@ Dizajnové špecifikácie: [`AUTOGRAM_MASTER_UI_UX_SPEC.md`](AUTOGRAM_MASTER_UI_
 | Smery E→P, E→E | architektúra pripravená | formuláre príloh č. 1 a 5 |
 | Formuláre v1.2 (2027) | verziovaný placeholder (`ZakoCodelists`) | auto-update artefaktov z formulare.slovensko.sk |
 
-> ⚠️ **Právna poznámka:** aplikácia je vo vývoji. Keď je dostupná identita s privátnym kľúčom (eID karta alebo advokátsky preukaz SAK cez CryptoTokenKit), appka vytvára reálny KEP (XAdES/PAdES) s RFC 3161 QTS. Ak identita nie je dostupná, beží DEMO podpisovač — jeho výstupy nemajú právne účinky kvalifikovaného elektronického podpisu. Integráciu s IS EZZK overte pred produkčným nasadením.
+> ⚠️ **Právna poznámka:** aplikácia je vo vývoji. Keď je dostupná identita s privátnym kľúčom (eID karta alebo advokátsky preukaz SAK cez CryptoTokenKit, prípadne PKCS#11 token cez EngineBridge), appka vytvára reálny KEP (XAdES/PAdES) s RFC 3161 QTS. Ak identita nie je dostupná, beží DEMO podpisovač — jeho výstupy nemajú právne účinky kvalifikovaného elektronického podpisu. Integráciu s IS EZZK overte pred produkčným nasadením.
 
 ---
 

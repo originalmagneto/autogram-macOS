@@ -33,7 +33,7 @@ public struct TimestampReply: Sendable, Equatable {
 public struct RFC3161TimestampClient: Sendable {
     public var transport: any LLMTransport
 
-    public init(transport: any LLMTransport = URLSessionLLMTransport()) {
+    public init(transport: any LLMTransport = URLSessionLLMTransport(timeout: 12)) {
         self.transport = transport
     }
 
@@ -49,6 +49,27 @@ public struct RFC3161TimestampClient: Sendable {
         ])    }
 
     public func requestToken(for data: Data, tsaURL: URL) async throws -> TimestampReply {
+        var lastError: Error = TimestampError.transportFailure("žiadny TSA")
+        var candidates: [URL] = []
+        let selectedUnqualified = TimestampAuthority.builtIn.contains {
+            $0.url == tsaURL.absoluteString && !$0.isQualified
+        }
+        if !selectedUnqualified { candidates.append(tsaURL) }
+        for extra in TimestampAuthority.qualifiedURLs where !candidates.contains(extra) {
+            candidates.append(extra)
+        }
+        for url in candidates {
+            do {
+                return try await requestOnce(data: data, tsaURL: url)
+            } catch {
+                lastError = error
+            }
+        }
+        if let last = lastError as? TimestampError { throw last }
+        throw TimestampError.transportFailure(lastError.localizedDescription)
+    }
+
+    private func requestOnce(data: Data, tsaURL: URL) async throws -> TimestampReply {
         let nonce = UInt64.random(in: 1...UInt64.max)
         let requestBody = Self.buildRequest(for: data, nonce: nonce)
         do {

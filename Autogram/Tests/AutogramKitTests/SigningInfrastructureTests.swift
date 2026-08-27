@@ -34,8 +34,24 @@ final class SigningInfrastructureTests: XCTestCase {
         XCTAssertEqual(X509Inspector.escape2253("#leading"), "\\#leading")
     }
 
-    func testProviderSelectionPrefersRealIdentities() {
+    func testExclusiveC14NAddsSortedNamespacesAndExpandsEmptyTags() {
+        let source = "<xades:SignedProperties Id=\"xades-id-1\"><ds:DigestMethod Algorithm=\"http://www.w3.org/2001/04/xmlenc#sha256\"/></xades:SignedProperties>"
+        let canonical = XAdESSigner.exclusiveC14N(
+            source,
+            namespaces: [("xades", XAdESSigner.xadesNS), ("ds", XAdESSigner.dsNS)])
+        XCTAssertTrue(canonical.hasPrefix("<xades:SignedProperties xmlns:xades=\"\(XAdESSigner.xadesNS)\" Id=\"xades-id-1\">"))
+        XCTAssertTrue(canonical.contains("<ds:DigestMethod xmlns:ds=\"\(XAdESSigner.dsNS)\" Algorithm=\"http://www.w3.org/2001/04/xmlenc#sha256\"></ds:DigestMethod>"))
+        XCTAssertFalse(canonical.contains("/>"))
+    }
+
+    func testProviderSelectionPrefersEngineWhenInstalled() {
         let provider = SigningProviderFactory.makeDefault()
+        if JavaEngineLocator().locate()?.helperURL.path.contains("Helpers") == true,
+           FileManager.default.isExecutableFile(atPath: "/Applications/Autogram macOS 2.app/Contents/Helpers/AutogramCLI-arm64") {
+            XCTAssertTrue(provider is EngineBridgeSigningProvider,
+                          "Pri nainštalovanom engine musí factory preferovať EngineBridgeSigningProvider.")
+            return
+        }
         let hasRealIdentity = KeychainIdentityScanner.scanAll().contains { $0.hasPrivateKey }
         if hasRealIdentity {
             XCTAssertTrue(provider is KeychainXAdESSigningProvider)
