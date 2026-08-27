@@ -211,7 +211,7 @@ struct SigningPrepareView: View {
                     signButton
                 }
             }
-            .frame(width: 360)
+            .frame(width: 380)
             .background(.bar)
             .overlay(alignment: .leading) {
                 Rectangle().fill(Color.primary.opacity(0.08)).frame(width: 1)
@@ -406,138 +406,143 @@ struct SigningPrepareView: View {
         }
     }
 
-    private var certificateSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            tokenStatusLine
-
-            if store.identities.isEmpty {
-                Label("Žiadny certifikát k dispozícii: pripojte eID kartu.", systemImage: "info.circle")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            } else {
-                if store.signingProvider is DemoSigningProvider {
-                    Label("DEMO režim: podpis nie je právne záväzný.", systemImage: "info.circle")
-                        .font(.caption2)
-                        .foregroundStyle(.orange)
-                }
-                ForEach(store.identities) { identity in
-                    IdentityRow(
-                        identity: identity,
-                        isSelected: store.selectedIdentityID == identity.id,
-                        onSelect: { store.selectedIdentityID = identity.id }
-                    )
-                }
-            }
-        }
-    }
-
     private var settingsContent: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Label("Nastavenia podpisu", systemImage: "signature")
-                .font(.headline)
+            // Section 1: Podpisový certifikát & PIN
+            VStack(alignment: .leading, spacing: 12) {
+                Label("Podpisový certifikát", systemImage: "creditcard.fill")
+                    .font(.headline)
 
-            GroupBox("Existujúce podpisy") {
-                existingSignaturesSection
-                    .padding(4)
-            }
+                tokenStatusLine
 
-            GroupBox("Podpisový certifikát") {
-                certificateSection
-                    .padding(4)
-            }
-
-            if let selected = store.identities.first(where: { $0.id == store.selectedIdentityID }),
-               selected.requiresPIN {
-                GroupBox("PIN karty") {
-                    VStack(alignment: .leading, spacing: 6) {
-                        SecureField("Zadajte PIN / BOK", text: $store.signingPIN)
-                            .textFieldStyle(.roundedBorder)
-                        Text("PIN sa používa iba na túto operáciu a neukladá sa.")
+                if store.identities.isEmpty {
+                    Text("Pripojte čítačku eID alebo advokátsky preukaz SAK.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    if store.signingProvider is DemoSigningProvider {
+                        Label("DEMO režim: podpis nie je právne záväzný.", systemImage: "info.circle")
                             .font(.caption2)
-                            .foregroundStyle(.secondary)
-
-                        if store.isResolvingCertificate {
-                            ProgressView("Načítavam certifikát pre náhľad…")
-                                .font(.caption2)
-                        }
-                        if let error = store.certificateLoadError {
-                            Label(error, systemImage: "exclamationmark.triangle.fill")
-                                .font(.caption2)
-                                .foregroundStyle(.orange)
-                        }
+                            .foregroundStyle(.orange)
                     }
-                    .padding(4)
+
+                    ForEach(store.identities) { identity in
+                        IdentityRow(
+                            identity: identity,
+                            isSelected: store.selectedIdentityID == identity.id,
+                            onSelect: { store.selectedIdentityID = identity.id }
+                        )
+                    }
+
+                    if let selected = store.identities.first(where: { $0.id == store.selectedIdentityID }),
+                       selected.requiresPIN {
+                        VStack(alignment: .leading, spacing: 6) {
+                            SecureField("Zadajte PIN karty", text: $store.signingPIN)
+                                .textFieldStyle(.roundedBorder)
+
+                            Text("PIN sa používa iba na túto operáciu a neukladá sa.")
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+
+                            if store.isResolvingCertificate {
+                                ProgressView("Načítavam certifikát pre náhľad…")
+                                    .font(.caption2)
+                            }
+                            if let error = store.certificateLoadError {
+                                Label(error, systemImage: "exclamationmark.triangle.fill")
+                                    .font(.caption2)
+                                    .foregroundStyle(.orange)
+                            }
+                        }
+                        .padding(.top, 4)
+                    }
                 }
             }
+            .liquidGlass(cornerRadius: 14, padding: 14)
 
-            GroupBox("Parametre výstupu") {
-                VStack(alignment: .leading, spacing: 12) {
+            // Section 2: Parametre výstupu & TSA
+            VStack(alignment: .leading, spacing: 12) {
+                Label("Parametre podpisu", systemImage: "slider.horizontal.3")
+                    .font(.headline)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Formát výstupu")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+
+                    Picker("", selection: $store.outputFormat) {
+                        ForEach(SigningOutputFormat.allCases) { format in
+                            Text(format.rawValue).tag(format)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                }
+
+                Divider().opacity(0.5)
+
+                Toggle(isOn: $store.includeQualifiedTimestamp) {
+                    Label("Kvalifikovaná časová pečiatka (QTS)", systemImage: "clock.badge.checkmark")
+                        .font(.callout)
+                }
+
+                if store.includeQualifiedTimestamp {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Formát výstupu")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Picker("", selection: $store.outputFormat) {
-                            ForEach(SigningOutputFormat.allCases) { format in
-                                Text(format.rawValue).tag(format)
+                        Picker("", selection: $store.selectedTSAURL) {
+                            ForEach(store.settings.availableTSAServers) { server in
+                                Text(server.name).tag(server.url)
                             }
                         }
                         .labelsHidden()
                         .pickerStyle(.menu)
                     }
-
-                    Toggle(isOn: $store.includeQualifiedTimestamp) {
-                        Label("Kvalifikovaná časová pečiatka (QTS)", systemImage: "clock.badge.checkmark")
-                    }
-
-                    if store.includeQualifiedTimestamp {
-                        timestampPicker
-                    }
-
-                    Toggle(isOn: $store.convertToPDFA) {
-                        Label("Konvertovať do PDF/A pred podpisom", systemImage: "doc.badge.arrow.up")
-                    }
-
-                    Toggle(isOn: $store.includeVisibleSignature) {
-                        Label("Vizuálna pečiatka podpisu", systemImage: "rectangle.and.pencil.and.ellipsis")
-                    }
-                    .toggleStyle(.switch)
-
-                    if store.includeVisibleSignature, let visualState {
-                        VisibleAppearanceInspector(state: visualState)
-                    }
+                    .padding(.leading, 8)
                 }
-                .padding(4)
+
+                Divider().opacity(0.5)
+
+                Toggle(isOn: $store.convertToPDFA) {
+                    Label("Konvertovať do PDF/A pred podpisom", systemImage: "doc.badge.arrow.up")
+                        .font(.callout)
+                }
             }
+            .liquidGlass(cornerRadius: 14, padding: 14)
+
+            // Section 3: Vizuálna pečiatka podpisu
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Label("Vizuálna pečiatka v PDF", systemImage: "seal")
+                        .font(.headline)
+                    Spacer()
+                    Toggle("", isOn: $store.includeVisibleSignature)
+                        .labelsHidden()
+                        .toggleStyle(.switch)
+                }
+
+                if store.includeVisibleSignature, let visualState {
+                    Divider().opacity(0.5)
+                    VisibleAppearanceInspector(state: visualState)
+                }
+            }
+            .liquidGlass(cornerRadius: 14, padding: 14)
+
+            // Section 4: Existujúce podpisy
+            VStack(alignment: .leading, spacing: 8) {
+                Label("Podpisy v dokumente", systemImage: "signature")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.secondary)
+
+                existingSignaturesSection
+            }
+            .liquidGlass(cornerRadius: 14, padding: 12)
 
             if let error = store.lastError {
                 Text(error)
                     .font(.footnote)
                     .foregroundStyle(.red)
-                    .padding(8)
+                    .padding(10)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(Color.red.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
-            }
-        }
-    }
-
-    private var timestampPicker: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Picker("", selection: $store.selectedTSAURL) {
-                ForEach(store.settings.availableTSAServers) { server in
-                    Text(server.name).tag(server.url)
-                }
-            }
-            .labelsHidden()
-
-            HStack(spacing: 6) {
-                TextField("https://vlastna-tsa.sk/tsa", text: $customTSADraft)
-                    .textFieldStyle(.roundedBorder)
-                Button("Pridať") {
-                    store.addCustomTSA(customTSADraft)
-                    customTSADraft = ""
-                }
-                .disabled(customTSADraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                .controlSize(.small)
             }
         }
     }
@@ -662,7 +667,7 @@ struct SigningDoneView: View {
                     }
                 }
             }
-            .frame(width: 360)
+            .frame(width: 380)
             .background(.bar)
             .overlay(alignment: .leading) {
                 Rectangle().fill(Color.primary.opacity(0.08)).frame(width: 1)

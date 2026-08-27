@@ -12,92 +12,109 @@ public struct VisibleAppearanceInspector: View {
     }
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Toggle("Zobraziť vizuálnu pečiatku v PDF", isOn: Binding(
-                get: { state.isEnabled },
-                set: { state.setEnabled($0) }
-            ))
-            .disabled(state.selectedAsset == nil)
-
+        VStack(alignment: .leading, spacing: 12) {
             if state.assets.isEmpty {
-                Text("Vyberte obrázok podpisu (PNG, JPEG alebo PDF).")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                VStack(spacing: 8) {
+                    Text("Pre vizuálny podpis nahrajte obrázok podpisu alebo pečiatku.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    Button {
+                        chooseArtwork()
+                    } label: {
+                        Label("Nahrať podpis (PNG / JPEG / PDF)", systemImage: "plus.circle.fill")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
+                .padding(.vertical, 4)
             } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(state.assets) { asset in
-                            Button {
-                                state.select(asset)
-                            } label: {
-                                artworkThumbnail(for: asset)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Zvolená pečiatka podpisu")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 10) {
+                            ForEach(state.assets) { asset in
+                                Button {
+                                    state.select(asset)
+                                } label: {
+                                    artworkThumbnail(for: asset)
+                                }
+                                .buttonStyle(.plain)
+                                .padding(3)
+                                .background(
+                                    state.selectedAsset?.id == asset.id
+                                        ? Color.accentColor.opacity(0.18)
+                                        : Color.primary.opacity(0.03),
+                                    in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                        .strokeBorder(
+                                            state.selectedAsset?.id == asset.id
+                                                ? Color.accentColor
+                                                : Color.primary.opacity(0.1),
+                                            lineWidth: state.selectedAsset?.id == asset.id ? 2 : 1
+                                        )
+                                )
                             }
-                            .buttonStyle(.plain)
-                            .padding(3)
-                            .background(
-                                state.selectedAsset?.id == asset.id
-                                    ? Color.accentColor.opacity(0.25)
-                                    : Color.clear,
-                                in: RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                    .strokeBorder(
-                                        state.selectedAsset?.id == asset.id
-                                            ? Color.accentColor
-                                            : Color.primary.opacity(0.08),
-                                        lineWidth: 1
-                                    )
-                            )
+                        }
+                        .padding(.vertical, 2)
+                    }
+
+                    HStack(spacing: 8) {
+                        Button {
+                            chooseArtwork()
+                        } label: {
+                            Label("Pridať ďalší", systemImage: "plus")
+                        }
+                        .controlSize(.small)
+
+                        if state.selectedAsset != nil {
+                            Button(role: .destructive) {
+                                deleteSelectedArtwork()
+                            } label: {
+                                Label("Zmazať", systemImage: "trash")
+                            }
+                            .controlSize(.small)
+                        }
+
+                        Spacer()
+
+                        if state.placement != nil {
+                            Button {
+                                state.resetRotation()
+                            } label: {
+                                Image(systemName: "arrow.counterclockwise")
+                            }
+                            .help("Obnoviť pôvodnú pozíciu")
+                            .controlSize(.small)
                         }
                     }
-                    .padding(.vertical, 2)
-                }
-                .frame(height: 64)
-            }
-
-            HStack(spacing: 8) {
-                Button {
-                    chooseArtwork()
-                } label: {
-                    Label("Pridať obrázok…", systemImage: "plus")
-                }
-                .controlSize(.small)
-
-                if state.selectedAsset != nil {
-                    Button(role: .destructive) {
-                        deleteSelectedArtwork()
-                    } label: {
-                        Label("Zmazať", systemImage: "trash")
-                    }
-                    .controlSize(.small)
                 }
             }
 
             if state.pageCount > 1 {
-                pageSelector
-            }
-
-            if state.placement != nil {
                 HStack {
-                    Button {
-                        state.resetRotation()
-                    } label: {
-                        Label("Obnoviť pozíciu", systemImage: "arrow.counterclockwise")
-                    }
-                    .controlSize(.small)
+                    Text("Umiestnenie na strane:")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    pageSelector
                 }
             }
 
             Text("Pozíciu, veľkosť a rotáciu pečiatky upravíte priamo na plátne dokumentu.")
                 .font(.caption2)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.tertiary)
         }
-        .padding(.vertical, 4)
+        .padding(.top, 4)
     }
 
     private var pageSelector: some View {
-        Picker("Strana", selection: Binding(
+        Picker("", selection: Binding(
             get: { state.placement?.pageIndex ?? 0 },
             set: { state.selectPage($0) }
         )) {
@@ -107,6 +124,7 @@ public struct VisibleAppearanceInspector: View {
         }
         .disabled(state.placement == nil || state.pageCount == 0)
         .pickerStyle(.menu)
+        .labelsHidden()
     }
 
     private func chooseArtwork() {
@@ -133,12 +151,12 @@ public struct VisibleAppearanceInspector: View {
             Image(nsImage: image)
                 .resizable()
                 .scaledToFit()
-                .frame(width: 80, height: 50)
-                .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 6))
+                .frame(width: 80, height: 48)
+                .padding(4)
         } else {
             Image(systemName: "photo")
-                .frame(width: 80, height: 50)
-                .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 6))
+                .frame(width: 80, height: 48)
+                .padding(4)
         }
     }
 

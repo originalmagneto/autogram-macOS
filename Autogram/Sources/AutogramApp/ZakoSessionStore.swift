@@ -75,6 +75,12 @@ final class ZakoSessionStore {
     static func buildPipeline(settings: AppSettings) -> DetectionPipeline {
         let llmProvider: (any SecurityElementsProviding)?
         switch settings.aiMode {
+        case .omlxLocal:
+            llmProvider = OpenAIVisionProvider(
+                baseURL: URL(string: settings.omlxURL) ?? URL(string: "http://localhost:8000/v1")!,
+                model: settings.omlxModel,
+                apiKey: "",
+                promptOverride: settings.aiPrompt)
         case .ollamaLocal:
             llmProvider = OllamaVisionProvider(
                 endpoint: URL(string: settings.ollamaURL) ?? URL(string: "http://localhost:11434")!,

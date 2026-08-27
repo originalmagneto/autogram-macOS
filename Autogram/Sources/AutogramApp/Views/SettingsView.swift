@@ -13,29 +13,37 @@ struct SettingsView: View {
         TabView {
             ScrollView {
                 aiTab
-                    .frame(maxWidth: 720)
-                    .padding(24)
+                    .frame(maxWidth: 680)
+                    .padding(.vertical, 20)
+                    .padding(.horizontal, 24)
+                    .frame(maxWidth: .infinity)
             }
             .tabItem { Label("AI Vision", systemImage: "brain.head.profile") }
 
             ScrollView {
                 conversionTab
-                    .frame(maxWidth: 720)
-                    .padding(24)
+                    .frame(maxWidth: 680)
+                    .padding(.vertical, 20)
+                    .padding(.horizontal, 24)
+                    .frame(maxWidth: .infinity)
             }
             .tabItem { Label("Konverzia PDF/A", systemImage: "doc.badge.gearshape") }
 
             ScrollView {
                 ezzkTab
-                    .frame(maxWidth: 720)
-                    .padding(24)
+                    .frame(maxWidth: 680)
+                    .padding(.vertical, 20)
+                    .padding(.horizontal, 24)
+                    .frame(maxWidth: .infinity)
             }
             .tabItem { Label("EZZK", systemImage: "number.square") }
 
             ScrollView {
                 profilesTab
-                    .frame(maxWidth: 720)
-                    .padding(24)
+                    .frame(maxWidth: 680)
+                    .padding(.vertical, 20)
+                    .padding(.horizontal, 24)
+                    .frame(maxWidth: .infinity)
             }
             .tabItem { Label("Profily advokáta", systemImage: "person.crop.circle.badge.checkmark") }
         }
@@ -43,23 +51,163 @@ struct SettingsView: View {
 
     // MARK: - Tab 1: AI Vision
     private var aiTab: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Režim detekcie bezpečnostných prvkov")
+        VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Poskytovateľ AI Vision detekcie")
                     .font(.headline)
 
-                Picker("", selection: $settingsStore.settings.aiMode) {
-                    ForEach(AppSettings.AIMode.allCases, id: \.self) { mode in
-                        Text(mode.rawValue).tag(mode)
-                    }
-                }
-                .pickerStyle(.segmented)
+                VStack(spacing: 8) {
+                    aiProviderRow(
+                        mode: .omlxLocal,
+                        title: "oMLX (Apple Silicon MLX)",
+                        subtitle: "Lokálne MLX servovanie modelov Qwen2.5-VL / Llama-3.2-Vision (localhost:8000)",
+                        icon: "apple.logo"
+                    )
 
-                Text("Vstavaná on-device detekcia beží vždy. Zvolený AI režim dopĺňa nálezy pečiatok a podpisov. Všetky prvky možno kedykoľvek upraviť alebo doplniť ručne.")
-                    .font(.caption)
+                    aiProviderRow(
+                        mode: .ollamaLocal,
+                        title: "Ollama (Local Vision)",
+                        subtitle: "Lokálny Ollama server pre modely LLaVA / Llama-Vision (localhost:11434)",
+                        icon: "laptopcomputer"
+                    )
+
+                    aiProviderRow(
+                        mode: .builtInOnDevice,
+                        title: "Interný režim (On-Device Vision)",
+                        subtitle: "Základné počítačové videnie priamo na Macu bez externých serverov",
+                        icon: "bolt.badge.checkmark"
+                    )
+
+                    aiProviderRow(
+                        mode: .customAPIKey,
+                        title: "Vlastný API kľúč (OpenAI / Claude / Gemini)",
+                        subtitle: "Cloudové OpenAI-compatible API s bezpečným uložením kľúča v Kľúčenke",
+                        icon: "key.fill"
+                    )
+
+                    aiProviderRow(
+                        mode: .disabled,
+                        title: "Vypnuté",
+                        subtitle: "Využívať iba základné pravidlá bez asistencie AI",
+                        icon: "xmark.circle"
+                    )
+                }
+
+                Text("Vstavané on-device pravidlá bežia vždy. Zvolený AI režim dopĺňa detekciu úradných pečiatok a vlastnoručných podpisov podľa § 37.")
+                    .font(.caption2)
                     .foregroundStyle(.secondary)
+                    .padding(.top, 2)
             }
             .liquidGlass(cornerRadius: 14, padding: 16)
+
+            if settingsStore.settings.aiMode == .omlxLocal {
+                VStack(alignment: .leading, spacing: 12) {
+                    Label("Konfigurácia oMLX (Apple Silicon)", systemImage: "apple.logo")
+                        .font(.headline)
+
+                    Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 10) {
+                        GridRow {
+                            Text("API Endpoint")
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                                .frame(width: 140, alignment: .leading)
+                            TextField("http://localhost:8000/v1", text: $settingsStore.settings.omlxURL)
+                                .textFieldStyle(.roundedBorder)
+                        }
+
+                        GridRow {
+                            Text("Vision Model")
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                            TextField("mlx-community/Qwen2.5-VL-7B-Instruct-4bit", text: $settingsStore.settings.omlxModel)
+                                .textFieldStyle(.roundedBorder)
+                        }
+                    }
+
+                    Text("oMLX beží na Apple Silicon s natívnou akceleráciou GPU/Neural Engine. Odporúčané modely: Qwen2.5-VL, Llama-3.2-11B-Vision-Instruct.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                .liquidGlass(cornerRadius: 14, padding: 16)
+            }
+
+            if settingsStore.settings.aiMode == .ollamaLocal {
+                VStack(alignment: .leading, spacing: 12) {
+                    Label("Konfigurácia Ollama", systemImage: "laptopcomputer")
+                        .font(.headline)
+
+                    Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 10) {
+                        GridRow {
+                            Text("Server URL")
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                                .frame(width: 140, alignment: .leading)
+                            TextField("http://localhost:11434", text: $settingsStore.settings.ollamaURL)
+                                .textFieldStyle(.roundedBorder)
+                        }
+
+                        GridRow {
+                            Text("Model")
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                            TextField("llava / llama3.2-vision", text: $settingsStore.settings.ollamaModel)
+                                .textFieldStyle(.roundedBorder)
+                        }
+                    }
+
+                    Text("100 % offline spracovanie priamo na Macu cez lokálny Ollama server.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                .liquidGlass(cornerRadius: 14, padding: 16)
+            }
+
+            if settingsStore.settings.aiMode == .customAPIKey {
+                VStack(alignment: .leading, spacing: 12) {
+                    Label("Vlastný API kľúč", systemImage: "key.fill")
+                        .font(.headline)
+
+                    Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 10) {
+                        GridRow {
+                            Text("Base URL")
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                                .frame(width: 140, alignment: .leading)
+                            TextField("https://api.openai.com/v1", text: $settingsStore.settings.openAICompatibleBaseURL)
+                                .textFieldStyle(.roundedBorder)
+                        }
+
+                        GridRow {
+                            Text("Model")
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                            TextField("gpt-4o-mini", text: $settingsStore.settings.openAICompatibleModel)
+                                .textFieldStyle(.roundedBorder)
+                        }
+
+                        GridRow {
+                            Text("API kľúč (Keychain)")
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                            SecureField("sk-…", text: Binding(
+                                get: { KeychainStore.load(account: "ai.apikey") ?? "" },
+                                set: { newValue in
+                                    if newValue.isEmpty {
+                                        KeychainStore.delete(account: "ai.apikey")
+                                    } else {
+                                        _ = KeychainStore.save(secret: newValue, account: "ai.apikey")
+                                    }
+                                }))
+                                .textFieldStyle(.roundedBorder)
+                        }
+                    }
+
+                    Text("Kľúč sa ukladá výhradne do systémovej Kľúčenky tohto Macu.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                .liquidGlass(cornerRadius: 14, padding: 16)
+            }
 
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
@@ -80,7 +228,7 @@ struct SettingsView: View {
                                 ? nil : newValue
                     }))
                     .font(.system(size: 11, design: .monospaced))
-                    .frame(height: 110)
+                    .frame(height: 100)
                     .padding(4)
                     .background(Color.primary.opacity(0.03), in: RoundedRectangle(cornerRadius: 8))
                     .overlay(
@@ -93,86 +241,51 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
             .liquidGlass(cornerRadius: 14, padding: 16)
-
-            VStack(alignment: .leading, spacing: 12) {
-                Label("Lokálny model (Ollama)", systemImage: "laptopcomputer")
-                    .font(.headline)
-
-                Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 10) {
-                    GridRow {
-                        Text("Server")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                            .frame(width: 140, alignment: .leading)
-                        TextField("http://localhost:11434", text: $settingsStore.settings.ollamaURL)
-                            .textFieldStyle(.roundedBorder)
-                    }
-
-                    GridRow {
-                        Text("Model")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                        TextField("llava / llama3.2-vision", text: $settingsStore.settings.ollamaModel)
-                            .textFieldStyle(.roundedBorder)
-                    }
-                }
-
-                Text("100 % offline spracovanie priamo na Macu. Odporúčané modely: llava, qwen2-vl.")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
-            .liquidGlass(cornerRadius: 14, padding: 16)
-
-            VStack(alignment: .leading, spacing: 12) {
-                Label("Vlastný API kľúč (OpenAI-compatible)", systemImage: "key.fill")
-                    .font(.headline)
-
-                Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 10) {
-                    GridRow {
-                        Text("Base URL")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                            .frame(width: 140, alignment: .leading)
-                        TextField("https://api.openai.com/v1", text: $settingsStore.settings.openAICompatibleBaseURL)
-                            .textFieldStyle(.roundedBorder)
-                    }
-
-                    GridRow {
-                        Text("Model")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                        TextField("gpt-4o-mini", text: $settingsStore.settings.openAICompatibleModel)
-                            .textFieldStyle(.roundedBorder)
-                    }
-
-                    GridRow {
-                        Text("API kľúč (Keychain)")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                        SecureField("sk-…", text: Binding(
-                            get: { KeychainStore.load(account: "ai.apikey") ?? "" },
-                            set: { newValue in
-                                if newValue.isEmpty {
-                                    KeychainStore.delete(account: "ai.apikey")
-                                } else {
-                                    _ = KeychainStore.save(secret: newValue, account: "ai.apikey")
-                                }
-                            }))
-                            .textFieldStyle(.roundedBorder)
-                    }
-                }
-
-                Text("Kľúč sa ukladá bezpečne výhradne do systémovej Kľúčenky tohto Macu.")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
-            .liquidGlass(cornerRadius: 14, padding: 16)
         }
+    }
+
+    private func aiProviderRow(mode: AppSettings.AIMode, title: String, subtitle: String, icon: String) -> some View {
+        let isSelected = settingsStore.settings.aiMode == mode
+
+        return Button {
+            settingsStore.settings.aiMode = mode
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: isSelected ? "largecircle.fill.circle" : "circle")
+                    .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
+
+                Image(systemName: icon)
+                    .font(.system(size: 15))
+                    .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
+                    .frame(width: 22)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.callout.weight(isSelected ? .semibold : .medium))
+                        .foregroundStyle(Color.primary)
+                    Text(subtitle)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(isSelected ? Color.accentColor.opacity(0.08) : Color.primary.opacity(0.02),
+                        in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(isSelected ? Color.accentColor.opacity(0.4) : Color.primary.opacity(0.06), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Tab 2: Konverzia PDF/A
     private var conversionTab: some View {
-        VStack(alignment: .leading, spacing: 20) {
+        VStack(alignment: .leading, spacing: 18) {
             VStack(alignment: .leading, spacing: 10) {
                 Text("Spôsob konverzie do PDF/A")
                     .font(.headline)
@@ -307,7 +420,7 @@ struct SettingsView: View {
 
     // MARK: - Tab 3: EZZK
     private var ezzkTab: some View {
-        VStack(alignment: .leading, spacing: 20) {
+        VStack(alignment: .leading, spacing: 18) {
             VStack(alignment: .leading, spacing: 14) {
                 Label("Centrálna evidencia záznamov o konverzii (IS EZZK)", systemImage: "number.square")
                     .font(.headline)
@@ -385,7 +498,7 @@ struct SettingsView: View {
 
     // MARK: - Tab 4: Profily advokáta
     private var profilesTab: some View {
-        VStack(alignment: .leading, spacing: 20) {
+        VStack(alignment: .leading, spacing: 18) {
             HStack {
                 Text("Správa profilov advokáta")
                     .font(.headline)

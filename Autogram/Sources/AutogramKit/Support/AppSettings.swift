@@ -45,6 +45,7 @@ public enum KeychainStore {
 public struct AppSettings: Codable, Sendable {
     public enum AIMode: String, Codable, CaseIterable, Identifiable, Sendable {
         case builtInOnDevice = "Interný (on-device Vision)"
+        case omlxLocal = "Lokálny model (oMLX - Apple Silicon)"
         case ollamaLocal = "Lokálny model (Ollama)"
         case customAPIKey = "Vlastný API kľúč (OpenAI-compatible)"
         case disabled = "Vypnuté"
@@ -54,6 +55,8 @@ public struct AppSettings: Codable, Sendable {
 
     public var aiMode: AIMode
     public var aiPrompt: String?
+    public var omlxURL: String
+    public var omlxModel: String
     public var ollamaURL: String
     public var ollamaModel: String
     public var openAICompatibleBaseURL: String
@@ -69,7 +72,9 @@ public struct AppSettings: Codable, Sendable {
     public var ezzkEdeskAddress: String
 
     private enum CodingKeys: String, CodingKey {
-        case aiMode, aiPrompt, ollamaURL, ollamaModel
+        case aiMode, aiPrompt
+        case omlxURL, omlxModel
+        case ollamaURL, ollamaModel
         case openAICompatibleBaseURL, openAICompatibleModel
         case customTSAServers, selectedTSAURL, legacyTSAURL = "tsaURL"
         case pdfaMode, profiles, activeProfileID
@@ -78,6 +83,8 @@ public struct AppSettings: Codable, Sendable {
 
     public init(aiMode: AIMode = .builtInOnDevice,
                 aiPrompt: String? = nil,
+                omlxURL: String = "http://localhost:8000/v1",
+                omlxModel: String = "mlx-community/Qwen2.5-VL-7B-Instruct-4bit",
                 ollamaURL: String = "http://localhost:11434",
                 ollamaModel: String = "llava",
                 openAICompatibleBaseURL: String = "https://api.openai.com/v1",
@@ -93,6 +100,8 @@ public struct AppSettings: Codable, Sendable {
                 ezzkEdeskAddress: String = "") {
         self.aiMode = aiMode
         self.aiPrompt = aiPrompt
+        self.omlxURL = omlxURL
+        self.omlxModel = omlxModel
         self.ollamaURL = ollamaURL
         self.ollamaModel = ollamaModel
         self.openAICompatibleBaseURL = openAICompatibleBaseURL
@@ -112,6 +121,9 @@ public struct AppSettings: Codable, Sendable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.aiMode = try container.decodeIfPresent(AIMode.self, forKey: .aiMode) ?? .builtInOnDevice
         self.aiPrompt = try container.decodeIfPresent(String.self, forKey: .aiPrompt)
+        self.omlxURL = try container.decodeIfPresent(String.self, forKey: .omlxURL) ?? "http://localhost:8000/v1"
+        self.omlxModel = try container.decodeIfPresent(String.self, forKey: .omlxModel)
+            ?? "mlx-community/Qwen2.5-VL-7B-Instruct-4bit"
         self.ollamaURL = try container.decodeIfPresent(String.self, forKey: .ollamaURL) ?? "http://localhost:11434"
         self.ollamaModel = try container.decodeIfPresent(String.self, forKey: .ollamaModel) ?? "llava"
         self.openAICompatibleBaseURL = try container.decodeIfPresent(String.self, forKey: .openAICompatibleBaseURL)
@@ -149,6 +161,8 @@ public struct AppSettings: Codable, Sendable {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(aiMode, forKey: .aiMode)
         try container.encodeIfPresent(aiPrompt, forKey: .aiPrompt)
+        try container.encode(omlxURL, forKey: .omlxURL)
+        try container.encode(omlxModel, forKey: .omlxModel)
         try container.encode(ollamaURL, forKey: .ollamaURL)
         try container.encode(ollamaModel, forKey: .ollamaModel)
         try container.encode(openAICompatibleBaseURL, forKey: .openAICompatibleBaseURL)
