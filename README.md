@@ -57,6 +57,21 @@ Každá konverzia prechádza stavmi od konceptu po potvrdenie v centrálnej evid
 
 ---
 
+## Finder Quick Action: QES + QTS priamo z Findera
+
+<img src="docs/diagrams/finder-quick-action.svg" alt="Finder Quick Action: podpis označených PDF s QES a QTS" width="100%">
+
+Označte PDF (alebo priečinky s PDF) vo Finderi, kliknite pravým tlačidlom → *Rýchle akcie* → **Podpísať s QES + QTS (Autogram)**. Autogram prevezme výber, automaticky vyberie podpisový certifikát z pripojenej karty, podpíše dávku a uloží výstupy do výstupného priečinka.
+
+- Registrácia cez natívne `NSServices` v hlavnom bundle: macOS appku príp. sám spustí
+- BOK/PIN dialóg príde priamo od eID klienta alebo čítačky
+- Kvalifikovaná časová pečiatka (QTS) sa pripája z aktívnej TSA (default: Belgium BOSA)
+- Ak sa akcia nezobrazuje: pravý klik vo Finderi → *Rýchle akcie* → *Prispôsobiť…* a zapnite ju
+
+> Alternatívne funguje aj klasický drag & drop viacerých súborov do okna appky s dávkovým podpisom zo sidebaru.
+
+---
+
 ## PDF/A-2b engine
 
 <img src="docs/diagrams/pdfa-pipeline.svg" alt="Dátove toky PDF/A konvertora" width="100%">
@@ -75,7 +90,7 @@ On-device počítačové videnie (farebné/tmavé masky, connected components, r
 
 ## Ako začať (advokát)
 
-1. **Podpísať bežný dokument?** → sidebar *Podpisovanie*: pretiahni PDF (`⌘O`), voliteľne umiestni pečiatku, klikni **Podpísať KEP** (`⌘⏎`).
+1. **Podpísať bežný dokument?** → sidebar *Podpisovanie*: pretiahni PDF (`⌘O`), voliteľne umiestni pečiatku, klikni **Podpísať KEP** (`⌘⏎`). Alebo označ súbory priamo vo Finderi → *Rýchle akcie* → **Podpísať s QES + QTS (Autogram)**.
 2. **Previesť papierový originál do elektronickej podoby?** → sidebar *Zaručená konverzia*: pretiahni sken originálu, skontroluj AI-detekované prvky cez plávajúci markup panel, over doložku v živom náhľade, klikni **Autorizovať konverziu**.
 3. **Spravovať evidenciu a CEZZK?** → sidebar *Register konverzií* → odoslať dávku alebo exportovať CSV.
 
@@ -91,6 +106,7 @@ On-device počítačové videnie (farebné/tmavé masky, connected components, r
 - KEP podpis + QTS, identity z Keychainu / eID karty (CryptoTokenKit) alebo PKCS#11 tokenu cez EngineBridge
 - Ukotvené akčné tlačidlá (`StickyActionBar`) s klávesovou skratkou `⌘⏎`
 - Výstup: podpísané PDF (+ ASiC-E kontajner), priame akcie pre Finder a otvorenie
+- **Finder Quick Action:** označené PDF alebo priečinky vo Finderi sa podpíšu pravým klikom (*Rýchle akcie* → Podpísať s QES + QTS) bez nutnosti otvárať okno appky
 
 ### 🏛️ Modul Zaručená konverzia (advanced)
 - 5-krokový plynulý workflow stepper (`FlowStepBar`)
@@ -103,10 +119,12 @@ On-device počítačové videnie (farebné/tmavé masky, connected components, r
 
 ### 🤖 Modul AI Vision (voliteľný boost)
 - **On-device detekcia beží vždy** (farebné/tmavé masky, connected components, radial coverage)
+- **oMLX (Apple Silicon MLX):** natívna integrácia lokálneho MLX servovania (`http://localhost:8000/v1`) s modelmi Qwen2.5-VL / Llama-3.2-Vision; GPU akcelerácia priamo na Macu
 - **Lokálny LLM:** Ollama (`llava`, `llama3.2-vision`, `qwen2-vl`) s offline spracovaním
 - **API:** ľubovoľný OpenAI-compatible endpoint s bezpečným kľúčom v Keychain
 - **Editovateľný klasifikačný prompt**: pokrýva § 37 typy (pečiatka so znakom, reliéfna pečať, parafa)
 - IoU deduplikácia: LLM dopĺňa vstavané nálezy
+- Výber providera cez prehľadné karty v Nastaveniach (konfigurácia sa zobrazí pod zvoleným režimom)
 
 ### 🔐 Bezpečnosť a autorizácia
 - **Reálny KEP podpis**: XAdES-B/T v ASiC-E alebo PAdES-B/T priamo v PDF cez SecKey (CryptoTokenKit) alebo EngineBridge

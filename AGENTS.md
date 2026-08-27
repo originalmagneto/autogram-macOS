@@ -9,6 +9,8 @@ Autogram is a 100% native macOS SwiftUI application for Qualified Electronic Sig
 - Core Data / SQLite for Evidence and Conversion registers (CEZZK integration)
 - PKCS#11 bridge for Slovak eID cards, SAK advocate cards, and Disig smartcards
 - PDFKit, CoreGraphics, and on-device Vision AI for document analysis and security element detection
+  - Local LLM vision providers: oMLX (Apple Silicon MLX, `localhost:8000/v1`) and Ollama (`localhost:11434`), plus OpenAI-compatible cloud APIs with keys in Keychain
+  - AI provider selection in Settings uses provider cards (`SettingsView.aiProviderRow`); config panel renders under the chosen mode
 
 ## Design System & UI/UX Structure
 - **DesignSystem.swift**: Contains `.liquidGlass()` modifiers, `StickyActionBar` containers, `SmartcardHUDStatus` reader badges, `EIDASBadge` verification pills, and `FlowStepBar` subheader stepper navigation.
@@ -23,6 +25,7 @@ Autogram is a 100% native macOS SwiftUI application for Qualified Electronic Sig
   - `AuthorizeView`: Mandate certificate verification, PIN handling, and sticky authorization action bar.
   - `DoneView`: Direct access to converted PDF/A and clause files.
 - **Evidence Dashboard (EvidenceDashboardView.swift)**: Search filter, segmented status picker, SQLite table with right-click context menu, and confirmation dialog for deletions.
+- **Finder Quick Action (ServicesProvider.swift)**: NSServices provider (`signFiles`) registered in Info.plist; `FinderSigningRouter` (MainActor singleton) routes selected PDFs into `SigningSessionStore.signFromFinder(_:)` for headless batch QES + QTS signing; Quick Action label "Podpísať s QES + QTS (Autogram)", restricted to Finder via `NSRequiredContext`
 
 ## Build & Test Instructions
 - Run build script: `DEVELOPER_DIR="/Applications/Xcode-26.5.app/Contents/Developer" ./build_app.sh`
