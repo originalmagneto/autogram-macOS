@@ -391,6 +391,15 @@ final class ZakoSessionStore {
             serverTimeUsed = conversionTime
             attestation.conversionExecutionDateTime = conversionTime
 
+            // § 3 vyhlášky č. 70/2021 Z. z.: formát listiny je povinnou náležitosťou doložky.
+            // Ak klasifikácia analýzy nevyplnila rozpad (napr. netypická veľkosť strany),
+            // doplň A4 na výšku s odhadom počtu listov, aby validácia neprepadla.
+            if attestation.paperSizeBreakdown.isEmpty {
+                attestation.paperSizeBreakdown = [AttestationData.PaperSizeGroup(
+                    sizeClass: .a4Portrait,
+                    sheets: max(effectiveSheetCount, 1))]
+            }
+
             let errors = validate()
             guard errors.isEmpty else {
                 analysisProgressText = ""

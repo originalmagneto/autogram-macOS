@@ -1,16 +1,30 @@
 import Foundation
 import PDFKit
 import CoreGraphics
+import Vision
+import AppKit
 
+/// On-device detector combining classical CV masks with Apple Vision requests.
+///
+/// Vision provides two signals the color/dark masks cannot:
+///  - `VNRecognizeTextRequest`: bounding boxes of text lines. Components overlapping
+///    text are rejected (this is what previously misclassified text rows as signatures).
+///  - `VNDetectBarcodesRequest`: QR / barcode boxes (notary certification blocks).
+///    They are reported as `.other` security elements and excluded from stamp candidates.
 public struct BuiltInVisionProvider: SecurityElementsProviding {
-    public var providerName: String { "Built-in Vision (on-device)" }
+    public var providerName: String { "Built-in Vision (on-device, Apple Vision)" }
 
     public var minStampDiameterRatio: Double = 0.035
     public var maxStampDiameterRatio: Double = 0.30
     public var minSignatureWidthRatio: Double = 0.08
     public var maxSignatureWidthRatio: Double = 0.62
 
+    /// Rendered page width used for analysis (px).
+    public var renderTargetWidth: Int = 760
+
     public init() {}
+
+    // MARK: - Public entry point
 
     public func detect(in document: PDFDocument, pageAnalyses: [PageAnalysis]) async -> [SecurityElement] {
         guard document.pageCount > 0 else { return [] }
@@ -18,59 +32,89 @@ public struct BuiltInVisionProvider: SecurityElementsProviding {
 
         for pageIndex in 0..<document.pageCount {
             guard let page = document.page(at: pageIndex),
-                  let pixels = Self.renderPixels(page: page) else { continue }
-            if let analysis = pageAnalyses.first(where: { $0.pageIndex == pageIndex }), analysis.isEmpty {
-                continue
-            }
-            let pageElements = detectOnPage(pixels: pixels, pageIndex: pageIndex)
+                  let analysis = pageAnalyses.first(where: { $0.pageIndex == pageIndex }),
+                  !analysis.isEmpty,
+                  let rendered = Self.render(page: page, targetWidth: renderTargetWidth) else { continue }
+
+            let exclusions = await Self.visionExclusionBoxes(cgImage: rendered.cgImage)
+            let pageElements = detectOnPage(pixels: rendered.pixels,
+                                            pageIndex: pageIndex,
+                                            exclusions: exclusions)
             elements.append(contentsOf: pageElements)
+
+            for barcode in exclusions.barcodeBoxes {
+                elements.append(SecurityElement(
+                    kind: .other,
+                    pageIndex: pageIndex,
+                    boundingBox: barcode,
+                    confidence: 0.9,
+                    verbalDescription: "Čiarový kód / QR (notárska pripojka)",
+                    detectedByAI: false))
+            }
         }
         return elements
     }
 
-    func detectOnPage(pixels: PixelMap, pageIndex: Int) -> [SecurityElement] {
+    // MARK: - Mask based detection
+
+    func detectOnPage(pixels: PixelMap, pageIndex: Int,
+                      exclusions: VisionExclusions = .empty) -> [SecurityElement] {
         var masks = Masks(width: pixels.width, height: pixels.height)
         for y in 0..<pixels.height {
             for x in 0..<pixels.width {
                 let (h, s, v) = pixels.hueSaturationValue(x: x, y: y)
-                if s > 0.28 && v > 0.15 && v < 0.96 {
+                if s > 0.18 && v > 0.15 && v < 0.96 {
+                    // Lowered saturation threshold: light-blue notary stamps were
+                    // previously missed at 0.28.
                     masks.colored[y * pixels.width + x] = true
+                    masks.ink[y * pixels.width + x] = true
                 } else if v < 0.42 && s < 0.55 {
                     masks.dark[y * pixels.width + x] = true
+                    masks.ink[y * pixels.width + x] = true
                 }
-                masks.gray[y * pixels.width + x] = 0.299 * v
                 _ = h
             }
         }
 
         var elements: [SecurityElement] = []
-        elements.append(contentsOf: detectStamps(masks: masks, pixels: pixels, pageIndex: pageIndex))
-        elements.append(contentsOf: detectSignatures(masks: masks, pixels: pixels, pageIndex: pageIndex))
+        let stamps = detectStamps(masks: masks, pixels: pixels, pageIndex: pageIndex,
+                                  exclusions: exclusions)
+        elements.append(contentsOf: stamps)
+
+        let stampBoxes = stamps.map { $0.boundingBox }
+        elements.append(contentsOf: detectSignatures(masks: masks, pixels: pixels, pageIndex: pageIndex,
+                                                     exclusions: exclusions,
+                                                     stampBoxes: stampBoxes))
         return elements
     }
 
     private struct Masks {
         var colored: [Bool]
         var dark: [Bool]
-        var gray: [Double]
+        var ink: [Bool]
 
         init(width: Int, height: Int) {
             colored = [Bool](repeating: false, count: width * height)
             dark = [Bool](repeating: false, count: width * height)
-            gray = [Double](repeating: 1.0, count: width * height)
+            ink = [Bool](repeating: false, count: width * height)
         }
     }
 
-    private func detectStamps(masks: Masks, pixels: PixelMap, pageIndex: Int) -> [SecurityElement] {
+    private func detectStamps(masks: Masks, pixels: PixelMap, pageIndex: Int,
+                              exclusions: VisionExclusions) -> [SecurityElement] {
         let components = ConnectedComponents.label(mask: masks.colored,
                                                    width: pixels.width,
                                                    height: pixels.height)
         var stamps: [SecurityElement] = []
+        let pageArea = Double(pixels.width * pixels.height)
 
         for component in components {
             let stats = ConnectedComponents.stats(for: component, mask: masks.colored,
                                                   width: pixels.width, height: pixels.height)
-            guard stats.area > 24 else { continue }
+            guard stats.area > 60 else { continue }
+
+            let box = normalizedRect(stats: stats, pixels: pixels)
+            guard !exclusions.overlapsTextOrBarcode(box) else { continue }
 
             let diameter = Double(max(stats.bboxWidth, stats.bboxHeight))
             let relativeDiameter = diameter / Double(pixels.width)
@@ -80,20 +124,22 @@ public struct BuiltInVisionProvider: SecurityElementsProviding {
             let aspect = stats.aspectRatio
             guard aspect > 0.55 && aspect < 1.7 else { continue }
 
+            let fillRatio = Double(stats.area) /
+                Double(max(stats.bboxWidth, 1) * max(stats.bboxHeight, 1))
+            guard fillRatio > 0.05 && fillRatio < 0.85 else { continue }
+            guard Double(stats.area) / pageArea > 0.0002 else { continue }
+
             let coverage = Self.radialCoverage(stats: stats, mask: masks.colored,
                                                width: pixels.width, height: pixels.height)
             guard coverage >= 0.45 else { continue }
 
-            let confidence = min(0.97, 0.42 + coverage * 0.55 +
+            let confidence = min(0.97, 0.45 + coverage * 0.5 +
                                  (stats.fillRatio > 0.5 ? 0.04 : 0))
-
-            let rect = normalizedRect(stats: stats, pixels: pixels)
-            let element = SecurityElement(
+            stamps.append(SecurityElement(
                 kind: .officialStamp,
                 pageIndex: pageIndex,
-                boundingBox: rect,
-                confidence: confidence)
-            stamps.append(element)
+                boundingBox: box,
+                confidence: confidence))
         }
         return stamps
     }
@@ -124,17 +170,20 @@ public struct BuiltInVisionProvider: SecurityElementsProviding {
         return Double(hits) / Double(sampleCount)
     }
 
-    private func detectSignatures(masks: Masks, pixels: PixelMap, pageIndex: Int) -> [SecurityElement] {
-        let components = ConnectedComponents.label(mask: masks.dark,
+    private func detectSignatures(masks: Masks, pixels: PixelMap, pageIndex: Int,
+                                  exclusions: VisionExclusions,
+                                  stampBoxes: [NormalizedRect]) -> [SecurityElement] {
+        // Ink mask (dark AND colored strokes): blue ballpoint signatures are colored.
+        let components = ConnectedComponents.label(mask: masks.ink,
                                                    width: pixels.width,
                                                    height: pixels.height)
         var signatures: [SecurityElement] = []
         let pageArea = Double(pixels.width * pixels.height)
 
         for component in components {
-            let stats = ConnectedComponents.stats(for: component, mask: masks.dark,
+            let stats = ConnectedComponents.stats(for: component, mask: masks.ink,
                                                   width: pixels.width, height: pixels.height)
-            guard stats.area > 40 else { continue }
+            guard stats.area > 120 else { continue }
 
             let areaRatio = Double(stats.area) / pageArea
             guard areaRatio < 0.25 else { continue }
@@ -143,38 +192,58 @@ public struct BuiltInVisionProvider: SecurityElementsProviding {
                 continue
             }
 
+            let box = normalizedRect(stats: stats, pixels: pixels)
+            // Text lines (from Vision OCR) and stamp/barcode regions are not signatures.
+            guard !exclusions.overlapsTextOrBarcode(box, threshold: 0.3) else { continue }
+            guard !stampBoxes.contains(where: { Self.overlapFraction(box, $0) > 0.5 }) else { continue }
+
             let relativeWidth = Double(stats.bboxWidth) / Double(pixels.width)
             guard relativeWidth >= minSignatureWidthRatio,
                   relativeWidth <= maxSignatureWidthRatio else { continue }
 
+            // Text lines: high bbox fill ratio and extreme width/height ratio.
+            let fillRatio = Double(stats.area) /
+                Double(max(stats.bboxWidth, 1) * max(stats.bboxHeight, 1))
+            guard fillRatio < 0.55 else { continue }
+            guard stats.aspectRatio < 18 else { continue }
+
             let elongation = Double(stats.perimeter * stats.perimeter) / (Double(stats.area) * 4.0 * .pi)
-            guard elongation > 2.2 else { continue }
+            guard elongation > 2.0 else { continue }
 
-            var confidence = 0.35 + min(elongation / 14.0, 0.4)
-
+            var confidence = 0.4 + min(elongation / 14.0, 0.35)
+            // Convention: normalized y=0 is the page BOTTOM (PDF semantics);
+            // signatures sit predominantly in the lower half.
             let verticalCenter = Double((stats.minY + stats.maxY)) / Double(pixels.height * 2)
-            if verticalCenter > 0.55 { confidence += 0.18 }
+            if verticalCenter < 0.45 { confidence += 0.18 }
 
-            guard confidence >= 0.42 else { continue }
+            guard confidence >= 0.45 else { continue }
 
-            let rect = normalizedRect(stats: stats, pixels: pixels)
             signatures.append(SecurityElement(
                 kind: .handwrittenSignature,
                 pageIndex: pageIndex,
-                boundingBox: rect,
+                boundingBox: box,
                 confidence: min(confidence, 0.92)))
         }
         return signatures
     }
 
+    static func overlapFraction(_ a: NormalizedRect, _ b: NormalizedRect) -> Double {
+        let interW = max(0, min(a.x + a.width, b.x + b.width) - max(a.x, b.x))
+        let interH = max(0, min(a.y + a.height, b.y + b.height) - max(a.y, b.y))
+        let inter = interW * interH
+        let aArea = max(a.width * a.height, 0.000001)
+        return inter / aArea
+    }
+
     private func touchesEdges(stats: ComponentStats, width: Int, height: Int, margin: Int) -> Bool {
         var touchedEdges = 0
-        if stats.minX <= margin || stats.maxX >= width - margin - 1 { touchedEdges += 1 }
-        if stats.minY <= margin || stats.maxY >= height - margin - 1 { touchedEdges += 1 }
-        return touchedEdges >= 2 &&
-               (Double(stats.bboxWidth) / Double(width) > 0.85 ||
-                Double(stats.bboxHeight) / Double(height) > 0.85)
+        if stats.minX <= margin { touchedEdges += 1 }
+        if stats.maxX >= width - margin { touchedEdges += 1 }
+        if stats.minY <= margin { touchedEdges += 1 }
+        if stats.maxY >= height - margin { touchedEdges += 1 }
+        return touchedEdges > 0
     }
+
 
     private func normalizedRect(stats: ComponentStats, pixels: PixelMap) -> NormalizedRect {
         NormalizedRect(
@@ -184,7 +253,14 @@ public struct BuiltInVisionProvider: SecurityElementsProviding {
             height: Double(stats.bboxHeight) / Double(pixels.height))
     }
 
-    static func renderPixels(page: PDFPage, targetWidth: Int = 520) -> PixelMap? {
+    // MARK: - Rendering
+
+    struct RenderedPage {
+        let pixels: PixelMap
+        let cgImage: CGImage
+    }
+
+    static func render(page: PDFPage, targetWidth: Int = 520) -> RenderedPage? {
         let bounds = page.bounds(for: .mediaBox)
         guard bounds.width > 1, bounds.height > 1 else { return nil }
         let scale = CGFloat(targetWidth) / bounds.width
@@ -192,6 +268,7 @@ public struct BuiltInVisionProvider: SecurityElementsProviding {
         let h = max(Int(bounds.height * scale), 8)
 
         var buffer = [UInt8](repeating: 255, count: w * h * 4)
+        var cgImage: CGImage?
         let ok = buffer.withUnsafeMutableBytes { ptr -> Bool in
             guard let ctx = CGContext(
                 data: ptr.baseAddress,
@@ -207,9 +284,81 @@ public struct BuiltInVisionProvider: SecurityElementsProviding {
             ctx.translateBy(x: 0, y: bounds.height)
             ctx.scaleBy(x: 1, y: -1)
             if let ref = page.pageRef { ctx.drawPDFPage(ref) }
+            cgImage = ctx.makeImage()
             return true
         }
-        guard ok else { return nil }
-        return PixelMap(width: w, height: h, rgba: buffer)
+        guard ok, let image = cgImage else { return nil }
+        return RenderedPage(pixels: PixelMap(width: w, height: h, rgba: buffer), cgImage: image)
+    }
+
+    // MARK: - Apple Vision
+
+    struct VisionExclusions {
+        var textBoxes: [NormalizedRect] = []
+        var barcodeBoxes: [NormalizedRect] = []
+
+        static let empty = VisionExclusions()
+
+        func overlapsTextOrBarcode(_ box: NormalizedRect, threshold: Double = 0.35) -> Bool {
+            textBoxes.contains { BuiltInVisionProvider.overlapFraction(box, $0) > threshold } ||
+            barcodeBoxes.contains { BuiltInVisionProvider.overlapFraction(box, $0) > threshold }
+        }
+    }
+
+    /// Runs Apple Vision text recognition and barcode detection on the rendered page.
+    /// Vision uses a bottom-left normalized origin, matching our component convention.
+    static func visionExclusionBoxes(cgImage: CGImage) async -> VisionExclusions {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                var exclusions = VisionExclusions()
+
+                let textRequest = VNRecognizeTextRequest { request, _ in
+                    guard let observations = request.results as? [VNRecognizedTextObservation] else { return }
+                    exclusions.textBoxes = observations.compactMap { observation in
+                        // Only confident real text excludes regions; a squiggly
+                        // signature can OCR as garbage with low confidence.
+                        guard let candidate = observation.topCandidates(1).first,
+                              candidate.confidence > 0.35,
+                              candidate.string.contains(where: { $0.isLetter || $0.isNumber })
+                        else { return nil }
+                        return visionBox(observation.boundingBox)
+                    }
+                }
+                textRequest.recognitionLevel = .fast
+                textRequest.usesLanguageCorrection = false
+
+                let barcodeRequest = VNDetectBarcodesRequest { request, _ in
+                    guard let observations = request.results as? [VNBarcodeObservation] else { return }
+                    exclusions.barcodeBoxes = observations.compactMap {
+                        visionBox($0.boundingBox)
+                    }
+                }
+
+                let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
+                do {
+                    try handler.perform([textRequest, barcodeRequest])
+                } catch {
+                    // Vision failure must not break detection: fall back to masks only.
+                    NSLog("Vision exclusion requests failed: \(error.localizedDescription)")
+                }
+                continuation.resume(returning: exclusions)
+            }
+        }
+    }
+
+    private static func visionBox(_ boundingBox: CGRect) -> NormalizedRect {
+        // The page bitmap is bottom-up in memory, so the CGImage derived from it is
+        // vertically flipped. Vision reports bottom-left-origin boxes on that flipped
+        // image; map them back: y_true = 1 - (y_vision + h_vision).
+        NormalizedRect(
+            x: Double(max(0, boundingBox.minX)),
+            y: Double(max(0, min(1 - boundingBox.maxY, 1))),
+            width: Double(min(1, boundingBox.width)),
+            height: Double(min(1, boundingBox.height)))
+    }
+
+    /// Compatibility wrapper for LLM vision providers expecting a PixelMap.
+    static func renderPixels(page: PDFPage, targetWidth: Int = 520) -> PixelMap? {
+        render(page: page, targetWidth: targetWidth)?.pixels
     }
 }

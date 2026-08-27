@@ -18,6 +18,25 @@ struct AnalysisCanvasView: View {
         var moved: Bool = false
     }
 
+    /// Maps between view coordinates (y=0 top) and the domain convention
+    /// (normalized y=0 page BOTTOM, PDF semantics) used by SecurityElement boxes.
+    struct CanvasMapper {
+        let fitter: ElementGeometry.AspectFitter
+
+        func viewRect(for normalized: NormalizedRect) -> CGRect {
+            fitter.viewRect(for: NormalizedRect(
+                x: normalized.x,
+                y: 1 - normalized.y - normalized.height,
+                width: normalized.width,
+                height: normalized.height))
+        }
+
+        func normalizedPoint(from viewPoint: CGPoint) -> NormalizedPoint {
+            let topDown = fitter.normalizedPoint(from: viewPoint)
+            return NormalizedPoint(x: topDown.x, y: 1 - topDown.y)
+        }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             HSplitView {
@@ -144,50 +163,50 @@ struct AnalysisCanvasView: View {
 
     // MARK: - Markup Floating Toolbar
     private var markupToolbar: some View {
-        HStack(spacing: 10) {
-            HStack(spacing: 4) {
+        HStack(spacing: 6) {
+            HStack(spacing: 2) {
                 toolButton(kind: nil, title: "Vybrať", icon: "arrow.up.left.and.arrow.down.right")
-                Divider().frame(height: 18)
+                Divider().frame(height: 16)
                 toolButton(kind: .officialStamp, title: "Pečiatka", icon: "seal.fill")
                 toolButton(kind: .handwrittenSignature, title: "Podpis", icon: "signature")
                 toolButton(kind: .embossedSeal, title: "Pečať", icon: "rosette")
                 toolButton(kind: .initial, title: "Parafa", icon: "text.badge.checkmark")
             }
-            .padding(4)
+            .padding(3)
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
             )
-
-            Spacer()
-
-            HStack(spacing: 8) {
-                Button {
-                    store.previewPageIndex = max(store.previewPageIndex - 1, 0)
-                } label: {
-                    Image(systemName: "chevron.left")
-                }
-                .disabled(store.previewPageIndex <= 0)
-                .controlSize(.small)
-
-                Text("Strana \(store.previewPageIndex + 1) z \(max(store.analysis.totalPages, 1))")
-                    .font(.callout.monospacedDigit().weight(.medium))
-                    .frame(minWidth: 100)
-
-                Button {
-                    store.previewPageIndex = min(store.previewPageIndex + 1,
-                                                 max(store.analysis.totalPages - 1, 0))
-                } label: {
-                    Image(systemName: "chevron.right")
-                }
-                .disabled(store.previewPageIndex >= max(store.analysis.totalPages - 1, 0))
-                .controlSize(.small)
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(.ultraThinMaterial, in: Capsule())
         }
+    }
+
+    private var pageNavBar: some View {
+        HStack(spacing: 8) {
+            Button {
+                store.previewPageIndex = max(store.previewPageIndex - 1, 0)
+            } label: {
+                Image(systemName: "chevron.left")
+            }
+            .disabled(store.previewPageIndex <= 0)
+            .controlSize(.small)
+
+            Text("Strana \(store.previewPageIndex + 1) z \(max(store.analysis.totalPages, 1))")
+                .font(.caption.monospacedDigit().weight(.medium))
+                .fixedSize()
+
+            Button {
+                store.previewPageIndex = min(store.previewPageIndex + 1,
+                                             max(store.analysis.totalPages - 1, 0))
+            } label: {
+                Image(systemName: "chevron.right")
+            }
+            .disabled(store.previewPageIndex >= max(store.analysis.totalPages - 1, 0))
+            .controlSize(.small)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(.ultraThinMaterial, in: Capsule())
     }
 
     private func toolButton(kind: SecurityElement.Kind?, title: String, icon: String) -> some View {
@@ -195,13 +214,14 @@ struct AnalysisCanvasView: View {
         return Button {
             store.activeTool = kind
         } label: {
-            HStack(spacing: 5) {
+            HStack(spacing: 4) {
                 Image(systemName: icon)
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.system(size: 11, weight: .medium))
                 Text(title)
                     .font(.caption.weight(isSelected ? .semibold : .regular))
+                    .lineLimit(1)
             }
-            .padding(.horizontal, 8)
+            .padding(.horizontal, 6)
             .padding(.vertical, 4)
             .background(isSelected ? Color.accentColor.opacity(0.2) : Color.clear, in: RoundedRectangle(cornerRadius: 8))
             .overlay(
@@ -212,6 +232,7 @@ struct AnalysisCanvasView: View {
         }
         .buttonStyle(.plain)
     }
+
 
     private var pageImageLoader: some View {
         GeometryReader { geometry in
@@ -233,9 +254,10 @@ struct AnalysisCanvasView: View {
                         .overlay {
                             ElementOverlay(
                                 store: store,
-                                fitter: ElementGeometry.AspectFitter(
-                                    container: canvasFitter.contentRect.size,
-                                    imageAspect: pageAspect),
+                                mapper: AnalysisCanvasView.CanvasMapper(
+                                    fitter: ElementGeometry.AspectFitter(
+                                        container: canvasFitter.contentRect.size,
+                                        imageAspect: pageAspect)),
                                 interaction: $interaction)
                         }
                         .shadow(color: .black.opacity(0.15), radius: 8, y: 3)
@@ -310,6 +332,8 @@ struct AnalysisCanvasView: View {
             .onChange(of: store.sheetMethod) { _, _ in
                 store.applySheetMethodChange()
             }
+
+            pageNavBar
         }
     }
 
@@ -432,7 +456,7 @@ struct FlowChips: View {
 
 struct ElementOverlay: View {
     @Bindable var store: ZakoSessionStore
-    let fitter: ElementGeometry.AspectFitter
+    let mapper: AnalysisCanvasView.CanvasMapper
     @Binding var interaction: AnalysisCanvasView.Interaction?
 
     private let handleRadius: CGFloat = 14
@@ -451,7 +475,7 @@ struct ElementOverlay: View {
     }
 
     private func draw(context: GraphicsContext, element: SecurityElement) {
-        let rect = fitter.viewRect(for: element.boundingBox)
+        let rect = mapper.viewRect(for: element.boundingBox)
         guard rect.width > 1, rect.height > 1 else { return }
         let color = ElementKindColor.color(for: element.kind)
         let isSelected = store.selectedElementID == element.id
@@ -501,7 +525,7 @@ struct ElementOverlay: View {
     /// Returns the normalized point of the corner OPPOSITE to the grabbed corner,
     /// or nil when the point is not near any corner (with handleRadius tolerance).
     private func oppositeCornerAnchor(of box: NormalizedRect, at viewPoint: CGPoint) -> NormalizedPoint? {
-        let rect = fitter.viewRect(for: box)
+        let rect = mapper.viewRect(for: box)
         let corners: [(CGFloat, CGFloat)] = [
             (rect.minX, rect.minY), (rect.maxX, rect.minY),
             (rect.minX, rect.maxY), (rect.maxX, rect.maxY)
@@ -524,7 +548,7 @@ struct ElementOverlay: View {
     }
 
     private func handleDragChanged(_ value: DragGesture.Value) {
-        let normPoint = fitter.normalizedPoint(from: value.location)
+        let normPoint = mapper.normalizedPoint(from: value.location)
 
         if interaction == nil {
             // 1. Existing element always wins: select and start move or corner-resize,
