@@ -6,54 +6,59 @@ struct AuthorizeView: View {
     @Bindable var store: ZakoSessionStore
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                Label("Pred autorizáciou — kontrolný zoznam", systemImage: "checklist")
-                    .font(.headline)
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    Label("Pred autorizáciou: kontrolný zoznam", systemImage: "checklist")
+                        .font(.headline)
 
-                tokenStatusRow
+                    tokenStatusRow
 
-                ViewThatFits(in: .horizontal) {
-                    HStack(alignment: .top, spacing: 14) {
-                        checklistCard
-                        certificateCard
+                    ViewThatFits(in: .horizontal) {
+                        HStack(alignment: .top, spacing: 14) {
+                            checklistCard
+                            certificateCard
+                        }
+                        VStack(alignment: .leading, spacing: 14) {
+                            checklistCard
+                            certificateCard
+                        }
                     }
-                    VStack(alignment: .leading, spacing: 14) {
-                        checklistCard
-                        certificateCard
+
+                    if let error = store.lastError {
+                        Text(error)
+                            .font(.callout)
+                            .foregroundStyle(.red)
+                            .padding(10)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Color.red.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
                     }
-                }
 
-                if let error = store.lastError {
-                    Text(error)
-                        .font(.callout)
-                        .foregroundStyle(.red)
-                        .padding(10)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(.red.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
-                }
-
-                if !store.validationErrors.isEmpty {
-                    VStack(alignment: .leading, spacing: 4) {
-                        ForEach(Array(store.validationErrors.enumerated()), id: \.offset) { _, err in
-                            Text("• \(err.errorDescription ?? "")")
-                                .font(.footnote)
-                                .foregroundStyle(.orange)
+                    if !store.validationErrors.isEmpty {
+                        VStack(alignment: .leading, spacing: 4) {
+                            ForEach(Array(store.validationErrors.enumerated()), id: \.offset) { _, err in
+                                Text("• \(err.errorDescription ?? "")")
+                                    .font(.footnote)
+                                    .foregroundStyle(.orange)
+                            }
                         }
                     }
                 }
-
-                HStack {
-                    Button {
-                        store.step = .attestation
-                    } label: {
-                        Label("Späť", systemImage: "chevron.left")
-                    }
-                    Spacer()
-                    authorizeButton
-                }
+                .padding(20)
             }
-            .padding(22)
+
+            StickyActionBar {
+                Button {
+                    store.step = .attestation
+                } label: {
+                    Label("Späť na doložku", systemImage: "chevron.left")
+                }
+                .controlSize(.large)
+
+                Spacer()
+
+                authorizeButton
+            }
         }
         .task { await store.refreshIdentities() }
     }
@@ -61,12 +66,12 @@ struct AuthorizeView: View {
     private var tokenStatusRow: some View {
         Group {
             if store.signingProvider is DemoSigningProvider {
-                Label("Demo režim — kvalifikovaná karta nie je pripojená.",
+                Label("Demo režim: kvalifikovaná karta nie je pripojená.",
                       systemImage: "creditcard.and.123")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } else if store.identities.isEmpty {
-                Label("Karta nie je detegovaná — vložte eID alebo advokátsky preukaz.",
+                Label("Karta nie je detegovaná: vložte eID alebo advokátsky preukaz.",
                       systemImage: "creditcard.and.123")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -92,8 +97,8 @@ struct AuthorizeView: View {
             mandateLabel = "Mandátny certifikát SAK vybraný"
         } else if store.isCertificateTypePending {
             mandateLabel = store.signingPIN.isEmpty
-                ? "Mandátny certifikát SAK — overí sa po zadaní PIN"
-                : "Mandátny certifikát SAK — prebieha overenie na karte"
+                ? "Mandátny certifikát SAK (overí sa po zadaní PIN)"
+                : "Mandátny certifikát SAK (prebieha overenie na karte)"
         } else {
             mandateLabel = "Mandátny certifikát SAK chýba"
         }
@@ -110,8 +115,8 @@ struct AuthorizeView: View {
     }
 
     private var checklistCard: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Náležitosti doložky")
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Zákonné náležitosti doložky")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.secondary)
             ForEach(Array(checklistItems.enumerated()), id: \.offset) { _, item in
@@ -127,18 +132,19 @@ struct AuthorizeView: View {
                 }
             }
         }
-        .glassCard()
+        .liquidGlass(cornerRadius: 14, padding: 14)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var certificateCard: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Certifikát pre autorizáciu")
+            Text("Podpisový certifikát pre autorizáciu")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.secondary)
 
             if store.identities.isEmpty {
                 ProgressView("Vyhľadávam certifikáty…")
+                    .controlSize(.small)
             } else {
                 ForEach(store.identities) { identity in
                     IdentityRow(identity: identity,
@@ -152,12 +158,13 @@ struct AuthorizeView: View {
                     .textFieldStyle(.roundedBorder)
                 Label("Certifikát sa vyberie pri autorizácii. eID klient zobrazí natívny BOK dialóg až pri podpise.",
                       systemImage: "key.horizontal")
-                    .font(.footnote)
+                    .font(.caption2)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+
             Toggle(isOn: $store.includeQualifiedTimestamp) {
-                Label("Pripojiť kvalifikovanú časovú pečiatku (QTS)", systemImage: "clock.badge.checkmark")
+                Label("Kvalifikovaná časová pečiatka (QTS)", systemImage: "clock.badge.checkmark")
             }
             .toggleStyle(.switch)
             .controlSize(.small)
@@ -166,38 +173,21 @@ struct AuthorizeView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Label("Zvolený certifikát nie je mandátnym certifikátom pre zaručenú konverziu.",
                           systemImage: "exclamationmark.triangle.fill")
-                        .font(.footnote.weight(.semibold))
+                        .font(.caption.weight(.semibold))
                         .foregroundStyle(.orange)
                     Toggle(isOn: $store.allowNonMandateOverride) {
-                        Text("Rozumiem — pokračovať s ne-mandátnym certifikátom (zápis do CEZZK by mohol byť zamietnutý)")
-                            .font(.caption)
+                        Text("Rozumiem: pokračovať s ne-mandátnym certifikátom")
+                            .font(.caption2)
                     }
                     .toggleStyle(.switch)
                     .controlSize(.small)
                 }
                 .padding(10)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
-            }
-
-            Divider()
-
-            LabeledRow(label: "Formát výstupu") {
-                Picker("", selection: Binding(
-                    get: { store.settings.pdfaMode },
-                    set: { _ in })) {
-                    Text(store.settings.pdfaMode.rawValue).tag(store.settings.pdfaMode)
-                }
-                .disabled(true)
-                .labelsHidden()
-            }
-            LabeledRow(label: "Čas konverzie") {
-                Text("serverový čas EZZK pri autorizácii")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+                .background(Color.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
             }
         }
-        .glassCard()
+        .liquidGlass(cornerRadius: 14, padding: 14)
         .frame(width: 380)
     }
 
@@ -216,15 +206,16 @@ struct AuthorizeView: View {
                     .font(.body.weight(.semibold))
             }
             .padding(.horizontal, 10)
-            .padding(.vertical, 4)
         }
-        .buttonStyle(.glassProminent)
+        .buttonStyle(.borderedProminent)
         .controlSize(.large)
-        .tint(Color.accentColor)
+        .tint(.indigo)
         .disabled(!store.analysisProgressText.isEmpty)
+        .keyboardShortcut(.defaultAction)
     }
 }
 
+// MARK: - Identity Row Component
 struct IdentityRow: View {
     let identity: SigningIdentityInfo
     let isSelected: Bool
@@ -261,8 +252,8 @@ struct IdentityRow: View {
         }
         .padding(9)
         .background(isSelected ? Color.accentColor.opacity(0.09) : Color.primary.opacity(0.03),
-                    in: RoundedRectangle(cornerRadius: 11, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 11)
+                    in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 10)
             .strokeBorder(isSelected ? Color.accentColor.opacity(0.5) : Color.primary.opacity(0.07)))
         .contentShape(Rectangle())
         .onTapGesture(perform: onSelect)
@@ -278,82 +269,92 @@ struct IdentityRow: View {
     }
 }
 
+// MARK: - Step 5: Done View for ZaKo
 struct DoneView: View {
     let store: ZakoSessionStore
 
     var body: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 24) {
             Spacer()
+
             ZStack {
                 Circle()
-                    .fill(Color.green.opacity(0.13))
-                    .frame(width: 128, height: 128)
+                    .fill(Color.green.opacity(0.12))
+                    .frame(width: 130, height: 130)
                 Image(systemName: "checkmark.seal.fill")
-                    .font(.system(size: 58))
+                    .font(.system(size: 60))
                     .foregroundStyle(Color.green.gradient)
             }
 
             VStack(spacing: 6) {
-                Text("Zaručená konverzia bola ukončená")
-                    .font(.title.weight(.semibold))
+                Text("Zaručená konverzia bola úspešne dokončená")
+                    .font(.title2.weight(.bold))
+
                 if let result = store.result {
-                    Text(result.signatureLabel + (result.isLegallyBinding ? "" : " — DEMO režim (nenaväzuje právne)"))
+                    Text(result.isLegallyBinding ? "Kvalifikovaný elektronický podpis a doložka pripojené" : "DEMO režim: konverzia nemá právne účinky")
                         .font(.callout)
                         .foregroundStyle(result.isLegallyBinding ? Color.secondary : Color.orange)
                 }
+
                 if let evidence = store.attestation.evidenceNumber {
-                    Text("Evidenčné číslo: \(evidence)")
-                        .font(.callout.monospacedDigit().weight(.semibold))
+                    HStack(spacing: 6) {
+                        Text("Evidenčné číslo:")
+                            .foregroundStyle(.secondary)
+                        Text(evidence)
+                            .font(.callout.monospacedDigit().weight(.bold))
+                    }
+                    .padding(.top, 2)
                 }
             }
 
             if let directory = store.outputDirectory {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Výstupné súbory:")
-                        .font(.subheadline.weight(.semibold))
+                    Text("Priečinok s vygenerovanými súbormi:")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
                     Text(directory.path)
-                        .font(.caption.monospaced())
+                        .font(.caption2.monospaced())
                         .foregroundStyle(.secondary)
                         .textSelection(.enabled)
                 }
-                .glassCard(cornerRadius: 14, padding: 12)
+                .liquidGlass(cornerRadius: 12, padding: 12)
+                .frame(maxWidth: 520)
 
                 HStack(spacing: 12) {
                     Button {
                         NSWorkspace.shared.open(directory)
                     } label: {
-                        Label("Otvoriť vo Finderi", systemImage: "folder")
+                        Label("Ukázať vo Finderi", systemImage: "folder")
                     }
+                    .controlSize(.large)
+
                     Button {
                         exportAs()
                     } label: {
                         Label("Uložiť ako…", systemImage: "square.and.arrow.up")
                     }
-                    .buttonStyle(.glassProminent)
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
 
                     Button {
                         startNewConversion()
                     } label: {
                         Label("Nová konverzia", systemImage: "plus")
                     }
-                    .buttonStyle(.glass)
+                    .controlSize(.large)
                 }
             }
+
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                Text("Konverzia dokončená").font(.headline)
-            }
-        }
     }
 
     private func exportAs() {
         guard let directory = store.outputDirectory else { return }
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.pdf]
-        panel.nameFieldStringValue = (store.attestation.newDocumentName.isEmpty ? "dokument" : store.attestation.newDocumentName) + "-pdfa"
+        panel.nameFieldStringValue = (store.attestation.newDocumentName.isEmpty ? "dokument" : store.attestation.newDocumentName) + "-konvertovane"
         panel.begin { response in
             guard response == .OK, let url = panel.url else { return }
             let files = (try? FileManager.default.contentsOfDirectory(at: directory,

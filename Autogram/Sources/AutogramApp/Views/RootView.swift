@@ -6,7 +6,7 @@ struct RootView: View {
     enum SidebarSection: String, CaseIterable, Identifiable, Hashable {
         case signing = "Podpisovanie"
         case zako = "Zaručená konverzia"
-        case evidence = "Evidencia konverzií"
+        case evidence = "Register konverzií"
         case settings = "Nastavenia"
 
         var id: String { rawValue }
@@ -19,8 +19,6 @@ struct RootView: View {
             case .settings: return "gearshape.fill"
             }
         }
-
-        var isAdvancedMode: Bool { self == .zako }
     }
 
     @State private var selection: SidebarSection = .signing
@@ -40,29 +38,31 @@ struct RootView: View {
     var body: some View {
         NavigationSplitView {
             List(selection: $selection) {
-                Section("Autogram") {
+                Section("Kancelária") {
                     Label(SidebarSection.signing.rawValue, systemImage: SidebarSection.signing.symbol)
                         .tag(SidebarSection.signing)
+
+                    Label(SidebarSection.zako.rawValue, systemImage: SidebarSection.zako.symbol)
+                        .tag(SidebarSection.zako)
+
+                    Label(SidebarSection.evidence.rawValue, systemImage: SidebarSection.evidence.symbol)
+                        .tag(SidebarSection.evidence)
                 }
-                Section("Pokročilé · Advanced") {
-                    ForEach([SidebarSection.zako, SidebarSection.evidence]) { section in
-                        Label(section.rawValue, systemImage: section.symbol)
-                            .tag(section)
-                    }
-                }
-                Section {
-                    Label(SidebarSection.settings.rawValue, systemImage: SidebarSection.settings.symbol)
-                        .tag(SidebarSection.settings)
-                }
+
                 if !signingStore.queue.isEmpty {
-                    Section("Otvorené súbory") {
+                    Section("Fronta podpisovania (\(signingStore.queue.count))") {
                         ForEach(signingStore.queue) { item in
-                            Label {
-                                Text(item.displayName).lineLimit(1)
-                            } icon: {
+                            HStack(spacing: 8) {
                                 Image(systemName: queueIcon(item.status))
                                     .foregroundStyle(queueColor(item.status))
+                                    .frame(width: 16)
+                                Text(item.displayName)
+                                    .lineLimit(1)
+                                    .truncationMode(.middle)
+                                    .font(.callout)
+                                Spacer(minLength: 0)
                             }
+                            .padding(.vertical, 2)
                             .contentShape(Rectangle())
                             .onTapGesture {
                                 selection = .signing
@@ -74,31 +74,49 @@ struct RootView: View {
                                     : Color.clear
                             )
                             .contextMenu {
-                                Button("Odstrániť zo zoznamu", role: .destructive) {
+                                Button("Vybrať na podpis") {
+                                    selection = .signing
+                                    Task { await signingStore.selectQueueItem(item.id) }
+                                }
+                                if let outputURL = item.signedOutputURL {
+                                    Button("Ukázať vo Finderi") {
+                                        NSWorkspace.shared.activateFileViewerSelecting([outputURL])
+                                    }
+                                }
+                                Divider()
+                                Button("Odstrániť z fronty", role: .destructive) {
                                     signingStore.removeQueueItem(item.id)
                                 }
                             }
                         }
-                        Label("Pridať súbory…", systemImage: "plus")
-                            .foregroundStyle(.secondary)
-                            .contentShape(Rectangle())
-                            .onTapGesture { openMoreFiles() }
+
                         if signingStore.unsignedQueueItems.count > 1 {
-                            Label("Podpísať všetky (\(signingStore.unsignedQueueItems.count))",
-                                  systemImage: "signature")
-                                .foregroundStyle(.secondary)
-                                .contentShape(Rectangle())
-                                .onTapGesture {
-                                    selection = .signing
-                                    Task { await signingStore.signAllUnsigned() }
-                                }
+                            Button {
+                                selection = .signing
+                                Task { await signingStore.signAllUnsigned() }
+                            } label: {
+                                Label("Podpísať všetky (\(signingStore.unsignedQueueItems.count))",
+                                      systemImage: "signature.badge.checkmark")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(Color.accentColor)
+                            }
+                            .buttonStyle(.plain)
+                            .padding(.top, 4)
                         }
                     }
+                }
+
+                Section("Predvoľby") {
+                    Label(SidebarSection.settings.rawValue, systemImage: SidebarSection.settings.symbol)
+                        .tag(SidebarSection.settings)
                 }
             }
             .listStyle(.sidebar)
             .navigationTitle("Autogram")
             .navigationSplitViewColumnWidth(min: 220, ideal: 250, max: 320)
+            .safeAreaInset(edge: .bottom) {
+                sidebarBottomBar
+            }
         } detail: {
             detailView
                 .navigationTitle(selection.rawValue)
@@ -107,18 +125,60 @@ struct RootView: View {
         }
     }
 
+    private var sidebarBottomBar: some View {
+        VStack(spacing: 8) {
+            Divider()
+                .opacity(0.6)
+
+            let isCardConnected = !signingStore.identities.isEmpty
+            let cardLabel = signingStore.identities.first?.label ?? (settingsStore.signingProvider is DemoSigningProvider ? "DEMO režim bez karty" : "Karta nepripojená")
+            let cardDetail = isCardConnected ? "Čítačka je pripravená" : "Vložte eID alebo SAK kartu"
+
+            SmartcardHUDStatus(
+                isConnected: isCardConnected,
+                label: cardLabel,
+                detail: cardDetail
+            )
+
+            HStack {
+                Button {
+                    openMoreFiles()
+                } label: {
+                    Label("Pridať súbory…", systemImage: "plus")
+                        .font(.caption.weight(.medium))
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+
+                Spacer()
+
+                if !signingStore.queue.isEmpty {
+                    Button("Vyčistiť") {
+                        signingStore.queue.removeAll()
+                    }
+                    .font(.caption)
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+                }
+            }
+            .padding(.horizontal, 4)
+        }
+        .padding(10)
+        .background(.ultraThinMaterial)
+    }
+
     private var subtitle: String {
         switch selection {
         case .signing:
             return settingsStore.signingProvider is DemoSigningProvider
                 ? "demo podpis"
-                : "kvalifikované podpisovanie"
+                : "kvalifikované podpisovanie KEP"
         case .zako:
-            return "advanced · § 35–39 Zz"
+            return "zaručená konverzia (§ 35-39 Zz)"
         case .evidence:
-            return "register konverzií"
+            return "register konverzií a CEZZK"
         case .settings:
-            return "konfigurácia"
+            return "konfigurácia a profily"
         }
     }
 

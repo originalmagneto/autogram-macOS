@@ -3,7 +3,7 @@ import PDFKit
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// Panel „Grafický podpis" – port z Autogram macOS 2, viazaný na SignaturePlacementState.
+/// Panel vizuálneho podpisu s výberom grafickej pečiatky a nastavením strany.
 public struct VisibleAppearanceInspector: View {
     @Bindable var state: SignaturePlacementState
 
@@ -12,17 +12,19 @@ public struct VisibleAppearanceInspector: View {
     }
 
     public var body: some View {
-        Section("Graphic signature") {
-            Toggle("Show signature on document", isOn: Binding(
+        VStack(alignment: .leading, spacing: 10) {
+            Toggle("Zobraziť vizuálnu pečiatku v PDF", isOn: Binding(
                 get: { state.isEnabled },
                 set: { state.setEnabled($0) }
             ))
             .disabled(state.selectedAsset == nil)
+
             if state.assets.isEmpty {
-                Text("Choose PNG or PDF artwork to add a graphic signature.")
+                Text("Vyberte obrázok podpisu (PNG, JPEG alebo PDF).")
+                    .font(.caption)
                     .foregroundStyle(.secondary)
             } else {
-                ScrollView(.horizontal) {
+                ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         ForEach(state.assets) { asset in
                             Button {
@@ -34,53 +36,86 @@ public struct VisibleAppearanceInspector: View {
                             .padding(3)
                             .background(
                                 state.selectedAsset?.id == asset.id
-                                    ? Color.accentColor.opacity(0.22)
+                                    ? Color.accentColor.opacity(0.25)
                                     : Color.clear,
-                                in: RoundedRectangle(cornerRadius: 5)
+                                in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .strokeBorder(
+                                        state.selectedAsset?.id == asset.id
+                                            ? Color.accentColor
+                                            : Color.primary.opacity(0.08),
+                                        lineWidth: 1
+                                    )
                             )
                         }
                     }
+                    .padding(.vertical, 2)
                 }
-                .frame(height: 70)
+                .frame(height: 64)
             }
-            HStack {
-                Button("Choose PNG or PDF") {
+
+            HStack(spacing: 8) {
+                Button {
                     chooseArtwork()
+                } label: {
+                    Label("Pridať obrázok…", systemImage: "plus")
                 }
-                Button("Delete artwork", role: .destructive) {
-                    deleteSelectedArtwork()
+                .controlSize(.small)
+
+                if state.selectedAsset != nil {
+                    Button(role: .destructive) {
+                        deleteSelectedArtwork()
+                    } label: {
+                        Label("Zmazať", systemImage: "trash")
+                    }
+                    .controlSize(.small)
                 }
-                .disabled(state.selectedAsset == nil)
             }
-            pageSelector
-            Button("Reset placement") {
-                state.resetRotation()
+
+            if state.pageCount > 1 {
+                pageSelector
             }
-            .disabled(state.placement == nil)
-            Text("Drag, resize, or rotate the card directly on the page.")
-                .font(.caption)
+
+            if state.placement != nil {
+                HStack {
+                    Button {
+                        state.resetRotation()
+                    } label: {
+                        Label("Obnoviť pozíciu", systemImage: "arrow.counterclockwise")
+                    }
+                    .controlSize(.small)
+                }
+            }
+
+            Text("Pozíciu, veľkosť a rotáciu pečiatky upravíte priamo na plátne dokumentu.")
+                .font(.caption2)
                 .foregroundStyle(.secondary)
         }
+        .padding(.vertical, 4)
     }
 
     private var pageSelector: some View {
-        Picker("Page", selection: Binding(
+        Picker("Strana", selection: Binding(
             get: { state.placement?.pageIndex ?? 0 },
             set: { state.selectPage($0) }
         )) {
             ForEach(state.pageIndices, id: \.self) { pageIndex in
-                Text("Page \(pageIndex + 1)").tag(pageIndex)
+                Text("Strana \(pageIndex + 1)").tag(pageIndex)
             }
         }
         .disabled(state.placement == nil || state.pageCount == 0)
+        .pickerStyle(.menu)
     }
 
     private func chooseArtwork() {
         let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.png, .pdf]
+        panel.allowedContentTypes = [.png, .jpeg, .pdf]
         panel.canChooseDirectories = false
         panel.canChooseFiles = true
         panel.allowsMultipleSelection = false
+        panel.message = "Vyberte obrázok alebo vektorovú pečiatku podpisu."
         panel.begin { response in
             guard response == .OK, let url = panel.url else { return }
             do {
@@ -98,10 +133,12 @@ public struct VisibleAppearanceInspector: View {
             Image(nsImage: image)
                 .resizable()
                 .scaledToFit()
-                .frame(width: 88, height: 58)
+                .frame(width: 80, height: 50)
+                .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 6))
         } else {
             Image(systemName: "photo")
-                .frame(width: 88, height: 58)
+                .frame(width: 80, height: 50)
+                .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 6))
         }
     }
 
@@ -121,8 +158,8 @@ public struct VisibleAppearanceInspector: View {
             return 0
         }
         let alert = NSAlert()
-        alert.messageText = "Choose PDF artwork page"
-        alert.informativeText = "Enter the page number to import."
+        alert.messageText = "Výber strany PDF pečiatky"
+        alert.informativeText = "Zadajte číslo strany z PDF, ktorú chcete použiť."
         let field = NSTextField(string: "1")
         alert.accessoryView = field
         guard alert.runModal() == .alertFirstButtonReturn,

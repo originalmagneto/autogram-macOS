@@ -11,46 +11,55 @@ struct EvidenceDashboardView: View {
     @State private var isSubmitting = false
     @State private var submitFeedback: String?
     @State private var refreshTimer: Timer?
+    @State private var recordToDelete: EvidenceRecord?
+    @State private var showDeleteConfirmation = false
 
     var body: some View {
         VStack(spacing: 0) {
             summaryHeader
             filterBar
+
             Table(filteredRecords, selection: $selectedRecordID) {
                 TableColumn("Evidenčné číslo") { record in
                     HStack(spacing: 6) {
                         if record.isOverdue { OverdueDot() }
-                        Text(record.evidenceNumber ?? "—")
+                        Text(record.evidenceNumber ?? "nezískané")
                             .font(.callout.monospacedDigit().weight(.semibold))
                     }
+                    .contextMenu { recordContextMenu(for: record) }
                 }
                 .width(min: 130, ideal: 170)
 
                 TableColumn("Stav") { record in
                     Label(record.status.rawValue, systemImage: record.status.sfSymbol)
                         .foregroundStyle(statusTint(record.status))
+                        .contextMenu { recordContextMenu(for: record) }
                 }
                 .width(min: 150, ideal: 190)
 
                 TableColumn("Lehota CEZZK") { record in
                     deadlineLabel(record)
+                        .contextMenu { recordContextMenu(for: record) }
                 }
                 .width(min: 120, ideal: 160)
 
                 TableColumn("Dátum konverzie") { record in
                     Text(LocalEvidenceStore.csvDate(record.conversionTime))
                         .font(.caption.monospacedDigit())
+                        .contextMenu { recordContextMenu(for: record) }
                 }
                 .width(min: 120, ideal: 140)
 
                 TableColumn("Pôvodný dokument") { record in
                     Text(record.originalName).lineLimit(1)
                         .help(record.originalName)
+                        .contextMenu { recordContextMenu(for: record) }
                 }
 
                 TableColumn("Strany / Listy") { record in
                     Text("\(record.totalPages) / \(record.totalSheets)")
                         .font(.caption.monospacedDigit())
+                        .contextMenu { recordContextMenu(for: record) }
                 }
                 .width(90)
 
@@ -58,6 +67,7 @@ struct EvidenceDashboardView: View {
                     Text(String(record.fingerprintSHA256Hex.prefix(16)) + "…")
                         .font(.caption2.monospaced())
                         .foregroundStyle(.secondary)
+                        .contextMenu { recordContextMenu(for: record) }
                 }
             }
         }
@@ -74,6 +84,58 @@ struct EvidenceDashboardView: View {
                                  record: binding(for: record),
                                  onClose: { selectedRecordID = nil })
             }
+        }
+        .confirmationDialog(
+            "Naozaj chcete vymazať záznam z evidencie?",
+            isPresented: $showDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Zmazať záznam", role: .destructive) {
+                if let record = recordToDelete {
+                    settingsStore.evidenceStore.delete(id: record.id)
+                    reload()
+                }
+                recordToDelete = nil
+            }
+            Button("Zrušiť", role: .cancel) {
+                recordToDelete = nil
+            }
+        } message: {
+            Text("Tento krok je nevratný. Záznam bude odstránený z lokálneho registra konverzií.")
+        }
+    }
+
+    @ViewBuilder
+    private func recordContextMenu(for record: EvidenceRecord) -> some View {
+        Button {
+            selectedRecordID = record.id
+        } label: {
+            Label("Zobraziť detail a doložku", systemImage: "doc.text")
+        }
+
+        if let evidenceNumber = record.evidenceNumber {
+            Button {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(evidenceNumber, forType: .string)
+            } label: {
+                Label("Kopírovať evidenčné číslo", systemImage: "doc.on.doc")
+            }
+        }
+
+        Button {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(record.fingerprintSHA256Hex, forType: .string)
+        } label: {
+            Label("Kopírovať SHA-256 odtlačok", systemImage: "number.square")
+        }
+
+        Divider()
+
+        Button(role: .destructive) {
+            recordToDelete = record
+            showDeleteConfirmation = true
+        } label: {
+            Label("Vymazať z evidencie…", systemImage: "trash")
         }
     }
 
@@ -103,6 +165,7 @@ struct EvidenceDashboardView: View {
             SummaryCard(title: "Zapísaných v CEZZK", value: "\(submitted)", symbol: "checkmark.seal.fill", tint: .green)
             SummaryCard(title: "Čaká na odoslanie", value: "\(pending)", symbol: "tray.and.arrow.up", tint: pending > 0 ? .orange : .secondary)
             SummaryCard(title: "Po lehote 24 h", value: "\(overdue)", symbol: "clock.badge.exclamationmark", tint: overdue > 0 ? .red : .secondary)
+
             if let feedback = submitFeedback {
                 Spacer()
                 Text(feedback)
@@ -117,17 +180,29 @@ struct EvidenceDashboardView: View {
 
     private var filterBar: some View {
         HStack(spacing: 10) {
-            Image(systemName: "magnifyingglass")
-                .foregroundStyle(.secondary)
-            TextField("Hľadať podľa názvu alebo evidenčného čísla", text: $filterText)
-                .textFieldStyle(.plain)
-
-            ForEach([EvidenceRecord.Status?.none] + EvidenceRecord.Status.allCases.map { Optional($0) },
-                    id: \.self) { status in
-                chip(for: status)
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(.secondary)
+                TextField("Hľadať podľa názvu alebo čísla", text: $filterText)
+                    .textFieldStyle(.plain)
             }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 8))
+            .frame(width: 240)
+
+            Picker("Filter", selection: $statusFilter) {
+                Text("Všetky stavy").tag(EvidenceRecord.Status?.none)
+                ForEach(EvidenceRecord.Status.allCases, id: \.self) { status in
+                    Text(status.rawValue).tag(Optional(status))
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+            .frame(width: 170)
 
             Spacer()
+
             Button {
                 submitPending()
             } label: {
@@ -140,33 +215,19 @@ struct EvidenceDashboardView: View {
                     Text("Odoslať čakajúce do CEZZK")
                 }
             }
+            .buttonStyle(.bordered)
             .disabled(isSubmitting || !records.contains(where: \.isSubmissionPending))
+
             Button {
                 exportCSV()
             } label: {
                 Label("Export CSV", systemImage: "square.and.arrow.up.on.square")
             }
+            .buttonStyle(.bordered)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
         .background(.bar)
-        .dividerBackground()
-    }
-
-    private func chip(for status: EvidenceRecord.Status?) -> some View {
-        let title = status?.rawValue ?? "Všetky"
-        let isActive = statusFilter == status || (status == nil && statusFilter == nil)
-        return Button {
-            statusFilter = status
-        } label: {
-            Text(title)
-                .font(.caption.weight(.medium))
-                .padding(.horizontal, 8)
-                .padding(.vertical, 3)
-                .background(isActive ? Color.accentColor.opacity(0.18) : Color.primary.opacity(0.05),
-                            in: Capsule())
-        }
-        .buttonStyle(.plain)
     }
 
     static let deadlineFormatter: DateFormatter = {
@@ -255,8 +316,8 @@ struct EvidenceDashboardView: View {
                 reload()
                 isSubmitting = false
                 submitFeedback = failedCount == 0
-                    ? "✓ Odoslaných \(submittedCount) záznamov."
-                    : "⚠ \(submittedCount) ok, \(failedCount) zamietnutých."
+                    ? "✓ Odoslaných \(submittedCount) záznamov do CEZZK."
+                    : "⚠ \(submittedCount) úspešných, \(failedCount) zlyhalo."
             }
         }
     }
@@ -273,17 +334,11 @@ struct EvidenceDashboardView: View {
 }
 
 struct OverdueDot: View {
-    @State private var pulsing = false
-
     var body: some View {
         Circle()
             .fill(Color.red)
             .frame(width: 8, height: 8)
-            .scaleEffect(pulsing ? 1.35 : 1.0)
-            .opacity(pulsing ? 0.6 : 1.0)
-            .animation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true), value: pulsing)
-            .onAppear { pulsing = true }
-            .help("Záznam nepodlieha zápisu — lehota 24 h uplynula")
+            .help("Záznam prekročil zákonnú lehotu 24 h na zápis do CEZZK")
     }
 }
 
@@ -294,49 +349,70 @@ struct SummaryCard: View {
     let tint: Color
 
     var body: some View {
-        HStack(spacing: 9) {
+        HStack(spacing: 10) {
             Image(systemName: symbol)
                 .font(.title3)
                 .foregroundStyle(tint.gradient)
             VStack(alignment: .leading, spacing: 1) {
                 Text(value)
-                    .font(.title3.monospacedDigit().weight(.semibold))
+                    .font(.title3.monospacedDigit().weight(.bold))
                 Text(title)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 7)
-        .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 11))
+        .padding(.vertical, 8)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 11, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.5)
+        )
     }
 }
 
+// MARK: - Record Detail Modal Sheet
 struct RecordDetailView: View {
     @Bindable var settingsStore: AppSettingsStore
     @Binding var record: EvidenceRecord
     let onClose: () -> Void
     @State private var copiedFingerprint = false
+    @State private var showDeleteConfirm = false
+    @State private var selectedTab = 0
 
     private var timelineStages: [(String, Bool, Bool)] {
         [
             ("Evidenčné číslo", record.evidenceNumber != nil, false),
             ("Autorizácia KEP", record.status.progressIndex >= 3, false),
-            ("Zápis v CEZZK", record.status == .submitted,
-             record.status == .submissionFailed)
+            ("Zápis v CEZZK", record.status == .submitted, record.status == .submissionFailed)
         ]
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             header
-            StatusTimeline(stages: timelineStages)
-            factsGrid
-            attestationPreview
+
+            Picker("", selection: $selectedTab) {
+                Text("Prehľad záznamu").tag(0)
+                Text("Osvedčovacia doložka (XML)").tag(1)
+            }
+            .pickerStyle(.segmented)
+
+            if selectedTab == 0 {
+                VStack(alignment: .leading, spacing: 14) {
+                    StatusTimeline(stages: timelineStages)
+                    factsGrid
+                }
+            } else {
+                attestationPreview
+            }
+
+            Spacer()
+
             HStack {
                 if let uri = record.evidenceURI {
                     Link(destination: URL(string: "https://ezzk.iomo.sk")!) {
-                        Label("Overiť v CEZZK", systemImage: "safari")
+                        Label("Overiť na portáli CEZZK", systemImage: "safari")
                     }
                     Button {
                         NSPasteboard.general.clearContents()
@@ -346,25 +422,36 @@ struct RecordDetailView: View {
                     }
                     .help("Skopírovať URI záznamu (\(uri))")
                 }
+
                 Spacer()
+
                 Button(role: .destructive) {
-                    settingsStore.evidenceStore.delete(id: record.id)
-                    onClose()
+                    showDeleteConfirm = true
                 } label: {
-                    Label("Zmazať z evidencie", systemImage: "trash")
+                    Label("Zmazať", systemImage: "trash")
                 }
+
                 Button("Zavrieť") { onClose() }
                     .keyboardShortcut(.defaultAction)
             }
         }
-        .padding(20)
-        .frame(width: 560, height: 540)
+        .padding(22)
+        .frame(width: 580, height: 540)
+        .confirmationDialog("Naozaj chcete vymazať tento záznam?", isPresented: $showDeleteConfirm) {
+            Button("Zmazať záznam", role: .destructive) {
+                settingsStore.evidenceStore.delete(id: record.id)
+                onClose()
+            }
+            Button("Zrušiť", role: .cancel) {}
+        } message: {
+            Text("Záznam bude natrvalo odstránený z lokálnej evidencie.")
+        }
     }
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(record.originalName)
-                .font(.title3.weight(.semibold))
+                .font(.title3.weight(.bold))
             HStack(spacing: 8) {
                 Label(record.status.rawValue, systemImage: record.status.sfSymbol)
                     .foregroundStyle(statusTint)
@@ -378,21 +465,22 @@ struct RecordDetailView: View {
     }
 
     private var factsGrid: some View {
-        Grid(horizontalSpacing: 16, verticalSpacing: 7) {
-            row("Evidenčné číslo", record.evidenceNumber ?? "—")
-            row("Osoba", record.performingPersonName.isEmpty ? "—" : record.performingPersonName)
+        Grid(horizontalSpacing: 16, verticalSpacing: 8) {
+            row("Evidenčné číslo", record.evidenceNumber ?? "nezískané")
+            row("Osvedčujúca osoba", record.performingPersonName.isEmpty ? "neurčená" : record.performingPersonName)
             row("Nový dokument", record.newDocumentName)
             row("Strany / listy / prvky",
-                "\(record.totalPages) / \(record.totalSheets) / \(record.securityElementCount)")
+                "\(record.totalPages) strán / \(record.totalSheets) listov / \(record.securityElementCount) prvkov")
             fingerprintRow
         }
+        .liquidGlass(cornerRadius: 12, padding: 12)
     }
 
     @ViewBuilder
     private var fingerprintRow: some View {
         let short = String(record.fingerprintSHA256Hex.prefix(24)) + "…"
         GridRow {
-            Text("SHA-256")
+            Text("SHA-256 odtlačok")
                 .foregroundStyle(.secondary)
             HStack(spacing: 6) {
                 Text(short)
@@ -420,14 +508,14 @@ struct RecordDetailView: View {
     }
 
     private var attestationPreview: some View {
-        GroupBox("Osvedčovacia doložka (XML)") {
+        GroupBox("Osvedčovacia doložka (XML dáta)") {
             ScrollView {
                 Text(record.attestationXML)
                     .font(.system(size: 10, design: .monospaced))
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .textSelection(.enabled)
             }
-            .frame(height: 180)
+            .frame(height: 240)
         }
     }
 
@@ -471,11 +559,5 @@ struct StatusTimeline: View {
             }
         }
         .padding(.vertical, 6)
-    }
-}
-
-private extension View {
-    func dividerBackground() -> some View {
-        shadow(color: .black.opacity(0.05), radius: 1, y: 1)
     }
 }

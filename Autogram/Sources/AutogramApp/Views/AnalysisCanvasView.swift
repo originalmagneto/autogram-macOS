@@ -19,37 +19,62 @@ struct AnalysisCanvasView: View {
     }
 
     var body: some View {
-        HSplitView {
-            VStack(spacing: 12) {
-                pageBar
-                pageImageLoader
-                    .frame(minWidth: 480, maxWidth: .infinity, maxHeight: .infinity)
-                countersRow
-            }
-            .padding(14)
+        VStack(spacing: 0) {
+            HSplitView {
+                HStack(spacing: 0) {
+                    if store.analysis.totalPages > 1 {
+                        pageThumbnailStrip
+                            .frame(width: 80)
+                            .background(.bar)
+                            .overlay(alignment: .trailing) {
+                                Rectangle().fill(Color.primary.opacity(0.08)).frame(width: 1)
+                            }
+                    }
 
-            elementsPanel
-                .frame(minWidth: 300, idealWidth: 330, maxWidth: 380)
-        }
-        .toolbar {
-            ToolbarItemGroup {
+                    VStack(spacing: 10) {
+                        markupToolbar
+                        pageImageLoader
+                            .frame(minWidth: 460, maxWidth: .infinity, maxHeight: .infinity)
+                        countersRow
+                    }
+                    .padding(14)
+                }
+
+                elementsPanel
+                    .frame(minWidth: 320, idealWidth: 350, maxWidth: 400)
+            }
+
+            StickyActionBar {
+                Button {
+                    store.resetSession(keepingProfile: true)
+                    store.step = .intake
+                } label: {
+                    Label("Iný dokument", systemImage: "chevron.left")
+                }
+                .controlSize(.large)
+
                 Button {
                     Task { await store.runAnalysis() }
                 } label: {
-                    Label("Znova analyzovať", systemImage: "arrow.clockwise")
+                    Label("Znova analyzovať AI", systemImage: "arrow.clockwise")
                 }
                 .disabled(store.isAnalyzing)
+                .controlSize(.large)
 
                 Spacer()
 
                 Button {
                     store.step = .attestation
                 } label: {
-                    Text("Pokračovať na doložku")
-                    Image(systemName: "chevron.right")
+                    HStack(spacing: 6) {
+                        Text("Pokračovať na doložku")
+                        Image(systemName: "chevron.right")
+                    }
                 }
-                .buttonStyle(.glassProminent)
-                .disabled(store.isAnalyzing || store.securityElements.isEmpty)
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .disabled(store.isAnalyzing)
+                .keyboardShortcut(.defaultAction)
             }
         }
         .task(id: "\(store.previewPageIndex)-\(store.document == nil)") {
@@ -68,27 +93,69 @@ struct AnalysisCanvasView: View {
         pageImage = page.thumbnail(of: size, for: .mediaBox)
     }
 
-    private var pageBar: some View {
-        HStack(spacing: 12) {
-            Picker("", selection: $store.activeTool) {
-                Text("Vybrať / presunúť").tag(SecurityElement.Kind?.none)
-                ForEach(SecurityElement.Kind.allCases, id: \.self) { kind in
-                    Label(kind.rawValue, systemImage: kind.sfSymbol)
-                        .tag(SecurityElement.Kind?.some(kind))
-                }
-            }
-            .pickerStyle(.menu)
-            .frame(width: 260)
+    // MARK: - Left Page Thumbnail Strip
+    private var pageThumbnailStrip: some View {
+        ScrollView(.vertical, showsIndicators: true) {
+            VStack(spacing: 8) {
+                ForEach(0..<store.analysis.totalPages, id: \.self) { pageIndex in
+                    let isSelected = store.previewPageIndex == pageIndex
+                    let countOnPage = store.securityElements.filter { $0.pageIndex == pageIndex }.count
 
-            if store.activeTool != nil {
-                Button(role: .destructive) {
-                    store.activeTool = nil
-                } label: {
-                    Label("Ukončiť pridávanie", systemImage: "xmark.circle.fill")
-                        .font(.callout)
+                    Button {
+                        store.previewPageIndex = pageIndex
+                    } label: {
+                        VStack(spacing: 4) {
+                            ZStack(alignment: .topTrailing) {
+                                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                    .fill(Color.primary.opacity(isSelected ? 0.12 : 0.04))
+                                    .frame(width: 54, height: 72)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                            .strokeBorder(isSelected ? Color.accentColor : Color.primary.opacity(0.1), lineWidth: isSelected ? 2 : 1)
+                                    )
+
+                                Text("\(pageIndex + 1)")
+                                    .font(.caption2.monospacedDigit().weight(.bold))
+                                    .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
+                                    .padding(4)
+
+                                if countOnPage > 0 {
+                                    Text("\(countOnPage)")
+                                        .font(.system(size: 9, weight: .bold))
+                                        .padding(.horizontal, 4)
+                                        .padding(.vertical, 2)
+                                        .background(Color.green, in: Capsule())
+                                        .foregroundStyle(.white)
+                                        .offset(x: 4, y: -4)
+                                }
+                            }
+                        }
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.glass)
             }
+            .padding(.vertical, 10)
+            .padding(.horizontal, 6)
+        }
+    }
+
+    // MARK: - Markup Floating Toolbar
+    private var markupToolbar: some View {
+        HStack(spacing: 10) {
+            HStack(spacing: 4) {
+                toolButton(kind: nil, title: "Vybrať", icon: "arrow.up.left.and.arrow.down.right")
+                Divider().frame(height: 18)
+                toolButton(kind: .officialStamp, title: "Pečiatka", icon: "seal.fill")
+                toolButton(kind: .handwrittenSignature, title: "Podpis", icon: "signature")
+                toolButton(kind: .embossedSeal, title: "Pečať", icon: "rosette")
+                toolButton(kind: .initial, title: "Parafa", icon: "text.badge.checkmark")
+            }
+            .padding(4)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+            )
 
             Spacer()
 
@@ -99,9 +166,10 @@ struct AnalysisCanvasView: View {
                     Image(systemName: "chevron.left")
                 }
                 .disabled(store.previewPageIndex <= 0)
+                .controlSize(.small)
 
                 Text("Strana \(store.previewPageIndex + 1) z \(max(store.analysis.totalPages, 1))")
-                    .font(.callout.monospacedDigit())
+                    .font(.callout.monospacedDigit().weight(.medium))
                     .frame(minWidth: 100)
 
                 Button {
@@ -111,8 +179,35 @@ struct AnalysisCanvasView: View {
                     Image(systemName: "chevron.right")
                 }
                 .disabled(store.previewPageIndex >= max(store.analysis.totalPages - 1, 0))
+                .controlSize(.small)
             }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(.ultraThinMaterial, in: Capsule())
         }
+    }
+
+    private func toolButton(kind: SecurityElement.Kind?, title: String, icon: String) -> some View {
+        let isSelected = store.activeTool == kind
+        return Button {
+            store.activeTool = kind
+        } label: {
+            HStack(spacing: 5) {
+                Image(systemName: icon)
+                    .font(.system(size: 12, weight: .medium))
+                Text(title)
+                    .font(.caption.weight(isSelected ? .semibold : .regular))
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(isSelected ? Color.accentColor.opacity(0.2) : Color.clear, in: RoundedRectangle(cornerRadius: 8))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .strokeBorder(isSelected ? Color.accentColor : Color.clear, lineWidth: 1)
+            )
+            .foregroundStyle(isSelected ? Color.accentColor : Color.primary)
+        }
+        .buttonStyle(.plain)
     }
 
     private var pageImageLoader: some View {
@@ -135,14 +230,37 @@ struct AnalysisCanvasView: View {
                                            interaction: $interaction)
                         }
                 } else if store.isAnalyzing {
-                    ProgressView("Renderujem stranu…")
+                    VStack(spacing: 8) {
+                        ProgressView().controlSize(.regular)
+                        Text("Analyzujem bezpečnostné prvky…")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 } else {
                     Text("Žiadna strana na zobrazenie")
                         .foregroundStyle(.secondary)
                 }
+
+                if let tool = store.activeTool {
+                    VStack {
+                        HStack {
+                            Label("Režim pridávania: \(tool.rawValue) - kliknite na plátno", systemImage: "plus.viewfinder")
+                                .font(.caption.weight(.semibold))
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 5)
+                                .background(Color.orange.opacity(0.9), in: Capsule())
+                                .foregroundStyle(.white)
+                                .shadow(radius: 4)
+
+                            Spacer()
+                        }
+                        .padding(10)
+                        Spacer()
+                    }
+                }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .glassCard(padding: 6)
+            .liquidGlass(cornerRadius: 18, padding: 6)
             .clipped()
         }
     }
@@ -150,13 +268,13 @@ struct AnalysisCanvasView: View {
     private var countersRow: some View {
         HStack(spacing: 10) {
             StatChip(title: "Strany", value: "\(store.analysis.totalPages)", symbol: "doc.on.doc", tint: .blue)
-            StatChip(title: "Neprázdne strany",
+            StatChip(title: "Neprázdne",
                      value: "\(store.analysis.nonEmptyPages)",
                      symbol: "doc.text.fill", tint: .teal)
-            StatChip(title: "Listy (odhad duplex)",
+            StatChip(title: "Listy (odhad)",
                      value: "\(store.effectiveSheetCount)",
                      symbol: "rectangle.stack", tint: .indigo)
-            StatChip(title: "Bezpečnostné prvky",
+            StatChip(title: "Prvky",
                      value: "\(store.securityElements.count)",
                      symbol: "shield.checkerboard", tint: .green)
 
@@ -176,7 +294,8 @@ struct AnalysisCanvasView: View {
                             in: 1...999)
                 }
             } label: {
-                Label("Listy", systemImage: "rectangle.stack.badge.plus")
+                Label("Spôsob: \(store.sheetMethod.rawValue)", systemImage: "rectangle.stack.badge.plus")
+                    .font(.caption)
             }
             .onChange(of: store.sheetMethod) { _, _ in
                 store.applySheetMethodChange()
@@ -185,75 +304,72 @@ struct AnalysisCanvasView: View {
     }
 
     private var elementsPanel: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 10) {
-                Label("Bezpečnostné prvky — strana \(store.previewPageIndex + 1)",
-                      systemImage: "shield.checkerboard")
-                    .font(.headline)
-                    .padding(.bottom, 2)
-
-                if !store.unconfirmedNonEmptyPages.isEmpty && !store.isAnalyzing {
-                    unconfirmedWarning
-                }
-
-                if store.lastDeletedElement != nil {
-                    Button {
-                        store.undoDelete()
-                    } label: {
-                        Label("Vrátiť odstránený prvok", systemImage: "arrow.uturn.backward")
-                            .font(.callout)
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Label("Prvky: strana \(store.previewPageIndex + 1)", systemImage: "shield.checkerboard")
+                            .font(.headline)
+                        Spacer()
+                        if store.lastDeletedElement != nil {
+                            Button {
+                                store.undoDelete()
+                            } label: {
+                                Image(systemName: "arrow.uturn.backward")
+                            }
+                            .help("Vrátiť zmazaný prvok")
+                            .controlSize(.small)
+                        }
                     }
-                    .buttonStyle(.glass)
+
+                    if !store.unconfirmedNonEmptyPages.isEmpty && !store.isAnalyzing {
+                        unconfirmedWarning
+                    }
+
+                    let pageElements = store.securityElements
+                        .filter { $0.pageIndex == store.previewPageIndex }
+                        .sorted { $0.boundingBox.y < $1.boundingBox.y }
+
+                    if pageElements.isEmpty && !store.isAnalyzing {
+                        emptyHint
+                    }
+
+                    ForEach(pageElements) { element in
+                        ElementRow(element: element,
+                                   isSelected: store.selectedElementID == element.id,
+                                   onSelect: { store.selectedElementID = element.id },
+                                   onDelete: {
+                                       if store.selectedElementID == element.id {
+                                           store.selectedElementID = nil
+                                       }
+                                       store.removeSecurityElement(id: element.id)
+                                   },
+                                   onDuplicate: { _ = store.duplicateElement(id: element.id) },
+                                   onKindChange: { kind in store.updateElementKind(id: element.id, kind: kind) },
+                                   onPageChange: { page in store.updateElementPage(id: element.id, pageIndex: page) },
+                                   onDescriptionChange: { text in
+                                       store.updateElementDescription(id: element.id, text: text)
+                                   })
+                    }
+
+                    Divider().padding(.vertical, 4)
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Pridanie a úprava:")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                        Text("Vyberte nástroj hore a kliknite do náhľadu. Bounding box môžete presúvať a vpravo dole meniť jeho veľkosť.")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
                 }
-
-                let pageElements = store.securityElements
-                    .filter { $0.pageIndex == store.previewPageIndex }
-                    .sorted { $0.boundingBox.y < $1.boundingBox.y }
-
-                if pageElements.isEmpty && !store.isAnalyzing {
-                    emptyHint
-                }
-
-                ForEach(pageElements) { element in
-                    ElementRow(element: element,
-                               isSelected: store.selectedElementID == element.id,
-                               onSelect: { store.selectedElementID = element.id },
-                               onDelete: {
-                                   if store.selectedElementID == element.id {
-                                       store.selectedElementID = nil
-                                   }
-                                   store.removeSecurityElement(id: element.id)
-                               },
-                               onDuplicate: { _ = store.duplicateElement(id: element.id) },
-                               onKindChange: { kind in store.updateElementKind(id: element.id, kind: kind) },
-                               onPageChange: { page in store.updateElementPage(id: element.id, pageIndex: page) },
-                               onDescriptionChange: { text in
-                                   store.updateElementDescription(id: element.id, text: text)
-                               })
-                }
-
-                Divider().padding(.vertical, 6)
-
-                if let tool = store.activeTool {
-                    Label("Režim pridávania: \(tool.rawValue)", systemImage: "plus.viewfinder")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.orange)
-                    Text("Klikni alebo ťahaj priamo v náhľade strany. Rukoväť vpravo dole mení veľkosť boxu.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                } else {
-                    Text("Režim „Vybrať“: klik vyberie prvok, ťahanie ho presúva, rukoväť vpravo dole mení veľkosť.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer()
+                .padding(16)
             }
-            .padding(14)
         }
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .padding(.vertical, 14)
-        .padding(.trailing, 14)
+        .background(.regularMaterial)
+        .overlay(alignment: .leading) {
+            Rectangle().fill(Color.primary.opacity(0.08)).frame(width: 1)
+        }
     }
 
     private var unconfirmedWarning: some View {
@@ -267,21 +383,19 @@ struct AnalysisCanvasView: View {
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.orange.opacity(0.09), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(Color.orange.opacity(0.09), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
     private var emptyHint: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Na tejto strane nie sú žiadne prvky.")
+            Text("Na tejto strane zatiaľ nie sú detegované prvky.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
-            if store.activeTool == nil {
-                Text("Zvoľ nástroj hore a klikni do náhľadu pre manuálne pridanie pečiatky či podpisu.")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-            }
+            Text("Zvoľte nástroj hore v lište a kliknite do dokumentu pre manuálne pridanie.")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
         }
-        .padding(.vertical, 8)
+        .padding(.vertical, 6)
     }
 }
 
@@ -299,8 +413,8 @@ struct FlowChips: View {
                         Text("Str. \(pageIndex + 1)")
                             .font(.caption.weight(.medium))
                     }
-                    .buttonStyle(.glass)
-                    .tint(.orange)
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
                 }
             }
         }
@@ -331,11 +445,11 @@ struct ElementOverlay: View {
         let color = ElementKindColor.color(for: element.kind)
         let isSelected = store.selectedElementID == element.id
 
-        context.fill(Path(roundedRect: rect, cornerRadius: 3),
+        context.fill(Path(roundedRect: rect, cornerRadius: 4),
                      with: .color(color.opacity(isSelected ? 0.22 : 0.10)))
-        context.stroke(Path(roundedRect: rect, cornerRadius: 3),
+        context.stroke(Path(roundedRect: rect, cornerRadius: 4),
                        with: .color(color),
-                       lineWidth: isSelected ? 2.6 : 1.6)
+                       lineWidth: isSelected ? 2.5 : 1.5)
 
         if isSelected {
             let handleSide: CGFloat = 10
@@ -347,7 +461,7 @@ struct ElementOverlay: View {
             context.stroke(Path(roundedRect: handle, cornerRadius: 2),
                            with: .color(.white), lineWidth: 1.2)
 
-            let labelText = "\(element.kind.rawValue) · \(Int(element.confidence * 100)) %"
+            let labelText = "\(element.kind.rawValue) (\(Int(element.confidence * 100)) %)"
             let labelSize = CGSize(width: 170, height: 14)
             let labelFrame = CGRect(x: rect.minX,
                                     y: max(rect.minY - labelSize.height - 2, 0),
@@ -368,68 +482,47 @@ struct ElementOverlay: View {
     private var dragGesture: some Gesture {
         DragGesture(minimumDistance: 0)
             .onChanged { value in
-                let point = fitter.normalizedPoint(from: value.location)
-
-                if interaction == nil {
-                    startInteraction(at: point)
-                    return
-                }
-
-                switch interaction?.kind {
-                case .placing(let id, let anchor):
-                    interaction?.moved = true
-                    store.drawElement(id: id, from: anchor, to: point)
-                case .moving(let id):
-                    interaction?.moved = true
-                    store.moveElement(id: id, center: point)
-                case .resizing(let id, let anchor):
-                    interaction?.moved = true
-                    store.drawElement(id: id, from: anchor, to: point)
-                case nil:
-                    break
-                }
+                handleDragChanged(value)
             }
-            .onEnded { value in
-                defer { interaction = nil }
-                guard interaction == nil else {
-                    if case .placing(let id, _) = interaction?.kind, interaction?.moved == false {
-                        _ = id
-                    }
-                    return
-                }
-
-                let point = fitter.normalizedPoint(from: value.location)
-                guard let tool = store.activeTool else {
-                    store.selectedElementID = store.elementID(at: point,
-                                                              pageIndex: store.previewPageIndex)
-                    return
-                }
-                _ = store.placeElement(kind: tool, at: point, pageIndex: store.previewPageIndex)
+            .onEnded { _ in
+                interaction = nil
             }
     }
 
-    private func startInteraction(at point: NormalizedPoint) {
-        if store.activeTool != nil {
-            let id = store.placeElement(kind: store.activeTool!,
-                                        at: point,
-                                        pageIndex: store.previewPageIndex)
-            interaction = .init(kind: .placing(id, point), startPoint: point)
+    private func handleDragChanged(_ value: DragGesture.Value) {
+        let normPoint = fitter.normalizedPoint(from: value.location)
+
+        if interaction == nil {
+            if let tool = store.activeTool {
+                let newID = store.placeElement(kind: tool, at: normPoint)
+                interaction = .init(kind: .resizing(newID, normPoint), startPoint: normPoint)
+                return
+            }
+
+            if let hitID = store.elementID(at: normPoint, pageIndex: store.previewPageIndex) {
+                store.selectedElementID = hitID
+                if let element = store.securityElements.first(where: { $0.id == hitID }),
+                   ElementGeometry.isInResizeHandle(element.boundingBox, normPoint) {
+                    interaction = .init(kind: .resizing(hitID, normPoint), startPoint: normPoint)
+                } else {
+                    interaction = .init(kind: .moving(hitID), startPoint: normPoint)
+                }
+            } else {
+                store.selectedElementID = nil
+            }
             return
         }
 
-        guard let hitID = store.elementID(at: point, pageIndex: store.previewPageIndex) else {
-            store.selectedElementID = nil
-            return
-        }
-        store.selectedElementID = hitID
-
-        if store.isResizeHandle(hitID, at: point),
-           let element = store.securityElements.first(where: { $0.id == hitID }) {
-            let anchor = NormalizedPoint(x: element.boundingBox.x,
-                                         y: element.boundingBox.y)
-            interaction = .init(kind: .resizing(hitID, anchor), startPoint: point)
-        } else {
-            interaction = .init(kind: .moving(hitID), startPoint: point)
+        guard let current = interaction else { return }
+        switch current.kind {
+        case .moving(let id):
+            store.moveElement(id: id, center: normPoint)
+            interaction?.moved = true
+        case .resizing(let id, _):
+            store.drawElement(id: id, from: current.startPoint, to: normPoint)
+            interaction?.moved = true
+        case .placing:
+            break
         }
     }
 }
@@ -444,89 +537,49 @@ struct ElementRow: View {
     let onPageChange: (Int) -> Void
     let onDescriptionChange: (String) -> Void
 
-    @State private var descriptionDraft: String = ""
-    @FocusState private var descriptionFocused: Bool
-
     var body: some View {
-        VStack(alignment: .leading, spacing: 7) {
+        VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
                 Image(systemName: element.kind.sfSymbol)
                     .foregroundStyle(ElementKindColor.color(for: element.kind))
-                    .frame(width: 20)
+                    .frame(width: 18)
 
-                Menu {
+                Picker("", selection: Binding(get: { element.kind }, set: { onKindChange($0) })) {
                     ForEach(SecurityElement.Kind.allCases, id: \.self) { kind in
-                        Button(kind.rawValue) { onKindChange(kind) }
+                        Text(kind.rawValue).tag(kind)
                     }
-                } label: {
-                    Text(element.kind.rawValue)
-                        .font(.callout.weight(.semibold))
                 }
-                .buttonStyle(.borderless)
+                .labelsHidden()
+                .pickerStyle(.menu)
 
                 Spacer()
+
+                ConfidenceBar(confidence: element.confidence)
 
                 Menu {
-                    Button("Duplikovať") { onDuplicate() }
+                    Button("Duplikovať", action: onDuplicate)
+                    Divider()
+                    Button("Odstrániť", role: .destructive, action: onDelete)
                 } label: {
-                    Image(systemName: "ellipsis.circle")
+                    Image(systemName: "ellipsis")
                 }
-                .buttonStyle(.borderless)
-
-                Button(role: .destructive, action: onDelete) {
-                    Image(systemName: "trash")
-                        .font(.caption)
-                }
-                .buttonStyle(.borderless)
+                .menuStyle(.borderlessButton)
+                .frame(width: 16)
             }
 
-            HStack(spacing: 8) {
-                Stepper("Strana \(element.pageIndex + 1)",
-                        value: Binding(
-                            get: { element.pageIndex },
-                            set: { onPageChange(max($0, 0)) }),
-                        in: 0...999)
-                    .font(.caption.monospacedDigit())
-
-                Spacer()
-
-                if !element.detectedByAI {
-                    Text("manuálne")
-                        .font(.caption2.weight(.medium))
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Color.purple.opacity(0.15), in: Capsule())
-                        .foregroundStyle(.purple)
-                } else {
-                    ConfidenceBar(confidence: element.confidence)
-                    Text("\(Int(element.confidence * 100)) %")
-                        .font(.caption2.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                }
+            if !element.verbalDescription.isEmpty {
+                Text(element.verbalDescription)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
             }
-
-            TextField("Slovný opis pre doložku",
-                      text: Binding(
-                          get: {
-                              descriptionFocused || !descriptionDraft.isEmpty
-                                  ? descriptionDraft
-                                  : element.verbalDescription
-                          },
-                          set: { newValue in
-                              descriptionDraft = newValue
-                              onDescriptionChange(newValue)
-                          }),
-                      axis: .vertical)
-                .font(.caption)
-                .textFieldStyle(.roundedBorder)
-                .lineLimit(2...3)
-                .focused($descriptionFocused)
         }
         .padding(10)
-        .background(isSelected ? Color.accentColor.opacity(0.08) : Color.clear,
-                    in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
-            .strokeBorder(isSelected ? Color.accentColor.opacity(0.4) : Color.primary.opacity(0.06)))
+        .background(isSelected ? Color.accentColor.opacity(0.1) : Color.primary.opacity(0.03),
+                    in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(isSelected ? Color.accentColor : Color.primary.opacity(0.08), lineWidth: 1)
+        )
         .contentShape(Rectangle())
         .onTapGesture(perform: onSelect)
     }
