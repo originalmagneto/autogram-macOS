@@ -128,10 +128,9 @@ struct RootView: View {
     private var sidebarBottomBar: some View {
         VStack(spacing: 8) {
             Divider()
-                .opacity(0.6)
 
             let isCardConnected = !signingStore.identities.isEmpty
-            let cardLabel = signingStore.identities.first?.label ?? (settingsStore.signingProvider is DemoSigningProvider ? "DEMO režim bez karty" : "Karta nepripojená")
+            let cardLabel = signingStore.identities.first?.label ?? (settingsStore.signingProvider is DemoSigningProvider ? "DEMO režim" : "Karta nepripojená")
             let cardDetail = isCardConnected ? "Čítačka je pripravená" : "Vložte eID alebo SAK kartu"
 
             SmartcardHUDStatus(
@@ -140,31 +139,18 @@ struct RootView: View {
                 detail: cardDetail
             )
 
-            HStack {
-                Button {
-                    openMoreFiles()
-                } label: {
-                    Label("Pridať súbory…", systemImage: "plus")
-                        .font(.caption.weight(.medium))
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-
-                Spacer()
-
-                if !signingStore.queue.isEmpty {
-                    Button("Vyčistiť") {
-                        signingStore.queue.removeAll()
-                    }
-                    .font(.caption)
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.secondary)
-                }
+            Button {
+                openMoreFiles()
+            } label: {
+                Label("Pridať súbory…", systemImage: "plus")
+                    .font(.caption.weight(.medium))
+                    .frame(maxWidth: .infinity)
             }
-            .padding(.horizontal, 4)
+            .buttonStyle(.bordered)
+            .controlSize(.small)
         }
-        .padding(10)
-        .background(.ultraThinMaterial)
+        .padding(12)
+        .background(.bar)
     }
 
     private var subtitle: String {

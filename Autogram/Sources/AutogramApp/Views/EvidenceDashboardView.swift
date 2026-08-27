@@ -17,7 +17,9 @@ struct EvidenceDashboardView: View {
     var body: some View {
         VStack(spacing: 0) {
             summaryHeader
+            Divider().opacity(0.6)
             filterBar
+            Divider().opacity(0.4)
 
             Table(filteredRecords, selection: $selectedRecordID) {
                 TableColumn("Evidenčné číslo") { record in
@@ -166,30 +168,34 @@ struct EvidenceDashboardView: View {
             SummaryCard(title: "Čaká na odoslanie", value: "\(pending)", symbol: "tray.and.arrow.up", tint: pending > 0 ? .orange : .secondary)
             SummaryCard(title: "Po lehote 24 h", value: "\(overdue)", symbol: "clock.badge.exclamationmark", tint: overdue > 0 ? .red : .secondary)
 
+            Spacer()
+
             if let feedback = submitFeedback {
-                Spacer()
                 Text(feedback)
-                    .font(.footnote)
+                    .font(.footnote.weight(.medium))
                     .foregroundStyle(feedback.hasPrefix("✓") ? Color.green : Color.orange)
-                    .lineLimit(2)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Color.primary.opacity(0.04), in: Capsule())
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 12)
+        .background(.bar)
     }
 
     private var filterBar: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 12) {
             HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(.secondary)
                 TextField("Hľadať podľa názvu alebo čísla", text: $filterText)
                     .textFieldStyle(.plain)
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 8))
-            .frame(width: 240)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 8))
+            .frame(width: 260)
 
             Picker("Filter", selection: $statusFilter) {
                 Text("Všetky stavy").tag(EvidenceRecord.Status?.none)
@@ -199,7 +205,7 @@ struct EvidenceDashboardView: View {
             }
             .labelsHidden()
             .pickerStyle(.menu)
-            .frame(width: 170)
+            .frame(width: 180)
 
             Spacer()
 
@@ -215,7 +221,7 @@ struct EvidenceDashboardView: View {
                     Text("Odoslať čakajúce do CEZZK")
                 }
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(.borderedProminent)
             .disabled(isSubmitting || !records.contains(where: \.isSubmissionPending))
 
             Button {
@@ -225,9 +231,9 @@ struct EvidenceDashboardView: View {
             }
             .buttonStyle(.bordered)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
-        .background(.bar)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 10)
+        .background(Color(nsColor: .windowBackgroundColor))
     }
 
     static let deadlineFormatter: DateFormatter = {

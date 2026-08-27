@@ -1,98 +1,154 @@
 import SwiftUI
 import AutogramKit
+import AppKit
 
 struct SettingsView: View {
     @Bindable var settingsStore: AppSettingsStore
-    @State private var newProfileName = ""
     @State private var newTSAURL = ""
     @State private var tsaTestStatus: String?
     @State private var isTestingTSA = false
+    @State private var ezzkSavedHint = false
 
     var body: some View {
         TabView {
-            aiTab.tabItem { Label("AI Vision", systemImage: "brain.head.profile") }
-            conversionTab.tabItem { Label("Konverzia PDF/A", systemImage: "doc.badge.gearshape") }
-            ezzkTab.tabItem { Label("EZZK", systemImage: "number.square") }
-            profilesTab.tabItem { Label("Profily advokáta", systemImage: "person.crop.circle.badge.checkmark") }
+            ScrollView {
+                aiTab
+                    .frame(maxWidth: 720)
+                    .padding(24)
+            }
+            .tabItem { Label("AI Vision", systemImage: "brain.head.profile") }
+
+            ScrollView {
+                conversionTab
+                    .frame(maxWidth: 720)
+                    .padding(24)
+            }
+            .tabItem { Label("Konverzia PDF/A", systemImage: "doc.badge.gearshape") }
+
+            ScrollView {
+                ezzkTab
+                    .frame(maxWidth: 720)
+                    .padding(24)
+            }
+            .tabItem { Label("EZZK", systemImage: "number.square") }
+
+            ScrollView {
+                profilesTab
+                    .frame(maxWidth: 720)
+                    .padding(24)
+            }
+            .tabItem { Label("Profily advokáta", systemImage: "person.crop.circle.badge.checkmark") }
         }
-        .padding(18)
     }
 
+    // MARK: - Tab 1: AI Vision
     private var aiTab: some View {
-        Form {
-            Picker("Režim detekcie prvkov", selection: $settingsStore.settings.aiMode) {
-                ForEach(AppSettings.AIMode.allCases, id: \.self) { mode in
-                    Text(mode.rawValue).tag(mode)
+        VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Režim detekcie bezpečnostných prvkov")
+                    .font(.headline)
+
+                Picker("", selection: $settingsStore.settings.aiMode) {
+                    ForEach(AppSettings.AIMode.allCases, id: \.self) { mode in
+                        Text(mode.rawValue).tag(mode)
+                    }
                 }
+                .pickerStyle(.segmented)
+
+                Text("Vstavaná on-device detekcia beží vždy. Zvolený AI režim dopĺňa nálezy pečiatok a podpisov. Všetky prvky možno kedykoľvek upraviť alebo doplniť ručne.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
-            .pickerStyle(.radioGroup)
+            .liquidGlass(cornerRadius: 14, padding: 16)
 
-            Text("Vstavaná on-device detekcia beží vždy a jej výsledky sa nedajú vypnúť — zvolený AI režim len pridáva ďalšie nálezy (IoU deduplikácia). Všetky prvky je možné kedykoľvek upraviť, presunúť alebo vymazať ručne.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Text("Klasifikačný prompt pre LLM")
+                        .font(.headline)
+                    Spacer()
+                    Button("Obnoviť predvolený") {
+                        settingsStore.settings.aiPrompt = nil
+                    }
+                    .controlSize(.small)
+                }
 
-            GroupBox("Klasifikačný prompt pre LLM") {
-                VStack(alignment: .leading, spacing: 8) {
-                    TextEditor(text: Binding(
-                        get: { settingsStore.settings.aiPrompt ?? "" },
-                        set: { newValue in
-                            settingsStore.settings.aiPrompt =
-                                newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                                    ? nil : newValue
-                        }))
-                        .font(.system(size: 11, design: .monospaced))
-                        .frame(width: 560, height: 130)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 6)
-                                .strokeBorder(Color.primary.opacity(0.12)))
+                TextEditor(text: Binding(
+                    get: { settingsStore.settings.aiPrompt ?? "" },
+                    set: { newValue in
+                        settingsStore.settings.aiPrompt =
+                            newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                                ? nil : newValue
+                    }))
+                    .font(.system(size: 11, design: .monospaced))
+                    .frame(height: 110)
+                    .padding(4)
+                    .background(Color.primary.opacity(0.03), in: RoundedRectangle(cornerRadius: 8))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .strokeBorder(Color.primary.opacity(0.1), lineWidth: 1)
+                    )
 
-                    HStack {
-                        Text("Prázdne = predvolený prompt. Vlastný text nahradí klasifikačné inštrukcie; formát JSON odpovede je vynútený automaticky.")
-                            .font(.caption2)
+                Text("Prázdne pole znamená predvolený prompt pre § 37 (pečiatky, vlastnoručné podpisy, reliéfne pečate, parafy).")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            .liquidGlass(cornerRadius: 14, padding: 16)
+
+            VStack(alignment: .leading, spacing: 12) {
+                Label("Lokálny model (Ollama)", systemImage: "laptopcomputer")
+                    .font(.headline)
+
+                Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 10) {
+                    GridRow {
+                        Text("Server")
+                            .font(.callout)
                             .foregroundStyle(.secondary)
-                        Spacer()
-                        Button("Obnoviť predvolený") {
-                            settingsStore.settings.aiPrompt = nil
-                        }
-                        .buttonStyle(.bordered)
-                    }
-                }
-                .padding(4)
-            }
-
-            GroupBox("Lokálny model (Ollama)") {
-                VStack(alignment: .leading, spacing: 8) {
-                    LabeledRow(label: "Server") {
-                        TextField("http://localhost:11434",
-                                  text: $settingsStore.settings.ollamaURL)
+                            .frame(width: 140, alignment: .leading)
+                        TextField("http://localhost:11434", text: $settingsStore.settings.ollamaURL)
                             .textFieldStyle(.roundedBorder)
-                            .frame(width: 300)
                     }
-                    LabeledRow(label: "Model") {
+
+                    GridRow {
+                        Text("Model")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
                         TextField("llava / llama3.2-vision", text: $settingsStore.settings.ollamaModel)
                             .textFieldStyle(.roundedBorder)
-                            .frame(width: 300)
                     }
-                    Text("100 % offline spracovanie priamo na Macu. Odporúčané modely: llava, qwen2-vl.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
                 }
-            }
 
-            GroupBox("Vlastný API kľúč (OpenAI-compatible)") {
-                VStack(alignment: .leading, spacing: 8) {
-                    LabeledRow(label: "Base URL") {
-                        TextField("https://api.openai.com/v1",
-                                  text: $settingsStore.settings.openAICompatibleBaseURL)
+                Text("100 % offline spracovanie priamo na Macu. Odporúčané modely: llava, qwen2-vl.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            .liquidGlass(cornerRadius: 14, padding: 16)
+
+            VStack(alignment: .leading, spacing: 12) {
+                Label("Vlastný API kľúč (OpenAI-compatible)", systemImage: "key.fill")
+                    .font(.headline)
+
+                Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 10) {
+                    GridRow {
+                        Text("Base URL")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .frame(width: 140, alignment: .leading)
+                        TextField("https://api.openai.com/v1", text: $settingsStore.settings.openAICompatibleBaseURL)
                             .textFieldStyle(.roundedBorder)
-                            .frame(width: 340)
                     }
-                    LabeledRow(label: "Model") {
+
+                    GridRow {
+                        Text("Model")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
                         TextField("gpt-4o-mini", text: $settingsStore.settings.openAICompatibleModel)
                             .textFieldStyle(.roundedBorder)
-                            .frame(width: 340)
                     }
-                    LabeledRow(label: "API kľúč (Keychain)") {
+
+                    GridRow {
+                        Text("API kľúč (Keychain)")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
                         SecureField("sk-…", text: Binding(
                             get: { KeychainStore.load(account: "ai.apikey") ?? "" },
                             set: { newValue in
@@ -103,110 +159,126 @@ struct SettingsView: View {
                                 }
                             }))
                             .textFieldStyle(.roundedBorder)
-                            .frame(width: 340)
                     }
-                    Text("Kľúč sa ukladá výhradne do macOS Kľúčenky tohto Macu.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
                 }
+
+                Text("Kľúč sa ukladá bezpečne výhradne do systémovej Kľúčenky tohto Macu.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
             }
+            .liquidGlass(cornerRadius: 14, padding: 16)
         }
-        .formStyle(.grouped)
     }
 
+    // MARK: - Tab 2: Konverzia PDF/A
     private var conversionTab: some View {
-        Form {
-            Picker("Spôsob konverzie do PDF/A", selection: $settingsStore.settings.pdfaMode) {
-                ForEach(PDFAConversionMode.allCases, id: \.self) { mode in
-                    Text(mode.rawValue).tag(mode)
-                }
-            }
-            .pickerStyle(.radioGroup)
+        VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Spôsob konverzie do PDF/A")
+                    .font(.headline)
 
-            GroupBox("Časová pečiatka (RFC 3161 TSA)") {
-                VStack(alignment: .leading, spacing: 10) {
-                    Picker("Aktívna TSA", selection: $settingsStore.settings.selectedTSAURL) {
-                        ForEach(settingsStore.settings.availableTSAServers) { server in
-                            Text("\(server.name) — \(server.url)").tag(server.url)
-                        }
+                Picker("", selection: $settingsStore.settings.pdfaMode) {
+                    ForEach(PDFAConversionMode.allCases, id: \.self) { mode in
+                        Text(mode.rawValue).tag(mode)
                     }
-                    .frame(width: 520)
+                }
+                .pickerStyle(.segmented)
 
-                    Text("Kvalifikované TSA: Belgium BOSA a CA Disig. DigiCert/Sectigo sú len nekvalifikované. Vlastnú TSA pridáš nižšie alebo priamo pri podpisovaní.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                Text("Vektorová konverzia zachováva textovú vrstvu; rasterizovaná garancia (300 dpi) vyrovná problematické skeny. Obe možnosti spĺňajú štandard PDF/A-2b.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .liquidGlass(cornerRadius: 14, padding: 16)
 
-                    if !settingsStore.settings.customTSAServers.isEmpty {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("Vlastné servery").font(.subheadline.weight(.semibold))
-                            ForEach(settingsStore.settings.customTSAServers, id: \.self) { server in
-                                HStack {
-                                    Image(systemName: "globe")
-                                        .foregroundStyle(.secondary)
-                                    Text(server)
-                                        .font(.caption.monospaced())
-                                        .textSelection(.enabled)
-                                    Spacer()
-                                    Button {
-                                        settingsStore.settings.customTSAServers.removeAll { $0 == server }
-                                        if settingsStore.settings.selectedTSAURL == server {
-                                            settingsStore.settings.selectedTSAURL =
-                                                TimestampAuthority.legacyDefaultURL
-                                        }
-                                    } label: {
-                                        Image(systemName: "minus.circle.fill")
-                                            .foregroundStyle(.red)
+            VStack(alignment: .leading, spacing: 14) {
+                Label("Časová pečiatka (RFC 3161 TSA)", systemImage: "clock.badge.checkmark")
+                    .font(.headline)
+
+                Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 10) {
+                    GridRow {
+                        Text("Aktívna TSA")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .frame(width: 140, alignment: .leading)
+
+                        Picker("", selection: $settingsStore.settings.selectedTSAURL) {
+                            ForEach(settingsStore.settings.availableTSAServers) { server in
+                                Text("\(server.name) (\(server.url))").tag(server.url)
+                            }
+                        }
+                        .labelsHidden()
+                    }
+                }
+
+                if !settingsStore.settings.customTSAServers.isEmpty {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Vlastné TSA servery")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+
+                        ForEach(settingsStore.settings.customTSAServers, id: \.self) { server in
+                            HStack {
+                                Image(systemName: "globe")
+                                    .foregroundStyle(.secondary)
+                                Text(server)
+                                    .font(.caption.monospaced())
+                                    .textSelection(.enabled)
+                                Spacer()
+                                Button {
+                                    settingsStore.settings.customTSAServers.removeAll { $0 == server }
+                                    if settingsStore.settings.selectedTSAURL == server {
+                                        settingsStore.settings.selectedTSAURL = TimestampAuthority.legacyDefaultURL
                                     }
-                                    .buttonStyle(.plain)
+                                } label: {
+                                    Image(systemName: "trash")
+                                        .foregroundStyle(.red)
                                 }
+                                .buttonStyle(.plain)
                             }
-                        }
-                    }
-
-                    HStack(spacing: 8) {
-                        TextField("https://vasa-tsa.example.com/tsp", text: $newTSAURL)
-                            .textFieldStyle(.roundedBorder)
-                            .frame(width: 340)
-                        Button("Pridať vlastnú TSA") {
-                            let trimmed = newTSAURL.trimmingCharacters(in: .whitespacesAndNewlines)
-                            guard !trimmed.isEmpty,
-                                  !settingsStore.settings.customTSAServers.contains(trimmed) else { return }
-                            settingsStore.settings.customTSAServers.append(trimmed)
-                            newTSAURL = ""
-                        }
-                        .disabled(newTSAURL.trimmingCharacters(in: .whitespaces).isEmpty)
-                    }
-
-                    HStack(spacing: 10) {
-                        Button {
-                            testTSAConnection()
-                        } label: {
-                            HStack(spacing: 6) {
-                                if isTestingTSA {
-                                    ProgressView().controlSize(.small)
-                                } else {
-                                    Image(systemName: "bolt.horizontal.circle")
-                                }
-                                Text("Otestovať spojenie")
-                            }
-                        }
-                        .disabled(isTestingTSA || settingsStore.settings.selectedTSAURL.isEmpty)
-
-                        if let status = tsaTestStatus {
-                            Text(status)
-                                .font(.caption)
-                                .foregroundStyle(status.hasPrefix("✓") ? Color.green : Color.red)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(Color.primary.opacity(0.03), in: RoundedRectangle(cornerRadius: 6))
                         }
                     }
                 }
-                .padding(4)
-            }
 
-            Text("Vektorová konverzia zachováva text a vektorovú grafiku; rasterizovaná garancia vykreslí stránky do 300 dpi obrazu — vhodné pre problematické skeny. Výstup je v oboch prípadoch doplnený o XMP metadáta pdfaid (PDF/A-2b) a sRGB OutputIntent.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                HStack(spacing: 8) {
+                    TextField("https://vlastna-tsa.sk/tsp", text: $newTSAURL)
+                        .textFieldStyle(.roundedBorder)
+
+                    Button("Pridať TSA") {
+                        let trimmed = newTSAURL.trimmingCharacters(in: .whitespacesAndNewlines)
+                        guard !trimmed.isEmpty, !settingsStore.settings.customTSAServers.contains(trimmed) else { return }
+                        settingsStore.settings.customTSAServers.append(trimmed)
+                        newTSAURL = ""
+                    }
+                    .disabled(newTSAURL.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+
+                HStack(spacing: 10) {
+                    Button {
+                        testTSAConnection()
+                    } label: {
+                        HStack(spacing: 6) {
+                            if isTestingTSA {
+                                ProgressView().controlSize(.small)
+                            } else {
+                                Image(systemName: "bolt.horizontal.circle")
+                            }
+                            Text("Otestovať spojenie")
+                        }
+                    }
+                    .disabled(isTestingTSA || settingsStore.settings.selectedTSAURL.isEmpty)
+
+                    if let status = tsaTestStatus {
+                        Text(status)
+                            .font(.caption)
+                            .foregroundStyle(status.hasPrefix("✓") ? Color.green : Color.red)
+                    }
+                }
+            }
+            .liquidGlass(cornerRadius: 14, padding: 16)
         }
-        .formStyle(.grouped)
     }
 
     private func testTSAConnection() {
@@ -233,108 +305,203 @@ struct SettingsView: View {
         }
     }
 
+    // MARK: - Tab 3: EZZK
     private var ezzkTab: some View {
-        Form {
-            Section {
-                Text("Údaje z registrácie v evidencii záznamov o zaručenej konverzii (ezzk.iomo.sk). Bez vyplnených údajov beží aplikácia v DEMO režime evidencie.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            }
-            LabeledRow(label: "IČO") {
-                TextField("IČO advokátskej kancelárie", text: $settingsStore.settings.ezzkICO)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: 240)
-            }
-            LabeledRow(label: "Prihlasovacie meno") {
-                TextField("username", text: $settingsStore.settings.ezzkUsername)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: 240)
-            }
-            LabeledRow(label: "Heslo (Keychain)") {
-                SecureField("heslo", text: $settingsStore.ezzkPassword)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: 240)
-                    .onSubmit { settingsStore.saveEZZKPassword() }
-            }
-            LabeledRow(label: "Notifikačný e-mail") {
-                TextField("advokat@kancelaria.sk", text: $settingsStore.settings.ezzkNotificationEmail)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: 240)
-            }
-            LabeledRow(label: "Adresa elektronickej schránky") {
-                TextField("edesk", text: $settingsStore.settings.ezzkEdeskAddress)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: 240)
-            }
-            Button("Uložiť prístupy do Kľúčenky") {
-                settingsStore.saveEZZKPassword()
-            }
-            .buttonStyle(.borderedProminent)
-        }
-        .formStyle(.grouped)
-    }
+        VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 14) {
+                Label("Centrálna evidencia záznamov o konverzii (IS EZZK)", systemImage: "number.square")
+                    .font(.headline)
 
-    private var profilesTab: some View {
-        Form {
-            if settingsStore.settings.profiles.isEmpty {
-                Text("Zatiaľ žiadny profil. Pridajte profil advokáta pre automatické predvyplňovanie doložky.")
+                Text("Údaje z registrácie na portáli ezzk.iomo.sk. Bez vyplnených údajov beží evidencia v lokálnom DEMO režime.")
+                    .font(.caption)
                     .foregroundStyle(.secondary)
-            }
-            ForEach($settingsStore.settings.profiles) { $profile in
-                GroupBox(profile.displayName.isEmpty ? "Nový profil" : profile.displayName) {
-                    VStack(spacing: 8) {
-                        LabeledRow(label: "Meno a priezvisko") {
-                            TextField("JUDr. Meno Priezvisko", text: $profile.fullName)
-                                .textFieldStyle(.roundedBorder)
-                        }
-                        HStack(spacing: 12) {
-                            LabeledRow(label: "Funkcia") {
-                                TextField("advokát", text: $profile.position)
-                                    .textFieldStyle(.roundedBorder)
-                                    .frame(width: 140)
-                            }
-                            LabeledRow(label: "Evidenčné číslo SAK") {
-                                TextField("1234", text: $profile.registrationNumber)
-                                    .textFieldStyle(.roundedBorder)
-                                    .frame(width: 120)
-                            }
-                            LabeledRow(label: "IČO") {
-                                TextField("IČO", text: $profile.ico)
-                                    .textFieldStyle(.roundedBorder)
-                                    .frame(width: 140)
-                            }
-                        }
-                        LabeledRow(label: "Názov kancelárie") {
-                            TextField("Advokátska kancelária…", text: $profile.officeName)
-                                .textFieldStyle(.roundedBorder)
-                        }
-                        Toggle("Právnická osoba (kancelária)", isOn: $profile.isLegalEntity)
-                            .toggleStyle(.switch)
 
-                        Picker("Aktívny profil", selection: $settingsStore.settings.activeProfileID) {
-                            Text("(vybrať)").tag(UUID?.none)
-                            Text(profile.displayName.isEmpty ? "profil" : profile.displayName)
-                                .tag(UUID?.some(profile.id))
-                        }
-                        .frame(width: 260)
+                Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 10) {
+                    GridRow {
+                        Text("IČO kancelárie")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .frame(width: 170, alignment: .leading)
+                        TextField("IČO", text: $settingsStore.settings.ezzkICO)
+                            .textFieldStyle(.roundedBorder)
+                    }
+
+                    GridRow {
+                        Text("Prihlasovacie meno")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                        TextField("username", text: $settingsStore.settings.ezzkUsername)
+                            .textFieldStyle(.roundedBorder)
+                    }
+
+                    GridRow {
+                        Text("Heslo (Keychain)")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                        SecureField("heslo", text: $settingsStore.ezzkPassword)
+                            .textFieldStyle(.roundedBorder)
+                    }
+
+                    GridRow {
+                        Text("Notifikačný e-mail")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                        TextField("advokat@kancelaria.sk", text: $settingsStore.settings.ezzkNotificationEmail)
+                            .textFieldStyle(.roundedBorder)
+                    }
+
+                    GridRow {
+                        Text("Adresa eDesk")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                        TextField("elektronická schránka", text: $settingsStore.settings.ezzkEdeskAddress)
+                            .textFieldStyle(.roundedBorder)
                     }
                 }
-            }
 
+                HStack {
+                    Button {
+                        settingsStore.saveEZZKPassword()
+                        ezzkSavedHint = true
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+                            ezzkSavedHint = false
+                        }
+                    } label: {
+                        Label("Uložiť prístupy do Kľúčenky", systemImage: "lock.shield")
+                    }
+                    .buttonStyle(.borderedProminent)
+
+                    if ezzkSavedHint {
+                        Text("✓ Uložené")
+                            .font(.caption)
+                            .foregroundStyle(.green)
+                    }
+                }
+                .padding(.top, 4)
+            }
+            .liquidGlass(cornerRadius: 14, padding: 16)
+        }
+    }
+
+    // MARK: - Tab 4: Profily advokáta
+    private var profilesTab: some View {
+        VStack(alignment: .leading, spacing: 20) {
             HStack {
+                Text("Správa profilov advokáta")
+                    .font(.headline)
+
+                Spacer()
+
                 Button {
                     let profile = AdvocateProfile()
                     settingsStore.settings.profiles.append(profile)
-                    if settingsStore.settings.activeProfileID == nil {
-                        settingsStore.settings.activeProfileID = profile.id
-                    }
+                    settingsStore.settings.activeProfileID = profile.id
                 } label: {
-                    Label("Pridať profil", systemImage: "plus")
+                    Label("Nový profil", systemImage: "plus")
                 }
-                Spacer()
+                .controlSize(.small)
+            }
+
+            if settingsStore.settings.profiles.isEmpty {
+                Text("Zatiaľ nemáte vytvorený profil. Kliknite na 'Nový profil' pre pridanie údajov advokáta.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .padding(20)
+                    .frame(maxWidth: .infinity)
+                    .liquidGlass(cornerRadius: 14)
+            } else {
+                ForEach($settingsStore.settings.profiles) { $profile in
+                    let isActive = settingsStore.settings.activeProfileID == profile.id
+
+                    VStack(alignment: .leading, spacing: 14) {
+                        HStack {
+                            Text(profile.displayName.isEmpty ? "Nový profil" : profile.displayName)
+                                .font(.headline)
+
+                            if isActive {
+                                Text("AKTÍVNY")
+                                    .font(.caption2.weight(.bold))
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(Color.green.opacity(0.2), in: Capsule())
+                                    .foregroundStyle(.green)
+                            }
+
+                            Spacer()
+
+                            if !isActive {
+                                Button("Nastaviť ako aktívny") {
+                                    settingsStore.settings.activeProfileID = profile.id
+                                }
+                                .controlSize(.small)
+                            }
+
+                            if settingsStore.settings.profiles.count > 1 {
+                                Button(role: .destructive) {
+                                    settingsStore.settings.profiles.removeAll { $0.id == profile.id }
+                                    if settingsStore.settings.activeProfileID == profile.id {
+                                        settingsStore.settings.activeProfileID = settingsStore.settings.profiles.first?.id
+                                    }
+                                } label: {
+                                    Image(systemName: "trash")
+                                }
+                                .controlSize(.small)
+                            }
+                        }
+
+                        Divider()
+
+                        Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 10) {
+                            GridRow {
+                                Text("Meno a priezvisko")
+                                    .font(.callout)
+                                    .foregroundStyle(.secondary)
+                                    .frame(width: 160, alignment: .leading)
+                                TextField("JUDr. Meno Priezvisko", text: $profile.fullName)
+                                    .textFieldStyle(.roundedBorder)
+                            }
+
+                            GridRow {
+                                Text("Funkcia")
+                                    .font(.callout)
+                                    .foregroundStyle(.secondary)
+                                TextField("advokát", text: $profile.position)
+                                    .textFieldStyle(.roundedBorder)
+                            }
+
+                            GridRow {
+                                Text("Evidenčné číslo SAK")
+                                    .font(.callout)
+                                    .foregroundStyle(.secondary)
+                                TextField("1234", text: $profile.registrationNumber)
+                                    .textFieldStyle(.roundedBorder)
+                            }
+
+                            GridRow {
+                                Text("IČO kancelárie")
+                                    .font(.callout)
+                                    .foregroundStyle(.secondary)
+                                TextField("IČO", text: $profile.ico)
+                                    .textFieldStyle(.roundedBorder)
+                            }
+
+                            GridRow {
+                                Text("Názov kancelárie")
+                                    .font(.callout)
+                                    .foregroundStyle(.secondary)
+                                TextField("Advokátska kancelária…", text: $profile.officeName)
+                                    .textFieldStyle(.roundedBorder)
+                            }
+                        }
+
+                        Toggle("Právnická osoba (kancelária)", isOn: $profile.isLegalEntity)
+                            .font(.callout)
+                            .toggleStyle(.switch)
+                    }
+                    .liquidGlass(cornerRadius: 14, padding: 16)
+                }
             }
         }
-        .formStyle(.grouped)
     }
 }
 
