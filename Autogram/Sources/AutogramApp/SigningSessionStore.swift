@@ -449,6 +449,21 @@ final class SigningSessionStore {
         settingsStore.settings = next
     }
 
+    /// Entry point for the Finder Quick Action (NSServices).
+    /// Batch-signs the given PDFs with the current settings: QES + qualified timestamp (QTS).
+    func signFromFinder(_ urls: [URL]) async {
+        await refreshIdentities()
+        if selectedIdentityID == nil {
+            selectedIdentityID = identities.first(where: \.isQualified)?.id ?? identities.first?.id
+        }
+        guard selectedIdentityID != nil else {
+            lastError = "Nie je pripojený podpisový certifikát. Pripojte eID kartu alebo advokátsky preukaz a opakujte Quick Action."
+            return
+        }
+        await addDocuments(at: urls)
+        await signAllUnsigned()
+    }
+
     func reset(keepingIdentity: Bool = true) {
         let identity = keepingIdentity ? selectedIdentityID : nil
         step = queue.isEmpty ? .intake : .prepare

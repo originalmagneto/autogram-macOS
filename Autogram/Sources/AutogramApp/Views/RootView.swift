@@ -123,6 +123,12 @@ struct RootView: View {
                 .navigationSubtitle(subtitle)
                 .toolbarBackgroundVisibility(.visible, for: .windowToolbar)
         }
+        .task {
+            FinderSigningRouter.shared.install { urls in
+                selection = .signing
+                Task { await signingStore.signFromFinder(urls) }
+            }
+        }
     }
 
     private var sidebarBottomBar: some View {
