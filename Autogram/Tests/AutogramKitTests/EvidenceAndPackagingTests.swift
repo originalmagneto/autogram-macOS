@@ -1,3 +1,4 @@
+import Compression
 import XCTest
 @testable import AutogramKit
 
@@ -32,6 +33,51 @@ final class EvidenceAndPackagingTests: XCTestCase {
         XCTAssertTrue(csv.contains("\"Zmluva; o dielo\""))
         XCTAssertTrue(csv.contains("2026/000001"))
     }
+    func testASiCEVerifierReadsDeflateEntries() throws {
+        // Regression: ASiC-E containers produced by the Java/DSS signing engine use
+        // DEFLATE entries; the verifier must accept them, not only STORED entries.
+        let payload = Data(String(repeating: "0123456789ABCDEF", count: 64).utf8)
+        let compressed = try XCTUnwrap(deflate(payload))
+
+        func u16(_ v: Int) -> [UInt8] { [UInt8(v & 0xFF), UInt8((v >> 8) & 0xFF)] }
+        func u32(_ v: Int) -> [UInt8] {
+            [UInt8(v & 0xFF), UInt8((v >> 8) & 0xFF), UInt8((v >> 16) & 0xFF), UInt8((v >> 24) & 0xFF)]
+        }
+
+        var zip = Data([0x50, 0x4B, 0x03, 0x04])
+        zip += u16(20)                  // version
+        zip += u16(0)                   // flags
+        zip += u16(8)                   // method = DEFLATE
+        zip += u16(0) + u16(0)          // time, date
+        zip += u32(0)                   // crc32 (not verified by the reader)
+        zip += u32(compressed.count)    // compressed size
+        zip += u32(payload.count)       // uncompressed size
+        zip += u16("document.pdf".count)
+        zip += u16(0)                   // extra length
+        zip += Data("document.pdf".utf8)
+        zip += compressed
+
+        let entries = try XCTUnwrap(ASiCEContainerVerifier.readEntries(zip))
+        XCTAssertEqual(entries.count, 1)
+        XCTAssertEqual(entries.first?.name, "document.pdf")
+        XCTAssertEqual(entries.first?.data, payload)
+    }
+
+    private func deflate(_ data: Data) throws -> Data {
+        let dstCapacity = data.count + 256
+        var dst = Data(count: dstCapacity)
+        let written = dst.withUnsafeMutableBytes { dstPtr -> Int in
+            data.withUnsafeBytes { srcPtr -> Int in
+                compression_encode_buffer(
+                    dstPtr.bindMemory(to: UInt8.self).baseAddress!, dstCapacity,
+                    srcPtr.bindMemory(to: UInt8.self).baseAddress!, data.count,
+                    nil, COMPRESSION_ZLIB)
+            }
+        }
+        guard written > 0 else { throw NSError(domain: "deflate-test", code: 1) }
+        return dst.prefix(written)
+    }
+
 
     func testASiCEPackageStructureIsValidZip() throws {
         let packager = ASiCEPackager()

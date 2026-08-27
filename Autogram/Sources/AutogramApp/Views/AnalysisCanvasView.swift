@@ -6,10 +6,10 @@ struct AnalysisCanvasView: View {
     @Bindable var store: ZakoSessionStore
     @State private var interaction: Interaction?
     @State private var pageImage: NSImage?
+    @State private var pageAspect: CGFloat = 1.414
 
     struct Interaction {
         enum Kind {
-            case placing(UUID, NormalizedPoint)
             case moving(UUID)
             case resizing(UUID, NormalizedPoint)
         }
@@ -89,8 +89,13 @@ struct AnalysisCanvasView: View {
             pageImage = nil
             return
         }
-        let size = CGSize(width: 1240, height: 1754)
-        pageImage = page.thumbnail(of: size, for: .mediaBox)
+        // Aspect from the page cropBox so bitmap, frame and normalized mapping agree.
+        let bounds = page.bounds(for: .cropBox)
+        let aspect = bounds.width / max(bounds.height, 1)
+        let renderHeight: CGFloat = 1754
+        let renderSize = CGSize(width: renderHeight * aspect, height: renderHeight)
+        pageImage = page.thumbnail(of: renderSize, for: .cropBox)
+        pageAspect = aspect
     }
 
     // MARK: - Left Page Thumbnail Strip
@@ -104,30 +109,28 @@ struct AnalysisCanvasView: View {
                     Button {
                         store.previewPageIndex = pageIndex
                     } label: {
-                        VStack(spacing: 4) {
-                            ZStack(alignment: .topTrailing) {
-                                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                    .fill(Color.primary.opacity(isSelected ? 0.12 : 0.04))
-                                    .frame(width: 54, height: 72)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                            .strokeBorder(isSelected ? Color.accentColor : Color.primary.opacity(0.1), lineWidth: isSelected ? 2 : 1)
-                                    )
+                        ZStack(alignment: .topTrailing) {
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                .fill(Color.primary.opacity(isSelected ? 0.12 : 0.04))
+                                .frame(width: 54, height: 72)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                        .strokeBorder(isSelected ? Color.accentColor : Color.primary.opacity(0.1), lineWidth: isSelected ? 2 : 1)
+                                )
 
-                                Text("\(pageIndex + 1)")
-                                    .font(.caption2.monospacedDigit().weight(.bold))
-                                    .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
-                                    .padding(4)
+                            Text("\(pageIndex + 1)")
+                                .font(.caption2.monospacedDigit().weight(.bold))
+                                .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
+                                .padding(4)
 
-                                if countOnPage > 0 {
-                                    Text("\(countOnPage)")
-                                        .font(.system(size: 9, weight: .bold))
-                                        .padding(.horizontal, 4)
-                                        .padding(.vertical, 2)
-                                        .background(Color.green, in: Capsule())
-                                        .foregroundStyle(.white)
-                                        .offset(x: 4, y: -4)
-                                }
+                            if countOnPage > 0 {
+                                Text("\(countOnPage)")
+                                    .font(.system(size: 9, weight: .bold))
+                                    .padding(.horizontal, 4)
+                                    .padding(.vertical, 2)
+                                    .background(Color.green, in: Capsule())
+                                    .foregroundStyle(.white)
+                                    .offset(x: 4, y: -4)
                             }
                         }
                     }
@@ -216,19 +219,26 @@ struct AnalysisCanvasView: View {
                 Color(nsColor: .controlBackgroundColor).opacity(0.35)
 
                 if let image = pageImage {
-                    let fitter = ElementGeometry.AspectFitter(
+                    // Fitter over the whole canvas resolves the letterboxed page rect.
+                    let canvasFitter = ElementGeometry.AspectFitter(
                         container: geometry.size,
-                        imageAspect: image.size.width / max(image.size.height, 1))
+                        imageAspect: pageAspect)
 
+                    // Image sized exactly to the page rect; overlay covers the same frame,
+                    // so normalized coordinates stay anchored to the document at any size.
                     Image(nsImage: image)
                         .resizable()
-                        .scaledToFit()
-                        .shadow(color: .black.opacity(0.15), radius: 8, y: 3)
+                        .frame(width: canvasFitter.contentRect.width,
+                               height: canvasFitter.contentRect.height)
                         .overlay {
-                            ElementOverlay(store: store,
-                                           fitter: fitter,
-                                           interaction: $interaction)
+                            ElementOverlay(
+                                store: store,
+                                fitter: ElementGeometry.AspectFitter(
+                                    container: canvasFitter.contentRect.size,
+                                    imageAspect: pageAspect),
+                                interaction: $interaction)
                         }
+                        .shadow(color: .black.opacity(0.15), radius: 8, y: 3)
                 } else if store.isAnalyzing {
                     VStack(spacing: 8) {
                         ProgressView().controlSize(.regular)
@@ -244,7 +254,7 @@ struct AnalysisCanvasView: View {
                 if let tool = store.activeTool {
                     VStack {
                         HStack {
-                            Label("Režim pridávania: \(tool.rawValue) - kliknite na plátno", systemImage: "plus.viewfinder")
+                            Label("Režim pridávania: \(tool.rawValue) - klik na prázdne miesto pridá, klik na prvok ho vyberie", systemImage: "plus.viewfinder")
                                 .font(.caption.weight(.semibold))
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 5)
@@ -346,7 +356,6 @@ struct AnalysisCanvasView: View {
                                    },
                                    onDuplicate: { _ = store.duplicateElement(id: element.id) },
                                    onKindChange: { kind in store.updateElementKind(id: element.id, kind: kind) },
-                                   onPageChange: { page in store.updateElementPage(id: element.id, pageIndex: page) },
                                    onDescriptionChange: { text in
                                        store.updateElementDescription(id: element.id, text: text)
                                    })
@@ -355,10 +364,10 @@ struct AnalysisCanvasView: View {
                     Divider().padding(.vertical, 4)
 
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Pridanie a úprava:")
+                        Text("Manipulácia:")
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.secondary)
-                        Text("Vyberte nástroj hore a kliknite do náhľadu. Bounding box môžete presúvať a vpravo dole meniť jeho veľkosť.")
+                        Text("Klik na prvok ho vyberie a presúva. Ťahanie za roh zmení veľkosť z ktorejkoľvek strany. Nástroj pridáva nový prvok klikom na prázdne miesto.")
                             .font(.caption2)
                             .foregroundStyle(.tertiary)
                     }
@@ -391,7 +400,7 @@ struct AnalysisCanvasView: View {
             Text("Na tejto strane zatiaľ nie sú detegované prvky.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
-            Text("Zvoľte nástroj hore v lište a kliknite do dokumentu pre manuálne pridanie.")
+            Text("Spustite AI analýzu alebo zvoľte nástroj a kliknite do dokumentu pre manuálne pridanie.")
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
         }
@@ -426,6 +435,8 @@ struct ElementOverlay: View {
     let fitter: ElementGeometry.AspectFitter
     @Binding var interaction: AnalysisCanvasView.Interaction?
 
+    private let handleRadius: CGFloat = 14
+
     var body: some View {
         GeometryReader { geometry in
             Canvas { context, _ in
@@ -452,14 +463,13 @@ struct ElementOverlay: View {
                        lineWidth: isSelected ? 2.5 : 1.5)
 
         if isSelected {
-            let handleSide: CGFloat = 10
-            let handle = CGRect(x: rect.maxX - handleSide - 2,
-                                y: rect.maxY - handleSide - 2,
-                                width: handleSide,
-                                height: handleSide)
-            context.fill(Path(roundedRect: handle, cornerRadius: 2), with: .color(color))
-            context.stroke(Path(roundedRect: handle, cornerRadius: 2),
-                           with: .color(.white), lineWidth: 1.2)
+            // Corner resize handles on all four corners.
+            for corner in cornerPoints(of: rect) {
+                let handle = CGRect(x: corner.x - 5, y: corner.y - 5, width: 10, height: 10)
+                context.fill(Path(roundedRect: handle, cornerRadius: 2), with: .color(color))
+                context.stroke(Path(roundedRect: handle, cornerRadius: 2),
+                               with: .color(.white), lineWidth: 1.2)
+            }
 
             let labelText = "\(element.kind.rawValue) (\(Int(element.confidence * 100)) %)"
             let labelSize = CGSize(width: 170, height: 14)
@@ -479,6 +489,30 @@ struct ElementOverlay: View {
         }
     }
 
+    private func cornerPoints(of rect: CGRect) -> [CGPoint] {
+        [
+            CGPoint(x: rect.minX, y: rect.minY),
+            CGPoint(x: rect.maxX, y: rect.minY),
+            CGPoint(x: rect.minX, y: rect.maxY),
+            CGPoint(x: rect.maxX, y: rect.maxY)
+        ]
+    }
+
+    /// Returns the normalized point of the corner OPPOSITE to the grabbed corner,
+    /// or nil when the point is not near any corner (with handleRadius tolerance).
+    private func oppositeCornerAnchor(of box: NormalizedRect, at viewPoint: CGPoint) -> NormalizedPoint? {
+        let rect = fitter.viewRect(for: box)
+        let corners: [(CGFloat, CGFloat)] = [
+            (rect.minX, rect.minY), (rect.maxX, rect.minY),
+            (rect.minX, rect.maxY), (rect.maxX, rect.maxY)
+        ]
+        let grabbed = corners.first { hypot(viewPoint.x - $0.0, viewPoint.y - $0.1) <= handleRadius }
+        guard let grabbed else { return nil }
+        return NormalizedPoint(
+            x: grabbed.0 == rect.minX ? box.x + box.width : box.x,
+            y: grabbed.1 == rect.minY ? box.y + box.height : box.y)
+    }
+
     private var dragGesture: some Gesture {
         DragGesture(minimumDistance: 0)
             .onChanged { value in
@@ -493,23 +527,30 @@ struct ElementOverlay: View {
         let normPoint = fitter.normalizedPoint(from: value.location)
 
         if interaction == nil {
+            // 1. Existing element always wins: select and start move or corner-resize,
+            //    regardless of the active tool.
+            if let hitID = store.elementID(at: normPoint, pageIndex: store.previewPageIndex),
+               let element = store.securityElements.first(where: { $0.id == hitID }) {
+                store.selectedElementID = hitID
+
+                if let anchor = oppositeCornerAnchor(of: element.boundingBox, at: value.location) {
+                    interaction = .init(kind: .resizing(hitID, anchor), startPoint: normPoint)
+                } else {
+                    interaction = .init(kind: .moving(hitID), startPoint: normPoint)
+                }
+                return
+            }
+
+            // 2. Empty space with a tool: create and let the drag size the box
+            //    from the initial click point.
             if let tool = store.activeTool {
                 let newID = store.placeElement(kind: tool, at: normPoint)
                 interaction = .init(kind: .resizing(newID, normPoint), startPoint: normPoint)
                 return
             }
 
-            if let hitID = store.elementID(at: normPoint, pageIndex: store.previewPageIndex) {
-                store.selectedElementID = hitID
-                if let element = store.securityElements.first(where: { $0.id == hitID }),
-                   ElementGeometry.isInResizeHandle(element.boundingBox, normPoint) {
-                    interaction = .init(kind: .resizing(hitID, normPoint), startPoint: normPoint)
-                } else {
-                    interaction = .init(kind: .moving(hitID), startPoint: normPoint)
-                }
-            } else {
-                store.selectedElementID = nil
-            }
+            // 3. Empty space without a tool: deselect.
+            store.selectedElementID = nil
             return
         }
 
@@ -521,8 +562,6 @@ struct ElementOverlay: View {
         case .resizing(let id, _):
             store.drawElement(id: id, from: current.startPoint, to: normPoint)
             interaction?.moved = true
-        case .placing:
-            break
         }
     }
 }
@@ -534,7 +573,6 @@ struct ElementRow: View {
     let onDelete: () -> Void
     let onDuplicate: () -> Void
     let onKindChange: (SecurityElement.Kind) -> Void
-    let onPageChange: (Int) -> Void
     let onDescriptionChange: (String) -> Void
 
     var body: some View {
@@ -542,7 +580,7 @@ struct ElementRow: View {
             HStack(spacing: 8) {
                 Image(systemName: element.kind.sfSymbol)
                     .foregroundStyle(ElementKindColor.color(for: element.kind))
-                    .frame(width: 18)
+                    .frame(width: 16)
 
                 Picker("", selection: Binding(get: { element.kind }, set: { onKindChange($0) })) {
                     ForEach(SecurityElement.Kind.allCases, id: \.self) { kind in
@@ -552,25 +590,39 @@ struct ElementRow: View {
                 .labelsHidden()
                 .pickerStyle(.menu)
 
-                Spacer()
+                Spacer(minLength: 4)
 
                 ConfidenceBar(confidence: element.confidence)
-
-                Menu {
-                    Button("Duplikovať", action: onDuplicate)
-                    Divider()
-                    Button("Odstrániť", role: .destructive, action: onDelete)
-                } label: {
-                    Image(systemName: "ellipsis")
-                }
-                .menuStyle(.borderlessButton)
-                .frame(width: 16)
+                    .frame(width: 44)
             }
 
-            if !element.verbalDescription.isEmpty {
-                Text(element.verbalDescription)
+            HStack(alignment: .top, spacing: 6) {
+                Text(element.verbalDescription.isEmpty ? "Bez popisu" : element.verbalDescription)
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(element.verbalDescription.isEmpty ? .tertiary : .secondary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                Button {
+                    onDuplicate()
+                } label: {
+                    Image(systemName: "plus.square.on.square")
+                        .font(.caption2)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .help("Duplikovať prvok")
+
+                Button(role: .destructive) {
+                    onDelete()
+                } label: {
+                    Image(systemName: "trash")
+                        .font(.caption2)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.red)
+                .help("Odstrániť prvok")
             }
         }
         .padding(10)

@@ -1,4 +1,5 @@
 import Foundation
+import Compression
 import CryptoKit
 
 public struct ASiCEContainerVerifier: Sendable {
@@ -27,6 +28,7 @@ public struct ASiCEContainerVerifier: Sendable {
             guard u32(cursor) == 0x04034B50 else { break }
             let method = u16(cursor + 8)
             let compressedSize = u32(cursor + 18)
+            let uncompressedSize = u32(cursor + 22)
             let nameLength = u16(cursor + 26)
             let extraLength = u16(cursor + 28)
             let nameStart = cursor + 30
@@ -34,9 +36,31 @@ public struct ASiCEContainerVerifier: Sendable {
             let name = String(decoding: bytes[nameStart..<(nameStart + nameLength)], as: UTF8.self)
             let contentStart = nameStart + nameLength + extraLength
             if !name.hasSuffix("/") {
-                guard method == 0 else { return nil }
-                let payload = bytes[contentStart..<(contentStart + compressedSize)]
-                result.append((name, Data(payload)))
+                let payload: Data
+                switch method {
+                case 0:
+                    payload = Data(bytes[contentStart..<(contentStart + compressedSize)])
+                case 8:
+                    guard uncompressedSize > 0 else { return nil }
+                    var dst = Data(count: uncompressedSize)
+                    let written = dst.withUnsafeMutableBytes { (dstPtr: UnsafeMutableRawBufferPointer) -> Int in
+                        let srcSlice = bytes[contentStart..<(contentStart + compressedSize)]
+                        return srcSlice.withContiguousStorageIfAvailable { srcPtr -> Int in
+                            compression_decode_buffer(
+                                dstPtr.baseAddress!.assumingMemoryBound(to: UInt8.self),
+                                uncompressedSize,
+                                srcPtr.baseAddress!,
+                                compressedSize,
+                                nil,
+                                COMPRESSION_ZLIB)
+                        } ?? 0
+                    }
+                    guard written == uncompressedSize else { return nil }
+                    payload = dst
+                default:
+                    return nil
+                }
+                result.append((name, payload))
             }
             cursor = contentStart + compressedSize
         }
@@ -48,7 +72,7 @@ public struct ASiCEContainerVerifier: Sendable {
 
         guard let entries = Self.readEntries(asic) else {
             return Verification(isValid: false,
-                                issues: ["Kontajner nie je čitateľný ASiC-E ZIP (len uložené položky)."],
+                                issues: ["Kontajner nie je čitateľný ASiC-E ZIP."],
                                 entryNames: [], verifiedObjectURIs: [], containsDemoSignature: false)
         }
         let names = entries.map(\.name)
