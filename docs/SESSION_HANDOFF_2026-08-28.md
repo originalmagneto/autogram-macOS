@@ -380,6 +380,9 @@ Reviewed implementation commits:
 The reviewed branch was merged locally into `main` as:
 
 - `6830b276` `Merge branch 'feature/macos27-ux'`
+Documentation and README updates were committed on `main` as:
+
+- `d90a8c37` `docs: update macOS 27 UX handoff`
 
 The implementation plan is:
 
