@@ -39,6 +39,8 @@ struct AttestationFormView: View {
                 .controlSize(.large)
 
                 Button {
+                    store.recomputePreflight()
+                    guard !store.hasUnresolvedPreflightErrors else { return }
                     store.step = .authorize
                     Task { await store.refreshIdentities() }
                 } label: {
@@ -49,8 +51,18 @@ struct AttestationFormView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
+                .disabled(store.fetchingEvidenceNumber || store.hasUnresolvedPreflightErrors)
                 .keyboardShortcut(.defaultAction)
             }
+        }
+        .onChange(of: store.attestation) { _, _ in
+            store.recomputePreflight()
+        }
+        .onChange(of: store.securityElements) { _, _ in
+            store.recomputePreflight()
+        }
+        .onChange(of: store.effectiveSheetCount) { _, _ in
+            store.recomputePreflight()
         }
     }
 
@@ -99,7 +111,7 @@ struct AttestationFormView: View {
                     .foregroundStyle(.green)
             }
 
-            if !store.validationErrors.isEmpty {
+            if !store.preflightErrors.isEmpty || store.evidenceNumberError != nil {
                 errorCard
             }
 
@@ -130,6 +142,13 @@ struct AttestationFormView: View {
                         .font(.callout)
                 }
             }
+            inlineError(.missingOriginalName)
+            inlineError(.invalidSheetCount)
+            inlineError(.noSecurityElementsConfirmed)
+            Toggle("Potvrdzujem, že vstupný dokument je originál alebo úradne osvedčená kópia.",
+                   isOn: $store.attestation.originConfirmed)
+                .toggleStyle(.switch)
+            inlineError(.originNotConfirmed)
 
             section("Novovzniknutý elektronický dokument", symbol: "doc.badge.gearshape") {
                 LabeledRow(label: "Názov výstupu (PDF/A)") {
@@ -137,6 +156,7 @@ struct AttestationFormView: View {
                         .textFieldStyle(.roundedBorder)
                 }
             }
+            inlineError(.missingNewDocumentName)
 
             section("Osoba vykonávajúca konverziu", symbol: "person.crop.circle.badge.checkmark") {
                 LabeledRow(label: "Meno a priezvisko") {
@@ -159,6 +179,8 @@ struct AttestationFormView: View {
                         .frame(width: 220)
                 }
             }
+            inlineError(.missingPerformingPerson)
+            inlineError(.missingRegistrationNumber)
 
             section("Evidencia záznamov o konverzii (CEZZK)", symbol: "number.square") {
                 LabeledRow(label: "Evidenčné číslo z EZZK") {
@@ -181,7 +203,8 @@ struct AttestationFormView: View {
                             if store.fetchingEvidenceNumber {
                                 ProgressView().controlSize(.small)
                             } else {
-                                Label(store.attestation.evidenceNumber == nil ? "Získať číslo" : "Znova",
+                                Label(store.attestation.evidenceNumber == nil
+                                      ? "Získať číslo" : "Znova získať číslo",
                                       systemImage: "number.square.fill")
                             }
                         }
@@ -189,6 +212,12 @@ struct AttestationFormView: View {
                         .controlSize(.small)
                     }
                 }
+                if let error = store.evidenceNumberError {
+                    Text(error)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+                inlineError(.missingEvidenceNumber)
                 Text("Číslo sa viaže na registráciu v evidencii záznamov. Záznam sa odošle do centrálnej evidencie do 24 hodín.")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
@@ -249,6 +278,15 @@ struct AttestationFormView: View {
         Tento elektronický dokument vznikol zaručenou konverziou z listinnej podoby a má rovnaké právne účinky ako pôvodný dokument.
         """
     }
+    @ViewBuilder
+    private func inlineError(_ error: AttestationValidationError) -> some View {
+        if store.preflightErrors.contains(error) {
+            Text(error.errorDescription ?? "")
+                .font(.caption)
+                .foregroundStyle(.red)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
 
     private var errorCard: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -273,7 +311,7 @@ struct AttestationFormView: View {
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.secondary)
             VStack(spacing: 8) { content() }
-                .liquidGlass(cornerRadius: 14, padding: 14)
+                .glassCard(cornerRadius: 14, padding: 14)
         }
     }
 }

@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "Autogram",
-    platforms: [.macOS("26.0")],
+    platforms: [.macOS("27.0")],
     products: [
         .executable(name: "Autogram", targets: ["AutogramApp"]),
         .library(name: "AutogramKit", targets: ["AutogramKit"])

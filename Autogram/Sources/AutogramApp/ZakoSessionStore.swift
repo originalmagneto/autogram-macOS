@@ -27,6 +27,8 @@ final class ZakoSessionStore {
     var signingPIN = ""
     var evidenceNumberRequested = false
     var fetchingEvidenceNumber = false
+    var evidenceNumberError: String?
+    var isAuthorizing = false
 
     var activeTool: SecurityElement.Kind?
     var previewPageIndex: Int = 0
@@ -34,10 +36,31 @@ final class ZakoSessionStore {
     var selectedElementID: UUID?
 
     var validationErrors: [AttestationValidationError] = []
+    var preflightErrors: [AttestationValidationError] = []
     var result: SignedConversionResult?
+    var submissionStatus: EvidenceRecord.Status?
     var outputDirectory: URL?
     var lastError: String?
     var serverTimeUsed: Date?
+
+    var isPreflightComplete: Bool {
+        let result = AttestationPreflight.evaluate(
+            attestation,
+            securityElements: securityElements,
+            hasSelectedIdentity: selectedIdentityID != nil,
+            mandateRequirementSatisfied: mandateRequirementSatisfied
+                || allowNonMandateOverride
+                || isCertificateTypePending)
+        return result.isComplete && preflightErrors.isEmpty && evidenceNumberError == nil
+    }
+    var hasUnresolvedPreflightErrors: Bool {
+        !AttestationPreflight.evaluate(
+            attestation,
+            securityElements: securityElements,
+            hasSelectedIdentity: selectedIdentityID != nil,
+            mandateRequirementSatisfied: mandateRequirementSatisfied
+        ).errors.isEmpty || evidenceNumberError != nil
+    }
 
     let settingsStore: AppSettingsStore
     var settings: AppSettings { settingsStore.settings }
@@ -50,6 +73,7 @@ final class ZakoSessionStore {
     var signingProvider: any QualifiedSigningProviding { settingsStore.signingProvider }
     var evidenceStore: LocalEvidenceStore { settingsStore.evidenceStore }
 
+    private var evidenceRequestID: UUID?
     var profilePersister: ((AdvocateProfile) -> Void)?
     private(set) var currentRecordID = UUID()
 
@@ -319,6 +343,20 @@ final class ZakoSessionStore {
         }
     }
 
+    func updateElementBoundingBox(id: UUID, boundingBox: NormalizedRect) {
+        guard let index = securityElements.firstIndex(where: { $0.id == id }) else { return }
+        let clamped = NormalizedRect(
+            x: min(max(boundingBox.x, 0), 1),
+            y: min(max(boundingBox.y, 0), 1),
+            width: min(max(boundingBox.width, 0.01), 1),
+            height: min(max(boundingBox.height, 0.01), 1))
+        securityElements[index].boundingBox = NormalizedRect(
+            x: min(clamped.x, 1 - clamped.width),
+            y: min(clamped.y, 1 - clamped.height),
+            width: min(clamped.width, 1),
+            height: min(clamped.height, 1))
+    }
+
     func refreshIdentities() async {
         identities = await signingProvider.availableIdentities()
         if identities.isEmpty {
@@ -356,19 +394,52 @@ final class ZakoSessionStore {
         signingProvider is DemoSigningProvider
     }
 
+    func recomputePreflight() {
+        let result = AttestationPreflight.evaluate(
+            attestation,
+            securityElements: securityElements,
+            hasSelectedIdentity: selectedIdentityID != nil,
+            mandateRequirementSatisfied: mandateRequirementSatisfied)
+        preflightErrors = result.errors
+        validationErrors = result.errors
+    }
+
+    func preparePreflight() async {
+        evidenceNumberError = nil
+        if attestation.evidenceNumber?.trimmingCharacters(in: .whitespaces).isEmpty != false {
+            await fetchEvidenceNumber()
+        }
+        recomputePreflight()
+    }
+
     func fetchEvidenceNumber() async {
         guard !fetchingEvidenceNumber else { return }
+        let requestID = currentRecordID
+        evidenceRequestID = requestID
+        evidenceNumberError = nil
         fetchingEvidenceNumber = true
-        defer { fetchingEvidenceNumber = false }
+        defer {
+            if evidenceRequestID == requestID {
+                fetchingEvidenceNumber = false
+                evidenceRequestID = nil
+            }
+        }
         do {
             let numbers = try await ezzkService.requestEvidenceNumbers(count: 1)
+            guard requestID == currentRecordID, !Task.isCancelled else { return }
             guard let number = numbers.first else {
                 throw EZZKError.invalidResponse
             }
             attestation.evidenceNumber = number
             evidenceNumberRequested = true
+            lastError = nil
+            evidenceNumberError = nil
+            recomputePreflight()
         } catch {
+            guard requestID == currentRecordID, !Task.isCancelled else { return }
+            evidenceNumberError = error.localizedDescription
             lastError = error.localizedDescription
+            recomputePreflight()
         }
     }
 
@@ -380,10 +451,18 @@ final class ZakoSessionStore {
         validationErrors = errors
         return errors
     }
-
     func authorizeAndSign() async {
+        guard !isAuthorizing else { return }
+        isAuthorizing = true
+        defer {
+            isAuthorizing = false
+            analysisProgressText = ""
+        }
+
         lastError = nil
         validationErrors = []
+        await preparePreflight()
+        guard isPreflightComplete else { return }
 
         do {
             analysisProgressText = "Zisťujem dôveryhodný čas…"
@@ -399,7 +478,6 @@ final class ZakoSessionStore {
                     sizeClass: .a4Portrait,
                     sheets: max(effectiveSheetCount, 1))]
             }
-
             let errors = validate()
             guard errors.isEmpty else {
                 analysisProgressText = ""
@@ -440,12 +518,21 @@ final class ZakoSessionStore {
                 into: pdfaData)
 
             analysisProgressText = "Autorizujem kvalifikovaným podpisom…"
+            if isCertificateTypePending {
+                analysisProgressText = "Overujem certifikát na karte…"
+                let resolved = await signingProvider.resolveIdentities(pin: signingPIN)
+                guard let resolved, !resolved.isEmpty else {
+                    throw SigningError.identityUnavailable
+                }
+                identities = resolved
+                selectedIdentityID = resolved.first(where: { $0.isMandateCertificate })?.id
+                    ?? resolved.first?.id
+            }
             guard let identityID = selectedIdentityID else {
                 throw SigningError.identityUnavailable
             }
             if requiresMandateOverride {
                 lastError = "Zvolený certifikát nie je mandátnym certifikátom pre zaručenú konverziu. Pokračovanie je možné len s výslovným override (audit záznam)."
-                analysisProgressText = ""
                 return
             }
             if includeQualifiedTimestamp,
@@ -520,19 +607,40 @@ final class ZakoSessionStore {
                 updated.status = .submitted
                 updated.updatedAt = Date()
                 evidenceStore.upsert(updated)
+                submissionStatus = .submitted
             } catch {
                 var queued = record
                 queued.status = .queuedForSubmission
                 queued.updatedAt = Date()
                 evidenceStore.upsert(queued)
+                submissionStatus = .queuedForSubmission
             }
 
             result = signed
-            analysisProgressText = ""
             step = .done
         } catch {
             lastError = error.localizedDescription
-            analysisProgressText = ""
+        }
+    }
+
+    func retryQueuedSubmission() async {
+        guard let record = evidenceStore.record(id: currentRecordID),
+              record.status != .submitted else { return }
+        do {
+            try await ezzkService.submit(record.envelope())
+            var updated = record
+            updated.status = .submitted
+            updated.updatedAt = Date()
+            evidenceStore.upsert(updated)
+            submissionStatus = .submitted
+            lastError = nil
+        } catch {
+            var queued = record
+            queued.status = .queuedForSubmission
+            queued.updatedAt = Date()
+            evidenceStore.upsert(queued)
+            submissionStatus = .queuedForSubmission
+            lastError = error.localizedDescription
         }
     }
 
@@ -558,8 +666,11 @@ final class ZakoSessionStore {
             return
         }
         attestation = template
+        attestation.originConfirmed = false
         attestation.evidenceNumber = nil
         evidenceNumberRequested = false
+        evidenceNumberError = nil
+        preflightErrors = []
     }
 
     func saveProfileFromForm() {
@@ -601,7 +712,13 @@ func resetSession(keepingProfile: Bool) {
         signingPIN = ""
         allowNonMandateOverride = false
         evidenceNumberRequested = false
+        evidenceNumberError = nil
+        fetchingEvidenceNumber = false
+        evidenceRequestID = nil
+        isAuthorizing = false
+        preflightErrors = []
         validationErrors = []
+        submissionStatus = nil
         result = nil
         outputDirectory = nil
         lastError = nil

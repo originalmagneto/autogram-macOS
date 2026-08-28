@@ -6,7 +6,8 @@ import UniformTypeIdentifiers
 /// Panel vizuálneho podpisu s výberom grafickej pečiatky a nastavením strany.
 public struct VisibleAppearanceInspector: View {
     @Bindable var state: SignaturePlacementState
-
+    @State private var artworkError: String?
+    @State private var showDeleteConfirmation = false
     public init(state: SignaturePlacementState) {
         self.state = state
     }
@@ -44,6 +45,8 @@ public struct VisibleAppearanceInspector: View {
                                     artworkThumbnail(for: asset)
                                 }
                                 .buttonStyle(.plain)
+                                .accessibilityLabel("Grafika podpisu \(asset.id.uuidString)")
+                                .accessibilityValue(state.selectedAsset?.id == asset.id ? "Vybraná" : "Nevybraná")
                                 .padding(3)
                                 .background(
                                     state.selectedAsset?.id == asset.id
@@ -75,7 +78,7 @@ public struct VisibleAppearanceInspector: View {
 
                         if state.selectedAsset != nil {
                             Button(role: .destructive) {
-                                deleteSelectedArtwork()
+                                showDeleteConfirmation = true
                             } label: {
                                 Label("Zmazať", systemImage: "trash")
                             }
@@ -88,11 +91,16 @@ public struct VisibleAppearanceInspector: View {
                             Button {
                                 state.resetRotation()
                             } label: {
-                                Image(systemName: "arrow.counterclockwise")
+                                Label("Obnoviť pôvodnú pozíciu", systemImage: "arrow.counterclockwise")
                             }
-                            .help("Obnoviť pôvodnú pozíciu")
                             .controlSize(.small)
                         }
+                    }
+                    if let artworkError {
+                        Text(artworkError)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                            .accessibilityAddTraits(.isStaticText)
                     }
                 }
             }
@@ -111,10 +119,20 @@ public struct VisibleAppearanceInspector: View {
                 .foregroundStyle(.tertiary)
         }
         .padding(.top, 4)
+        .confirmationDialog("Naozaj chcete zmazať túto grafiku?",
+                           isPresented: $showDeleteConfirmation,
+                           titleVisibility: .visible) {
+            Button("Zmazať grafiku", role: .destructive) {
+                deleteSelectedArtwork()
+            }
+            Button("Zrušiť", role: .cancel) {}
+        } message: {
+            Text("Grafika sa odstráni z lokálnej knižnice podpisov.")
+        }
     }
 
     private var pageSelector: some View {
-        Picker("", selection: Binding(
+        Picker("Strana podpisu", selection: Binding(
             get: { state.placement?.pageIndex ?? 0 },
             set: { state.selectPage($0) }
         )) {
@@ -124,7 +142,6 @@ public struct VisibleAppearanceInspector: View {
         }
         .disabled(state.placement == nil || state.pageCount == 0)
         .pickerStyle(.menu)
-        .labelsHidden()
     }
 
     private func chooseArtwork() {
@@ -140,7 +157,7 @@ public struct VisibleAppearanceInspector: View {
                 try state.importArtwork(from: url,
                                         pdfPageIndex: selectedPDFPageIndex(for: url))
             } catch {
-                NSLog("VisibleAppearance import failed: \(error.localizedDescription)")
+                artworkError = "Nahratie grafiky sa nepodarilo: \(error.localizedDescription)"
             }
         }
     }
@@ -164,8 +181,9 @@ public struct VisibleAppearanceInspector: View {
         guard let asset = state.selectedAsset else { return }
         do {
             try state.delete(asset)
+            artworkError = nil
         } catch {
-            NSLog("VisibleAppearance delete failed: \(error.localizedDescription)")
+            artworkError = "Zmazanie grafiky sa nepodarilo: \(error.localizedDescription)"
         }
     }
 

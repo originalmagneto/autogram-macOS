@@ -66,6 +66,9 @@ struct ZakoFlowView: View {
             AnalysisCanvasView(store: store)
         case .attestation:
             AttestationFormView(store: store)
+                .task(id: store.currentRecordID) {
+                    await store.preparePreflight()
+                }
         case .authorize:
             AuthorizeView(store: store)
         case .done:
@@ -137,7 +140,7 @@ struct IntakeView: View {
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
                 }
-                .keyboardShortcut("o", modifiers: .command)
+                .keyboardShortcut("o", modifiers: [.command, .option])
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
                 .tint(.indigo)

@@ -44,23 +44,23 @@ struct AnalysisCanvasView: View {
                     if store.analysis.totalPages > 1 {
                         pageThumbnailStrip
                             .frame(width: 80)
-                            .background(.bar)
                             .overlay(alignment: .trailing) {
                                 Rectangle().fill(Color.primary.opacity(0.08)).frame(width: 1)
                             }
                     }
 
                     VStack(spacing: 10) {
-                        markupToolbar
                         pageImageLoader
-                            .frame(minWidth: 460, maxWidth: .infinity, maxHeight: .infinity)
+                            .frame(minWidth: MacOS27Layout.canvasMinimumWidth, maxWidth: .infinity, maxHeight: .infinity)
                         countersRow
                     }
                     .padding(14)
                 }
 
                 elementsPanel
-                    .frame(minWidth: 320, idealWidth: 350, maxWidth: 400)
+                    .frame(minWidth: MacOS27Layout.inspectorMinimumWidth,
+                           idealWidth: MacOS27Layout.inspectorIdealWidth,
+                           maxWidth: 400)
             }
 
             StickyActionBar {
@@ -99,22 +99,31 @@ struct AnalysisCanvasView: View {
         .task(id: "\(store.previewPageIndex)-\(store.document == nil)") {
             renderPage()
         }
+        .toolbar {
+            ToolbarItemGroup(placement: .principal) {
+                markupToolbar
+            }
+            ToolbarItemGroup(placement: .secondaryAction) {
+                detectionProviderPicker
+                sheetCountMenu
+                pageNavBar
+            }
+        }
     }
 
     private func renderPage() {
         guard let document = store.document,
               let page = document.page(at: min(store.previewPageIndex,
-                                               max(document.pageCount - 1, 0))) else {
+                                               max(document.pageCount - 1, 0))),
+              let rendered = BuiltInVisionProvider.render(page: page, targetWidth: 1240) else {
             pageImage = nil
             return
         }
-        // Aspect from the page cropBox so bitmap, frame and normalized mapping agree.
-        let bounds = page.bounds(for: .cropBox)
-        let aspect = bounds.width / max(bounds.height, 1)
-        let renderHeight: CGFloat = 1754
-        let renderSize = CGSize(width: renderHeight * aspect, height: renderHeight)
-        pageImage = page.thumbnail(of: renderSize, for: .cropBox)
-        pageAspect = aspect
+        // Rotation-aware render: displayed bitmap and aspect agree with the page
+        // as the user sees it (/Rotate honored).
+        let cg = rendered.cgImage
+        pageImage = NSImage(cgImage: cg, size: NSSize(width: cg.width, height: cg.height))
+        pageAspect = CGFloat(cg.width) / max(CGFloat(cg.height), 1)
     }
 
     // MARK: - Left Page Thumbnail Strip
@@ -161,23 +170,56 @@ struct AnalysisCanvasView: View {
         }
     }
 
-    // MARK: - Markup Floating Toolbar
+    // MARK: - Markup Toolbar
     private var markupToolbar: some View {
-        HStack(spacing: 6) {
-            HStack(spacing: 2) {
-                toolButton(kind: nil, title: "Vybrať", icon: "arrow.up.left.and.arrow.down.right")
-                Divider().frame(height: 16)
-                toolButton(kind: .officialStamp, title: "Pečiatka", icon: "seal.fill")
-                toolButton(kind: .handwrittenSignature, title: "Podpis", icon: "signature")
-                toolButton(kind: .embossedSeal, title: "Pečať", icon: "rosette")
-                toolButton(kind: .initial, title: "Parafa", icon: "text.badge.checkmark")
+        HStack(spacing: 2) {
+            toolButton(kind: nil, title: "Vybrať", icon: "arrow.up.left.and.arrow.down.right")
+            Divider().frame(height: 16)
+            toolButton(kind: .officialStamp, title: "Pečiatka", icon: "seal.fill")
+            toolButton(kind: .handwrittenSignature, title: "Podpis", icon: "signature")
+            toolButton(kind: .embossedSeal, title: "Pečať", icon: "rosette")
+            toolButton(kind: .initial, title: "Parafa", icon: "text.badge.checkmark")
+        }
+        .liquidGlass(cornerRadius: 12, padding: 3)
+    }
+
+    /// Indicator + inline switcher for the detection provider. Apple Vision
+    /// (on-device) always runs; the selected mode only adds LLM findings.
+    private var detectionProviderPicker: some View {
+        let currentMode = store.settingsStore.settings.aiMode
+        return Menu {
+            Picker("Poskytovateľ detekcie", selection: Binding(
+                get: { store.settingsStore.settings.aiMode },
+                set: { store.settingsStore.settings.aiMode = $0 })) {
+                ForEach(AppSettings.AIMode.allCases) { mode in
+                    Label(mode.rawValue, systemImage: icon(for: mode)).tag(mode)
+                }
             }
-            .padding(3)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
-            )
+        } label: {
+            HStack(spacing: 5) {
+                Image(systemName: "sparkles")
+                Text("Detekcia: \(currentMode.rawValue)")
+                    .lineLimit(1)
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 8, weight: .bold))
+            }
+            .font(.caption)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+        }
+        .menuStyle(.borderedButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("Apple Vision beží vždy on-device; zvolený režim dopĺňa LLM klasifikáciu. Zmena sa prejaví pri ďalšej analýze.")
+    }
+
+    private func icon(for mode: AppSettings.AIMode) -> String {
+        switch mode {
+        case .omlxLocal: return "apple.logo"
+        case .ollamaLocal: return "laptopcomputer"
+        case .builtInOnDevice: return "bolt.badge.checkmark"
+        case .customAPIKey: return "key.fill"
+        case .disabled: return "xmark.circle"
         }
     }
 
@@ -190,6 +232,7 @@ struct AnalysisCanvasView: View {
             }
             .disabled(store.previewPageIndex <= 0)
             .controlSize(.small)
+            .accessibilityLabel("Predchádzajúca strana")
 
             Text("Strana \(store.previewPageIndex + 1) z \(max(store.analysis.totalPages, 1))")
                 .font(.caption.monospacedDigit().weight(.medium))
@@ -203,10 +246,10 @@ struct AnalysisCanvasView: View {
             }
             .disabled(store.previewPageIndex >= max(store.analysis.totalPages - 1, 0))
             .controlSize(.small)
+            .accessibilityLabel("Nasledujúca strana")
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
-        .background(.ultraThinMaterial, in: Capsule())
     }
 
     private func toolButton(kind: SecurityElement.Kind?, title: String, icon: String) -> some View {
@@ -292,8 +335,7 @@ struct AnalysisCanvasView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .liquidGlass(cornerRadius: 18, padding: 6)
-            .clipped()
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         }
     }
 
@@ -309,34 +351,31 @@ struct AnalysisCanvasView: View {
             StatChip(title: "Prvky",
                      value: "\(store.securityElements.count)",
                      symbol: "shield.checkerboard", tint: .green)
-
-            Spacer()
-
-            Menu {
-                Picker("Spôsob počítania listov", selection: $store.sheetMethod) {
-                    ForEach(SheetCountingMethod.allCases, id: \.self) { method in
-                        Text(method.rawValue).tag(method)
-                    }
-                }
-                if store.sheetMethod == .manual {
-                    Stepper("Počet listov: \(store.manualSheetCount ?? store.analysis.estimatedSheetsDuplex)",
-                            value: Binding(
-                                get: { store.manualSheetCount ?? store.analysis.estimatedSheetsDuplex },
-                                set: { store.manualSheetCount = $0 }),
-                            in: 1...999)
-                }
-            } label: {
-                Label("Spôsob: \(store.sheetMethod.rawValue)", systemImage: "rectangle.stack.badge.plus")
-                    .font(.caption)
-            }
-            .onChange(of: store.sheetMethod) { _, _ in
-                store.applySheetMethodChange()
-            }
-
-            pageNavBar
         }
     }
 
+    private var sheetCountMenu: some View {
+        Menu {
+            Picker("Spôsob počítania listov", selection: $store.sheetMethod) {
+                ForEach(SheetCountingMethod.allCases, id: \.self) { method in
+                    Text(method.rawValue).tag(method)
+                }
+            }
+            if store.sheetMethod == .manual {
+                Stepper("Počet listov: \(store.manualSheetCount ?? store.analysis.estimatedSheetsDuplex)",
+                        value: Binding(
+                            get: { store.manualSheetCount ?? store.analysis.estimatedSheetsDuplex },
+                            set: { store.manualSheetCount = $0 }),
+                        in: 1...999)
+            }
+        } label: {
+            Label("Spôsob: \(store.sheetMethod.rawValue)", systemImage: "rectangle.stack.badge.plus")
+                .font(.caption)
+        }
+        .onChange(of: store.sheetMethod) { _, _ in
+            store.applySheetMethodChange()
+        }
+    }
     private var elementsPanel: some View {
         VStack(spacing: 0) {
             ScrollView {
@@ -349,9 +388,8 @@ struct AnalysisCanvasView: View {
                             Button {
                                 store.undoDelete()
                             } label: {
-                                Image(systemName: "arrow.uturn.backward")
+                                Label("Vrátiť zmazaný prvok", systemImage: "arrow.uturn.backward")
                             }
-                            .help("Vrátiť zmazaný prvok")
                             .controlSize(.small)
                         }
                     }
@@ -385,13 +423,17 @@ struct AnalysisCanvasView: View {
                                    })
                     }
 
+                    if store.selectedElementID != nil {
+                        selectedElementInspector
+                    }
+
                     Divider().padding(.vertical, 4)
 
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Manipulácia:")
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.secondary)
-                        Text("Klik na prvok ho vyberie a presúva. Ťahanie za roh zmení veľkosť z ktorejkoľvek strany. Nástroj pridáva nový prvok klikom na prázdne miesto.")
+                        Text("Ovládacie prvky nižšie umožňujú presun a zmenu veľkosti bez myši. Ťahanie na plátne zostáva rýchlejšou alternatívou.")
                             .font(.caption2)
                             .foregroundStyle(.tertiary)
                     }
@@ -403,6 +445,114 @@ struct AnalysisCanvasView: View {
         .overlay(alignment: .leading) {
             Rectangle().fill(Color.primary.opacity(0.08)).frame(width: 1)
         }
+    }
+
+    @ViewBuilder
+    private var selectedElementInspector: some View {
+        if let element = store.securityElements.first(where: { $0.id == store.selectedElementID }) {
+            VStack(alignment: .leading, spacing: 8) {
+                Label("Vybraný prvok: \(element.kind.rawValue)", systemImage: element.kind.sfSymbol)
+                    .font(.caption.weight(.semibold))
+                Text("Umiestnenie a veľkosť (0 až 1)")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+
+                Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 6) {
+                    GridRow {
+                        normalizedField("X", value: element.boundingBox.x) { value in
+                            updateBoundingBox(element.id) { $0.x = value }
+                        }
+                        normalizedField("Y", value: element.boundingBox.y) { value in
+                            updateBoundingBox(element.id) { $0.y = value }
+                        }
+                    }
+                    GridRow {
+                        normalizedField("Šírka", value: element.boundingBox.width) { value in
+                            updateBoundingBox(element.id) { $0.width = value }
+                        }
+                        normalizedField("Výška", value: element.boundingBox.height) { value in
+                            updateBoundingBox(element.id) { $0.height = value }
+                        }
+                    }
+                }
+
+                HStack(spacing: 6) {
+                    Text("Posun")
+                        .font(.caption2.weight(.semibold))
+                    placementButton("doľava", icon: "arrow.left", shortcut: .leftArrow) {
+                        adjustSelectedElement(dx: -0.01, dy: 0)
+                    }
+                    placementButton("doprava", icon: "arrow.right", shortcut: .rightArrow) {
+                        adjustSelectedElement(dx: 0.01, dy: 0)
+                    }
+                    placementButton("hore", icon: "arrow.up", shortcut: .upArrow) {
+                        adjustSelectedElement(dx: 0, dy: 0.01)
+                    }
+                    placementButton("dole", icon: "arrow.down", shortcut: .downArrow) {
+                        adjustSelectedElement(dx: 0, dy: -0.01)
+                    }
+                }
+
+                HStack(spacing: 6) {
+                    Text("Veľkosť")
+                        .font(.caption2.weight(.semibold))
+                    placementButton("zmenšiť šírku", icon: "arrow.left.and.right", shortcut: .leftArrow, modifiers: [.shift]) {
+                        adjustSelectedElement(dx: 0, dy: 0, dw: -0.01, dh: 0)
+                    }
+                    placementButton("zväčšiť šírku", icon: "arrow.left.and.right", shortcut: .rightArrow, modifiers: [.shift]) {
+                        adjustSelectedElement(dx: 0, dy: 0, dw: 0.01, dh: 0)
+                    }
+                    placementButton("zmenšiť výšku", icon: "arrow.up.and.down", shortcut: .downArrow, modifiers: [.shift]) {
+                        adjustSelectedElement(dx: 0, dy: 0, dw: 0, dh: -0.01)
+                    }
+                    placementButton("zväčšiť výšku", icon: "arrow.up.and.down", shortcut: .upArrow, modifiers: [.shift]) {
+                        adjustSelectedElement(dx: 0, dy: 0, dw: 0, dh: 0.01)
+                    }
+                }
+            }
+            .padding(10)
+            .background(Color.accentColor.opacity(0.07), in: RoundedRectangle(cornerRadius: 10))
+            .accessibilityElement(children: .contain)
+            .accessibilityValue("\(UXLabels.confidenceLabel(for: element.confidence)); \(UXLabels.provenanceLabel(detectedByAI: element.detectedByAI))")
+        }
+    }
+
+    private func normalizedField(_ label: String, value: Double,
+                                onChange: @escaping (Double) -> Void) -> some View {
+        TextField(label, value: Binding(
+            get: { value },
+            set: { onChange($0) }
+        ), format: .number.precision(.fractionLength(3)))
+        .textFieldStyle(.roundedBorder)
+        .frame(minWidth: 72)
+        .accessibilityLabel(label)
+    }
+
+    private func updateBoundingBox(_ id: UUID, update: (inout NormalizedRect) -> Void) {
+        guard var box = store.securityElements.first(where: { $0.id == id })?.boundingBox else { return }
+        update(&box)
+        store.updateElementBoundingBox(id: id, boundingBox: box)
+    }
+
+    private func adjustSelectedElement(dx: Double, dy: Double, dw: Double = 0, dh: Double = 0) {
+        guard let element = store.securityElements.first(where: { $0.id == store.selectedElementID }) else { return }
+        var box = element.boundingBox
+        box.x += dx
+        box.y += dy
+        box.width += dw
+        box.height += dh
+        store.updateElementBoundingBox(id: element.id, boundingBox: box)
+    }
+
+    private func placementButton(_ label: String, icon: String, shortcut: KeyEquivalent,
+                                 modifiers: EventModifiers = [], action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.small)
+        .accessibilityLabel(label)
+        .keyboardShortcut(shortcut, modifiers: modifiers)
     }
 
     private var unconfirmedWarning: some View {
@@ -551,29 +701,23 @@ struct ElementOverlay: View {
         let normPoint = mapper.normalizedPoint(from: value.location)
 
         if interaction == nil {
-            // 1. Existing element always wins: select and start move or corner-resize,
-            //    regardless of the active tool.
             if let hitID = store.elementID(at: normPoint, pageIndex: store.previewPageIndex),
                let element = store.securityElements.first(where: { $0.id == hitID }) {
                 store.selectedElementID = hitID
-
                 if let anchor = oppositeCornerAnchor(of: element.boundingBox, at: value.location) {
-                    interaction = .init(kind: .resizing(hitID, anchor), startPoint: normPoint)
+                    interaction = .init(kind: .resizing(hitID, anchor), startPoint: anchor)
                 } else {
                     interaction = .init(kind: .moving(hitID), startPoint: normPoint)
                 }
                 return
             }
 
-            // 2. Empty space with a tool: create and let the drag size the box
-            //    from the initial click point.
             if let tool = store.activeTool {
                 let newID = store.placeElement(kind: tool, at: normPoint)
                 interaction = .init(kind: .resizing(newID, normPoint), startPoint: normPoint)
                 return
             }
 
-            // 3. Empty space without a tool: deselect.
             store.selectedElementID = nil
             return
         }
@@ -598,55 +742,70 @@ struct ElementRow: View {
     let onDuplicate: () -> Void
     let onKindChange: (SecurityElement.Kind) -> Void
     let onDescriptionChange: (String) -> Void
+    @State private var showDeleteConfirmation = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
-                Image(systemName: element.kind.sfSymbol)
-                    .foregroundStyle(ElementKindColor.color(for: element.kind))
-                    .frame(width: 16)
+                Button(action: onSelect) {
+                    HStack(spacing: 8) {
+                        Image(systemName: element.kind.sfSymbol)
+                            .foregroundStyle(ElementKindColor.color(for: element.kind))
+                            .frame(width: 16)
+                        Text(element.kind.rawValue)
+                            .font(.callout.weight(.medium))
+                            .lineLimit(1)
+                        Spacer(minLength: 0)
+                    }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("\(element.kind.rawValue), \(UXLabels.provenanceLabel(detectedByAI: element.detectedByAI))")
+                .accessibilityValue("\(UXLabels.confidenceLabel(for: element.confidence)); \(isSelected ? "Vybraný" : "Nevybraný")")
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
 
-                Picker("", selection: Binding(get: { element.kind }, set: { onKindChange($0) })) {
+                Picker("Typ prvku", selection: Binding(get: { element.kind }, set: { onKindChange($0) })) {
                     ForEach(SecurityElement.Kind.allCases, id: \.self) { kind in
                         Text(kind.rawValue).tag(kind)
                     }
                 }
-                .labelsHidden()
                 .pickerStyle(.menu)
-
-                Spacer(minLength: 4)
+                .accessibilityLabel("Typ prvku")
+                .accessibilityValue(element.kind.rawValue)
 
                 ConfidenceBar(confidence: element.confidence)
-                    .frame(width: 44)
+                Text(UXLabels.confidenceLabel(for: element.confidence))
+                    .font(.caption2.monospacedDigit())
+                    .foregroundStyle(.secondary)
             }
 
-            HStack(alignment: .top, spacing: 6) {
-                Text(element.verbalDescription.isEmpty ? "Bez popisu" : element.verbalDescription)
-                    .font(.caption2)
-                    .foregroundStyle(element.verbalDescription.isEmpty ? .tertiary : .secondary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+            TextField("Popis prvku", text: Binding(
+                get: { element.verbalDescription },
+                set: { onDescriptionChange($0) }
+            ), axis: .vertical)
+            .lineLimit(2...4)
+            .textFieldStyle(.roundedBorder)
+            .accessibilityLabel("Popis prvku")
 
+            HStack(alignment: .center, spacing: 6) {
+                Label(UXLabels.provenanceLabel(detectedByAI: element.detectedByAI), systemImage: "info.circle")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Spacer()
                 Button {
                     onDuplicate()
                 } label: {
-                    Image(systemName: "plus.square.on.square")
-                        .font(.caption2)
+                    Label("Duplikovať prvok", systemImage: "plus.square.on.square")
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
-                .help("Duplikovať prvok")
 
                 Button(role: .destructive) {
-                    onDelete()
+                    showDeleteConfirmation = true
                 } label: {
-                    Image(systemName: "trash")
-                        .font(.caption2)
+                    Label("Odstrániť prvok", systemImage: "trash")
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.red)
-                .help("Odstrániť prvok")
             }
         }
         .padding(10)
@@ -656,7 +815,13 @@ struct ElementRow: View {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .strokeBorder(isSelected ? Color.accentColor : Color.primary.opacity(0.08), lineWidth: 1)
         )
-        .contentShape(Rectangle())
-        .onTapGesture(perform: onSelect)
+        .confirmationDialog("Naozaj chcete odstrániť tento prvok?",
+                           isPresented: $showDeleteConfirmation,
+                           titleVisibility: .visible) {
+            Button("Odstrániť prvok", role: .destructive, action: onDelete)
+            Button("Zrušiť", role: .cancel) {}
+        } message: {
+            Text("Prvok bude odstránený z doložky. Túto zmenu môžete vrátiť tlačidlom Späť.")
+        }
     }
 }

@@ -8,11 +8,13 @@ struct EvidenceDashboardView: View {
     @State private var filterText = ""
     @State private var statusFilter: EvidenceRecord.Status?
     @State private var selectedRecordID: UUID?
+    @State private var showDetail = false
     @State private var isSubmitting = false
     @State private var submitFeedback: String?
     @State private var refreshTimer: Timer?
     @State private var recordToDelete: EvidenceRecord?
     @State private var showDeleteConfirmation = false
+    @State private var exportError: String?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -21,55 +23,72 @@ struct EvidenceDashboardView: View {
             filterBar
             Divider().opacity(0.4)
 
-            Table(filteredRecords, selection: $selectedRecordID) {
-                TableColumn("Evidenčné číslo") { record in
-                    HStack(spacing: 6) {
-                        if record.isOverdue { OverdueDot() }
-                        Text(record.evidenceNumber ?? "nezískané")
-                            .font(.callout.monospacedDigit().weight(.semibold))
+            if records.isEmpty {
+                ContentUnavailableView("Register je prázdny",
+                                       systemImage: "archivebox",
+                                       description: Text("Po dokončení prvej zaručenej konverzie sa tu zobrazí evidenčný záznam."))
+            } else if filteredRecords.isEmpty && hasActiveFilter {
+                ContentUnavailableView.search(text: filterText)
+            } else {
+                Table(filteredRecords, selection: $selectedRecordID) {
+                    TableColumn("Evidenčné číslo") { record in
+                        HStack(spacing: 6) {
+                            if record.isOverdue { OverdueDot() }
+                            Text(record.evidenceNumber ?? "nezískané")
+                                .font(.callout.monospacedDigit().weight(.semibold))
+                        }
+                        .contextMenu { recordContextMenu(for: record) }
                     }
-                    .contextMenu { recordContextMenu(for: record) }
-                }
-                .width(min: 130, ideal: 170)
+                    .width(min: 130, ideal: 170)
 
-                TableColumn("Stav") { record in
-                    Label(record.status.rawValue, systemImage: record.status.sfSymbol)
-                        .foregroundStyle(statusTint(record.status))
-                        .contextMenu { recordContextMenu(for: record) }
-                }
-                .width(min: 150, ideal: 190)
+                    TableColumn("Stav") { record in
+                        Label(UXLabels.evidenceStatusLabel(for: record.status, isOverdue: record.isOverdue),
+                              systemImage: record.status.sfSymbol)
+                            .foregroundStyle(statusTint(record.status))
+                            .contextMenu { recordContextMenu(for: record) }
+                    }
+                    .width(min: 150, ideal: 190)
 
-                TableColumn("Lehota CEZZK") { record in
-                    deadlineLabel(record)
-                        .contextMenu { recordContextMenu(for: record) }
-                }
-                .width(min: 120, ideal: 160)
+                    TableColumn("Lehota CEZZK") { record in
+                        deadlineLabel(record)
+                            .contextMenu { recordContextMenu(for: record) }
+                    }
+                    .width(min: 120, ideal: 160)
 
-                TableColumn("Dátum konverzie") { record in
-                    Text(LocalEvidenceStore.csvDate(record.conversionTime))
-                        .font(.caption.monospacedDigit())
-                        .contextMenu { recordContextMenu(for: record) }
-                }
-                .width(min: 120, ideal: 140)
+                    TableColumn("Dátum konverzie") { record in
+                        Text(LocalEvidenceStore.csvDate(record.conversionTime))
+                            .font(.caption.monospacedDigit())
+                            .contextMenu { recordContextMenu(for: record) }
+                    }
+                    .width(min: 120, ideal: 140)
 
-                TableColumn("Pôvodný dokument") { record in
-                    Text(record.originalName).lineLimit(1)
-                        .help(record.originalName)
-                        .contextMenu { recordContextMenu(for: record) }
-                }
+                    TableColumn("Pôvodný dokument") { record in
+                        Text(record.originalName).lineLimit(1)
+                            .help(record.originalName)
+                            .contextMenu { recordContextMenu(for: record) }
+                    }
 
-                TableColumn("Strany / Listy") { record in
-                    Text("\(record.totalPages) / \(record.totalSheets)")
-                        .font(.caption.monospacedDigit())
-                        .contextMenu { recordContextMenu(for: record) }
-                }
-                .width(90)
+                    TableColumn("Strany / Listy") { record in
+                        Text("\(record.totalPages) / \(record.totalSheets)")
+                            .font(.caption.monospacedDigit())
+                            .contextMenu { recordContextMenu(for: record) }
+                    }
+                    .width(90)
 
-                TableColumn("SHA-256") { record in
-                    Text(String(record.fingerprintSHA256Hex.prefix(16)) + "…")
-                        .font(.caption2.monospaced())
-                        .foregroundStyle(.secondary)
-                        .contextMenu { recordContextMenu(for: record) }
+                    TableColumn("SHA-256") { record in
+                        Text(String(record.fingerprintSHA256Hex.prefix(16)) + "…")
+                            .font(.caption2.monospaced())
+                            .foregroundStyle(.secondary)
+                            .contextMenu { recordContextMenu(for: record) }
+                    }
+                }
+                .onKeyPress(.return) {
+                    guard selectedRecordID != nil else { return .ignored }
+                    showDetail = true
+                    return .handled
+                }
+                .onTapGesture(count: 2) {
+                    if selectedRecordID != nil { showDetail = true }
                 }
             }
         }
@@ -78,13 +97,14 @@ struct EvidenceDashboardView: View {
             startClock()
         }
         .onDisappear { refreshTimer?.invalidate() }
-        .sheet(isPresented: Binding(
-            get: { detailRecord != nil },
-            set: { if !$0 { selectedRecordID = nil } })) {
+        .sheet(isPresented: $showDetail) {
             if let record = detailRecord {
                 RecordDetailView(settingsStore: settingsStore,
                                  record: binding(for: record),
-                                 onClose: { selectedRecordID = nil })
+                                 onClose: {
+                                     showDetail = false
+                                     selectedRecordID = nil
+                                 })
             }
         }
         .confirmationDialog(
@@ -111,6 +131,7 @@ struct EvidenceDashboardView: View {
     private func recordContextMenu(for record: EvidenceRecord) -> some View {
         Button {
             selectedRecordID = record.id
+            showDetail = true
         } label: {
             Label("Zobraziť detail a doložku", systemImage: "doc.text")
         }
@@ -167,9 +188,7 @@ struct EvidenceDashboardView: View {
             SummaryCard(title: "Zapísaných v CEZZK", value: "\(submitted)", symbol: "checkmark.seal.fill", tint: .green)
             SummaryCard(title: "Čaká na odoslanie", value: "\(pending)", symbol: "tray.and.arrow.up", tint: pending > 0 ? .orange : .secondary)
             SummaryCard(title: "Po lehote 24 h", value: "\(overdue)", symbol: "clock.badge.exclamationmark", tint: overdue > 0 ? .red : .secondary)
-
             Spacer()
-
             if let feedback = submitFeedback {
                 Text(feedback)
                     .font(.footnote.weight(.medium))
@@ -195,19 +214,26 @@ struct EvidenceDashboardView: View {
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
             .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 8))
-            .frame(width: 260)
+            .frame(minWidth: 180, idealWidth: 260, maxWidth: 320)
 
-            Picker("Filter", selection: $statusFilter) {
+            Picker("Filtrovať podľa stavu", selection: $statusFilter) {
                 Text("Všetky stavy").tag(EvidenceRecord.Status?.none)
                 ForEach(EvidenceRecord.Status.allCases, id: \.self) { status in
                     Text(status.rawValue).tag(Optional(status))
                 }
             }
-            .labelsHidden()
             .pickerStyle(.menu)
-            .frame(width: 180)
+            .frame(minWidth: 150, idealWidth: 180, maxWidth: 220)
 
-            Spacer()
+            Spacer(minLength: 8)
+            Button {
+                showDetail = true
+            } label: {
+                Label("Otvoriť detail", systemImage: "doc.text.magnifyingglass")
+            }
+            .buttonStyle(.bordered)
+            .disabled(selectedRecordID == nil)
+            .keyboardShortcut(.defaultAction)
 
             Button {
                 submitPending()
@@ -230,6 +256,13 @@ struct EvidenceDashboardView: View {
                 Label("Export CSV", systemImage: "square.and.arrow.up.on.square")
             }
             .buttonStyle(.bordered)
+            if let exportError {
+                Text(exportError)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                Button("Skúsiť znova", action: exportCSV)
+                    .buttonStyle(.bordered)
+            }
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 10)
@@ -246,19 +279,27 @@ struct EvidenceDashboardView: View {
     private func deadlineLabel(_ record: EvidenceRecord) -> some View {
         let formatter = Self.deadlineFormatter
         if record.status == .submitted {
-            Text("zapísané ✓").font(.caption).foregroundStyle(.green)
+            Text(UXLabels.evidenceStatusLabel(for: record.status))
+                .font(.caption)
+                .foregroundStyle(.green)
         } else if record.isOverdue {
-            Text("do \(formatter.string(from: record.submissionDeadline))")
-                .font(.caption.weight(.semibold)).foregroundStyle(.red)
+            Text("Po lehote — \(formatter.string(from: record.submissionDeadline))")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.red)
         } else if record.isSubmissionPending {
-            Text("do \(formatter.string(from: record.submissionDeadline))")
-                .font(.caption).foregroundStyle(.orange)
+            Text("Blíži sa lehota — do \(formatter.string(from: record.submissionDeadline))")
+                .font(.caption)
+                .foregroundStyle(.orange)
         } else {
-            Text("do \(formatter.string(from: record.submissionDeadline))")
-                .font(.caption).foregroundStyle(.secondary)
+            Text("Lehota: \(formatter.string(from: record.submissionDeadline))")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
 
+    private var hasActiveFilter: Bool {
+        statusFilter != nil || !filterText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
     private var filteredRecords: [EvidenceRecord] {
         var result = records
         if let statusFilter {
@@ -329,12 +370,17 @@ struct EvidenceDashboardView: View {
     }
 
     private func exportCSV() {
+        exportError = nil
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.commaSeparatedText]
         panel.nameFieldStringValue = "evidencia-konverzii.csv"
         panel.begin { response in
             guard response == .OK, let url = panel.url else { return }
-            try? Data(settingsStore.evidenceStore.exportCSV().utf8).write(to: url, options: [.atomic])
+            do {
+                try Data(settingsStore.evidenceStore.exportCSV().utf8).write(to: url, options: [.atomic])
+            } catch {
+                exportError = "Export sa nepodaril: \(error.localizedDescription)"
+            }
         }
     }
 }
@@ -398,7 +444,7 @@ struct RecordDetailView: View {
         VStack(alignment: .leading, spacing: 16) {
             header
 
-            Picker("", selection: $selectedTab) {
+            Picker("Časť detailu záznamu", selection: $selectedTab) {
                 Text("Prehľad záznamu").tag(0)
                 Text("Osvedčovacia doložka (XML)").tag(1)
             }
@@ -426,6 +472,8 @@ struct RecordDetailView: View {
                     } label: {
                         Image(systemName: "link.badge.plus")
                     }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Skopírovať URI záznamu")
                     .help("Skopírovať URI záznamu (\(uri))")
                 }
 
@@ -442,7 +490,8 @@ struct RecordDetailView: View {
             }
         }
         .padding(22)
-        .frame(width: 580, height: 540)
+        .frame(minWidth: 320, idealWidth: 580, maxWidth: .infinity,
+               minHeight: 400, idealHeight: 540, maxHeight: .infinity)
         .confirmationDialog("Naozaj chcete vymazať tento záznam?", isPresented: $showDeleteConfirm) {
             Button("Zmazať záznam", role: .destructive) {
                 settingsStore.evidenceStore.delete(id: record.id)
@@ -479,7 +528,7 @@ struct RecordDetailView: View {
                 "\(record.totalPages) strán / \(record.totalSheets) listov / \(record.securityElementCount) prvkov")
             fingerprintRow
         }
-        .liquidGlass(cornerRadius: 12, padding: 12)
+        .glassCard(cornerRadius: 12, padding: 12)
     }
 
     @ViewBuilder
@@ -500,6 +549,7 @@ struct RecordDetailView: View {
                     Image(systemName: copiedFingerprint ? "checkmark" : "doc.on.doc")
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Skopírovať SHA-256 odtlačok")
                 .help("Skopírovať otlačok")
             }
         }

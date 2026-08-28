@@ -7,7 +7,6 @@ struct RootView: View {
         case signing = "Podpisovanie"
         case zako = "Zaručená konverzia"
         case evidence = "Register konverzií"
-        case settings = "Nastavenia"
 
         var id: String { rawValue }
 
@@ -16,24 +15,22 @@ struct RootView: View {
             case .signing: return "signature"
             case .zako: return "building.columns.fill"
             case .evidence: return "archivebox.fill"
-            case .settings: return "gearshape.fill"
             }
         }
     }
 
+    @Bindable var model: AutogramAppModel
     @State private var selection: SidebarSection = .signing
-    @State private var settingsStore: AppSettingsStore
-    @State private var signingStore: SigningSessionStore
-    @State private var zakoStore: ZakoSessionStore
+    @State private var queueItemToDelete: UUID?
+    @State private var showQueueDeleteConfirmation = false
 
-    init() {
-        let settings = AppSettingsStore()
-        _settingsStore = State(initialValue: settings)
-        _signingStore = State(initialValue: SigningSessionStore(
-            signingProvider: settings.signingProvider,
-            settingsStore: settings))
-        _zakoStore = State(initialValue: ZakoSessionStore(settingsStore: settings))
+    init(model: AutogramAppModel) {
+        self._model = Bindable(wrappedValue: model)
     }
+
+    private var settingsStore: AppSettingsStore { model.settingsStore }
+    private var signingStore: SigningSessionStore { model.signingStore }
+    private var zakoStore: ZakoSessionStore { model.zakoStore }
 
     var body: some View {
         NavigationSplitView {
@@ -52,24 +49,29 @@ struct RootView: View {
                 if !signingStore.queue.isEmpty {
                     Section("Fronta podpisovania (\(signingStore.queue.count))") {
                         ForEach(signingStore.queue) { item in
-                            HStack(spacing: 8) {
-                                Image(systemName: queueIcon(item.status))
-                                    .foregroundStyle(queueColor(item.status))
-                                    .frame(width: 16)
-                                Text(item.displayName)
-                                    .lineLimit(1)
-                                    .truncationMode(.middle)
-                                    .font(.callout)
-                                Spacer(minLength: 0)
-                            }
-                            .padding(.vertical, 2)
-                            .contentShape(Rectangle())
-                            .onTapGesture {
+                            let isSelected = signingStore.selectedQueueID == item.id
+                            Button {
                                 selection = .signing
                                 Task { await signingStore.selectQueueItem(item.id) }
+                            } label: {
+                                HStack(spacing: 8) {
+                                    Image(systemName: queueIcon(item.status))
+                                        .foregroundStyle(queueColor(item.status))
+                                        .frame(width: 16)
+                                    Text(item.displayName)
+                                        .lineLimit(1)
+                                        .truncationMode(.middle)
+                                        .font(.callout)
+                                    Spacer(minLength: 0)
+                                }
                             }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Dokument \(item.displayName)")
+                            .accessibilityValue("\(queueStatusLabel(item.status)); \(isSelected ? "Vybraný" : "Nevybraný")")
+                            .accessibilityAddTraits(isSelected ? .isSelected : [])
+                            .padding(.vertical, 2)
                             .listRowBackground(
-                                signingStore.selectedQueueID == item.id
+                                isSelected
                                     ? Color.accentColor.opacity(0.14)
                                     : Color.clear
                             )
@@ -85,7 +87,8 @@ struct RootView: View {
                                 }
                                 Divider()
                                 Button("Odstrániť z fronty", role: .destructive) {
-                                    signingStore.removeQueueItem(item.id)
+                                    queueItemToDelete = item.id
+                                    showQueueDeleteConfirmation = true
                                 }
                             }
                         }
@@ -107,8 +110,9 @@ struct RootView: View {
                 }
 
                 Section("Predvoľby") {
-                    Label(SidebarSection.settings.rawValue, systemImage: SidebarSection.settings.symbol)
-                        .tag(SidebarSection.settings)
+                    SettingsLink {
+                        Label("Nastavenia", systemImage: "gearshape.fill")
+                    }
                 }
             }
             .listStyle(.sidebar)
@@ -121,13 +125,29 @@ struct RootView: View {
             detailView
                 .navigationTitle(selection.rawValue)
                 .navigationSubtitle(subtitle)
-                .toolbarBackgroundVisibility(.visible, for: .windowToolbar)
         }
         .task {
             FinderSigningRouter.shared.install { urls in
                 selection = .signing
                 Task { await signingStore.signFromFinder(urls) }
             }
+        }
+        .focusedValue(\.autogramCommandActions, AutogramCommandActions(
+            openDocument: openDocument,
+            addFiles: openMoreFiles,
+            toggleSidebar: toggleSidebar))
+        .confirmationDialog(
+            "Naozaj chcete odstrániť dokument z fronty?",
+            isPresented: $showQueueDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Odstrániť z fronty", role: .destructive) {
+                if let id = queueItemToDelete { signingStore.removeQueueItem(id) }
+                queueItemToDelete = nil
+            }
+            Button("Zrušiť", role: .cancel) { queueItemToDelete = nil }
+        } message: {
+            Text("Dokument zostane v pôvodnom umiestnení; odstráni sa iba z fronty podpisovania.")
         }
     }
 
@@ -156,7 +176,6 @@ struct RootView: View {
             .controlSize(.small)
         }
         .padding(12)
-        .background(.bar)
     }
 
     private var subtitle: String {
@@ -169,8 +188,6 @@ struct RootView: View {
             return "zaručená konverzia (§ 35-39 Zz)"
         case .evidence:
             return "register konverzií a CEZZK"
-        case .settings:
-            return "konfigurácia a profily"
         }
     }
 
@@ -183,8 +200,6 @@ struct RootView: View {
             ZakoFlowView(store: zakoStore)
         case .evidence:
             EvidenceDashboardView(settingsStore: settingsStore)
-        case .settings:
-            SettingsView(settingsStore: settingsStore)
         }
     }
 
@@ -196,6 +211,14 @@ struct RootView: View {
         case .failed: "exclamationmark.triangle.fill"
         }
     }
+    private func queueStatusLabel(_ status: SigningSessionStore.SigningQueueItem.Status) -> String {
+        switch status {
+        case .ready: "Pripravené"
+        case .signing: "Podpisuje sa"
+        case .signed: "Podpísané"
+        case .failed: "Podpis zlyhal"
+        }
+    }
 
     private func queueColor(_ status: SigningSessionStore.SigningQueueItem.Status) -> Color {
         switch status {
@@ -203,6 +226,19 @@ struct RootView: View {
         case .signing: .orange
         case .signed: .green
         case .failed: .red
+        }
+    }
+
+    private func openDocument() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.pdf]
+        panel.allowsMultipleSelection = false
+        panel.begin { response in
+            guard response == .OK, let url = panel.url else { return }
+            Task { @MainActor in
+                selection = .signing
+                await signingStore.loadDocument(at: url)
+            }
         }
     }
 
@@ -217,5 +253,9 @@ struct RootView: View {
                 await signingStore.addDocuments(at: panel.urls)
             }
         }
+    }
+
+    private func toggleSidebar() {
+        NSApp.sendAction(#selector(NSSplitViewController.toggleSidebar(_:)), to: nil, from: nil)
     }
 }

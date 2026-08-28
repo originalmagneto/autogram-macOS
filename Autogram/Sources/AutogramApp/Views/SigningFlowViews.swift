@@ -348,7 +348,7 @@ struct SigningPrepareView: View {
                     }
                 }
             }
-            .liquidGlass(cornerRadius: 18, padding: 6)
+            .glassCard(cornerRadius: 18, padding: 6)
 
             HStack(spacing: 12) {
                 StatChip(title: "Strany", value: "\(store.analysis.totalPages)", symbol: "doc.on.doc", tint: .blue)
@@ -458,7 +458,7 @@ struct SigningPrepareView: View {
                     }
                 }
             }
-            .liquidGlass(cornerRadius: 14, padding: 14)
+            .glassCard(cornerRadius: 14, padding: 14)
 
             // Section 2: Parametre výstupu & TSA
             VStack(alignment: .leading, spacing: 12) {
@@ -506,7 +506,7 @@ struct SigningPrepareView: View {
                         .font(.callout)
                 }
             }
-            .liquidGlass(cornerRadius: 14, padding: 14)
+            .glassCard(cornerRadius: 14, padding: 14)
 
             // Section 3: Vizuálna pečiatka podpisu
             VStack(alignment: .leading, spacing: 12) {
@@ -524,7 +524,7 @@ struct SigningPrepareView: View {
                     VisibleAppearanceInspector(state: visualState)
                 }
             }
-            .liquidGlass(cornerRadius: 14, padding: 14)
+            .glassCard(cornerRadius: 14, padding: 14)
 
             // Section 4: Existujúce podpisy
             VStack(alignment: .leading, spacing: 8) {
@@ -534,7 +534,7 @@ struct SigningPrepareView: View {
 
                 existingSignaturesSection
             }
-            .liquidGlass(cornerRadius: 14, padding: 12)
+            .glassCard(cornerRadius: 14, padding: 12)
 
             if let error = store.lastError {
                 Text(error)
@@ -688,7 +688,7 @@ struct SigningDoneView: View {
                     )
                 }
             }
-            .liquidGlass(cornerRadius: 18, padding: 6)
+            .glassCard(cornerRadius: 18, padding: 6)
 
             if let url = store.signedOutputURL {
                 Text(url.lastPathComponent)
