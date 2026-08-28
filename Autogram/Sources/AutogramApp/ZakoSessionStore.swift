@@ -64,8 +64,6 @@ final class ZakoSessionStore {
 
     let settingsStore: AppSettingsStore
     var settings: AppSettings { settingsStore.settings }
-    let analysisEngine: PDFAnalysisEngine
-    let detectionPipeline: DetectionPipeline
     let pdfaConverter: PDFAConverter
     let clauseGenerator: AttestationClauseGenerator
     let embeddedFileService: EmbeddedFileService
@@ -79,8 +77,6 @@ final class ZakoSessionStore {
 
     init(settingsStore: AppSettingsStore) {
         self.settingsStore = settingsStore
-        self.analysisEngine = PDFAnalysisEngine()
-        self.detectionPipeline = Self.buildPipeline(settings: settingsStore.settings)
         self.pdfaConverter = PDFAConverter()
         self.clauseGenerator = AttestationClauseGenerator()
         self.embeddedFileService = EmbeddedFileService()
@@ -165,7 +161,7 @@ final class ZakoSessionStore {
         }.value ?? .empty()
 
         analysisProgressText = "Detegujem bezpečnostné prvky…"
-        let pipeline = detectionPipeline
+        let pipeline = Self.buildPipeline(settings: settings)
         let detected = await Task.detached(priority: .userInitiated) { [doc, pipeline] in
             await pipeline.detect(in: doc.value, pageAnalyses: baseAnalysis.pageAnalyses)
         }.value

@@ -25,6 +25,25 @@ final class SecurityElementsDetectorTests: XCTestCase {
                                     "Vlastnoručný podpis nebol detegovaný.")
     }
 
+    func testRotatedPageKeepsDisplayedOrientationForAnalysisAndVision() throws {
+        let document = try XCTUnwrap(PDFDocument(data: TestPDFBuilder.typicalContractPDF()))
+        let page = try XCTUnwrap(document.page(at: 0))
+        page.rotation = 90
+
+        let analysis = PDFAnalysisEngine().analyze(document: document)
+        XCTAssertEqual(analysis.pageAnalyses[0].sizeClass, .a4Landscape)
+        XCTAssertEqual(analysis.pageAnalyses[0].widthPt, 842, accuracy: 0.1)
+        XCTAssertEqual(analysis.pageAnalyses[0].heightPt, 595, accuracy: 0.1)
+
+        let rendered = try XCTUnwrap(BuiltInVisionProvider.render(page: page, targetWidth: 520))
+        XCTAssertGreaterThan(rendered.cgImage.width, rendered.cgImage.height)
+
+        let provider = BuiltInVisionProvider()
+        let doc = TestUncheckedSendable(document)
+        let elements = awaitAsync { await provider.detect(in: doc.value, pageAnalyses: analysis.pageAnalyses) }
+        XCTAssertTrue(elements.contains { $0.pageIndex == 0 && $0.kind == .officialStamp })
+    }
+
     func testNoElementsOnBlankPage() throws {
         let document = try XCTUnwrap(PDFDocument(data: TestPDFBuilder.singlePageWhitePDF()))
         let analysis = PDFAnalysisEngine().analyze(document: document)

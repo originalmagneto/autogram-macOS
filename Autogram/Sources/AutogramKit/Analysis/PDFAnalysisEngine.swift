@@ -19,7 +19,13 @@ public struct PDFAnalysisEngine: Sendable {
 
         for index in 0..<pageCount {
             guard let page = document.page(at: index) else { continue }
-            let bounds = page.bounds(for: .mediaBox)
+            // Classify by DISPLAYED size: /Rotate 90/270 swaps width and height,
+            // so a landscape diploma stored as portrait mediaBox is a4Landscape.
+            let mediaBox = page.bounds(for: .mediaBox)
+            let rotated = (page.rotation == 90 || page.rotation == 270)
+            let bounds = rotated
+                ? CGRect(x: 0, y: 0, width: mediaBox.height, height: mediaBox.width)
+                : mediaBox
             let sizeClass = PaperClassifier.classify(widthPt: bounds.width, heightPt: bounds.height)
             let coverage = Self.inkCoverage(of: page)
             let pixels = Self.inkPixelCount(of: page)

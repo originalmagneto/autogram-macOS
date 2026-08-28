@@ -195,6 +195,7 @@ struct AnalysisCanvasView: View {
                     Label(mode.rawValue, systemImage: icon(for: mode)).tag(mode)
                 }
             }
+
         } label: {
             HStack(spacing: 5) {
                 Image(systemName: "sparkles")
@@ -705,6 +706,7 @@ struct ElementOverlay: View {
                let element = store.securityElements.first(where: { $0.id == hitID }) {
                 store.selectedElementID = hitID
                 if let anchor = oppositeCornerAnchor(of: element.boundingBox, at: value.location) {
+
                     interaction = .init(kind: .resizing(hitID, anchor), startPoint: anchor)
                 } else {
                     interaction = .init(kind: .moving(hitID), startPoint: normPoint)

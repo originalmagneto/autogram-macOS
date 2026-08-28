@@ -211,10 +211,10 @@ public struct BuiltInVisionProvider: SecurityElementsProviding {
             guard elongation > 2.0 else { continue }
 
             var confidence = 0.4 + min(elongation / 14.0, 0.35)
-            // Convention: normalized y=0 is the page BOTTOM (PDF semantics);
-            // signatures sit predominantly in the lower half.
+            // Rows are top-down: larger y = lower on the page, where
+            // handwritten signatures predominantly sit.
             let verticalCenter = Double((stats.minY + stats.maxY)) / Double(pixels.height * 2)
-            if verticalCenter < 0.45 { confidence += 0.18 }
+            if verticalCenter > 0.55 { confidence += 0.18 }
 
             guard confidence >= 0.45 else { continue }
 
@@ -246,50 +246,42 @@ public struct BuiltInVisionProvider: SecurityElementsProviding {
 
 
     private func normalizedRect(stats: ComponentStats, pixels: PixelMap) -> NormalizedRect {
+        // PixelMap rows are TOP-origin for CGImage-derived bitmaps; convert to
+        // the domain convention (normalized y=0 = page BOTTOM).
         NormalizedRect(
             x: Double(stats.minX) / Double(pixels.width),
-            y: Double(stats.minY) / Double(pixels.height),
+            y: 1 - (Double(stats.minY) + Double(stats.bboxHeight)) / Double(pixels.height),
             width: Double(stats.bboxWidth) / Double(pixels.width),
             height: Double(stats.bboxHeight) / Double(pixels.height))
     }
-
     // MARK: - Rendering
 
-    struct RenderedPage {
-        let pixels: PixelMap
-        let cgImage: CGImage
+    public struct RenderedPage {
+        public let pixels: PixelMap
+        public let cgImage: CGImage
     }
 
-    static func render(page: PDFPage, targetWidth: Int = 520) -> RenderedPage? {
-        let bounds = page.bounds(for: .mediaBox)
-        guard bounds.width > 1, bounds.height > 1 else { return nil }
-        let scale = CGFloat(targetWidth) / bounds.width
-        let w = max(Int(bounds.width * scale), 8)
-        let h = max(Int(bounds.height * scale), 8)
+    public static func render(page: PDFPage, targetWidth: Int = 520) -> RenderedPage? {
+        // PDFKit's thumbnail honors /Rotate, so the rendered bitmap matches the
+        // page as displayed (a landscape diploma with portrait mediaBox renders
+        // landscape, not squashed).
+        let mediaBox = page.bounds(for: .mediaBox)
+        guard mediaBox.width > 1, mediaBox.height > 1 else { return nil }
+        let rotated = (page.rotation == 90 || page.rotation == 270)
+        let displayWidth = rotated ? mediaBox.height : mediaBox.width
+        let displayHeight = rotated ? mediaBox.width : mediaBox.height
+        let scale = CGFloat(targetWidth) / max(displayWidth, 1)
+        let pxW = max(Int(displayWidth * scale), 8)
+        let pxH = max(Int(displayHeight * scale), 8)
 
-        var buffer = [UInt8](repeating: 255, count: w * h * 4)
-        var cgImage: CGImage?
-        let ok = buffer.withUnsafeMutableBytes { ptr -> Bool in
-            guard let ctx = CGContext(
-                data: ptr.baseAddress,
-                width: w, height: h,
-                bitsPerComponent: 8,
-                bytesPerRow: w * 4,
-                space: CGColorSpaceCreateDeviceRGB(),
-                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-            ) else { return false }
-            ctx.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: 1))
-            ctx.fill(CGRect(x: 0, y: 0, width: w, height: h))
-            ctx.scaleBy(x: scale, y: scale)
-            ctx.translateBy(x: 0, y: bounds.height)
-            ctx.scaleBy(x: 1, y: -1)
-            if let ref = page.pageRef { ctx.drawPDFPage(ref) }
-            cgImage = ctx.makeImage()
-            return true
+        let nsImage = page.thumbnail(of: CGSize(width: pxW, height: pxH), for: .mediaBox)
+        guard let cgImage = nsImage.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+            return nil
         }
-        guard ok, let image = cgImage else { return nil }
-        return RenderedPage(pixels: PixelMap(width: w, height: h, rgba: buffer), cgImage: image)
+        guard let pixels = PixelMap(cgImage: cgImage, targetWidth: targetWidth) else { return nil }
+        return RenderedPage(pixels: pixels, cgImage: cgImage)
     }
+
 
     // MARK: - Apple Vision
 
@@ -347,12 +339,11 @@ public struct BuiltInVisionProvider: SecurityElementsProviding {
     }
 
     private static func visionBox(_ boundingBox: CGRect) -> NormalizedRect {
-        // The page bitmap is bottom-up in memory, so the CGImage derived from it is
-        // vertically flipped. Vision reports bottom-left-origin boxes on that flipped
-        // image; map them back: y_true = 1 - (y_vision + h_vision).
+        // The CGImage is now correctly oriented (PDFKit thumbnail), so Vision's
+        // bottom-left-origin box maps directly onto our bottom-origin convention.
         NormalizedRect(
             x: Double(max(0, boundingBox.minX)),
-            y: Double(max(0, min(1 - boundingBox.maxY, 1))),
+            y: Double(max(0, min(1 - boundingBox.height, 1))),
             width: Double(min(1, boundingBox.width)),
             height: Double(min(1, boundingBox.height)))
     }
