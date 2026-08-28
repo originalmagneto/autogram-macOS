@@ -386,6 +386,7 @@ Documentation and README updates were committed on `main` as:
 The final local-installation handoff update was committed on `main` as:
 
 - `804019c1` `docs: record local macOS 27 installation`
+- `24990d08` `docs: record merged branch cleanup`
 
 After the local merge, the feature branch `feature/macos27-ux` was deleted and its worktree was removed. The active branch is `main`.
 
