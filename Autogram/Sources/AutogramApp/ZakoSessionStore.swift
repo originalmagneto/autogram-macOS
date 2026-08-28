@@ -48,7 +48,9 @@ final class ZakoSessionStore {
             attestation,
             securityElements: securityElements,
             hasSelectedIdentity: selectedIdentityID != nil,
-            mandateRequirementSatisfied: mandateRequirementSatisfied || allowNonMandateOverride)
+            mandateRequirementSatisfied: mandateRequirementSatisfied
+                || allowNonMandateOverride
+                || isCertificateTypePending)
         return result.isComplete && preflightErrors.isEmpty && evidenceNumberError == nil
     }
     var hasUnresolvedPreflightErrors: Bool {
@@ -71,6 +73,7 @@ final class ZakoSessionStore {
     var signingProvider: any QualifiedSigningProviding { settingsStore.signingProvider }
     var evidenceStore: LocalEvidenceStore { settingsStore.evidenceStore }
 
+    private var evidenceRequestID: UUID?
     var profilePersister: ((AdvocateProfile) -> Void)?
     private(set) var currentRecordID = UUID()
 
@@ -397,11 +400,19 @@ final class ZakoSessionStore {
 
     func fetchEvidenceNumber() async {
         guard !fetchingEvidenceNumber else { return }
+        let requestID = currentRecordID
+        evidenceRequestID = requestID
         evidenceNumberError = nil
         fetchingEvidenceNumber = true
-        defer { fetchingEvidenceNumber = false }
+        defer {
+            if evidenceRequestID == requestID {
+                fetchingEvidenceNumber = false
+                evidenceRequestID = nil
+            }
+        }
         do {
             let numbers = try await ezzkService.requestEvidenceNumbers(count: 1)
+            guard requestID == currentRecordID, !Task.isCancelled else { return }
             guard let number = numbers.first else {
                 throw EZZKError.invalidResponse
             }
@@ -411,6 +422,7 @@ final class ZakoSessionStore {
             evidenceNumberError = nil
             recomputePreflight()
         } catch {
+            guard requestID == currentRecordID, !Task.isCancelled else { return }
             evidenceNumberError = error.localizedDescription
             lastError = error.localizedDescription
             recomputePreflight()
@@ -631,6 +643,7 @@ final class ZakoSessionStore {
             return
         }
         attestation = template
+        attestation.originConfirmed = false
         attestation.evidenceNumber = nil
         evidenceNumberRequested = false
         evidenceNumberError = nil
@@ -678,6 +691,7 @@ func resetSession(keepingProfile: Bool) {
         evidenceNumberRequested = false
         evidenceNumberError = nil
         fetchingEvidenceNumber = false
+        evidenceRequestID = nil
         isAuthorizing = false
         preflightErrors = []
         validationErrors = []

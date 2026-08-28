@@ -67,4 +67,19 @@ final class AttestationValidatorTests: XCTestCase {
 
         XCTAssertFalse(decoded.originConfirmed)
     }
+    func testReusedTemplateRequiresFreshOriginConfirmation() throws {
+        var template = validAttestationData()
+        template.originConfirmed = true
+        let persisted = try JSONEncoder.pretty.encode(template)
+        let decodedTemplate = try JSONDecoder.standard.decode(AttestationData.self, from: persisted)
+
+        var reusedForAnotherDocument = decodedTemplate
+        reusedForAnotherDocument.originConfirmed = false
+        let errors = AttestationValidator.validate(
+            reusedForAnotherDocument,
+            securityElements: validElements,
+            qualifiedTimestampTime: nil)
+
+        XCTAssertTrue(errors.contains(.originNotConfirmed))
+    }
 }
