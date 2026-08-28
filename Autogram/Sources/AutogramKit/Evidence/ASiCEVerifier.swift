@@ -13,56 +13,93 @@ public struct ASiCEContainerVerifier: Sendable {
 
     public init() {}
 
+    /// Reads ZIP entries via the central directory. This is the robust path for
+    /// real-world ASiC-E containers: engines (Java/DSS, Podpisuj.sk) write DEFLATE
+    /// entries with data descriptors (flag 0x0008), where local header sizes are 0
+    /// and only the central directory carries the true sizes.
     public static func readEntries(_ data: Data) -> [(name: String, data: Data)]? {
         let bytes = [UInt8](data)
-        var result: [(String, Data)] = []
-        var cursor = 0
 
         func u16(_ offset: Int) -> Int { Int(bytes[offset]) | (Int(bytes[offset + 1]) << 8) }
         func u32(_ offset: Int) -> Int {
             Int(bytes[offset]) | (Int(bytes[offset + 1]) << 8) |
             (Int(bytes[offset + 2]) << 16) | (Int(bytes[offset + 3]) << 24)
         }
+        func u64(_ offset: Int) -> Int {
+            u32(offset) | (u32(offset + 4) << 32)
+        }
 
-        while cursor + 4 <= bytes.count {
-            guard u32(cursor) == 0x04034B50 else { break }
-            let method = u16(cursor + 8)
-            let compressedSize = u32(cursor + 18)
-            let uncompressedSize = u32(cursor + 22)
-            let nameLength = u16(cursor + 26)
-            let extraLength = u16(cursor + 28)
-            let nameStart = cursor + 30
-            guard nameStart + nameLength + extraLength + compressedSize <= bytes.count else { return nil }
-            let name = String(decoding: bytes[nameStart..<(nameStart + nameLength)], as: UTF8.self)
-            let contentStart = nameStart + nameLength + extraLength
-            if !name.hasSuffix("/") {
-                let payload: Data
-                switch method {
-                case 0:
-                    payload = Data(bytes[contentStart..<(contentStart + compressedSize)])
-                case 8:
-                    guard uncompressedSize > 0 else { return nil }
-                    var dst = Data(count: uncompressedSize)
-                    let written = dst.withUnsafeMutableBytes { (dstPtr: UnsafeMutableRawBufferPointer) -> Int in
-                        let srcSlice = bytes[contentStart..<(contentStart + compressedSize)]
-                        return srcSlice.withContiguousStorageIfAvailable { srcPtr -> Int in
-                            compression_decode_buffer(
-                                dstPtr.baseAddress!.assumingMemoryBound(to: UInt8.self),
-                                uncompressedSize,
-                                srcPtr.baseAddress!,
-                                compressedSize,
-                                nil,
-                                COMPRESSION_ZLIB)
-                        } ?? 0
-                    }
-                    guard written == uncompressedSize else { return nil }
-                    payload = dst
-                default:
-                    return nil
+        // 1. Locate End of Central Directory (scan backwards past the comment).
+        guard bytes.count >= 22 else { return nil }
+        var eocdOffset = -1
+        var scan = bytes.count - 22
+        let scanFloor = max(0, bytes.count - 22 - 65536)
+        while scan >= scanFloor {
+            if u32(scan) == 0x06054B50 { eocdOffset = scan; break }
+            scan -= 1
+        }
+        guard eocdOffset >= 0 else { return nil }
+
+        var entryCount = u16(eocdOffset + 10)
+        var cdOffset = u32(eocdOffset + 16)
+
+        // 2. Minimal ZIP64 support via the EOCD locator.
+        if entryCount == 0xFFFF || cdOffset == 0xFFFFFFFF, eocdOffset >= 20,
+           u32(eocdOffset - 20) == 0x07064B50 {
+            let zip64EOCD = u64(eocdOffset - 20 + 8)
+            guard zip64EOCD + 56 <= bytes.count, u32(zip64EOCD) == 0x06064B50 else { return nil }
+            entryCount = Int(u64(zip64EOCD + 32))
+            cdOffset = Int(u64(zip64EOCD + 48))
+        }
+
+        // 3. Walk central directory entries; read each local header for the
+        //    actual name/extra lengths (they may differ from central values).
+        var result: [(String, Data)] = []
+        var cursor = cdOffset
+        for _ in 0..<entryCount {
+            guard cursor + 46 <= bytes.count, u32(cursor) == 0x02014B50 else { break }
+            let method = u16(cursor + 10)
+            let compressedSize = u32(cursor + 20)
+            let uncompressedSize = u32(cursor + 24)
+            let nameLength = u16(cursor + 28)
+            let extraLength = u16(cursor + 30)
+            let commentLength = u16(cursor + 32)
+            let localOffset = u32(cursor + 42)
+            let name = String(decoding: bytes[(cursor + 46)..<(cursor + 46 + nameLength)], as: UTF8.self)
+            cursor += 46 + nameLength + extraLength + commentLength
+
+            guard !name.hasSuffix("/") else { continue }
+            guard localOffset + 30 <= bytes.count, u32(localOffset) == 0x04034B50 else { return nil }
+            let localNameLength = u16(localOffset + 26)
+            let localExtraLength = u16(localOffset + 28)
+            let contentStart = localOffset + 30 + localNameLength + localExtraLength
+            guard contentStart + compressedSize <= bytes.count else { return nil }
+
+            let payload: Data
+            switch method {
+            case 0:
+                payload = Data(bytes[contentStart..<(contentStart + compressedSize)])
+            case 8:
+                guard uncompressedSize > 0 else { return nil }
+                var dst = Data(count: uncompressedSize)
+                let written = dst.withUnsafeMutableBytes { (dstPtr: UnsafeMutableRawBufferPointer) -> Int in
+                    let srcSlice = bytes[contentStart..<(contentStart + compressedSize)]
+                    return srcSlice.withContiguousStorageIfAvailable { srcPtr -> Int in
+                        compression_decode_buffer(
+                            dstPtr.baseAddress!.assumingMemoryBound(to: UInt8.self),
+                            uncompressedSize,
+                            srcPtr.baseAddress!,
+                            compressedSize,
+                            nil,
+                            COMPRESSION_ZLIB)
+                    } ?? 0
                 }
-                result.append((name, payload))
+                guard written == uncompressedSize else { return nil }
+                payload = dst
+            default:
+                return nil
             }
-            cursor = contentStart + compressedSize
+            result.append((name, payload))
         }
         return result.isEmpty ? nil : result
     }

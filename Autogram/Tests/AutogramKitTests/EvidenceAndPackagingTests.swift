@@ -33,11 +33,14 @@ final class EvidenceAndPackagingTests: XCTestCase {
         XCTAssertTrue(csv.contains("\"Zmluva; o dielo\""))
         XCTAssertTrue(csv.contains("2026/000001"))
     }
-    func testASiCEVerifierReadsDeflateEntries() throws {
-        // Regression: ASiC-E containers produced by the Java/DSS signing engine use
-        // DEFLATE entries; the verifier must accept them, not only STORED entries.
+    func testASiCEVerifierReadsDeflateEntriesWithDataDescriptors() throws {
+        // Regression: ASiC-E containers produced by signing engines (Java/DSS,
+        // Podpisuj.sk) use DEFLATE entries with data descriptors: local headers
+        // carry zero sizes and the true sizes live only in the central directory.
+        // Structure mirrors the real reference container byte-for-byte.
         let payload = Data(String(repeating: "0123456789ABCDEF", count: 64).utf8)
         let compressed = try XCTUnwrap(deflate(payload))
+        let name = "document.pdf"
 
         func u16(_ v: Int) -> [UInt8] { [UInt8(v & 0xFF), UInt8((v >> 8) & 0xFF)] }
         func u32(_ v: Int) -> [UInt8] {
@@ -45,21 +48,42 @@ final class EvidenceAndPackagingTests: XCTestCase {
         }
 
         var zip = Data([0x50, 0x4B, 0x03, 0x04])
-        zip += u16(20)                  // version
-        zip += u16(0)                   // flags
-        zip += u16(8)                   // method = DEFLATE
-        zip += u16(0) + u16(0)          // time, date
-        zip += u32(0)                   // crc32 (not verified by the reader)
-        zip += u32(compressed.count)    // compressed size
-        zip += u32(payload.count)       // uncompressed size
-        zip += u16("document.pdf".count)
-        zip += u16(0)                   // extra length
-        zip += Data("document.pdf".utf8)
+        zip += u16(20)              // version
+        zip += u16(0x0808)          // flags: data descriptor + UTF-8
+        zip += u16(8)               // method = DEFLATE
+        zip += u16(0) + u16(0)      // time, date
+        zip += u32(0)               // crc32 (in descriptor)
+        zip += u32(0) + u32(0)      // local sizes are ZERO with descriptors
+        zip += u16(name.count) + u16(0)
+        zip += Data(name.utf8)
         zip += compressed
+        zip += [0x50, 0x4B, 0x07, 0x08]   // data descriptor signature
+        zip += u32(0)                     // crc32
+        zip += u32(compressed.count)
+        zip += u32(payload.count)
+
+        let centralOffset = zip.count
+        zip += [0x50, 0x4B, 0x01, 0x02]   // central directory header
+        zip += u16(20) + u16(20)          // version made by / needed
+        zip += u16(0x0808) + u16(8)       // flags, method
+        zip += u16(0) + u16(0)            // time, date
+        zip += u32(0)                     // crc32
+        zip += u32(compressed.count) + u32(payload.count)
+        zip += u16(name.count) + u16(0) + u16(0)   // name, extra, comment lengths
+        zip += u16(0) + u16(0)            // disk, internal attrs
+        zip += u32(0)                     // external attrs
+        zip += u32(0)                     // local header offset
+        zip += Data(name.utf8)
+
+        zip += [0x50, 0x4B, 0x05, 0x06]   // EOCD
+        zip += u16(0) + u16(0)            // disk numbers
+        zip += u16(1) + u16(1)            // entry counts
+        zip += u32(zip.count - centralOffset) + u32(centralOffset)
+        zip += u16(0)                     // comment length
 
         let entries = try XCTUnwrap(ASiCEContainerVerifier.readEntries(zip))
         XCTAssertEqual(entries.count, 1)
-        XCTAssertEqual(entries.first?.name, "document.pdf")
+        XCTAssertEqual(entries.first?.name, name)
         XCTAssertEqual(entries.first?.data, payload)
     }
 
