@@ -1,4 +1,5 @@
 import SwiftUI
+import AutogramKit
 
 @MainActor
 @Observable
@@ -42,17 +43,17 @@ struct AutogramApp: App {
     var body: some Scene {
         WindowGroup {
             RootView(model: model)
-                .frame(minWidth: 760, minHeight: 640)
+                .frame(minWidth: MacOS27Layout.rootMinimumWidth, minHeight: 640)
                 .frame(idealWidth: 1320, idealHeight: 860)
         }
         .windowStyle(.automatic)
         .defaultSize(width: 1320, height: 860)
+        .commands {
+            AutogramCommands()
+        }
 
         Settings {
             SettingsView(settingsStore: model.settingsStore)
-        }
-        .commands {
-            AutogramCommands()
         }
     }
 }

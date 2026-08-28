@@ -25,12 +25,9 @@ final class MacOS27UXContractTests: XCTestCase {
     }
 
     func testInspectorLayoutCanCollapseWithoutWideningRoot() {
-        let inspectorMinWidth: CGFloat = 0
-        let rootMinWidth: CGFloat = 760
-        let preferredCanvasWidth: CGFloat = 460
-        let preferredInspectorWidth: CGFloat = 350
-
-        XCTAssertEqual(inspectorMinWidth, 0)
-        XCTAssertLessThan(rootMinWidth, preferredCanvasWidth + preferredInspectorWidth)
+        XCTAssertEqual(MacOS27Layout.inspectorMinimumWidth, 0)
+        XCTAssertLessThan(
+            MacOS27Layout.rootMinimumWidth,
+            MacOS27Layout.canvasMinimumWidth + MacOS27Layout.inspectorIdealWidth)
     }
 }

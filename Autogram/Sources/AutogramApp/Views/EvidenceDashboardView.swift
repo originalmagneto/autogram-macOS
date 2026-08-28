@@ -479,7 +479,7 @@ struct RecordDetailView: View {
                 "\(record.totalPages) strán / \(record.totalSheets) listov / \(record.securityElementCount) prvkov")
             fingerprintRow
         }
-        .liquidGlass(cornerRadius: 12, padding: 12)
+        .glassCard(cornerRadius: 12, padding: 12)
     }
 
     @ViewBuilder

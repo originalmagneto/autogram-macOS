@@ -98,7 +98,7 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
                     .padding(.top, 2)
             }
-            .liquidGlass(cornerRadius: 14, padding: 16)
+            .glassCard(cornerRadius: 14, padding: 16)
 
             if settingsStore.settings.aiMode == .omlxLocal {
                 VStack(alignment: .leading, spacing: 12) {
@@ -128,7 +128,7 @@ struct SettingsView: View {
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
-                .liquidGlass(cornerRadius: 14, padding: 16)
+                .glassCard(cornerRadius: 14, padding: 16)
             }
 
             if settingsStore.settings.aiMode == .ollamaLocal {
@@ -159,7 +159,7 @@ struct SettingsView: View {
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
-                .liquidGlass(cornerRadius: 14, padding: 16)
+                .glassCard(cornerRadius: 14, padding: 16)
             }
 
             if settingsStore.settings.aiMode == .customAPIKey {
@@ -206,7 +206,7 @@ struct SettingsView: View {
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
-                .liquidGlass(cornerRadius: 14, padding: 16)
+                .glassCard(cornerRadius: 14, padding: 16)
             }
 
             VStack(alignment: .leading, spacing: 10) {
@@ -240,7 +240,7 @@ struct SettingsView: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
-            .liquidGlass(cornerRadius: 14, padding: 16)
+            .glassCard(cornerRadius: 14, padding: 16)
         }
     }
 
@@ -301,7 +301,7 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            .liquidGlass(cornerRadius: 14, padding: 16)
+            .glassCard(cornerRadius: 14, padding: 16)
 
             VStack(alignment: .leading, spacing: 14) {
                 Label("Časová pečiatka (RFC 3161 TSA)", systemImage: "clock.badge.checkmark")
@@ -390,7 +390,7 @@ struct SettingsView: View {
                     }
                 }
             }
-            .liquidGlass(cornerRadius: 14, padding: 16)
+            .glassCard(cornerRadius: 14, padding: 16)
         }
     }
 
@@ -492,7 +492,7 @@ struct SettingsView: View {
                 }
                 .padding(.top, 4)
             }
-            .liquidGlass(cornerRadius: 14, padding: 16)
+            .glassCard(cornerRadius: 14, padding: 16)
         }
     }
 
@@ -521,7 +521,7 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
                     .padding(20)
                     .frame(maxWidth: .infinity)
-                    .liquidGlass(cornerRadius: 14)
+                    .glassCard(cornerRadius: 14)
             } else {
                 ForEach($settingsStore.settings.profiles) { $profile in
                     let isActive = settingsStore.settings.activeProfileID == profile.id
@@ -611,7 +611,7 @@ struct SettingsView: View {
                             .font(.callout)
                             .toggleStyle(.switch)
                     }
-                    .liquidGlass(cornerRadius: 14, padding: 16)
+                    .glassCard(cornerRadius: 14, padding: 16)
                 }
             }
         }

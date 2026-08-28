@@ -132,7 +132,7 @@ struct AuthorizeView: View {
                 }
             }
         }
-        .liquidGlass(cornerRadius: 14, padding: 14)
+        .glassCard(cornerRadius: 14, padding: 14)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
@@ -187,7 +187,7 @@ struct AuthorizeView: View {
                 .background(Color.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
             }
         }
-        .liquidGlass(cornerRadius: 14, padding: 14)
+        .glassCard(cornerRadius: 14, padding: 14)
         .frame(width: 380)
     }
 
@@ -317,7 +317,7 @@ struct DoneView: View {
                         .foregroundStyle(.secondary)
                         .textSelection(.enabled)
                 }
-                .liquidGlass(cornerRadius: 12, padding: 12)
+                .glassCard(cornerRadius: 12, padding: 12)
                 .frame(maxWidth: 520)
 
                 HStack(spacing: 12) {

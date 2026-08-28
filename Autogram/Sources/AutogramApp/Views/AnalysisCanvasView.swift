@@ -51,14 +51,16 @@ struct AnalysisCanvasView: View {
 
                     VStack(spacing: 10) {
                         pageImageLoader
-                            .frame(minWidth: 460, maxWidth: .infinity, maxHeight: .infinity)
+                            .frame(minWidth: MacOS27Layout.canvasMinimumWidth, maxWidth: .infinity, maxHeight: .infinity)
                         countersRow
                     }
                     .padding(14)
                 }
 
                 elementsPanel
-                    .frame(minWidth: 0, idealWidth: 350, maxWidth: 400)
+                    .frame(minWidth: MacOS27Layout.inspectorMinimumWidth,
+                           idealWidth: MacOS27Layout.inspectorIdealWidth,
+                           maxWidth: 400)
             }
 
             StickyActionBar {
@@ -178,6 +180,7 @@ struct AnalysisCanvasView: View {
             toolButton(kind: .embossedSeal, title: "Pečať", icon: "rosette")
             toolButton(kind: .initial, title: "Parafa", icon: "text.badge.checkmark")
         }
+        .liquidGlass(cornerRadius: 12, padding: 3)
     }
 
     /// Indicator + inline switcher for the detection provider. Apple Vision

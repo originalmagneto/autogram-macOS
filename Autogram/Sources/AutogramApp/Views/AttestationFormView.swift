@@ -273,7 +273,7 @@ struct AttestationFormView: View {
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.secondary)
             VStack(spacing: 8) { content() }
-                .liquidGlass(cornerRadius: 14, padding: 14)
+                .glassCard(cornerRadius: 14, padding: 14)
         }
     }
 }
