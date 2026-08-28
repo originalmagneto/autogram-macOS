@@ -191,7 +191,7 @@ struct AuthorizeView: View {
             }
         }
         .glassCard(cornerRadius: 14, padding: 14)
-        .frame(width: 380)
+        .frame(minWidth: 280, idealWidth: 380, maxWidth: .infinity, alignment: .leading)
     }
 
     @ViewBuilder
@@ -225,41 +225,45 @@ struct IdentityRow: View {
     let onSelect: () -> Void
 
     var body: some View {
-        HStack(spacing: 10) {
-            Image(systemName: isSelected ? "largecircle.fill.circle" : "circle")
-                .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(identity.label)
-                    .font(.callout.weight(.medium))
-                    .lineLimit(2)
-                Text(identity.issuerSummary)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                if !identity.hasPrivateKey {
-                    Text("vyžaduje PIN/BOK na karte")
-                        .font(.caption2)
-                        .foregroundStyle(.orange)
+        Button(action: onSelect) {
+            HStack(spacing: 10) {
+                Image(systemName: isSelected ? "largecircle.fill.circle" : "circle")
+                    .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(identity.label)
+                        .font(.callout.weight(.medium))
+                        .lineLimit(2)
+                    Text(identity.issuerSummary)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                         .lineLimit(1)
+                    if !identity.hasPrivateKey {
+                        Text("vyžaduje PIN/BOK na karte")
+                            .font(.caption2)
+                            .foregroundStyle(.orange)
+                            .lineLimit(1)
+                    }
+                }
+                Spacer(minLength: 6)
+                if identity.isMandateCertificate {
+                    badge("MANDÁTNY", tint: .green)
+                }
+                if identity.isQualified {
+                    badge("QCP", tint: .blue)
+                } else if !identity.id.hasPrefix("demo") {
+                    badge("KOMERČNÝ", tint: .orange)
                 }
             }
-            Spacer(minLength: 6)
-            if identity.isMandateCertificate {
-                badge("MANDÁTNY", tint: .green)
-            }
-            if identity.isQualified {
-                badge("QCP", tint: .blue)
-            } else if !identity.id.hasPrefix("demo") {
-                badge("KOMERČNÝ", tint: .orange)
-            }
+            .padding(9)
+            .background(isSelected ? Color.accentColor.opacity(0.09) : Color.primary.opacity(0.03),
+                        in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 10)
+                .strokeBorder(isSelected ? Color.accentColor.opacity(0.5) : Color.primary.opacity(0.07)))
         }
-        .padding(9)
-        .background(isSelected ? Color.accentColor.opacity(0.09) : Color.primary.opacity(0.03),
-                    in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 10)
-            .strokeBorder(isSelected ? Color.accentColor.opacity(0.5) : Color.primary.opacity(0.07)))
-        .contentShape(Rectangle())
-        .onTapGesture(perform: onSelect)
+        .buttonStyle(.plain)
+        .accessibilityLabel("Certifikát \(identity.label)")
+        .accessibilityValue("\(identity.issuerSummary); \(isSelected ? "Vybraný" : "Nevybraný")")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     private func badge(_ text: String, tint: Color) -> some View {
@@ -275,7 +279,7 @@ struct IdentityRow: View {
 // MARK: - Step 5: Done View for ZaKo
 struct DoneView: View {
     let store: ZakoSessionStore
-
+    @State private var exportError: String?
     var body: some View {
         VStack(spacing: 24) {
             Spacer()
@@ -336,33 +340,43 @@ struct DoneView: View {
                         .font(.caption2.monospaced())
                         .foregroundStyle(.secondary)
                         .textSelection(.enabled)
+
+                    HStack(spacing: 12) {
+                        Button {
+                            NSWorkspace.shared.open(directory)
+                        } label: {
+                            Label("Ukázať vo Finderi", systemImage: "folder")
+                        }
+                        .controlSize(.large)
+
+                        Button {
+                            exportAs()
+                        } label: {
+                            Label("Uložiť ako…", systemImage: "square.and.arrow.up")
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.large)
+
+                        Button {
+                            startNewConversion()
+                        } label: {
+                            Label("Nová konverzia", systemImage: "plus")
+                        }
+                        .controlSize(.large)
+                    }
+                    if let exportError {
+                        HStack(spacing: 8) {
+                            Text(exportError)
+                                .font(.caption)
+                                .foregroundStyle(.red)
+                            Button("Skúsiť znova", action: exportAs)
+                                .buttonStyle(.bordered)
+                        }
+                        .accessibilityElement(children: .combine)
+                    }
                 }
                 .glassCard(cornerRadius: 12, padding: 12)
                 .frame(maxWidth: 520)
-
-                HStack(spacing: 12) {
-                    Button {
-                        NSWorkspace.shared.open(directory)
-                    } label: {
-                        Label("Ukázať vo Finderi", systemImage: "folder")
-                    }
-                    .controlSize(.large)
-
-                    Button {
-                        exportAs()
-                    } label: {
-                        Label("Uložiť ako…", systemImage: "square.and.arrow.up")
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
-
-                    Button {
-                        startNewConversion()
-                    } label: {
-                        Label("Nová konverzia", systemImage: "plus")
-                    }
-                    .controlSize(.large)
-                }
             }
 
             Spacer()
@@ -371,16 +385,22 @@ struct DoneView: View {
     }
 
     private func exportAs() {
+        exportError = nil
         guard let directory = store.outputDirectory else { return }
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.pdf]
         panel.nameFieldStringValue = (store.attestation.newDocumentName.isEmpty ? "dokument" : store.attestation.newDocumentName) + "-konvertovane"
         panel.begin { response in
             guard response == .OK, let url = panel.url else { return }
-            let files = (try? FileManager.default.contentsOfDirectory(at: directory,
-                                                                      includingPropertiesForKeys: nil)) ?? []
-            if let pdf = files.first(where: { $0.pathExtension.lowercased() == "pdf" }) {
-                try? FileManager.default.copyItem(at: pdf, to: url)
+            do {
+                let files = try FileManager.default.contentsOfDirectory(at: directory,
+                                                                         includingPropertiesForKeys: nil)
+                guard let pdf = files.first(where: { $0.pathExtension.lowercased() == "pdf" }) else {
+                    throw CocoaError(.fileNoSuchFile, userInfo: [NSLocalizedDescriptionKey: "PDF výstup sa nenašiel."])
+                }
+                try FileManager.default.copyItem(at: pdf, to: url)
+            } catch {
+                exportError = "Export sa nepodaril: \(error.localizedDescription)"
             }
         }
     }

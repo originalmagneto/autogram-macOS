@@ -296,9 +296,10 @@ struct ConfidenceBar: View {
             .overlay(alignment: .leading) {
                 Capsule()
                     .fill((confidence > 0.75 ? Color.green : confidence > 0.5 ? Color.orange : Color.red).gradient)
-                    .frame(width: max(confidence, 0.05) * 44, height: 5)
+                    .frame(width: max(min(confidence, 1), 0.05) * 44, height: 5)
             }
-            .help("Istota detekcie \(Int(confidence * 100)) %")
+            .accessibilityLabel(UXLabels.confidenceLabel(for: confidence))
+            .help(UXLabels.confidenceLabel(for: confidence))
     }
 }
 

@@ -8,6 +8,10 @@ struct SettingsView: View {
     @State private var tsaTestStatus: String?
     @State private var isTestingTSA = false
     @State private var ezzkSavedHint = false
+    @State private var tsaToDelete: String?
+    @State private var showTSADeleteConfirmation = false
+    @State private var profileToDelete: UUID?
+    @State private var showProfileDeleteConfirmation = false
 
     var body: some View {
         TabView {
@@ -47,7 +51,40 @@ struct SettingsView: View {
             }
             .tabItem { Label("Profily advokáta", systemImage: "person.crop.circle.badge.checkmark") }
         }
+        .confirmationDialog("Naozaj chcete odstrániť tento TSA server?",
+                           isPresented: $showTSADeleteConfirmation,
+                           titleVisibility: .visible) {
+            Button("Odstrániť TSA server", role: .destructive) {
+                if let server = tsaToDelete {
+                    settingsStore.settings.customTSAServers.removeAll { $0 == server }
+                    if settingsStore.settings.selectedTSAURL == server {
+                        settingsStore.settings.selectedTSAURL = TimestampAuthority.legacyDefaultURL
+                    }
+                }
+                tsaToDelete = nil
+            }
+            Button("Zrušiť", role: .cancel) { tsaToDelete = nil }
+        } message: {
+            Text("Server bude odstránený zo zoznamu vlastných TSA služieb.")
+        }
+        .confirmationDialog("Naozaj chcete odstrániť tento profil?",
+                           isPresented: $showProfileDeleteConfirmation,
+                           titleVisibility: .visible) {
+            Button("Odstrániť profil", role: .destructive) {
+                if let id = profileToDelete {
+                    settingsStore.settings.profiles.removeAll { $0.id == id }
+                    if settingsStore.settings.activeProfileID == id {
+                        settingsStore.settings.activeProfileID = settingsStore.settings.profiles.first?.id
+                    }
+                }
+                profileToDelete = nil
+            }
+            Button("Zrušiť", role: .cancel) { profileToDelete = nil }
+        } message: {
+            Text("Profil a jeho údaje budú odstránené z tejto aplikácie.")
+        }
     }
+
 
     // MARK: - Tab 1: AI Vision
     private var aiTab: some View {
@@ -281,6 +318,9 @@ struct SettingsView: View {
             )
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(title)
+        .accessibilityValue(isSelected ? "Vybraný" : "Nevybraný")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     // MARK: - Tab 2: Konverzia PDF/A
@@ -290,7 +330,7 @@ struct SettingsView: View {
                 Text("Spôsob konverzie do PDF/A")
                     .font(.headline)
 
-                Picker("", selection: $settingsStore.settings.pdfaMode) {
+                Picker("Režim PDF/A", selection: $settingsStore.settings.pdfaMode) {
                     ForEach(PDFAConversionMode.allCases, id: \.self) { mode in
                         Text(mode.rawValue).tag(mode)
                     }
@@ -314,12 +354,12 @@ struct SettingsView: View {
                             .foregroundStyle(.secondary)
                             .frame(width: 140, alignment: .leading)
 
-                        Picker("", selection: $settingsStore.settings.selectedTSAURL) {
+                        Picker("Aktívna TSA", selection: $settingsStore.settings.selectedTSAURL) {
                             ForEach(settingsStore.settings.availableTSAServers) { server in
                                 Text("\(server.name) (\(server.url))").tag(server.url)
                             }
                         }
-                        .labelsHidden()
+                        .accessibilityLabel("Aktívna TSA")
                     }
                 }
 
@@ -338,12 +378,10 @@ struct SettingsView: View {
                                     .textSelection(.enabled)
                                 Spacer()
                                 Button {
-                                    settingsStore.settings.customTSAServers.removeAll { $0 == server }
-                                    if settingsStore.settings.selectedTSAURL == server {
-                                        settingsStore.settings.selectedTSAURL = TimestampAuthority.legacyDefaultURL
-                                    }
+                                    tsaToDelete = server
+                                    showTSADeleteConfirmation = true
                                 } label: {
-                                    Image(systemName: "trash")
+                                    Label("Odstrániť TSA server", systemImage: "trash")
                                         .foregroundStyle(.red)
                                 }
                                 .buttonStyle(.plain)
@@ -551,12 +589,10 @@ struct SettingsView: View {
 
                             if settingsStore.settings.profiles.count > 1 {
                                 Button(role: .destructive) {
-                                    settingsStore.settings.profiles.removeAll { $0.id == profile.id }
-                                    if settingsStore.settings.activeProfileID == profile.id {
-                                        settingsStore.settings.activeProfileID = settingsStore.settings.profiles.first?.id
-                                    }
+                                    profileToDelete = profile.id
+                                    showProfileDeleteConfirmation = true
                                 } label: {
-                                    Image(systemName: "trash")
+                                    Label("Odstrániť profil", systemImage: "trash")
                                 }
                                 .controlSize(.small)
                             }

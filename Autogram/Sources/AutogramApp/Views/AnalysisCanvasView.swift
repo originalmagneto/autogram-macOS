@@ -232,6 +232,7 @@ struct AnalysisCanvasView: View {
             }
             .disabled(store.previewPageIndex <= 0)
             .controlSize(.small)
+            .accessibilityLabel("Predchádzajúca strana")
 
             Text("Strana \(store.previewPageIndex + 1) z \(max(store.analysis.totalPages, 1))")
                 .font(.caption.monospacedDigit().weight(.medium))
@@ -245,6 +246,7 @@ struct AnalysisCanvasView: View {
             }
             .disabled(store.previewPageIndex >= max(store.analysis.totalPages - 1, 0))
             .controlSize(.small)
+            .accessibilityLabel("Nasledujúca strana")
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
@@ -386,9 +388,8 @@ struct AnalysisCanvasView: View {
                             Button {
                                 store.undoDelete()
                             } label: {
-                                Image(systemName: "arrow.uturn.backward")
+                                Label("Vrátiť zmazaný prvok", systemImage: "arrow.uturn.backward")
                             }
-                            .help("Vrátiť zmazaný prvok")
                             .controlSize(.small)
                         }
                     }
@@ -422,13 +423,17 @@ struct AnalysisCanvasView: View {
                                    })
                     }
 
+                    if store.selectedElementID != nil {
+                        selectedElementInspector
+                    }
+
                     Divider().padding(.vertical, 4)
 
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Manipulácia:")
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.secondary)
-                        Text("Klik na prvok ho vyberie a presúva. Ťahanie za roh zmení veľkosť z ktorejkoľvek strany. Nástroj pridáva nový prvok klikom na prázdne miesto.")
+                        Text("Ovládacie prvky nižšie umožňujú presun a zmenu veľkosti bez myši. Ťahanie na plátne zostáva rýchlejšou alternatívou.")
                             .font(.caption2)
                             .foregroundStyle(.tertiary)
                     }
@@ -440,6 +445,114 @@ struct AnalysisCanvasView: View {
         .overlay(alignment: .leading) {
             Rectangle().fill(Color.primary.opacity(0.08)).frame(width: 1)
         }
+    }
+
+    @ViewBuilder
+    private var selectedElementInspector: some View {
+        if let element = store.securityElements.first(where: { $0.id == store.selectedElementID }) {
+            VStack(alignment: .leading, spacing: 8) {
+                Label("Vybraný prvok: \(element.kind.rawValue)", systemImage: element.kind.sfSymbol)
+                    .font(.caption.weight(.semibold))
+                Text("Umiestnenie a veľkosť (0 až 1)")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+
+                Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 6) {
+                    GridRow {
+                        normalizedField("X", value: element.boundingBox.x) { value in
+                            updateBoundingBox(element.id) { $0.x = value }
+                        }
+                        normalizedField("Y", value: element.boundingBox.y) { value in
+                            updateBoundingBox(element.id) { $0.y = value }
+                        }
+                    }
+                    GridRow {
+                        normalizedField("Šírka", value: element.boundingBox.width) { value in
+                            updateBoundingBox(element.id) { $0.width = value }
+                        }
+                        normalizedField("Výška", value: element.boundingBox.height) { value in
+                            updateBoundingBox(element.id) { $0.height = value }
+                        }
+                    }
+                }
+
+                HStack(spacing: 6) {
+                    Text("Posun")
+                        .font(.caption2.weight(.semibold))
+                    placementButton("doľava", icon: "arrow.left", shortcut: .leftArrow) {
+                        adjustSelectedElement(dx: -0.01, dy: 0)
+                    }
+                    placementButton("doprava", icon: "arrow.right", shortcut: .rightArrow) {
+                        adjustSelectedElement(dx: 0.01, dy: 0)
+                    }
+                    placementButton("hore", icon: "arrow.up", shortcut: .upArrow) {
+                        adjustSelectedElement(dx: 0, dy: 0.01)
+                    }
+                    placementButton("dole", icon: "arrow.down", shortcut: .downArrow) {
+                        adjustSelectedElement(dx: 0, dy: -0.01)
+                    }
+                }
+
+                HStack(spacing: 6) {
+                    Text("Veľkosť")
+                        .font(.caption2.weight(.semibold))
+                    placementButton("zmenšiť šírku", icon: "arrow.left.and.right", shortcut: .leftArrow, modifiers: [.shift]) {
+                        adjustSelectedElement(dx: 0, dy: 0, dw: -0.01, dh: 0)
+                    }
+                    placementButton("zväčšiť šírku", icon: "arrow.left.and.right", shortcut: .rightArrow, modifiers: [.shift]) {
+                        adjustSelectedElement(dx: 0, dy: 0, dw: 0.01, dh: 0)
+                    }
+                    placementButton("zmenšiť výšku", icon: "arrow.up.and.down", shortcut: .downArrow, modifiers: [.shift]) {
+                        adjustSelectedElement(dx: 0, dy: 0, dw: 0, dh: -0.01)
+                    }
+                    placementButton("zväčšiť výšku", icon: "arrow.up.and.down", shortcut: .upArrow, modifiers: [.shift]) {
+                        adjustSelectedElement(dx: 0, dy: 0, dw: 0, dh: 0.01)
+                    }
+                }
+            }
+            .padding(10)
+            .background(Color.accentColor.opacity(0.07), in: RoundedRectangle(cornerRadius: 10))
+            .accessibilityElement(children: .contain)
+            .accessibilityValue("\(UXLabels.confidenceLabel(for: element.confidence)); \(UXLabels.provenanceLabel(detectedByAI: element.detectedByAI))")
+        }
+    }
+
+    private func normalizedField(_ label: String, value: Double,
+                                onChange: @escaping (Double) -> Void) -> some View {
+        TextField(label, value: Binding(
+            get: { value },
+            set: { onChange($0) }
+        ), format: .number.precision(.fractionLength(3)))
+        .textFieldStyle(.roundedBorder)
+        .frame(minWidth: 72)
+        .accessibilityLabel(label)
+    }
+
+    private func updateBoundingBox(_ id: UUID, update: (inout NormalizedRect) -> Void) {
+        guard var box = store.securityElements.first(where: { $0.id == id })?.boundingBox else { return }
+        update(&box)
+        store.updateElementBoundingBox(id: id, boundingBox: box)
+    }
+
+    private func adjustSelectedElement(dx: Double, dy: Double, dw: Double = 0, dh: Double = 0) {
+        guard let element = store.securityElements.first(where: { $0.id == store.selectedElementID }) else { return }
+        var box = element.boundingBox
+        box.x += dx
+        box.y += dy
+        box.width += dw
+        box.height += dh
+        store.updateElementBoundingBox(id: element.id, boundingBox: box)
+    }
+
+    private func placementButton(_ label: String, icon: String, shortcut: KeyEquivalent,
+                                 modifiers: EventModifiers = [], action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.small)
+        .accessibilityLabel(label)
+        .keyboardShortcut(shortcut, modifiers: modifiers)
     }
 
     private var unconfirmedWarning: some View {
@@ -588,15 +701,10 @@ struct ElementOverlay: View {
         let normPoint = mapper.normalizedPoint(from: value.location)
 
         if interaction == nil {
-            // 1. Existing element always wins: select and start move or corner-resize,
-            //    regardless of the active tool.
             if let hitID = store.elementID(at: normPoint, pageIndex: store.previewPageIndex),
                let element = store.securityElements.first(where: { $0.id == hitID }) {
                 store.selectedElementID = hitID
-
                 if let anchor = oppositeCornerAnchor(of: element.boundingBox, at: value.location) {
-                    // Anchor = the corner OPPOSITE the grabbed one, so the drag
-                    // resizes from the grabbed corner instead of collapsing.
                     interaction = .init(kind: .resizing(hitID, anchor), startPoint: anchor)
                 } else {
                     interaction = .init(kind: .moving(hitID), startPoint: normPoint)
@@ -604,15 +712,12 @@ struct ElementOverlay: View {
                 return
             }
 
-            // 2. Empty space with a tool: create and let the drag size the box
-            //    from the initial click point.
             if let tool = store.activeTool {
                 let newID = store.placeElement(kind: tool, at: normPoint)
                 interaction = .init(kind: .resizing(newID, normPoint), startPoint: normPoint)
                 return
             }
 
-            // 3. Empty space without a tool: deselect.
             store.selectedElementID = nil
             return
         }
@@ -637,55 +742,61 @@ struct ElementRow: View {
     let onDuplicate: () -> Void
     let onKindChange: (SecurityElement.Kind) -> Void
     let onDescriptionChange: (String) -> Void
+    @State private var showDeleteConfirmation = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 8) {
-                Image(systemName: element.kind.sfSymbol)
-                    .foregroundStyle(ElementKindColor.color(for: element.kind))
-                    .frame(width: 16)
-
-                Picker("", selection: Binding(get: { element.kind }, set: { onKindChange($0) })) {
-                    ForEach(SecurityElement.Kind.allCases, id: \.self) { kind in
-                        Text(kind.rawValue).tag(kind)
+        VStack(alignment: .leading, spacing: 8) {
+            Button(action: onSelect) {
+                HStack(spacing: 8) {
+                    Image(systemName: element.kind.sfSymbol)
+                        .foregroundStyle(ElementKindColor.color(for: element.kind))
+                        .frame(width: 16)
+                    Picker("Typ prvku", selection: Binding(get: { element.kind }, set: { onKindChange($0) })) {
+                        ForEach(SecurityElement.Kind.allCases, id: \.self) { kind in
+                            Text(kind.rawValue).tag(kind)
+                        }
                     }
+                    .pickerStyle(.menu)
+                    Spacer(minLength: 4)
+                    ConfidenceBar(confidence: element.confidence)
+                    Text(UXLabels.confidenceLabel(for: element.confidence))
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(.secondary)
                 }
-                .labelsHidden()
-                .pickerStyle(.menu)
-
-                Spacer(minLength: 4)
-
-                ConfidenceBar(confidence: element.confidence)
-                    .frame(width: 44)
             }
+            .buttonStyle(.plain)
+            .accessibilityLabel("\(element.kind.rawValue), \(UXLabels.provenanceLabel(detectedByAI: element.detectedByAI))")
+            .accessibilityValue("\(UXLabels.confidenceLabel(for: element.confidence)); \(isSelected ? "Vybraný" : "Nevybraný")")
+            .accessibilityAddTraits(isSelected ? .isSelected : [])
 
-            HStack(alignment: .top, spacing: 6) {
-                Text(element.verbalDescription.isEmpty ? "Bez popisu" : element.verbalDescription)
+            TextField("Popis prvku", text: Binding(
+                get: { element.verbalDescription },
+                set: { onDescriptionChange($0) }
+            ), axis: .vertical)
+            .lineLimit(2...4)
+            .textFieldStyle(.roundedBorder)
+            .accessibilityLabel("Popis prvku")
+
+            HStack(alignment: .center, spacing: 6) {
+                Label(UXLabels.provenanceLabel(detectedByAI: element.detectedByAI), systemImage: "info.circle")
                     .font(.caption2)
-                    .foregroundStyle(element.verbalDescription.isEmpty ? .tertiary : .secondary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
+                    .foregroundStyle(.secondary)
+                Spacer()
                 Button {
                     onDuplicate()
                 } label: {
-                    Image(systemName: "plus.square.on.square")
-                        .font(.caption2)
+                    Label("Duplikovať prvok", systemImage: "plus.square.on.square")
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
-                .help("Duplikovať prvok")
 
                 Button(role: .destructive) {
-                    onDelete()
+                    showDeleteConfirmation = true
                 } label: {
-                    Image(systemName: "trash")
-                        .font(.caption2)
+                    Label("Odstrániť prvok", systemImage: "trash")
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.red)
-                .help("Odstrániť prvok")
             }
         }
         .padding(10)
@@ -695,7 +806,13 @@ struct ElementRow: View {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .strokeBorder(isSelected ? Color.accentColor : Color.primary.opacity(0.08), lineWidth: 1)
         )
-        .contentShape(Rectangle())
-        .onTapGesture(perform: onSelect)
+        .confirmationDialog("Naozaj chcete odstrániť tento prvok?",
+                           isPresented: $showDeleteConfirmation,
+                           titleVisibility: .visible) {
+            Button("Odstrániť prvok", role: .destructive, action: onDelete)
+            Button("Zrušiť", role: .cancel) {}
+        } message: {
+            Text("Prvok bude odstránený z doložky. Túto zmenu môžete vrátiť tlačidlom Späť.")
+        }
     }
 }

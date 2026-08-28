@@ -21,6 +21,8 @@ struct RootView: View {
 
     @Bindable var model: AutogramAppModel
     @State private var selection: SidebarSection = .signing
+    @State private var queueItemToDelete: UUID?
+    @State private var showQueueDeleteConfirmation = false
 
     init(model: AutogramAppModel) {
         self._model = Bindable(wrappedValue: model)
@@ -47,24 +49,29 @@ struct RootView: View {
                 if !signingStore.queue.isEmpty {
                     Section("Fronta podpisovania (\(signingStore.queue.count))") {
                         ForEach(signingStore.queue) { item in
-                            HStack(spacing: 8) {
-                                Image(systemName: queueIcon(item.status))
-                                    .foregroundStyle(queueColor(item.status))
-                                    .frame(width: 16)
-                                Text(item.displayName)
-                                    .lineLimit(1)
-                                    .truncationMode(.middle)
-                                    .font(.callout)
-                                Spacer(minLength: 0)
-                            }
-                            .padding(.vertical, 2)
-                            .contentShape(Rectangle())
-                            .onTapGesture {
+                            let isSelected = signingStore.selectedQueueID == item.id
+                            Button {
                                 selection = .signing
                                 Task { await signingStore.selectQueueItem(item.id) }
+                            } label: {
+                                HStack(spacing: 8) {
+                                    Image(systemName: queueIcon(item.status))
+                                        .foregroundStyle(queueColor(item.status))
+                                        .frame(width: 16)
+                                    Text(item.displayName)
+                                        .lineLimit(1)
+                                        .truncationMode(.middle)
+                                        .font(.callout)
+                                    Spacer(minLength: 0)
+                                }
                             }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Dokument \(item.displayName)")
+                            .accessibilityValue("\(queueStatusLabel(item.status)); \(isSelected ? "Vybraný" : "Nevybraný")")
+                            .accessibilityAddTraits(isSelected ? .isSelected : [])
+                            .padding(.vertical, 2)
                             .listRowBackground(
-                                signingStore.selectedQueueID == item.id
+                                isSelected
                                     ? Color.accentColor.opacity(0.14)
                                     : Color.clear
                             )
@@ -80,7 +87,8 @@ struct RootView: View {
                                 }
                                 Divider()
                                 Button("Odstrániť z fronty", role: .destructive) {
-                                    signingStore.removeQueueItem(item.id)
+                                    queueItemToDelete = item.id
+                                    showQueueDeleteConfirmation = true
                                 }
                             }
                         }
@@ -128,6 +136,19 @@ struct RootView: View {
             openDocument: openDocument,
             addFiles: openMoreFiles,
             toggleSidebar: toggleSidebar))
+        .confirmationDialog(
+            "Naozaj chcete odstrániť dokument z fronty?",
+            isPresented: $showQueueDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Odstrániť z fronty", role: .destructive) {
+                if let id = queueItemToDelete { signingStore.removeQueueItem(id) }
+                queueItemToDelete = nil
+            }
+            Button("Zrušiť", role: .cancel) { queueItemToDelete = nil }
+        } message: {
+            Text("Dokument zostane v pôvodnom umiestnení; odstráni sa iba z fronty podpisovania.")
+        }
     }
 
     private var sidebarBottomBar: some View {
@@ -188,6 +209,14 @@ struct RootView: View {
         case .signing: "hourglass"
         case .signed: "checkmark.seal.fill"
         case .failed: "exclamationmark.triangle.fill"
+        }
+    }
+    private func queueStatusLabel(_ status: SigningSessionStore.SigningQueueItem.Status) -> String {
+        switch status {
+        case .ready: "Pripravené"
+        case .signing: "Podpisuje sa"
+        case .signed: "Podpísané"
+        case .failed: "Podpis zlyhal"
         }
     }
 

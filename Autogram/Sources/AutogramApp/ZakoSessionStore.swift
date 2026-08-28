@@ -343,6 +343,20 @@ final class ZakoSessionStore {
         }
     }
 
+    func updateElementBoundingBox(id: UUID, boundingBox: NormalizedRect) {
+        guard let index = securityElements.firstIndex(where: { $0.id == id }) else { return }
+        let clamped = NormalizedRect(
+            x: min(max(boundingBox.x, 0), 1),
+            y: min(max(boundingBox.y, 0), 1),
+            width: min(max(boundingBox.width, 0.01), 1),
+            height: min(max(boundingBox.height, 0.01), 1))
+        securityElements[index].boundingBox = NormalizedRect(
+            x: min(clamped.x, 1 - clamped.width),
+            y: min(clamped.y, 1 - clamped.height),
+            width: min(clamped.width, 1),
+            height: min(clamped.height, 1))
+    }
+
     func refreshIdentities() async {
         identities = await signingProvider.availableIdentities()
         if identities.isEmpty {

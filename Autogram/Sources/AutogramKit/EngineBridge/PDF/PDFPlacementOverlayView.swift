@@ -38,10 +38,10 @@ public final class PDFPlacementOverlayView: NSView {
 
         var accessibilityLabel: String {
             switch self {
-            case .topLeft: "Resize signature from top left corner"
-            case .topRight: "Resize signature from top right corner"
-            case .bottomLeft: "Resize signature from bottom left corner"
-            case .bottomRight: "Resize signature from bottom right corner"
+            case .topLeft: "Zmeniť veľkosť podpisu z ľavého horného rohu"
+            case .topRight: "Zmeniť veľkosť podpisu z pravého horného rohu"
+            case .bottomLeft: "Zmeniť veľkosť podpisu z ľavého dolného rohu"
+            case .bottomRight: "Zmeniť veľkosť podpisu z pravého dolného rohu"
             }
         }
     }
@@ -56,7 +56,16 @@ public final class PDFPlacementOverlayView: NSView {
     public var onPlacementChange: ((VisibleSignaturePlacement?) -> Void)?
 
     public var placement: VisibleSignaturePlacement? {
-        didSet { needsDisplay = true }
+        didSet {
+            needsDisplay = true
+            setAccessibilityRole(.group)
+            setAccessibilityLabel("Umiestnenie viditeľného podpisu")
+            if let placement {
+                setAccessibilityValue("Strana \(placement.pageIndex + 1), pozícia a veľkosť podpisu")
+            } else {
+                setAccessibilityValue("Podpis nie je umiestnený")
+            }
+        }
     }
 
     public var cardPreview: NSImage? {
