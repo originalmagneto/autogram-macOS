@@ -746,28 +746,37 @@ struct ElementRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Button(action: onSelect) {
-                HStack(spacing: 8) {
-                    Image(systemName: element.kind.sfSymbol)
-                        .foregroundStyle(ElementKindColor.color(for: element.kind))
-                        .frame(width: 16)
-                    Picker("Typ prvku", selection: Binding(get: { element.kind }, set: { onKindChange($0) })) {
-                        ForEach(SecurityElement.Kind.allCases, id: \.self) { kind in
-                            Text(kind.rawValue).tag(kind)
-                        }
+            HStack(spacing: 8) {
+                Button(action: onSelect) {
+                    HStack(spacing: 8) {
+                        Image(systemName: element.kind.sfSymbol)
+                            .foregroundStyle(ElementKindColor.color(for: element.kind))
+                            .frame(width: 16)
+                        Text(element.kind.rawValue)
+                            .font(.callout.weight(.medium))
+                            .lineLimit(1)
+                        Spacer(minLength: 0)
                     }
-                    .pickerStyle(.menu)
-                    Spacer(minLength: 4)
-                    ConfidenceBar(confidence: element.confidence)
-                    Text(UXLabels.confidenceLabel(for: element.confidence))
-                        .font(.caption2.monospacedDigit())
-                        .foregroundStyle(.secondary)
                 }
+                .buttonStyle(.plain)
+                .accessibilityLabel("\(element.kind.rawValue), \(UXLabels.provenanceLabel(detectedByAI: element.detectedByAI))")
+                .accessibilityValue("\(UXLabels.confidenceLabel(for: element.confidence)); \(isSelected ? "Vybraný" : "Nevybraný")")
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
+
+                Picker("Typ prvku", selection: Binding(get: { element.kind }, set: { onKindChange($0) })) {
+                    ForEach(SecurityElement.Kind.allCases, id: \.self) { kind in
+                        Text(kind.rawValue).tag(kind)
+                    }
+                }
+                .pickerStyle(.menu)
+                .accessibilityLabel("Typ prvku")
+                .accessibilityValue(element.kind.rawValue)
+
+                ConfidenceBar(confidence: element.confidence)
+                Text(UXLabels.confidenceLabel(for: element.confidence))
+                    .font(.caption2.monospacedDigit())
+                    .foregroundStyle(.secondary)
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("\(element.kind.rawValue), \(UXLabels.provenanceLabel(detectedByAI: element.detectedByAI))")
-            .accessibilityValue("\(UXLabels.confidenceLabel(for: element.confidence)); \(isSelected ? "Vybraný" : "Nevybraný")")
-            .accessibilityAddTraits(isSelected ? .isSelected : [])
 
             TextField("Popis prvku", text: Binding(
                 get: { element.verbalDescription },
