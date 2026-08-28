@@ -11,6 +11,7 @@ MODE="debug"
 if [[ "${1:-}" == "--release" ]]; then MODE="release"; fi
 
 export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode-26.5.app/Contents/Developer}"
+export MACOSX_DEPLOYMENT_TARGET="27.0"
 
 echo "▸ swift build -c $MODE"
 swift build -c "$MODE"
@@ -50,7 +51,7 @@ cat > "$CONTENTS/Info.plist" <<'PLIST'
     <key>CFBundleExecutable</key>
     <string>Autogram</string>
     <key>LSMinimumSystemVersion</key>
-    <string>14.0</string>
+    <string>27.0</string>
     <key>CFBundleDocumentTypes</key>
     <array>
         <dict>

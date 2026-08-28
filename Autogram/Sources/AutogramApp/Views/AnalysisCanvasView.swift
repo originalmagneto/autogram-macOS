@@ -44,14 +44,12 @@ struct AnalysisCanvasView: View {
                     if store.analysis.totalPages > 1 {
                         pageThumbnailStrip
                             .frame(width: 80)
-                            .background(.bar)
                             .overlay(alignment: .trailing) {
                                 Rectangle().fill(Color.primary.opacity(0.08)).frame(width: 1)
                             }
                     }
 
                     VStack(spacing: 10) {
-                        markupToolbar
                         pageImageLoader
                             .frame(minWidth: 460, maxWidth: .infinity, maxHeight: .infinity)
                         countersRow
@@ -60,7 +58,7 @@ struct AnalysisCanvasView: View {
                 }
 
                 elementsPanel
-                    .frame(minWidth: 320, idealWidth: 350, maxWidth: 400)
+                    .frame(minWidth: 0, idealWidth: 350, maxWidth: 400)
             }
 
             StickyActionBar {
@@ -99,22 +97,31 @@ struct AnalysisCanvasView: View {
         .task(id: "\(store.previewPageIndex)-\(store.document == nil)") {
             renderPage()
         }
+        .toolbar {
+            ToolbarItemGroup(placement: .principal) {
+                markupToolbar
+            }
+            ToolbarItemGroup(placement: .secondaryAction) {
+                detectionProviderPicker
+                sheetCountMenu
+                pageNavBar
+            }
+        }
     }
 
     private func renderPage() {
         guard let document = store.document,
               let page = document.page(at: min(store.previewPageIndex,
-                                               max(document.pageCount - 1, 0))) else {
+                                               max(document.pageCount - 1, 0))),
+              let rendered = BuiltInVisionProvider.render(page: page, targetWidth: 1240) else {
             pageImage = nil
             return
         }
-        // Aspect from the page cropBox so bitmap, frame and normalized mapping agree.
-        let bounds = page.bounds(for: .cropBox)
-        let aspect = bounds.width / max(bounds.height, 1)
-        let renderHeight: CGFloat = 1754
-        let renderSize = CGSize(width: renderHeight * aspect, height: renderHeight)
-        pageImage = page.thumbnail(of: renderSize, for: .cropBox)
-        pageAspect = aspect
+        // Rotation-aware render: displayed bitmap and aspect agree with the page
+        // as the user sees it (/Rotate honored).
+        let cg = rendered.cgImage
+        pageImage = NSImage(cgImage: cg, size: NSSize(width: cg.width, height: cg.height))
+        pageAspect = CGFloat(cg.width) / max(CGFloat(cg.height), 1)
     }
 
     // MARK: - Left Page Thumbnail Strip
@@ -161,23 +168,55 @@ struct AnalysisCanvasView: View {
         }
     }
 
-    // MARK: - Markup Floating Toolbar
+    // MARK: - Markup Toolbar
     private var markupToolbar: some View {
-        HStack(spacing: 6) {
-            HStack(spacing: 2) {
-                toolButton(kind: nil, title: "Vybrať", icon: "arrow.up.left.and.arrow.down.right")
-                Divider().frame(height: 16)
-                toolButton(kind: .officialStamp, title: "Pečiatka", icon: "seal.fill")
-                toolButton(kind: .handwrittenSignature, title: "Podpis", icon: "signature")
-                toolButton(kind: .embossedSeal, title: "Pečať", icon: "rosette")
-                toolButton(kind: .initial, title: "Parafa", icon: "text.badge.checkmark")
+        HStack(spacing: 2) {
+            toolButton(kind: nil, title: "Vybrať", icon: "arrow.up.left.and.arrow.down.right")
+            Divider().frame(height: 16)
+            toolButton(kind: .officialStamp, title: "Pečiatka", icon: "seal.fill")
+            toolButton(kind: .handwrittenSignature, title: "Podpis", icon: "signature")
+            toolButton(kind: .embossedSeal, title: "Pečať", icon: "rosette")
+            toolButton(kind: .initial, title: "Parafa", icon: "text.badge.checkmark")
+        }
+    }
+
+    /// Indicator + inline switcher for the detection provider. Apple Vision
+    /// (on-device) always runs; the selected mode only adds LLM findings.
+    private var detectionProviderPicker: some View {
+        let currentMode = store.settingsStore.settings.aiMode
+        return Menu {
+            Picker("Poskytovateľ detekcie", selection: Binding(
+                get: { store.settingsStore.settings.aiMode },
+                set: { store.settingsStore.settings.aiMode = $0 })) {
+                ForEach(AppSettings.AIMode.allCases) { mode in
+                    Label(mode.rawValue, systemImage: icon(for: mode)).tag(mode)
+                }
             }
-            .padding(3)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
-            )
+        } label: {
+            HStack(spacing: 5) {
+                Image(systemName: "sparkles")
+                Text("Detekcia: \(currentMode.rawValue)")
+                    .lineLimit(1)
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 8, weight: .bold))
+            }
+            .font(.caption)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+        }
+        .menuStyle(.borderedButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("Apple Vision beží vždy on-device; zvolený režim dopĺňa LLM klasifikáciu. Zmena sa prejaví pri ďalšej analýze.")
+    }
+
+    private func icon(for mode: AppSettings.AIMode) -> String {
+        switch mode {
+        case .omlxLocal: return "apple.logo"
+        case .ollamaLocal: return "laptopcomputer"
+        case .builtInOnDevice: return "bolt.badge.checkmark"
+        case .customAPIKey: return "key.fill"
+        case .disabled: return "xmark.circle"
         }
     }
 
@@ -206,7 +245,6 @@ struct AnalysisCanvasView: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
-        .background(.ultraThinMaterial, in: Capsule())
     }
 
     private func toolButton(kind: SecurityElement.Kind?, title: String, icon: String) -> some View {
@@ -292,8 +330,7 @@ struct AnalysisCanvasView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .liquidGlass(cornerRadius: 18, padding: 6)
-            .clipped()
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         }
     }
 
@@ -309,34 +346,31 @@ struct AnalysisCanvasView: View {
             StatChip(title: "Prvky",
                      value: "\(store.securityElements.count)",
                      symbol: "shield.checkerboard", tint: .green)
-
-            Spacer()
-
-            Menu {
-                Picker("Spôsob počítania listov", selection: $store.sheetMethod) {
-                    ForEach(SheetCountingMethod.allCases, id: \.self) { method in
-                        Text(method.rawValue).tag(method)
-                    }
-                }
-                if store.sheetMethod == .manual {
-                    Stepper("Počet listov: \(store.manualSheetCount ?? store.analysis.estimatedSheetsDuplex)",
-                            value: Binding(
-                                get: { store.manualSheetCount ?? store.analysis.estimatedSheetsDuplex },
-                                set: { store.manualSheetCount = $0 }),
-                            in: 1...999)
-                }
-            } label: {
-                Label("Spôsob: \(store.sheetMethod.rawValue)", systemImage: "rectangle.stack.badge.plus")
-                    .font(.caption)
-            }
-            .onChange(of: store.sheetMethod) { _, _ in
-                store.applySheetMethodChange()
-            }
-
-            pageNavBar
         }
     }
 
+    private var sheetCountMenu: some View {
+        Menu {
+            Picker("Spôsob počítania listov", selection: $store.sheetMethod) {
+                ForEach(SheetCountingMethod.allCases, id: \.self) { method in
+                    Text(method.rawValue).tag(method)
+                }
+            }
+            if store.sheetMethod == .manual {
+                Stepper("Počet listov: \(store.manualSheetCount ?? store.analysis.estimatedSheetsDuplex)",
+                        value: Binding(
+                            get: { store.manualSheetCount ?? store.analysis.estimatedSheetsDuplex },
+                            set: { store.manualSheetCount = $0 }),
+                        in: 1...999)
+            }
+        } label: {
+            Label("Spôsob: \(store.sheetMethod.rawValue)", systemImage: "rectangle.stack.badge.plus")
+                .font(.caption)
+        }
+        .onChange(of: store.sheetMethod) { _, _ in
+            store.applySheetMethodChange()
+        }
+    }
     private var elementsPanel: some View {
         VStack(spacing: 0) {
             ScrollView {
@@ -558,7 +592,9 @@ struct ElementOverlay: View {
                 store.selectedElementID = hitID
 
                 if let anchor = oppositeCornerAnchor(of: element.boundingBox, at: value.location) {
-                    interaction = .init(kind: .resizing(hitID, anchor), startPoint: normPoint)
+                    // Anchor = the corner OPPOSITE the grabbed one, so the drag
+                    // resizes from the grabbed corner instead of collapsing.
+                    interaction = .init(kind: .resizing(hitID, anchor), startPoint: anchor)
                 } else {
                     interaction = .init(kind: .moving(hitID), startPoint: normPoint)
                 }

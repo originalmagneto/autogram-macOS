@@ -13,24 +13,9 @@ public extension View {
     }
 
     func liquidGlass(cornerRadius: CGFloat = 18, padding: CGFloat = 16) -> some View {
-        self.padding(padding)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .strokeBorder(
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(0.20),
-                                Color.primary.opacity(0.06),
-                                Color.primary.opacity(0.02)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 1
-                    )
-            )
-            .shadow(color: Color.black.opacity(0.06), radius: 10, x: 0, y: 4)
+        self
+            .padding(padding)
+            .glassEffect(.regular, in: .rect(cornerRadius: cornerRadius))
     }
 
     func floatingGlass(cornerRadius: CGFloat = 24) -> some View {
@@ -56,7 +41,6 @@ struct StickyActionBar<Content: View>: View {
             }
             .padding(.horizontal, 18)
             .padding(.vertical, 12)
-            .background(.bar)
         }
     }
 }

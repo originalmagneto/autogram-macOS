@@ -7,7 +7,6 @@ struct RootView: View {
         case signing = "Podpisovanie"
         case zako = "Zaručená konverzia"
         case evidence = "Register konverzií"
-        case settings = "Nastavenia"
 
         var id: String { rawValue }
 
@@ -16,24 +15,20 @@ struct RootView: View {
             case .signing: return "signature"
             case .zako: return "building.columns.fill"
             case .evidence: return "archivebox.fill"
-            case .settings: return "gearshape.fill"
             }
         }
     }
 
+    @Bindable var model: AutogramAppModel
     @State private var selection: SidebarSection = .signing
-    @State private var settingsStore: AppSettingsStore
-    @State private var signingStore: SigningSessionStore
-    @State private var zakoStore: ZakoSessionStore
 
-    init() {
-        let settings = AppSettingsStore()
-        _settingsStore = State(initialValue: settings)
-        _signingStore = State(initialValue: SigningSessionStore(
-            signingProvider: settings.signingProvider,
-            settingsStore: settings))
-        _zakoStore = State(initialValue: ZakoSessionStore(settingsStore: settings))
+    init(model: AutogramAppModel) {
+        self._model = Bindable(wrappedValue: model)
     }
+
+    private var settingsStore: AppSettingsStore { model.settingsStore }
+    private var signingStore: SigningSessionStore { model.signingStore }
+    private var zakoStore: ZakoSessionStore { model.zakoStore }
 
     var body: some View {
         NavigationSplitView {
@@ -107,8 +102,9 @@ struct RootView: View {
                 }
 
                 Section("Predvoľby") {
-                    Label(SidebarSection.settings.rawValue, systemImage: SidebarSection.settings.symbol)
-                        .tag(SidebarSection.settings)
+                    SettingsLink {
+                        Label("Nastavenia", systemImage: "gearshape.fill")
+                    }
                 }
             }
             .listStyle(.sidebar)
@@ -121,7 +117,6 @@ struct RootView: View {
             detailView
                 .navigationTitle(selection.rawValue)
                 .navigationSubtitle(subtitle)
-                .toolbarBackgroundVisibility(.visible, for: .windowToolbar)
         }
         .task {
             FinderSigningRouter.shared.install { urls in
@@ -129,6 +124,10 @@ struct RootView: View {
                 Task { await signingStore.signFromFinder(urls) }
             }
         }
+        .focusedValue(\.autogramCommandActions, AutogramCommandActions(
+            openDocument: openDocument,
+            addFiles: openMoreFiles,
+            toggleSidebar: toggleSidebar))
     }
 
     private var sidebarBottomBar: some View {
@@ -156,7 +155,6 @@ struct RootView: View {
             .controlSize(.small)
         }
         .padding(12)
-        .background(.bar)
     }
 
     private var subtitle: String {
@@ -169,8 +167,6 @@ struct RootView: View {
             return "zaručená konverzia (§ 35-39 Zz)"
         case .evidence:
             return "register konverzií a CEZZK"
-        case .settings:
-            return "konfigurácia a profily"
         }
     }
 
@@ -183,8 +179,6 @@ struct RootView: View {
             ZakoFlowView(store: zakoStore)
         case .evidence:
             EvidenceDashboardView(settingsStore: settingsStore)
-        case .settings:
-            SettingsView(settingsStore: settingsStore)
         }
     }
 
@@ -206,6 +200,19 @@ struct RootView: View {
         }
     }
 
+    private func openDocument() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.pdf]
+        panel.allowsMultipleSelection = false
+        panel.begin { response in
+            guard response == .OK, let url = panel.url else { return }
+            Task { @MainActor in
+                selection = .signing
+                await signingStore.loadDocument(at: url)
+            }
+        }
+    }
+
     private func openMoreFiles() {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.pdf]
@@ -217,5 +224,9 @@ struct RootView: View {
                 await signingStore.addDocuments(at: panel.urls)
             }
         }
+    }
+
+    private func toggleSidebar() {
+        NSApp.sendAction(#selector(NSSplitViewController.toggleSidebar(_:)), to: nil, from: nil)
     }
 }
