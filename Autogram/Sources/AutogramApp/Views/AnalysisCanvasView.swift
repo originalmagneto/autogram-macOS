@@ -136,8 +136,19 @@ struct AnalysisCanvasView: View {
                     } label: {
                         ZStack(alignment: .topTrailing) {
                             RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .fill(Color.primary.opacity(isSelected ? 0.12 : 0.04))
+                                .fill(Color.white)
                                 .frame(width: 54, height: 72)
+                                .overlay {
+                                    if let page = store.document?.page(at: pageIndex) {
+                                        Image(nsImage: page.thumbnail(
+                                            of: CGSize(width: 108, height: 144),
+                                            for: .mediaBox))
+                                            .resizable()
+                                            .scaledToFit()
+                                            .frame(width: 52, height: 70)
+                                            .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+                                    }
+                                }
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 6, style: .continuous)
                                         .strokeBorder(isSelected ? Color.accentColor : Color.primary.opacity(0.1), lineWidth: isSelected ? 2 : 1)
@@ -146,7 +157,9 @@ struct AnalysisCanvasView: View {
                             Text("\(pageIndex + 1)")
                                 .font(.caption2.monospacedDigit().weight(.bold))
                                 .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
+                                .padding(.horizontal, 4)
                                 .padding(4)
+                                .background(.regularMaterial, in: Capsule())
 
                             if countOnPage > 0 {
                                 Text("\(countOnPage)")
