@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1160" height="640" viewBox="0 0 1160 640" role="img" aria-labelledby="arch-title arch-desc">
-  <title id="arch-title">Autogram macOS — architektúra</title>
+  <title id="arch-title">Autogram macOS - architektúra</title>
   <desc id="arch-desc">Vrstvená architektúra: SwiftUI aplikácia, session store a testovateľná knižnica AutogramKit s enginmi, dokumentovými službami a infraštruktúrou.</desc>
   <defs>
     <marker id="arr" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
@@ -12,12 +12,12 @@
 
   <rect x="0" y="0" width="1160" height="640" fill="#f5f5f5"/>
 
-  <text x="32" y="52" font-family="Georgia, 'Times New Roman', serif" font-size="30" fill="#2d3142">Autogram macOS — vrstvená architektúra</text>
-  <text x="32" y="76" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="10" letter-spacing="1.6" fill="#7a8399">SWIFTUI · @OBSERVABLE · ZERO DEPENDENCIES · MACOS 14+</text>
+  <text x="32" y="52" font-family="Georgia, 'Times New Roman', serif" font-size="30" fill="#2d3142">Autogram macOS - vrstvená architektúra</text>
+  <text x="32" y="76" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="10" letter-spacing="1.6" fill="#7a8399">SWIFTUI · @OBSERVABLE · ZERO PACKAGE DEPENDENCIES · MACOS 27 ONLY</text>
 
   <!-- Layer 1: App -->
   <rect x="32" y="104" width="1096" height="140" rx="8" fill="#ececec" stroke="rgba(45,49,66,0.12)" stroke-width="1"/>
-  <text x="48" y="128" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="9" letter-spacing="1.8" fill="#7a8399">AUTOGramAPP — SWIFTUI VRSTVA</text>
+  <text x="48" y="128" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="9" letter-spacing="1.8" fill="#7a8399">AUTOGRAMAPP - SWIFTUI VRSTVA</text>
   <g font-family="-apple-system, 'Helvetica Neue', Arial, sans-serif" font-size="12" font-weight="600" fill="#2d3142">
     <rect x="48" y="144" width="120" height="40" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
     <text x="108" y="168" text-anchor="middle">RootView</text>
@@ -42,8 +42,8 @@
 
   <!-- Focal store -->
   <rect x="352" y="276" width="456" height="56" rx="6" fill="rgba(235,108,54,0.08)" stroke="#eb6c36" stroke-width="1.2"/>
-  <text x="580" y="300" text-anchor="middle" font-family="-apple-system, 'Helvetica Neue', Arial, sans-serif" font-size="13" font-weight="600" fill="#2d3142">@Observable ZakoSessionStore</text>
-  <text x="580" y="318" text-anchor="middle" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="9" fill="#4f5d75">stav konverzie · analýza · prvky · doložka · výsledok</text>
+  <text x="580" y="300" text-anchor="middle" font-family="-apple-system, 'Helvetica Neue', Arial, sans-serif" font-size="13" font-weight="600" fill="#2d3142">@Observable session stores</text>
+  <text x="580" y="318" text-anchor="middle" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="9" fill="#4f5d75">SigningSessionStore · ZakoSessionStore · shared AppSettingsStore</text>
 
   <!-- connectors views -> store -->
   <line x1="250" y1="244" x2="420" y2="276" stroke="#4f5d75" stroke-width="1" marker-end="url(#arr)"/>
@@ -54,7 +54,7 @@
 
   <!-- Layer 3: Kit -->
   <rect x="32" y="372" width="1096" height="236" rx="8" fill="#ececec" stroke="rgba(45,49,66,0.12)" stroke-width="1"/>
-  <text x="48" y="396" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="9" letter-spacing="1.8" fill="#7a8399">AUTOGRAMKIT — LOGIKA (UNIT-TESTOVANÁ)</text>
+  <text x="48" y="396" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="9" letter-spacing="1.8" fill="#7a8399">AUTOGRAMKIT - LOGIKA (UNIT-TESTOVANÁ)</text>
 
   <!-- engines column -->
   <rect x="48" y="412" width="344" height="180" rx="8" fill="#f5f5f5" stroke="rgba(45,49,66,0.12)" stroke-width="1"/>
@@ -72,7 +72,7 @@
     <text x="300" y="506" text-anchor="middle">Ollama / OpenAI</text>
     <text x="300" y="520" text-anchor="middle" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="8.5" font-weight="400" fill="#7a8399">voliteľný LLM vision</text>
     <rect x="64" y="540" width="312" height="36" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="0.8"/>
-    <text x="220" y="554" text-anchor="middle">PaperClassifier · SheetCounter · TitleSuggest</text>
+    <text x="220" y="554" text-anchor="middle">PaperClassifier · sheet counting · title suggestion</text>
     <text x="220" y="568" text-anchor="middle" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="8.5" font-weight="400" fill="#7a8399">A4/A3/Letter · duplex · OCR titul</text>
   </g>
 
@@ -82,18 +82,18 @@
   <g font-family="-apple-system, 'Helvetica Neue', Arial, sans-serif" font-size="11.5" font-weight="600" fill="#2d3142">
     <rect x="424" y="444" width="160 " height="44" rx="6" fill="rgba(235,108,54,0.08)" stroke="#eb6c36" stroke-width="1.2"/>
     <text x="504" y="462" text-anchor="middle">PDFAConverter</text>
-    <text x="504" y="478" text-anchor="middle" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="8.5" font-weight="400" fill="#4f5d75">XMP pdfaid · OutputIntent</text>
+    <text x="504" y="478" text-anchor="middle" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="8.5" font-weight="400" fill="#4f5d75">XMP pdfaid · OutputIntent · validate</text>
     <rect x="592" y="444" width="160" height="44" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="0.8"/>
-    <text x="672" y="462" text-anchor="middle">ClauseGenerator</text>
+    <text x="672" y="462" text-anchor="middle">AttestationClauseGenerator</text>
     <text x="672" y="478" text-anchor="middle" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="8.5" font-weight="400" fill="#7a8399">XML schéma · SHA-256</text>
     <rect x="424" y="500" width="160" height="44" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="0.8"/>
     <text x="504" y="518" text-anchor="middle">EmbeddedFileService</text>
     <text x="504" y="534" text-anchor="middle" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="8.5" font-weight="400" fill="#7a8399">XML → PDF príloha</text>
     <rect x="592" y="500" width="160" height="44" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="0.8"/>
     <text x="672" y="518" text-anchor="middle">ClausePDFRenderer</text>
-    <text x="672" y="534" text-anchor="middle" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="8.5" font-weight="400" fill="#7a8399">tlač doložky (CoreText)</text>
+    <text x="672" y="534" text-anchor="middle" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="8.5" font-weight="400" fill="#7a8399">future preview / print</text>
     <rect x="424" y="556" width="328" height="20" rx="4" fill="rgba(45,49,66,0.05)" stroke="rgba(45,49,66,0.20)" stroke-width="0.8"/>
-    <text x="588" y="570" text-anchor="middle" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="9" fill="#4f5d75">ASiCEPackager · ZIP store + CRC32</text>
+    <text x="588" y="570" text-anchor="middle" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="9" fill="#4f5d75">ASiCEPackager · PDFAValidator · ConversionOutputNaming</text>
   </g>
 
   <!-- infra column -->
@@ -101,7 +101,7 @@
   <text x="800" y="434" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="9" letter-spacing="1.4" fill="#7a8399">INFRAŠTRUKTÚRA</text>
   <g font-family="-apple-system, 'Helvetica Neue', Arial, sans-serif" font-size="11.5" font-weight="600" fill="#2d3142">
     <rect x="800" y="444" width="296" height="36" rx="6" fill="rgba(45,49,66,0.05)" stroke="#4f5d75" stroke-width="0.8"/>
-    <text x="948" y="458" text-anchor="middle">EZZKServicing — Mock | HTTPS</text>
+    <text x="948" y="458" text-anchor="middle">EZZKServicing - Mock | HTTPS</text>
     <text x="948" y="472" text-anchor="middle" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="8.5" font-weight="400" fill="#7a8399">evidenčné číslo · serverový čas · zápis</text>
     <rect x="800" y="492" width="296" height="36" rx="6" fill="rgba(45,49,66,0.05)" stroke="#4f5d75" stroke-width="0.8"/>
     <text x="948" y="506" text-anchor="middle">QualifiedSigningProviding</text>

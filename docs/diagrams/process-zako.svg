@@ -11,7 +11,7 @@
   </defs>
 
   <rect width="1160" height="460" fill="#f5f5f5"/>
-  <text x="32" y="48" font-family="Georgia, 'Times New Roman', serif" font-size="30" fill="#2d3142">Zaručená konverzia P→E — procesný tok</text>
+  <text x="32" y="48" font-family="Georgia, 'Times New Roman', serif" font-size="30" fill="#2d3142">Zaručená konverzia P→E - procesný tok</text>
   <text x="32" y="72" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="10" letter-spacing="1.6" fill="#7a8399">§ 35–39 ZÁKONA Č. 305/2013 Z. Z. · VYHLÁŠKA MIRRI Č. 70/2021 Z. Z.</text>
 
   <!-- swimlane: advokát -->
@@ -19,7 +19,7 @@
   <text x="32" y="112" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="9" letter-spacing="1.4" fill="#7a8399">ADVOOKÁT</text>
   <!-- swimlane: autogram -->
   <line x1="32" y1="300" x2="1128" y2="300" stroke="#bfc0c0" stroke-width="1"/>
-  <text x="32" y="292" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="9" letter-spacing="1.4" fill="#7a8399">AUTOGRAM — AUTOMATIKA</text>
+  <text x="32" y="292" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="9" letter-spacing="1.4" fill="#7a8399">AUTOGRAM - AUTOMATIKA</text>
   <!-- lane: externé systémy -->
   <line x1="32" y1="420" x2="1128" y2="420" stroke="#bfc0c0" stroke-width="1"/>
   <text x="32" y="412" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="9" letter-spacing="1.4" fill="#7a8399">IS EZZK / CEZZK (MIRRI)</text>

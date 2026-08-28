@@ -422,7 +422,7 @@
    "updated": 1787923002839,
    "link": null,
    "locked": false,
-   "text": "zmergované · reviewované · 102 testov",
+   "text": "zmergované · reviewované · 107 testov · 0 fail",
    "fontSize": 9,
    "fontFamily": 3,
    "textAlign": "center",
@@ -430,7 +430,7 @@
    "containerId": null,
    "lineHeight": 1.25,
    "baseline": 8,
-   "originalText": "zmergované · reviewované · 102 testov",
+   "originalText": "zmergované · reviewované · 107 testov · 0 fail",
    "autoResize": true
   },
   {
@@ -1122,7 +1122,7 @@
    "updated": 1787923002839,
    "link": null,
    "locked": false,
-   "text": "rozhodnúť: 5 vs 4 stageov",
+   "text": "hotové: 5 krokov vrátane dokončenia",
    "fontSize": 9,
    "fontFamily": 3,
    "textAlign": "left",
@@ -1130,7 +1130,7 @@
    "containerId": null,
    "lineHeight": 1.25,
    "baseline": 8,
-   "originalText": "rozhodnúť: 5 vs 4 stageov",
+   "originalText": "hotové: 5 krokov vrátane dokončenia",
    "autoResize": true
   },
   {
@@ -1505,7 +1505,7 @@
    "updated": 1787923002839,
    "link": null,
    "locked": false,
-   "text": "Inherited zmeny",
+   "text": "Pipeline a výstupy",
    "fontSize": 11,
    "fontFamily": 2,
    "textAlign": "left",
@@ -1513,7 +1513,7 @@
    "containerId": null,
    "lineHeight": 1.25,
    "baseline": 9,
-   "originalText": "Inherited zmeny",
+   "originalText": "Pipeline a výstupy",
    "autoResize": true
   },
   {
@@ -1542,7 +1542,7 @@
    "updated": 1787923002839,
    "link": null,
    "locked": false,
-   "text": "rotation · pipeline · commit",
+   "text": "hotové: PDF/A · naming · delivery",
    "fontSize": 9,
    "fontFamily": 3,
    "textAlign": "left",
@@ -1550,7 +1550,7 @@
    "containerId": null,
    "lineHeight": 1.25,
    "baseline": 8,
-   "originalText": "rotation · pipeline · commit",
+   "originalText": "hotové: PDF/A · naming · delivery",
    "autoResize": true
   },
   {

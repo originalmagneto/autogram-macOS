@@ -55,6 +55,8 @@ struct AutogramApp: App {
         Settings {
             SettingsView(settingsStore: model.settingsStore)
         }
+        .defaultSize(width: 1080, height: 940)
+        .windowResizability(.contentSize)
     }
 }
 

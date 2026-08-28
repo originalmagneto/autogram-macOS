@@ -52,7 +52,7 @@
     <!-- failed -->
     <rect x="240" y="280" width="168" height="52" rx="6" fill="#ffffff" stroke="#eb6c36" stroke-width="1" stroke-dasharray="4,3"/>
     <text x="324" y="302" text-anchor="middle" fill="#2d3142">Odoslanie zlyhalo</text>
-    <text x="324" y="318" text-anchor="middle" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="8.5" font-weight="400" fill="#eb6c36">retry s backoffom</text>
+    <text x="324" y="318" text-anchor="middle" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="8.5" font-weight="400" fill="#eb6c36">manuálny retry</text>
   </g>
 
   <!-- transitions -->

@@ -1,170 +1,268 @@
 <p align="center">
-  <img src="docs/diagrams/hero.svg" alt="Autogram macOS: Podpisovanie a Zaručená konverzia" width="100%">
+  <img src="docs/diagrams/hero.svg" alt="Autogram macOS: podpisovanie a zaručená konverzia" width="100%">
 </p>
 
 # Autogram macOS
 
-**Natívna SwiftUI aplikácia na elektronické podpisovanie dokumentov** so štandardným režimom podpisovania (KEP + kvalifikovaná časová pečiatka) a **advanced režimom Zaručená konverzia** podľa § 35-39 zákona č. 305/2013 Z. z. o e-Governmente a vyhlášky MIRRI č. 70/2021 Z. z.
+Autogram je natívna macOS aplikácia v SwiftUI na elektronické podpisovanie dokumentov a zaručenú konverziu listinných dokumentov do elektronickej podoby.
 
-`macOS 27 only` (native Liquid Glass) · `SwiftUI + @Observable` · `0 Swift package dependencies` · `Swift 6 strict concurrency` · `102 tests passed, 3 live skipped`
+- **Podpisovanie:** KEP alebo PAdES podpis, kvalifikovaná časová pečiatka a ASiC-E kontajner.
+- **Zaručená konverzia (ZaKo):** analýza dokumentu, označenie bezpečnostných prvkov, osvedčovacia doložka, PDF/A-2b, autorizácia mandátnym certifikátom a evidencia CEZZK.
+- **Register:** lokálne uložené záznamy konverzií, fronta odoslania do CEZZK, vyhľadávanie, filtrovanie a CSV export.
 
-> Implementačná dokumentácia fáz 1 až 4: [`docs/PHASES.md`](docs/PHASES.md)
+`macOS 27 only` · `Swift 6` · `SwiftUI + @Observable` · `0 Swift package dependencies` · `107 tests executed` · `3 skipped` · `0 failures`
+
+> Implementačná dokumentácia: [`docs/PHASES.md`](docs/PHASES.md)
 >
-> Aktuálny handoff pre ďalšieho AI agenta: [`docs/SESSION_HANDOFF_2026-08-28.md`](docs/SESSION_HANDOFF_2026-08-28.md)
+> Posledný odovzdávací záznam: [`docs/SESSION_HANDOFF_2026-08-28.md`](docs/SESSION_HANDOFF_2026-08-28.md)
 
 ---
 
-## Prehľad: jeden nástroj, dva režimy
+## Požiadavky
 
-### Štandardný režim: Podpisovanie
-Vložte PDF alebo obrazový sken, skontrolujte náhľad, voliteľne umiestnite vizuálnu pečiatku a podpíšte dokument kvalifikovaným elektronickým podpisom a časovou pečiatkou. Primárne akcie používajú natívnu macOS 27 toolbar a inspector hierarchiu.
+- macOS 27 alebo novší
+- Apple Silicon alebo Intel Mac podporovaný použitým Xcode toolchainom
+- Xcode 26.5 a Swift 6 pre zostavenie zo zdrojov
+- pre reálny podpis: kompatibilná eID karta, advokátsky preukaz alebo iný PKCS#11/CryptoTokenKit token
+- pre produkčné CEZZK odoslanie: účet a sieťové pripojenie k príslušnej službe
+- pre PDFBox normalizáciu: nainštalovaný Autogram macOS 2 engine s Java runtime; bez neho sa použije lokálny fallback iba vtedy, ak výsledok prejde lokálnou kontrolou
 
-### Rozšírený režim: Zaručená konverzia
-Papierový dokument sa prevedie do elektronickej podoby s účinkami osvedčenej kópie. Aplikácia pripraví analýzu, osvedčovaciu doložku a právny preflight. Autorizácia vyžaduje mandátny certifikát a kvalifikovanú časovú pečiatku.
+Aplikácia je cielene zostavená pre macOS 27. `Package.swift` preto deklaruje platformu `.macOS("27.0")` a build script zapisuje `LSMinimumSystemVersion=27.0`.
 
-Flow oddeľuje vytvorenie a podpísanie súborov od zápisu do centrálnej evidencie CEZZK. Ak sa odoslanie do CEZZK zaradí do fronty, completion obrazovka to zobrazí ako samostatný stav s lehotou a možnosťou opakovania.
+---
+
+## Dva hlavné pracovné režimy
+
+### 1. Podpisovanie
+
+1. Otvorte PDF cez `⌘O`, vložte ho drag and drop alebo použite Finder Quick Action.
+2. Voliteľne zapnite vizuálny podpis a upravte jeho vzhľad a umiestnenie.
+3. Vyberte podpisovú identitu a spustite **Podpísať KEP** (`⌘⏎`).
+4. Aplikácia použije CryptoTokenKit alebo EngineBridge s PKCS#11 fallbackom a podľa voľby pridá QTS.
+5. Výsledok zobrazí podpísaný dokument, stav podpisu a dostupné ASiC-E artefakty.
+
+Ak nie je dostupný reálny token, aplikácia použije jasne označený DEMO podpisovač. DEMO podpis nie je právne záväzný.
+
+### 2. Zaručená konverzia
+
+ZaKo používa päť krokov:
+
+1. **Import:** vstupný PDF alebo obrazový sken a potvrdenie originálu alebo úradne osvedčenej kópie.
+2. **Analýza:** formát strán, neprázdne strany, listy a návrh názvu dokumentu.
+3. **Označenie:** AI Vision a manuálne označenie podpisov, pečiatok, reliéfnych pečatí, paraf a iných prvkov.
+4. **Osvedčovacia doložka:** údaje osoby, počítadlá, lokalizácia prvkov, XML náhľad a právny preflight.
+5. **Autorizácia a dokončenie:** evidenčné číslo, dôveryhodný čas, PDF/A, podpis, lokálna evidencia a odoslanie do CEZZK.
+
+Odoslanie do CEZZK je oddelené od vytvorenia súborov. Ak sieťové odoslanie zlyhá, podpísané súbory zostanú k dispozícii a záznam prejde do fronty s manuálnou možnosťou opakovania.
+
+### Procesný diagram
+
+<img src="docs/diagrams/process-zako.svg" alt="Procesný tok zaručenej konverzie" width="100%">
+
+| Krok | Činnosť | Vykonáva |
+|---|---|---|
+| 01 | Import skenu alebo dokumentu a potvrdenie pôvodu | advokát |
+| 02 | Analýza strán, listov a formátu | Autogram |
+| 03 | AI Vision a manuálne označenie bezpečnostných prvkov | Autogram + advokát |
+| 04 | Osvedčovacia doložka a právny preflight | Autogram + advokát |
+| 05 | Evidenčné číslo a dôveryhodný serverový čas | IS EZZK |
+| 06 | PDF/A-2b, XML príloha a finálna validácia | Autogram |
+| 07 | KEP s mandátnym certifikátom a QTS | advokát |
+| 08 | Lokálna evidencia a odoslanie do 24 hodín | CEZZK |
+
+---
+
+## AI Vision a označovanie prvkov
+
+<img src="docs/diagrams/ai-vision.svg" alt="AI Vision detekcia bezpečnostných prvkov" width="100%">
+
+Vstavaný detector pracuje lokálne na zariadení. Používa Apple Vision na vylúčenie textových riadkov a čiarových kódov, farebné a tmavé masky, connected components a konzervatívne geometrické filtre. Detekcia sa analyzuje na šírke 760 px, farebná maska používa saturáciu `s > 0.18` a rasterizačný režim PDF/A používa 200 dpi.
+
+Výsledkom sú `SecurityElement` záznamy s:
+
+- typom prvku a stranou,
+- normalizovaným bounding boxom,
+- mierou istoty,
+- slovným opisom v slovenčine,
+- pôvodom nálezu a možnosťou manuálnej úpravy.
+
+Voliteľné LLM režimy sú **oMLX**, **Ollama** a vlastné OpenAI-compatible API. Vstavané pravidlá bežia vždy, takže aplikácia má použiteľný fallback aj bez LLM. Pri vlastnom cloudovom API môže obraz dokumentu opustiť Mac, preto treba endpoint a režim zvoliť podľa požiadaviek na ochranu údajov.
+
+---
+
+## PDF/A-2b a osvedčovacia doložka
+
+<img src="docs/diagrams/pdfa-pipeline.svg" alt="Dátové toky PDF/A konvertora" width="100%">
+
+ZaKo vytvorí najprv intermediárny PDF/A-2b. Vektorový režim zachováva textovú vrstvu. Rasterizovaný režim vyrenderuje každú stranu pri 200 dpi a vytvorí stabilný obrazový PDF.
+
+Aktívna pipeline je:
+
+```text
+PDF/A konverzia
+  -> SHA-256 intermediárneho PDF/A
+  -> XML ConversionRecord 1.0
+  -> EmbeddedFile osvedcovacia-dolozka.xml
+  -> finálna normalizácia PDF/A (PDFBox, ak je dostupný)
+  -> lokálna kontrola finálneho artefaktu
+  -> KEP/QTS, ASiC-E a lokálna evidencia
+```
+
+Hash sa počíta z konvertovaných PDF/A bajtov pred vložením XML. Finálny dokument však validujeme až po vložení XML, pretože príloha je súčasťou artefaktu, ktorý používateľ podpisuje a odovzdáva.
+
+PDF obsahuje asociovaný súbor cez `/AF` a `/AFRelationship /Data`. Samostatná doložka sa zapisuje ako `.xml.xdcf`. Ak podpisový provider vráti ASiC-E, vytvorí sa aj `.asice` kontajner s PDF/A a doložkou.
+
+`PDFAValidator` kontroluje štruktúru a stabilné PDF/A kontrakty: hlavičku, EOF, `startxref`, XMP `pdfaid`, OutputIntent, ICC profil, šifrovanie, JavaScript a asociáciu EmbeddedFile. Nie je to úplná náhrada za veraPDF alebo Acrobat Preflight, preto sa pri release validácii odporúča aj externý nástroj.
+
+---
+
+## Výstupy, názvy a umiestnenie
+
+ZaKo sa pokúsi uložiť výstupy do zapisovateľného priečinka zdrojového dokumentu. Ak zdrojový priečinok nie je zapisovateľný alebo import nemá použiteľný security scope, použije sa:
+
+```text
+~/Library/Application Support/Autogram/Output
+```
+
+Názov PDF zachováva väzbu na pôvodný dokument. Typické príklady:
+
+```text
+diplom.pdf                  -> diplom-konvertovane.pdf
+diplom.pdf + nový názov     -> diplom-novy-nazov.pdf
+```
+
+Prípony generované pri ZaKo:
+
+- `{dokument}.pdf`: finálny podpísaný PDF/A-2b,
+- `{dokument}-{evidenčné-číslo}.xml.xdcf`: samostatná osvedčovacia doložka,
+- `{dokument}.asice`: voliteľný ASiC-E výstup podľa podpisového providera.
+
+Pri existujúcom súbore sa použije collision-safe suffix, napríklad `(2)`, aby sa pôvodný artefakt neprepísal. Výber cez file picker aj drag and drop zachováva zdrojový priečinok počas dokumentovej session pomocou security-scoped access.
+
+Štandardné podpisovanie používa zapisovateľný priečinok zdroja a pri nedostupnosti rovnaký Application Support fallback. Výstupný stem má tvar `{pôvodný-názov}_podpisane`.
+
+---
+
+## Nastavenia
+
+Native Settings scene obsahuje všetky konfiguračné oblasti v štyroch tabuľkách:
+
+1. **AI Vision:** on-device, oMLX, Ollama, vlastné OpenAI-compatible API, vypnutie asistenta, endpointy, modely, Keychain API kľúč a vlastný klasifikačný prompt.
+2. **Konverzia PDF/A:** vektorový alebo rasterizovaný režim, aktívna RFC 3161 TSA, vlastné TSA servery a test spojenia.
+3. **EZZK:** IČO, prihlasovacie meno, heslo v Keychain, notifikačný e-mail a adresa eDesk.
+4. **Profily advokáta:** viac profilov, aktívny profil, meno, funkcia, SAK číslo, IČO, kancelária, adresa a právnická osoba.
+
+Settings okno má natívnu predvolenú veľkosť `1080 × 820` a obsah tabuľky sa nezabalí do vnútorného vertikálneho `ScrollView`. Záložky sú preto navrhnuté ako vysoké, roztiahnuté plochy s priamym prístupom k voľbám. Pri viacerých uložených profiloch sa zobrazia všetky profily v poradí uloženia.
+
+Tajomstvá sa neukladajú do JSON nastavení. AI API kľúč a EZZK heslo idú do systémovej Kľúčenky. Ostatné nastavenia sa ukladajú do UserDefaults ako verzované JSON.
+
+---
+
+## Finder Quick Action
+
+<img src="docs/diagrams/finder-quick-action.svg" alt="Finder Quick Action na podpis PDF súborov" width="100%">
+
+Vo Finderi označte PDF súbory, prípadne priečinok s PDF súbormi, a zvoľte **Rýchle akcie -> Podpísať s QES + QTS (Autogram)**.
+
+- Služba je registrovaná cez natívne `NSServices` v hlavnom bundle.
+- `NSRequiredContext` obmedzuje službu na Finder.
+- `FinderSigningRouter` odovzdá výber do `SigningSessionStore.signFromFinder(_:)`.
+- Dávka automaticky použije dostupnú kvalifikovanú identitu a aktívnu TSA.
+- Alternatívou je drag and drop viacerých súborov do hlavného okna.
+
+Ak sa akcia nezobrazuje, otvorte vo Finderi **Rýchle akcie -> Prispôsobiť…** a službu zapnite.
 
 ---
 
 ## Architektúra
 
-<img src="docs/diagrams/architecture.svg" alt="Architektúra Autogram macOS" width="100%">
+<img src="docs/diagrams/architecture.svg" alt="Vrstvená architektúra Autogram macOS" width="100%">
 
-Tri vrstvy tvoria natívna SwiftUI prezentácia (`AutogramApp`) so zdieľaným `AutogramAppModel`, dva reaktívne session store (`SigningSessionStore` pre štandardné podpisovanie a `ZakoSessionStore` pre zaručenú konverziu) a testovateľná knižnica `AutogramKit` s enginmi, dokumentovými službami a infraštruktúrou. Bez externých balíčkových závislostí; PDF/A zápis, XML generátor aj ZIP/ASiC-E packager sú vlastná implementácia. Reálne tokenové podpisovanie používa natívny CryptoTokenKit alebo EngineBridge s Java/DSS engine pre PKCS#11 tokeny.
+Projekt má tri hlavné vrstvy:
 
----
+1. **AutogramApp:** SwiftUI views, native toolbar, Settings scene, menu commands, drag and drop a lifecycle aplikácie.
+2. **Session stores:** `SigningSessionStore` riadi štandardné podpisovanie a `ZakoSessionStore` riadi päťkrokový ZaKo workflow.
+3. **AutogramKit:** testovateľná doménová a dokumentová logika, PDF analýza, Vision pipeline, XML doložka, PDF/A, podpisovanie, ASiC-E a evidencia.
 
-## Proces P→E krok za krokom
+Dáta lokálneho registra sa ukladajú do `register.json` v `~/Library/Application Support/Autogram/Evidence`. Nejde o Core Data ani SQLite databázu. CEZZK je abstrahované cez `EZZKServicing`, ktoré má demo implementáciu a HTTPS kostru.
 
-<img src="docs/diagrams/process-zako.svg" alt="Procesný tok zaručenej konverzie" width="100%">
-
-| # | Krok | Kto |
-|---|---|---|
-| 01 | Sken papierového originálu alebo osvedčenej kópie | advokát |
-| 02 | Analýza strán, listov a formátu listiny | Autogram |
-| 03 | AI Vision detekcia pečiatok a podpisov | Autogram |
-| 04 | Právny preflight a potvrdenie údajov | advokát |
-| 05 | Evidenčné číslo a dôveryhodný serverový čas | IS EZZK |
-| 06 | PDF/A-2b konverzia a XML EmbeddedFile | Autogram |
-| 07 | Autorizácia KEP mandátnym certifikátom a QTS | advokát |
-| 08 | Zápis záznamu do centrálnej evidencie do 24 h | CEZZK |
+Java/PDFBox je voliteľná runtime infraštruktúra pre čistú PDF/A normalizáciu. Pri chýbajúcom engine sa použije Swift fallback iba po úspešnej lokálnej validácii.
 
 ---
 
-## Životný cyklus záznamu
+## Životný cyklus evidencie
 
 <img src="docs/diagrams/state-machine.svg" alt="Stavový automat evidencie konverzií" width="100%">
 
-Každá konverzia prechádza od konceptu k zápisu v centrálnej evidencii. Aplikácia sleduje zákonnú 24-hodinovú lehotu. Výraznejšie varovanie po 20 hodinách a pulzujúci indikátor po lehote zostávajú otvorenou follow-up úlohou.
+Záznam prechádza stavmi konceptu, čakania na číslo, pripravenosti na autorizáciu, autorizácie, fronty odoslania a zápisu v CEZZK. Sieťové zlyhanie vedie na manuálne opakovanie z dashboardu. Záznamy majú 24-hodinovú lehotu od času konverzie; 20-hodinové varovanie je ešte otvorený UX follow-up.
 
 ---
 
-## Finder Quick Action: QES + QTS priamo z Findera
+## Register a bezpečnostné hranice
 
-<img src="docs/diagrams/finder-quick-action.svg" alt="Finder Quick Action: podpis označených PDF s QES a QTS" width="100%">
-
-Označte PDF (alebo priečinky s PDF) vo Finderi, kliknite pravým tlačidlom → *Rýchle akcie* → **Podpísať s QES + QTS (Autogram)**. Autogram prevezme výber, automaticky vyberie podpisový certifikát z pripojenej karty, podpíše dávku a uloží výstupy do výstupného priečinka.
-
-- Registrácia cez natívne `NSServices` v hlavnom bundle: macOS appku príp. sám spustí
-- BOK/PIN dialóg príde priamo od eID klienta alebo čítačky
-- Kvalifikovaná časová pečiatka (QTS) sa pripája z aktívnej TSA (default: Belgium BOSA)
-- Ak sa akcia nezobrazuje: pravý klik vo Finderi → *Rýchle akcie* → *Prispôsobiť…* a zapnite ju
-
-> Alternatívne funguje aj klasický drag & drop viacerých súborov do okna appky s dávkovým podpisom zo sidebaru.
+- Preflight zastaví autorizáciu pri chýbajúcom pôvode, údajoch osoby, počte listov, prvkoch, čísle alebo certifikáte.
+- ZaKo preferuje mandátny kvalifikovaný certifikát. Výslovný non-mandate override je auditovateľný stav a nemá sa používať ako tiché obídenie pravidla.
+- PDF/A, XML a ASiC-E sa kontrolujú pred zápisom výsledku.
+- Lokálny register drží evidenčné číslo, hash, XML doložku, stav odoslania, názvy súborov a základné počítadlá.
+- CSV export používa slovenský oddeľovač `;`.
 
 ---
 
-## PDF/A-2b engine
+## Funkcie podľa modulu
 
-<img src="docs/diagrams/pdfa-pipeline.svg" alt="Dátove toky PDF/A konvertora" width="100%">
+### Podpisovanie
 
-Vlastný konvertor v čistom Swifte: inkrementálna PDF chirurgia doplní XMP metadáta (`pdfaid:part=2`, `conformance=B`), sRGB ICC OutputIntent `/GTS_PDFA1` a hlavičku `%PDF-1.7`. Vektorový režim zachováva textovú vrstvu, raster režim (300 dpi) garantuje vyrovnanie problematických skenov. Doložka sa vloží ako **XML EmbeddedFile** (§ 3 ods. 3 vyhlášky 70/2021) a navyše ako tlačiteľná priložená strana.
+- PDF, JPEG, PNG, TIFF a HEIC vstupy s konverziou obrazu do PDF
+- vizuálny podpis a viditeľné PAdES umiestnenie
+- KEP, PAdES, QTS a ASiC-E podľa nastaveného formátu
+- CryptoTokenKit, Keychain identity scanner a PKCS#11 EngineBridge
+- dávkové podpisovanie z Findera
 
----
+### Zaručená konverzia
 
-## AI Vision pipeline
+- päťkrokový stepper vrátane dokončenia
+- AI a manuálne security elements s trvalými manuálnymi úpravami
+- bounding boxy s pohybom, zmenou veľkosti, zmenou typu a popisu
+- miniatúry strán, počítadlá listov a formátov
+- XML doložka ConversionRecord 1.0 podľa codelistov
+- PDF/A-2b, finálna validácia a EmbeddedFile asociácia
+- lokálny register, fronta CEZZK a CSV export
 
-<img src="docs/diagrams/ai-vision.svg" alt="AI Vision detekcia bezpečnostných prvkov" width="100%">
+### Nastavenia a súkromie
 
-On-device počítačové videnie (farebné/tmavé masky, connected components, radial coverage sampling) rozpozná úradné pečiatky a vlastnoručné podpisy vrátane umiestnenia. Vygeneruje **slovný opis priamo do doložky** (napr. *„Úradná pečiatka na strane 2, v pravej dolnej časti…“*). Voliteľne LLM boost cez Ollama alebo OpenAI-compatible API (kľúč v Keychain).
-
----
-
-## Ako začať (advokát)
-
-1. **Sign a normal document?** → sidebar *Signing*: choose a PDF (`⌘O`), optionally place a visual signature, and select **Sign KEP** (`⌘⏎`). Or select files in Finder → *Quick Actions* → **Sign with QES + QTS (Autogram)**.
-2. **Convert a paper original to electronic form?** → sidebar *Guaranteed conversion*: drop the scan, review AI-detected elements in the native macOS 27 toolbar and inspector, verify the live attestation preview, complete the legal preflight, and select **Authorize conversion**. ZaKo intake uses `⌘⌥O`.
-3. **Manage evidence and CEZZK?** → sidebar *Conversion register* → submit the queue or export CSV.
-
-> Bez nastaveného EZZK beží evidencia v DEMO režime; bez pripojeného kvalifikovaného podpisového modulu podpisuje DEMO podpisovač (jasne označený).
-
----
-
-## Funkcie
-
-### Modul Podpisovanie
-- Drag and drop PDF aj obrazové skeny: JPEG, PNG, TIFF a HEIC s automatickou konverziou do PDF
-- Voliteľná vizuálna pečiatka s umiestnením na plátne dokumentu
-- KEP podpis a QTS cez CryptoTokenKit, Keychain alebo PKCS#11 EngineBridge
-- Primárne akcie v natívnej macOS 27 toolbar hierarchii s klávesovou skratkou `⌘⏎`
-- Výstupný podpísaný PDF súbor a ASiC-E kontajner
-- Finder Quick Action pre podpisovanie označených PDF
-
-### Modul Zaručená konverzia
-- Päťfázový workflow stepper vrátane dokončenia
-- Natívny macOS 27 toolbar pre výber, markup, AI providera, listy a navigáciu strán
-- Zbaliteľný inspector pre pozíciu a veľkosť bezpečnostných prvkov
-- Ľavý pás miniatúr stránok s počtom prvkov
-- Živý náhľad osvedčovacej doložky
-- Automatické počítadlá strán, neprázdnych strán, listov a veľkosti listiny
-- AI nálezy sa zlučujú s manuálnymi nálezmi a manuálne úpravy prežívajú re-analýzu
-- Šablóny doložiek a profily advokáta
-
-### AI Vision
-- On-device detekcia beží vždy
-- Voliteľné režimy oMLX, Ollama a OpenAI-compatible API
-- API kľúče sa ukladajú do Keychain
-- Editovateľný klasifikačný prompt
-- Confidence a pôvod nálezu sú viditeľné v inspectore prvku
-- Konfigurácia providera sa zobrazuje progresívne
-
-### Bezpečnosť a autorizácia
-- KEP podpis cez CryptoTokenKit alebo EngineBridge
-- Slovenská eID karta a PKCS#11 tokeny
-- Explicitný preflight mandátneho certifikátu
-- Potvrdenie pôvodu listiny pred autorizáciou
-- SHA-256, QTS, serverový čas a stav CEZZK v konverznom flow
-
-### Register a evidencia
-- Lokálny register konverzií
-- Vyhľadávanie a filtrovanie podľa stavu
-- Kopírovanie evidenčného čísla a SHA-256 odtlačku
-- Natívny confirmation dialog pred zmazaním záznamu
-- Hromadné odosielanie záznamov do CEZZK s viditeľným úspechom alebo chybou
+- päť AI režimov: vstavaný, oMLX, Ollama, vlastný API kľúč a vypnuté
+- endpointy a modely pre lokálne providery
+- API kľúče a heslá iba v Keychain
+- profily advokáta a vlastné TSA servery
+- jasné oddelenie on-device, local-network a cloudového spracovania
 
 ---
 
-## Build, test and local installation
+## Zostavenie, testy a lokálna inštalácia
 
 ```bash
 cd Autogram
 
-# Debug build
+# Debug build Swift targetov
 DEVELOPER_DIR=/Applications/Xcode-26.5.app/Contents/Developer swift build
 
-# Full test suite
+# Kompletný test suite
 DEVELOPER_DIR=/Applications/Xcode-26.5.app/Contents/Developer swift test
 
-# Build the macOS 27 application bundle
+# Debug .app bundle
 DEVELOPER_DIR=/Applications/Xcode-26.5.app/Contents/Developer ./build_app.sh
 
-# Build the release bundle
+# Release .app bundle
 DEVELOPER_DIR=/Applications/Xcode-26.5.app/Contents/Developer ./build_app.sh --release
 ```
 
-The debug bundle is created at `.build/arm64-apple-macosx/debug/Autogram.app`.
+Výstupný bundle:
 
-To install the locally built debug app for manual testing:
+```text
+Autogram/.build/arm64-apple-macosx/debug/Autogram.app
+```
+
+Lokálna inštalácia debug bundle:
 
 ```bash
 ditto --rsrc --extattr --acl \
@@ -173,50 +271,45 @@ ditto --rsrc --extattr --acl \
 open "/Applications/Autogram macOS.app"
 ```
 
-The current verification result is 102 tests passed, 3 optional live engine tests skipped, and `LSMinimumSystemVersion=27.0`. The live tests require `AUTOGRAM_ENGINE_LIVE_TEST=1` and the external signing engine.
-
-The current debug bundle is installed at `/Applications/Autogram macOS.app` and was launched successfully for a direct smoke check.
+Aktuálny overený výsledok je 107 vykonaných testov, 3 voliteľné live engine testy skipped a 0 failures. Live testy vyžadujú `AUTOGRAM_ENGINE_LIVE_TEST=1` a externý signing engine. Build script zároveň vloží PDFBox dependency classpath do `Contents/app/dependency-jars` pri inštalácii Autogram macOS 2 engine.
 
 ---
 
-## Current macOS 27 UX state
+## Aktuálny stav a limity
 
-The current branch is macOS 27 only. The main window uses a shared app model, native Settings scene, native menu commands, macOS 27 toolbar groups, collapsible inspectors, and restrained native Liquid Glass.
-
-The ZaKo flow now includes:
-
-- origin or certified-copy confirmation
-- live inline validation
-- automatic and retryable EZZK evidence-number acquisition
-- preflight before server time, PDF/A conversion, and signing
-- mandate-certificate enforcement after pending card identity resolution
-- explicit signed-file versus queued CEZZK completion state
-- accessible element descriptions, confidence, provenance, and keyboard movement controls
-
-Open follow-up work is documented in [`docs/SESSION_HANDOFF_2026-08-28.md`](docs/SESSION_HANDOFF_2026-08-28.md). The most important remaining verification is a real macOS 27 GUI pass with VoiceOver, Full Keyboard Access, Reduce Transparency, Reduce Motion, Increase Contrast, and multiple window sizes.
+- Manuálna kontrola bezpečnostných prvkov zostáva potrebná. Slabý kontrast, reliéf a rukopis nemusia byť spoľahlivo rozpoznané vstavaným detectorom.
+- Lokálny `PDFAValidator` je štrukturálny a heuristický. Finálny release artefakt treba overiť v Acrobat Preflight alebo veraPDF.
+- Produkčné CEZZK API je zatiaľ reprezentované Mock + HTTPS kostrou, pretože oficiálna OpenAPI špecifikácia nie je súčasťou repozitára.
+- XAdES chain/LTA archivácia je obmedzená na aktuálny signing flow; plná B-LT archivácia je budúce rozšírenie.
+- Presný OID mandátneho certifikátu treba doplniť po overení reálneho SAK certifikátu.
 
 ---
 
-## Roadmap: čo zostáva po merge
+## Otvorená roadmapa
 
-<img src="docs/diagrams/roadmap-open-work.svg" alt="Roadmap otvorených follow-up úloh po merge macOS 27 UX" width="100%">
+<img src="docs/diagrams/roadmap-open-work.svg" alt="Roadmap otvorených follow-up úloh" width="100%">
 
-Implementácia macOS 27 UX je zmergovaná do `main`. Otvorená práca sa delí na tri trate:
+Hotové položky z predchádzajúcej roadmapy, vrátane päťkrokového ZaKo steppera a pipeline/output zmien, sú označené ako dokončené. Aktívne follow-upy sú:
 
-1. **Runtime verifikácia na macOS 27**: manuálny GUI pass s VoiceOver a Full Keyboard Access, vizuálne nastavenia (Increase Contrast, Reduce Transparency, Reduce Motion), okná od minimálnej po veľkú veľkosť a overenie toolbar command routing a focus order.
-2. **UX follow-up fixy**: prípadný AppKit visible-signature placement overlay, rozhodnutie o piatom kroku ZaKo steppera, náhrada `try?` za actionable error UI a 20-hodinové varovanie v CEZZK evidence dashboard.
-3. **Údržba a release**: samostatný commit inherited rotation a pipeline zmien a aktualizácia release automatizácie na macOS 27 toolchain.
+1. GUI pass na macOS 27 s VoiceOver, Full Keyboard Access, Increase Contrast, Reduce Transparency a Reduce Motion.
+2. Overenie viacerých veľkostí okna, focus order a toolbar command routing.
+3. Posúdenie voliteľného AppKit overlay pre presné umiestnenie viditeľného podpisu.
+4. Nahradenie zostávajúcich nekritických `try?` miest actionable error UI.
+5. 20-hodinové varovanie v CEZZK dashboarde.
+6. Externá PDF/A-2b a EmbeddedFile validácia reálneho finálneho artefaktu.
 
-Editovateľný zdroj diagramu: [`docs/diagrams/roadmap-open-work.excalidraw`](docs/diagrams/roadmap-open-work.excalidraw). Detaily vrátane zoznamu necommitovaných súborov: [`docs/SESSION_HANDOFF_2026-08-28.md`](docs/SESSION_HANDOFF_2026-08-28.md).
-
----
-
-## Legislatívna kotva
-
-- **§ 35-39** zákona č. 305/2013 Z. z. (oprávnenie advokáta, postup, účinky osvedčenej kópie)
-- **Vyhláška MIRRI č. 70/2021 Z. z.** (obsah doložky, forma XML-in-PDF, mandátny certifikát + QTS, evidencia, 24 h lehota)
-- **eIDAS 910/2014 + IR 2015/1506** (PAdES/XAdES v ASiC kontajneroch)
+Editovateľný zdroj roadmap diagramu: [`docs/diagrams/roadmap-open-work.excalidraw`](docs/diagrams/roadmap-open-work.excalidraw).
 
 ---
 
-*Diagramy v štýle [diagram-design](https://github.com/cathrynlavery/diagram-design) - editorial tokens: white-smoke paper, jet-black ink, atomic-tangerine accent, blue-slate muted. Bez tieňov.*
+## Právna kotva
+
+- **§ 35 až 39** zákona č. 305/2013 Z. z. o e-Governmente
+- **Vyhláška MIRRI č. 70/2021 Z. z.** vrátane obsahu doložky, XML-in-PDF, mandátneho certifikátu, QTS a evidencie
+- **eIDAS 910/2014** a vykonávacie nariadenie **2015/1506** pre PAdES/XAdES/ASiC
+
+Implementácia je technický nástroj a nenahrádza právne posúdenie konkrétneho dokumentu ani povinnosť advokáta skontrolovať originál, bezpečnostné prvky, certifikát a výsledný artefakt.
+
+---
+
+*Diagramy používajú jednoduchý editorial štýl s hairline rámcami, bez tieňov a s obmedzenou akcentovou farbou.*

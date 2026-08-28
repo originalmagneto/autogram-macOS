@@ -15,42 +15,19 @@ struct SettingsView: View {
 
     var body: some View {
         TabView {
-            ScrollView {
-                aiTab
-                    .frame(maxWidth: 680)
-                    .padding(.vertical, 20)
-                    .padding(.horizontal, 24)
-                    .frame(maxWidth: .infinity)
-            }
+            settingsTabContent(aiTab)
             .tabItem { Label("AI Vision", systemImage: "brain.head.profile") }
 
-            ScrollView {
-                conversionTab
-                    .frame(maxWidth: 680)
-                    .padding(.vertical, 20)
-                    .padding(.horizontal, 24)
-                    .frame(maxWidth: .infinity)
-            }
+            settingsTabContent(conversionTab)
             .tabItem { Label("Konverzia PDF/A", systemImage: "doc.badge.gearshape") }
 
-            ScrollView {
-                ezzkTab
-                    .frame(maxWidth: 680)
-                    .padding(.vertical, 20)
-                    .padding(.horizontal, 24)
-                    .frame(maxWidth: .infinity)
-            }
+            settingsTabContent(ezzkTab)
             .tabItem { Label("EZZK", systemImage: "number.square") }
 
-            ScrollView {
-                profilesTab
-                    .frame(maxWidth: 680)
-                    .padding(.vertical, 20)
-                    .padding(.horizontal, 24)
-                    .frame(maxWidth: .infinity)
-            }
+            settingsTabContent(profilesTab)
             .tabItem { Label("Profily advokáta", systemImage: "person.crop.circle.badge.checkmark") }
         }
+        .frame(minWidth: 980, idealWidth: 1080, minHeight: 840, idealHeight: 940)
         .confirmationDialog("Naozaj chcete odstrániť tento TSA server?",
                            isPresented: $showTSADeleteConfirmation,
                            titleVisibility: .visible) {
@@ -83,6 +60,15 @@ struct SettingsView: View {
         } message: {
             Text("Profil a jeho údaje budú odstránené z tejto aplikácie.")
         }
+    }
+
+    private func settingsTabContent<Content: View>(_ content: Content) -> some View {
+        content
+            .frame(maxWidth: 960, alignment: .topLeading)
+            .padding(.vertical, 18)
+            .padding(.horizontal, 28)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
 
@@ -337,7 +323,7 @@ struct SettingsView: View {
                 }
                 .pickerStyle(.segmented)
 
-                Text("Vektorová konverzia zachováva textovú vrstvu; rasterizovaná garancia (300 dpi) vyrovná problematické skeny. Obe možnosti spĺňajú štandard PDF/A-2b.")
+                Text("Vektorová konverzia zachováva textovú vrstvu; rasterizovaná garancia (200 dpi) vyrovná problematické skeny. Obe možnosti spĺňajú štandard PDF/A-2b.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -639,6 +625,14 @@ struct SettingsView: View {
                                     .font(.callout)
                                     .foregroundStyle(.secondary)
                                 TextField("Advokátska kancelária…", text: $profile.officeName)
+                                    .textFieldStyle(.roundedBorder)
+                            }
+
+                            GridRow {
+                                Text("Adresa kancelárie")
+                                    .font(.callout)
+                                    .foregroundStyle(.secondary)
+                                TextField("Ulica, PSČ a mesto", text: $profile.officeAddress)
                                     .textFieldStyle(.roundedBorder)
                             }
                         }

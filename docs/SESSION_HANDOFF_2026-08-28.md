@@ -342,7 +342,7 @@ plutil -extract LSMinimumSystemVersion raw -o - "/Applications/Autogram macOS.ap
 
 Results:
 
-- full test suite: **102 tests passed, 0 failures**
+- full test suite: **107 tests executed, 0 failures**
 - live engine tests: **3 skipped** because they require `AUTOGRAM_ENGINE_LIVE_TEST=1`
 - packaged build: **passed**
 - bundle minimum version: **27.0**

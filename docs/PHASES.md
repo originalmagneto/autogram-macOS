@@ -1,13 +1,13 @@
-# Autogram macOS — Implementačná dokumentácia fáz 1–4
+# Autogram macOS - Implementačná dokumentácia fáz 1–4
 
-> Stav: august 2026 · 63/63 testov · Swift 6 strict concurrency · 0 externých závislostí
+> Stav: august 2026 · 107 vykonaných testov · 3 skipped · 0 failures · Swift 6 strict concurrency · 0 Swift package dependencies
 
 Tento dokument popisuje, čo presne implementujú jednotlivé fázy modulu Zaručená konverzia
 (ZaKo) a štandardného podpisovania, aké rozhodnutia boli prijaté a kde sú limity.
 
 ---
 
-## Fáza 1 — Výstupná pipeline podľa špecifikácie
+## Fáza 1 - Výstupná pipeline podľa špecifikácie
 
 ### XML doložka (ConversionRecord 1.0)
 - Namespace: `https://data.gov.sk/id/egov/eform/50349287.ConversionRecordOfPaperToElectronicDocument.sk/1.0`
@@ -27,7 +27,7 @@ Tento dokument popisuje, čo presne implementujú jednotlivé fázy modulu Zaru�
 
 - Identifikátor osoby ako IDCType: `ico://sk/{IČO}`
 - Evidenčné číslo vo forme URI: `https://data.gov.sk/id/egov/conversion-record/{číslo}`
-- Otlačok: **base64(SHA-256)** finálneho PDF/A pred vložením EmbeddedFile + metóda codelist 14
+- Otlačok: **base64(SHA-256)** intermediárneho PDF/A pred vložením EmbeddedFile + metóda codelist 14
 - Každý bezpečnostný prvok: slovný opis + strana + list (duplex počítadlo `(strana+1)/2`) +
   lokalita codelist 11 + nová strana
 - `ConversionExecutionDateTime` s lokálnym UTC offsetom (`+02:00`), nie Z-formou
@@ -35,7 +35,8 @@ Tento dokument popisuje, čo presne implementujú jednotlivé fázy modulu Zaru�
 ### Poradie pipeline (kľúčová oprava)
 ```
 PDF/A konverzia → SHA-256 (fingerprint) → XML doložka →
-EmbeddedFile do PDF → ASiC-E balenie → podpis → lokálna evidencia → CEZZK fronta
+EmbeddedFile do PDF → finálna normalizácia a validácia → ASiC-E balenie →
+podpis → lokálna evidencia → CEZZK fronta
 ```
 Fingerprint sa počíta nad čistým konvertovaným dokumentom (doložka je „spojená“ cez
 EmbeddedFile + samostatný `.xml.xdcf`, nemení teda obsah otlačku).
@@ -58,10 +59,10 @@ Produkčné čísla prichádzajú z IS EZZK ešte pred vytvorením záznamu (§ 
 
 ---
 
-## Fáza 2 — Časové pečiatky a PDF/A v štandardnom režime
+## Fáza 2 - Časové pečiatky a PDF/A v štandardnom režime
 
 ### RFC 3161 klient (`RFC3161TimestampClient`)
-- Vlastná DER enkódkia TimeStampReq (SHA-256 messageImprint, nonce, certReq) —
+- Vlastná DER enkódkia TimeStampReq (SHA-256 messageImprint, nonce, certReq) -
   golden vektor testovaný bajt-po-bajte
 - Parser odpovede: PKIStatusInfo (granted/grantedWithMods), extrakcia ContentInfo tokenu
   a `genTime` z TSTInfo (GeneralizedTime aj UTCTime)
@@ -69,20 +70,20 @@ Produkčné čísla prichádzajú z IS EZZK ešte pred vytvorením záznamu (§ 
 
 ### TSA servery
 Built-in zoznam zrkadlí originálnu aplikáciu Autogram + slovenskú realitu:
-1. **CA Disig (SK)** — `http://tsa.disig.sk/qts` *(default)*
-2. **Sectigo Qualified** — `http://timestamp.sectigo.com/qualified`
-3. **Belgian Federal Government TSA** — `http://tsa.belgium.be/connect`
+1. **CA Disig (SK)** - `http://tsa.disig.sk/qts` *(default)*
+2. **Sectigo Qualified** - `http://timestamp.sectigo.com/qualified`
+3. **Belgian Federal Government TSA** - `http://tsa.belgium.be/connect`
 
 Vlastné servery je možné pridávať v Nastaveniach; tlačidlo *Otestovať spojenie* pošle
 skutočnú RFC 3161 žiadosť. Migrácia starej jedinej `tsaURL` prebieha automaticky pri načítaní.
 
 ### PDF/A pred podpisom
 Toggle *Konvertovať do PDF/A pred podpisom* v štandardnom režime; režim konverzie
-(vektorový / raster 300 dpi) sa berie z Nastavenia › Konverzia PDF/A.
+(vektorový / raster 200 dpi) sa berie z Nastavenia › Konverzia PDF/A.
 
 ---
 
-## Fáza 3 — SAK karta end-to-end
+## Fáza 3 - SAK karta end-to-end
 
 ### Reálne KEP podpisy
 Dva natívne podpisové enginy nad `SecIdentity` (Keychain / CryptoTokenKit karty):
@@ -106,14 +107,14 @@ Test overuje, že `messageDigest` v CMS == SHA-256 nad rozsahmi ByteRange.
 issuer/subject → RFC 2253 (vrátane hex-formy pre neznáme typy a escapingu).
 
 ### Mandátna brána (ZaKo)
-- Checklist riadok *Mandátny certifikát SAK* — vyžaduje `isMandateCertificate &&
+- Checklist riadok *Mandátny certifikát SAK* - vyžaduje `isMandateCertificate &&
   isQualified && hasPrivateKey`
 - Autorizácia bez mandátu je zablokovaná; pokračovanie len výslovným override toggle-om
-  (varovanie, že CEZZK zápis môže byť zamietnutý) — edge case podľa špecu § 9
+  (varovanie, že CEZZK zápis môže byť zamietnutý) - edge case podľa špecu § 9
 - Auto-výber identity preferuje mandátny certifikát
 
 ### Live detekcia karty
-`CardPresenceMonitor` (TKTokenWatcher + KVO na `tokenIDs`) — vloženie/vytiahnutie karty
+`CardPresenceMonitor` (TKTokenWatcher + KVO na `tokenIDs`) - vloženie/vytiahnutie karty
 okamžite refreshuje zoznam certifikátov v autorizačnom kroku.
 
 ### eID / CryptoTokenKit
@@ -136,7 +137,7 @@ reálny provider (výstup označený ako právne záväzný), inak DEMO podpisov
 
 ---
 
-## Fáza 4 — Validácie a EZK dashboard
+## Fáza 4 - Validácie a EZK dashboard
 
 ### Validačné vrstvy (hard gates pred/po autorizácii)
 
@@ -151,7 +152,7 @@ Všetky tri bežajú automaticky v `ZakoSessionStore.authorizeAndSign()`; zlyhan
 
 ### Dashboard evidencie
 - Summary karty: celkovo / zapísaných v CEZZK / čakajúcich / **po lehote 24 h**
-- Pulsujúci červený indikátor prehorených záznamov + stĺpec „Lehota CEZZK"
+- Červený indikátor a textový stav pre záznamy po lehote + stĺpec „Lehota CEZZK"
 - Filtre podľa stavu + fulltext
 - Detail: status timeline (číslo → KEP → CEZZK), kopírovanie URI a SHA-256,
   náhľad XML doložky, zmazanie záznamu
