@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="448" viewBox="0 0 1040 448" role="img" aria-labelledby="roadmap-title roadmap-desc">
+  <title id="roadmap-title">Roadmap otvorených follow-up úloh po merge macOS 27 UX</title>
+  <desc id="roadmap-desc">Merge feature/macos27-ux je hotový. Otvorená práca sa delí na tri trate: runtime verifikácia na macOS 27, UX follow-up fixy a údržba s release.</desc>
+  <rect width="1040" height="448" fill="#f5f5f5"/>
+  <rect x="32" y="104" width="312" height="296" rx="8" fill="rgba(45,49,66,0.02)" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+  <rect x="104" y="108" width="167" height="14" rx="2" fill="#f5f5f5"/>
+  <text x="188" y="118" fill="rgba(45,49,66,0.40)" font-size="7" font-family="ui-monospace, 'SF Mono', Menlo, monospace" text-anchor="middle" letter-spacing="1.1">RUNTIME VERIFIKÁCIA · macOS 27</text>
+  <rect x="364" y="104" width="312" height="296" rx="8" fill="rgba(45,49,66,0.02)" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+  <rect x="471" y="108" width="98" height="14" rx="2" fill="#f5f5f5"/>
+  <text x="520" y="118" fill="rgba(45,49,66,0.40)" font-size="7" font-family="ui-monospace, 'SF Mono', Menlo, monospace" text-anchor="middle" letter-spacing="1.1">UX FOLLOW-UP FIXY</text>
+  <rect x="696" y="104" width="312" height="296" rx="8" fill="rgba(45,49,66,0.02)" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+  <rect x="806" y="108" width="92" height="14" rx="2" fill="#f5f5f5"/>
+  <text x="852" y="118" fill="rgba(45,49,66,0.40)" font-size="7" font-family="ui-monospace, 'SF Mono', Menlo, monospace" text-anchor="middle" letter-spacing="1.1">ÚDRŽBA A RELEASE</text>
+  <line x1="478" y1="80" x2="188" y2="100" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#rm-arrow)"/>
+  <line x1="520" y1="80" x2="520" y2="100" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#rm-arrow)"/>
+  <line x1="561" y1="80" x2="852" y2="100" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#rm-arrow)"/>
+  <rect x="400" y="32" width="240" height="48" rx="6" fill="#f5f5f5"/>
+  <rect x="400" y="32" width="240" height="48" rx="6" fill="rgba(235,108,54,0.08)" stroke="#eb6c36" stroke-width="1.2"/>
+  <text x="520" y="52" fill="#2d3142" font-size="12" font-weight="600" font-family="-apple-system, 'Helvetica Neue', Arial, sans-serif" text-anchor="middle">Merge feature/macos27-ux</text>
+  <text x="520" y="68" fill="#4f5d75" font-size="9" font-family="ui-monospace, 'SF Mono', Menlo, monospace" text-anchor="middle">zmergované · reviewované · 102 testov</text>
+  <rect x="48" y="136" width="280" height="52" rx="6" fill="#f5f5f5"/>
+  <rect x="48" y="136" width="280" height="52" rx="6" fill="rgba(79,93,117,0.10)" stroke="#7a8399" stroke-width="1"/>
+  <text x="60" y="157" fill="#7a8399" font-size="8" font-family="ui-monospace, 'SF Mono', Menlo, monospace" letter-spacing="0.5">01</text>
+  <text x="82" y="157" fill="#2d3142" font-size="11" font-weight="600" font-family="-apple-system, 'Helvetica Neue', Arial, sans-serif">GUI accessibility pass</text>
+  <text x="82" y="175" fill="#4f5d75" font-size="9" font-family="ui-monospace, 'SF Mono', Menlo, monospace">VoiceOver · Full Keyboard Access</text>
+  <rect x="48" y="200" width="280" height="52" rx="6" fill="#f5f5f5"/>
+  <rect x="48" y="200" width="280" height="52" rx="6" fill="rgba(79,93,117,0.10)" stroke="#7a8399" stroke-width="1"/>
+  <text x="60" y="221" fill="#7a8399" font-size="8" font-family="ui-monospace, 'SF Mono', Menlo, monospace" letter-spacing="0.5">02</text>
+  <text x="82" y="221" fill="#2d3142" font-size="11" font-weight="600" font-family="-apple-system, 'Helvetica Neue', Arial, sans-serif">Vizuálne nastavenia</text>
+  <text x="82" y="239" fill="#4f5d75" font-size="9" font-family="ui-monospace, 'SF Mono', Menlo, monospace">kontrast · transparentnosť · pohyb · okná</text>
+  <rect x="48" y="264" width="280" height="52" rx="6" fill="#f5f5f5"/>
+  <rect x="48" y="264" width="280" height="52" rx="6" fill="rgba(79,93,117,0.10)" stroke="#7a8399" stroke-width="1"/>
+  <text x="60" y="285" fill="#7a8399" font-size="8" font-family="ui-monospace, 'SF Mono', Menlo, monospace" letter-spacing="0.5">03</text>
+  <text x="82" y="285" fill="#2d3142" font-size="11" font-weight="600" font-family="-apple-system, 'Helvetica Neue', Arial, sans-serif">Toolbar a focus</text>
+  <text x="82" y="303" fill="#4f5d75" font-size="9" font-family="ui-monospace, 'SF Mono', Menlo, monospace">command routing · Picker labely</text>
+  <rect x="380" y="136" width="280" height="52" rx="6" fill="#f5f5f5"/>
+  <rect x="380" y="136" width="280" height="52" rx="6" fill="rgba(79,93,117,0.10)" stroke="#7a8399" stroke-width="1"/>
+  <text x="392" y="157" fill="#7a8399" font-size="8" font-family="ui-monospace, 'SF Mono', Menlo, monospace" letter-spacing="0.5">04</text>
+  <text x="414" y="157" fill="#2d3142" font-size="11" font-weight="600" font-family="-apple-system, 'Helvetica Neue', Arial, sans-serif">AppKit placement overlay</text>
+  <text x="414" y="175" fill="#4f5d75" font-size="9" font-family="ui-monospace, 'SF Mono', Menlo, monospace">visible signature · ak je potrebný</text>
+  <rect x="380" y="200" width="280" height="52" rx="6" fill="#f5f5f5"/>
+  <rect x="380" y="200" width="280" height="52" rx="6" fill="rgba(79,93,117,0.10)" stroke="#7a8399" stroke-width="1"/>
+  <text x="392" y="221" fill="#7a8399" font-size="8" font-family="ui-monospace, 'SF Mono', Menlo, monospace" letter-spacing="0.5">05</text>
+  <text x="414" y="221" fill="#2d3142" font-size="11" font-weight="600" font-family="-apple-system, 'Helvetica Neue', Arial, sans-serif">ZaKo stepper</text>
+  <text x="414" y="239" fill="#4f5d75" font-size="9" font-family="ui-monospace, 'SF Mono', Menlo, monospace">rozhodnúť: 5 vs 4 stageov</text>
+  <rect x="380" y="264" width="280" height="52" rx="6" fill="#f5f5f5"/>
+  <rect x="380" y="264" width="280" height="52" rx="6" fill="rgba(79,93,117,0.10)" stroke="#7a8399" stroke-width="1"/>
+  <text x="392" y="285" fill="#7a8399" font-size="8" font-family="ui-monospace, 'SF Mono', Menlo, monospace" letter-spacing="0.5">06</text>
+  <text x="414" y="285" fill="#2d3142" font-size="11" font-weight="600" font-family="-apple-system, 'Helvetica Neue', Arial, sans-serif">Chybové stavy</text>
+  <text x="414" y="303" fill="#4f5d75" font-size="9" font-family="ui-monospace, 'SF Mono', Menlo, monospace">try? -&gt; actionable error UI</text>
+  <rect x="380" y="328" width="280" height="52" rx="6" fill="#f5f5f5"/>
+  <rect x="380" y="328" width="280" height="52" rx="6" fill="rgba(79,93,117,0.10)" stroke="#7a8399" stroke-width="1"/>
+  <text x="392" y="349" fill="#7a8399" font-size="8" font-family="ui-monospace, 'SF Mono', Menlo, monospace" letter-spacing="0.5">07</text>
+  <text x="414" y="349" fill="#2d3142" font-size="11" font-weight="600" font-family="-apple-system, 'Helvetica Neue', Arial, sans-serif">CEZZK varovanie</text>
+  <text x="414" y="367" fill="#4f5d75" font-size="9" font-family="ui-monospace, 'SF Mono', Menlo, monospace">20-hodinová lehota v dashboard</text>
+  <rect x="712" y="136" width="280" height="52" rx="6" fill="#f5f5f5"/>
+  <rect x="712" y="136" width="280" height="52" rx="6" fill="rgba(79,93,117,0.10)" stroke="#7a8399" stroke-width="1"/>
+  <text x="724" y="157" fill="#7a8399" font-size="8" font-family="ui-monospace, 'SF Mono', Menlo, monospace" letter-spacing="0.5">08</text>
+  <text x="746" y="157" fill="#2d3142" font-size="11" font-weight="600" font-family="-apple-system, 'Helvetica Neue', Arial, sans-serif">Inherited zmeny</text>
+  <text x="746" y="175" fill="#4f5d75" font-size="9" font-family="ui-monospace, 'SF Mono', Menlo, monospace">rotation · pipeline · commit</text>
+  <rect x="712" y="200" width="280" height="52" rx="6" fill="#f5f5f5"/>
+  <rect x="712" y="200" width="280" height="52" rx="6" fill="rgba(79,93,117,0.10)" stroke="#7a8399" stroke-width="1"/>
+  <text x="724" y="221" fill="#7a8399" font-size="8" font-family="ui-monospace, 'SF Mono', Menlo, monospace" letter-spacing="0.5">09</text>
+  <text x="746" y="221" fill="#2d3142" font-size="11" font-weight="600" font-family="-apple-system, 'Helvetica Neue', Arial, sans-serif">Release automation</text>
+  <text x="746" y="239" fill="#4f5d75" font-size="9" font-family="ui-monospace, 'SF Mono', Menlo, monospace">macOS 27 · Xcode-26.5</text>
+  <rect x="712" y="264" width="280" height="52" rx="6" fill="#f5f5f5"/>
+  <rect x="712" y="264" width="280" height="52" rx="6" fill="rgba(235,108,54,0.08)" stroke="#eb6c36" stroke-width="1"/>
+  <text x="726" y="285" fill="#2d3142" font-size="11" font-weight="600" font-family="-apple-system, 'Helvetica Neue', Arial, sans-serif">Implementačný plán</text>
+  <text x="726" y="303" fill="#4f5d75" font-size="9" font-family="ui-monospace, 'SF Mono', Menlo, monospace">superpowers/plans · 2026-08-28</text>
+  <text x="48" y="352" fill="rgba(45,49,66,0.40)" font-size="7" font-family="ui-monospace, 'SF Mono', Menlo, monospace" letter-spacing="1.1">MANUÁLNY PASS NA REÁLNOM macOS 27 DESKTOPE</text>
+  <line x1="40" y1="418" x2="1000" y2="418" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+  <text x="40" y="436" fill="#4f5d75" font-size="8" font-family="ui-monospace, 'SF Mono', Menlo, monospace" letter-spacing="1.1">LEGEND</text>
+  <rect x="120" y="424" width="12" height="12" rx="2" fill="rgba(235,108,54,0.08)" stroke="#eb6c36" stroke-width="1"/>
+  <text x="140" y="434" fill="#4f5d75" font-size="9" font-family="ui-monospace, 'SF Mono', Menlo, monospace">Merge hotový</text>
+  <rect x="250" y="424" width="12" height="12" rx="2" fill="rgba(79,93,117,0.10)" stroke="#7a8399" stroke-width="1"/>
+  <text x="270" y="434" fill="#4f5d75" font-size="9" font-family="ui-monospace, 'SF Mono', Menlo, monospace">Otvorená úloha</text>
+  <rect x="410" y="424" width="12" height="12" rx="2" fill="#f5f5f5" stroke="#eb6c36" stroke-width="1"/>
+  <text x="430" y="434" fill="#4f5d75" font-size="9" font-family="ui-monospace, 'SF Mono', Menlo, monospace">Odkaz na dokument</text>
+  <line x1="590" y1="430" x2="618" y2="430" stroke="#4f5d75" stroke-width="1.2"/>
+  <text x="626" y="434" fill="#4f5d75" font-size="9" font-family="ui-monospace, 'SF Mono', Menlo, monospace">Rozdelenie práce</text>
+  <defs>
+    <marker id="rm-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#4f5d75"/>
+    </marker>
+  </defs>
+</svg>

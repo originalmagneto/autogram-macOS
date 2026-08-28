@@ -197,6 +197,20 @@ Open follow-up work is documented in [`docs/SESSION_HANDOFF_2026-08-28.md`](docs
 
 ---
 
+## Roadmap: čo zostáva po merge
+
+<img src="docs/diagrams/roadmap-open-work.svg" alt="Roadmap otvorených follow-up úloh po merge macOS 27 UX" width="100%">
+
+Implementácia macOS 27 UX je zmergovaná do `main`. Otvorená práca sa delí na tri trate:
+
+1. **Runtime verifikácia na macOS 27**: manuálny GUI pass s VoiceOver a Full Keyboard Access, vizuálne nastavenia (Increase Contrast, Reduce Transparency, Reduce Motion), okná od minimálnej po veľkú veľkosť a overenie toolbar command routing a focus order.
+2. **UX follow-up fixy**: prípadný AppKit visible-signature placement overlay, rozhodnutie o piatom kroku ZaKo steppera, náhrada `try?` za actionable error UI a 20-hodinové varovanie v CEZZK evidence dashboard.
+3. **Údržba a release**: samostatný commit inherited rotation a pipeline zmien a aktualizácia release automatizácie na macOS 27 toolchain.
+
+Editovateľný zdroj diagramu: [`docs/diagrams/roadmap-open-work.excalidraw`](docs/diagrams/roadmap-open-work.excalidraw). Detaily vrátane zoznamu necommitovaných súborov: [`docs/SESSION_HANDOFF_2026-08-28.md`](docs/SESSION_HANDOFF_2026-08-28.md).
+
+---
+
 ## Legislatívna kotva
 
 - **§ 35-39** zákona č. 305/2013 Z. z. (oprávnenie advokáta, postup, účinky osvedčenej kópie)
