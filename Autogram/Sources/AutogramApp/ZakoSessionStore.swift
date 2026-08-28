@@ -27,6 +27,8 @@ final class ZakoSessionStore {
     var signingPIN = ""
     var evidenceNumberRequested = false
     var fetchingEvidenceNumber = false
+    var evidenceNumberError: String?
+    var isAuthorizing = false
 
     var activeTool: SecurityElement.Kind?
     var previewPageIndex: Int = 0
@@ -34,10 +36,29 @@ final class ZakoSessionStore {
     var selectedElementID: UUID?
 
     var validationErrors: [AttestationValidationError] = []
+    var preflightErrors: [AttestationValidationError] = []
     var result: SignedConversionResult?
+    var submissionStatus: EvidenceRecord.Status?
     var outputDirectory: URL?
     var lastError: String?
     var serverTimeUsed: Date?
+
+    var isPreflightComplete: Bool {
+        let result = AttestationPreflight.evaluate(
+            attestation,
+            securityElements: securityElements,
+            hasSelectedIdentity: selectedIdentityID != nil,
+            mandateRequirementSatisfied: mandateRequirementSatisfied || allowNonMandateOverride)
+        return result.isComplete && preflightErrors.isEmpty && evidenceNumberError == nil
+    }
+    var hasUnresolvedPreflightErrors: Bool {
+        !AttestationPreflight.evaluate(
+            attestation,
+            securityElements: securityElements,
+            hasSelectedIdentity: selectedIdentityID != nil,
+            mandateRequirementSatisfied: mandateRequirementSatisfied
+        ).errors.isEmpty || evidenceNumberError != nil
+    }
 
     let settingsStore: AppSettingsStore
     var settings: AppSettings { settingsStore.settings }
@@ -356,8 +377,27 @@ final class ZakoSessionStore {
         signingProvider is DemoSigningProvider
     }
 
+    func recomputePreflight() {
+        let result = AttestationPreflight.evaluate(
+            attestation,
+            securityElements: securityElements,
+            hasSelectedIdentity: selectedIdentityID != nil,
+            mandateRequirementSatisfied: mandateRequirementSatisfied)
+        preflightErrors = result.errors
+        validationErrors = result.errors
+    }
+
+    func preparePreflight() async {
+        evidenceNumberError = nil
+        if attestation.evidenceNumber?.trimmingCharacters(in: .whitespaces).isEmpty != false {
+            await fetchEvidenceNumber()
+        }
+        recomputePreflight()
+    }
+
     func fetchEvidenceNumber() async {
         guard !fetchingEvidenceNumber else { return }
+        evidenceNumberError = nil
         fetchingEvidenceNumber = true
         defer { fetchingEvidenceNumber = false }
         do {
@@ -367,8 +407,13 @@ final class ZakoSessionStore {
             }
             attestation.evidenceNumber = number
             evidenceNumberRequested = true
+            lastError = nil
+            evidenceNumberError = nil
+            recomputePreflight()
         } catch {
+            evidenceNumberError = error.localizedDescription
             lastError = error.localizedDescription
+            recomputePreflight()
         }
     }
 
@@ -380,10 +425,18 @@ final class ZakoSessionStore {
         validationErrors = errors
         return errors
     }
-
     func authorizeAndSign() async {
+        guard !isAuthorizing else { return }
+        isAuthorizing = true
+        defer {
+            isAuthorizing = false
+            analysisProgressText = ""
+        }
+
         lastError = nil
         validationErrors = []
+        await preparePreflight()
+        guard isPreflightComplete else { return }
 
         do {
             analysisProgressText = "Zisťujem dôveryhodný čas…"
@@ -399,7 +452,6 @@ final class ZakoSessionStore {
                     sizeClass: .a4Portrait,
                     sheets: max(effectiveSheetCount, 1))]
             }
-
             let errors = validate()
             guard errors.isEmpty else {
                 analysisProgressText = ""
@@ -520,19 +572,40 @@ final class ZakoSessionStore {
                 updated.status = .submitted
                 updated.updatedAt = Date()
                 evidenceStore.upsert(updated)
+                submissionStatus = .submitted
             } catch {
                 var queued = record
                 queued.status = .queuedForSubmission
                 queued.updatedAt = Date()
                 evidenceStore.upsert(queued)
+                submissionStatus = .queuedForSubmission
             }
 
             result = signed
-            analysisProgressText = ""
             step = .done
         } catch {
             lastError = error.localizedDescription
-            analysisProgressText = ""
+        }
+    }
+
+    func retryQueuedSubmission() async {
+        guard let record = evidenceStore.record(id: currentRecordID),
+              record.status != .submitted else { return }
+        do {
+            try await ezzkService.submit(record.envelope())
+            var updated = record
+            updated.status = .submitted
+            updated.updatedAt = Date()
+            evidenceStore.upsert(updated)
+            submissionStatus = .submitted
+            lastError = nil
+        } catch {
+            var queued = record
+            queued.status = .queuedForSubmission
+            queued.updatedAt = Date()
+            evidenceStore.upsert(queued)
+            submissionStatus = .queuedForSubmission
+            lastError = error.localizedDescription
         }
     }
 
@@ -560,6 +633,8 @@ final class ZakoSessionStore {
         attestation = template
         attestation.evidenceNumber = nil
         evidenceNumberRequested = false
+        evidenceNumberError = nil
+        preflightErrors = []
     }
 
     func saveProfileFromForm() {
@@ -601,7 +676,12 @@ func resetSession(keepingProfile: Bool) {
         signingPIN = ""
         allowNonMandateOverride = false
         evidenceNumberRequested = false
+        evidenceNumberError = nil
+        fetchingEvidenceNumber = false
+        isAuthorizing = false
+        preflightErrors = []
         validationErrors = []
+        submissionStatus = nil
         result = nil
         outputDirectory = nil
         lastError = nil
