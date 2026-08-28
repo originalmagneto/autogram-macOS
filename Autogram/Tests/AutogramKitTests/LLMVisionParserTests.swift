@@ -42,6 +42,18 @@ final class LLMVisionParserTests: XCTestCase {
         XCTAssertEqual(elements[3].kind, .other)
     }
 
+    func testDecodeConvertsTopOriginYToPDFBottomOrigin() throws {
+        let payload = """
+        [{"kind":"officialStamp","page":1,"box":[0.2,0.1,0.3,0.2],"confidence":0.9}]
+        """
+        let element = try XCTUnwrap(LLMVisionParser.decode(elements: Data(payload.utf8)).first)
+
+        XCTAssertEqual(element.boundingBox.x, 0.2, accuracy: 0.001)
+        XCTAssertEqual(element.boundingBox.y, 0.7, accuracy: 0.001)
+        XCTAssertEqual(element.boundingBox.width, 0.3, accuracy: 0.001)
+        XCTAssertEqual(element.boundingBox.height, 0.2, accuracy: 0.001)
+    }
+
     func testEmptyResponseYieldsNothing() {
         XCTAssertNil(LLMVisionParser.extractJSONArray(from: "Žiadne prvky som nenašiel."))
         XCTAssertTrue(LLMVisionParser.decode(elements: Data("[]".utf8)).isEmpty)

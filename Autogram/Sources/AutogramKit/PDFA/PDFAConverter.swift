@@ -16,6 +16,8 @@ public enum PDFAError: LocalizedError, Equatable, Sendable {
     case rootNotFound
     case catalogNotFound(Int)
     case serializationFailed
+    case normalizerUnavailable
+    case normalizedOutputInvalid(issues: [String])
 
     public var errorDescription: String? {
         switch self {
@@ -24,6 +26,10 @@ public enum PDFAError: LocalizedError, Equatable, Sendable {
         case .rootNotFound: return "PDF nemá čitateľný koreňový katalóg."
         case .catalogNotFound(let num): return "Katalógová objekt #\(num) sa nepodarilo načítať."
         case .serializationFailed: return "Serializácia PDF zlyhala."
+        case .normalizerUnavailable:
+            return "PDF/A normalizácia nie je dostupná. Nainštalujte Autogram macOS 2 engine a skúste znova."
+        case .normalizedOutputInvalid(let issues):
+            return "Výsledný dokument neprešiel kontrolou PDF/A: \(issues.joined(separator: "; "))"
         }
     }
 }
@@ -53,18 +59,17 @@ public struct PDFAConverter: Sendable {
     }
 
     /// Konverzia na PDF/A-2B: čistý rewrite cez PDFBox v Java engine (PdfaNormalize).
-    /// Fallback: pôvodný ručný incremental append, keď engine nie je dostupný.
+    /// Fallback: ručný incremental append, keď engine nie je dostupný.
     public func convertData(_ data: Data, mode: PDFAConversionMode, title: String) throws -> Data {
-        if let normalized = Self.normalizeWithEngine(data, title: title),
-           PDFAValidator().validate(normalized).isValid {
-            return normalized
-        }
+        // Keep this intermediate PDF compatible with PDFKit and the incremental
+        // attachment writer. The final deliverable is normalized after the XML
+        // attachment, before its fingerprint is persisted.
         var baseData = Self.forceVersionHeader(data)
         return try injectPDFACompliance(into: baseData, title: title)
     }
 
     /// Zavolá PdfaNormalize z Autogram macOS 2 enginu (PDFBox 3, čistý rewrite s /ID a XMP).
-    static func normalizeWithEngine(_ data: Data, title: String) -> Data? {
+    public static func normalizeWithEngine(_ data: Data, title: String) -> Data? {
         guard let installation = JavaEngineLocator().locate(),
               FileManager.default.isExecutableFile(atPath: installation.javaExecutableURL.path),
               FileManager.default.fileExists(atPath: Self.sRGBProfileSystemPath) else {
@@ -81,8 +86,10 @@ public struct PDFAConverter: Sendable {
 
             let process = Process()
             process.executableURL = installation.javaExecutableURL
-            let contents = installation.jarFileURL.deletingLastPathComponent()
-            let classpath = "\(contents)/autogram.jar:\(contents)/dependency-jars/*"
+            // The locator points to Contents/app/autogram.jar. Keep the JAR and
+            // its sibling dependency-jars directory on the same classpath.
+            let appDirectory = installation.jarFileURL.deletingLastPathComponent()
+            let classpath = "\(installation.jarFileURL.path):\(appDirectory.appendingPathComponent("dependency-jars").path)/*"
             process.arguments = [
                 "-cp", classpath,
                 "digital.slovensko.autogram.core.PdfaNormalize",
@@ -101,6 +108,25 @@ public struct PDFAConverter: Sendable {
         } catch {
             return nil
         }
+    }
+
+    /// Rewrites an already assembled deliverable with the PDF/A normalizer when
+    /// the bundled Java engine is available. This is especially important after
+    /// attaching the XML clause, because an incremental PDF update must also be
+    /// accepted by external PDF/A validators such as Acrobat Preflight.
+    public func normalizeForDelivery(_ data: Data, title: String) throws -> Data {
+        guard let normalized = Self.normalizeWithEngine(data, title: title) else {
+            let fallbackCheck = PDFAValidator().validate(data)
+            guard fallbackCheck.isValid else {
+                throw PDFAError.normalizerUnavailable
+            }
+            return data
+        }
+        let check = PDFAValidator().validate(normalized)
+        guard check.isValid else {
+            throw PDFAError.normalizedOutputInvalid(issues: check.issues)
+        }
+        return normalized
     }
 
     static func forceVersionHeader(_ data: Data) -> Data {

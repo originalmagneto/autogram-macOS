@@ -72,6 +72,9 @@ final class ZakoSessionStore {
     var evidenceStore: LocalEvidenceStore { settingsStore.evidenceStore }
 
     private var evidenceRequestID: UUID?
+    private var sourceAccessIsActive = false
+    private var outputDirectoryOverride: URL?
+    private var sourceNameOverride: String?
     var profilePersister: ((AdvocateProfile) -> Void)?
     private(set) var currentRecordID = UUID()
 
@@ -134,16 +137,23 @@ final class ZakoSessionStore {
         }
     }
 
-    func loadDocument(at url: URL) async {
+    func loadDocument(at url: URL,
+                      outputDirectory: URL? = nil,
+                      sourceName: String? = nil) async {
         lastError = nil
-        let secured = url.startAccessingSecurityScopedResource()
-        defer { if secured { url.stopAccessingSecurityScopedResource() } }
+        resetSession(keepingProfile: true)
+        sourceAccessIsActive = url.startAccessingSecurityScopedResource()
+        outputDirectoryOverride = outputDirectory
+        sourceNameOverride = sourceName
 
         guard let document = PDFDocument(url: url) else {
+            if sourceAccessIsActive {
+                url.stopAccessingSecurityScopedResource()
+                sourceAccessIsActive = false
+            }
             lastError = "Súbor sa nepodarilo otvoriť ako PDF."
             return
         }
-        resetSession(keepingProfile: true)
         self.document = document
         self.sourceURL = url
         step = .analysis
@@ -203,7 +213,8 @@ final class ZakoSessionStore {
         var data = attestation
         data.performingPerson = profile
         data.originalDocumentOrder = 1
-        data.originalDocumentName = sourceURL?.deletingPathExtension().lastPathComponent
+        data.originalDocumentName = sourceNameOverride
+            ?? sourceURL?.deletingPathExtension().lastPathComponent
             ?? analysis.suggestedTitle ?? ""
         data.newDocumentName = (data.originalDocumentName.isEmpty ? "dokument" : data.originalDocumentName) + ".pdf"
         data.numberOfSheets = effectiveSheetCount
@@ -486,11 +497,6 @@ final class ZakoSessionStore {
                                                      mode: settings.pdfaMode,
                                                      title: attestation.newDocumentName)
 
-            let pdfaCheck = PDFAValidator().validate(pdfaData)
-            guard pdfaCheck.isValid else {
-                throw ComplianceValidationError(domain: "PDF/A-2b", issues: pdfaCheck.issues)
-            }
-
             let fingerprint = AttestationClauseGenerator.sha256Hex(of: pdfaData)
             let xmlInput = AttestationClauseGenerator.Input(
                 attestation: attestation,
@@ -507,11 +513,26 @@ final class ZakoSessionStore {
             }
 
             analysisProgressText = "Vkladám XML doložku do dokumentu…"
-            let finalPDF = try embeddedFileService.embed(
+            var finalPDF = try embeddedFileService.embed(
                 .init(fileName: "osvedcovacia-dolozka.xml",
                       mimeType: "application#2Fxml",
                       data: Data(xml.utf8)),
                 into: pdfaData)
+
+            // Normalize once more after adding the XML attachment. PDFBox
+            // writes a fresh page tree and preserves the attachment name tree,
+            // which is the artifact external validators actually inspect.
+            finalPDF = try pdfaConverter.normalizeForDelivery(
+                finalPDF,
+                title: attestation.newDocumentName)
+
+            // Validate the actual artifact that will be signed and written. The
+            // XML attachment is part of the final PDF/A deliverable, so checking
+            // only the pre-attachment bytes can produce a false green result.
+            let pdfaCheck = PDFAValidator().validate(finalPDF)
+            guard pdfaCheck.isValid else {
+                throw ComplianceValidationError(domain: "PDF/A-2b", issues: pdfaCheck.issues)
+            }
 
             analysisProgressText = "Autorizujem kvalifikovaným podpisom…"
             if isCertificateTypePending {
@@ -535,10 +556,24 @@ final class ZakoSessionStore {
                settings.selectedTSAURL.trimmingCharacters(in: .whitespaces).isEmpty {
                 throw SigningError.timestampFailed
             }
+
+            let directory = ConversionOutputNaming.outputDirectory(
+                sourceURL: sourceURL,
+                preferredDirectory: outputDirectoryOverride,
+                fallback: Self.outputDirectoryURL())
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+
             let packager = ASiCEPackager()
-            let docFileName = outputPDFFileName()
-            let xdcfFileName = Self.outputXDCFFileName(evidenceNumber: attestation.evidenceNumber,
-                                                       fallbackDocBase: docFileName)
+            let docFileName = ConversionOutputNaming.deliveryPDFFileName(
+                in: directory,
+                preferredName: outputPDFFileName())
+            let preferredXDCFFileName = ConversionOutputNaming.xdcfFileName(
+                originalDocumentName: attestation.originalDocumentName,
+                pdfFileName: docFileName,
+                evidenceNumber: attestation.evidenceNumber)
+            let xdcfTarget = ConversionOutputNaming.uniqueURL(in: directory,
+                                                              fileName: preferredXDCFFileName)
+            let xdcfFileName = xdcfTarget.lastPathComponent
             let containerFiles = packager.zakoContainer(pdfData: finalPDF,
                                                         pdfFileName: docFileName,
                                                         dolozkaXML: Data(xml.utf8),
@@ -560,14 +595,14 @@ final class ZakoSessionStore {
             }
 
             analysisProgressText = "Ukladám a zapisujem do evidencie…"
-            let directory = Self.outputDirectoryURL()
-            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             let pdfTarget = directory.appendingPathComponent(docFileName)
             try signed.pdfData.write(to: pdfTarget, options: [.atomic])
-            let xmlTarget = directory.appendingPathComponent(xdcfFileName)
-            try Data(xml.utf8).write(to: xmlTarget, options: [.atomic])
+            try Data(xml.utf8).write(to: xdcfTarget, options: [.atomic])
             if let asic = signed.asicData {
-                try asic.write(to: directory.appendingPathComponent("\(xdcfFileName).asice"),
+                let asicFileName = ConversionOutputNaming.asicFileName(pdfFileName: pdfTarget.lastPathComponent)
+                let asicTarget = ConversionOutputNaming.uniqueURL(in: directory,
+                                                                   fileName: asicFileName)
+                try asic.write(to: asicTarget,
                                options: [.atomic])
             }
             outputDirectory = directory
@@ -642,8 +677,11 @@ final class ZakoSessionStore {
 
     func saveTemplate() {
         let url = Self.templatesDirectory().appendingPathComponent("\(sanitizedBaseName()).zako-template.json")
-        if let data = try? JSONEncoder.pretty.encode(attestation) {
-            try? data.write(to: url, options: [.atomic])
+        do {
+            let data = try JSONEncoder.pretty.encode(attestation)
+            try data.write(to: url, options: [.atomic])
+        } catch {
+            lastError = "Šablónu sa nepodarilo uložiť: \(error.localizedDescription)"
         }
     }
 
@@ -690,6 +728,10 @@ final class ZakoSessionStore {
     }
 
 func resetSession(keepingProfile: Bool) {
+        if sourceAccessIsActive, let sourceURL {
+            sourceURL.stopAccessingSecurityScopedResource()
+            sourceAccessIsActive = false
+        }
         let profile = keepingProfile ? attestation.performingPerson : AdvocateProfile.empty
         step = .intake
         sourceURL = nil
@@ -717,6 +759,8 @@ func resetSession(keepingProfile: Bool) {
         submissionStatus = nil
         result = nil
         outputDirectory = nil
+        outputDirectoryOverride = nil
+        sourceNameOverride = nil
         lastError = nil
         serverTimeUsed = nil
         currentRecordID = UUID()
@@ -731,19 +775,11 @@ func resetSession(keepingProfile: Bool) {
     }
 
     func outputPDFFileName() -> String {
-        var base = sanitizedBaseName()
-        if (base as NSString).pathExtension.lowercased() == "pdf" {
-            base = (base as NSString).deletingPathExtension
-        }
-        return "\(base).pdf"
-    }
-
-    static func outputXDCFFileName(evidenceNumber: String?, fallbackDocBase: String) -> String {
-        let cleanedEvidence = evidenceNumber.map { ASiCEPackager.sanitizedFileName($0) } ?? ""
-        if !cleanedEvidence.isEmpty {
-            return "\(cleanedEvidence).xml.xdcf"
-        }
-        return "\((fallbackDocBase as NSString).deletingPathExtension)-dolozka.xml.xdcf"
+        ConversionOutputNaming.pdfFileName(
+            originalDocumentName: sourceNameOverride
+                ?? sourceURL?.deletingPathExtension().lastPathComponent
+                ?? attestation.originalDocumentName,
+            requestedDocumentName: attestation.newDocumentName)
     }
 
     static func outputDirectoryURL() -> URL {

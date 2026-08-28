@@ -68,9 +68,14 @@ public struct BuiltInVisionProvider: SecurityElementsProviding {
                     // previously missed at 0.28.
                     masks.colored[y * pixels.width + x] = true
                     masks.ink[y * pixels.width + x] = true
-                } else if v < 0.42 && s < 0.55 {
+                } else if v < 0.65 && s < 0.55 {
                     masks.dark[y * pixels.width + x] = true
-                    masks.ink[y * pixels.width + x] = true
+                    // Keep the original ink threshold for signature detection.
+                    // The broader dark mask is used only for conservative relief
+                    // candidates and must not merge ordinary printed text.
+                    if v < 0.42 {
+                        masks.ink[y * pixels.width + x] = true
+                    }
                 }
                 _ = h
             }
@@ -82,6 +87,10 @@ public struct BuiltInVisionProvider: SecurityElementsProviding {
         elements.append(contentsOf: stamps)
 
         let stampBoxes = stamps.map { $0.boundingBox }
+        elements.append(contentsOf: detectEmbossedSeals(masks: masks, pixels: pixels,
+                                                         pageIndex: pageIndex,
+                                                         exclusions: exclusions,
+                                                         stampBoxes: stampBoxes))
         elements.append(contentsOf: detectSignatures(masks: masks, pixels: pixels, pageIndex: pageIndex,
                                                      exclusions: exclusions,
                                                      stampBoxes: stampBoxes))
@@ -170,18 +179,77 @@ public struct BuiltInVisionProvider: SecurityElementsProviding {
         return Double(hits) / Double(sampleCount)
     }
 
+    /// Detects low-saturation circular relief marks that do not have enough
+    /// colour to be classified as an official stamp. This is intentionally a
+    /// conservative candidate pass: text-like and elongated components are
+    /// rejected, and the advocate can still confirm or remove the result.
+    private func detectEmbossedSeals(masks: Masks, pixels: PixelMap, pageIndex: Int,
+                                     exclusions: VisionExclusions,
+                                     stampBoxes: [NormalizedRect]) -> [SecurityElement] {
+        let reliefMask = dilated(masks.dark,
+                                 width: pixels.width,
+                                 height: pixels.height,
+                                 radius: 1)
+        let components = ConnectedComponents.label(mask: reliefMask,
+                                                    width: pixels.width,
+                                                    height: pixels.height)
+        var seals: [SecurityElement] = []
+        let pageArea = Double(pixels.width * pixels.height)
+
+        for component in components {
+            let stats = ConnectedComponents.stats(for: component, mask: reliefMask,
+                                                  width: pixels.width, height: pixels.height)
+            guard stats.area > 500 else { continue }
+            // A relief candidate must have a substantial connected contour,
+            // not a small glyph or a line of printed text.
+            guard stats.perimeter >= 180 else { continue }
+            let diameter = Double(max(stats.bboxWidth, stats.bboxHeight))
+            let relativeDiameter = diameter / Double(pixels.width)
+            guard relativeDiameter >= minStampDiameterRatio,
+                  relativeDiameter <= maxStampDiameterRatio,
+                  stats.aspectRatio > 0.70,
+                  stats.aspectRatio < 1.65 else { continue }
+
+            let fillRatio = Double(stats.area) /
+                Double(max(stats.bboxWidth, 1) * max(stats.bboxHeight, 1))
+            guard fillRatio > 0.25, fillRatio < 0.70,
+                  Double(stats.area) / pageArea > 0.00025 else { continue }
+
+            let box = normalizedRect(stats: stats, pixels: pixels)
+            guard !exclusions.overlapsTextOrBarcode(box, threshold: 0.25),
+                  !stampBoxes.contains(where: { Self.overlapFraction(box, $0) > 0.5 }) else { continue }
+
+            let coverage = Self.radialCoverage(stats: stats, mask: reliefMask,
+                                               width: pixels.width, height: pixels.height)
+            guard coverage >= 0.25 else { continue }
+
+            seals.append(SecurityElement(
+                kind: .embossedSeal,
+                pageIndex: pageIndex,
+                boundingBox: box,
+                confidence: min(0.82, 0.42 + coverage * 0.35),
+                verbalDescription: "Reliéfna slepotlač",
+                detectedByAI: true))
+        }
+        return seals
+    }
+
     private func detectSignatures(masks: Masks, pixels: PixelMap, pageIndex: Int,
                                   exclusions: VisionExclusions,
                                   stampBoxes: [NormalizedRect]) -> [SecurityElement] {
         // Ink mask (dark AND colored strokes): blue ballpoint signatures are colored.
-        let components = ConnectedComponents.label(mask: masks.ink,
+        let signatureMask = dilated(masks.ink,
+                                    width: pixels.width,
+                                    height: pixels.height,
+                                    radius: 1)
+        let components = ConnectedComponents.label(mask: signatureMask,
                                                    width: pixels.width,
                                                    height: pixels.height)
         var signatures: [SecurityElement] = []
         let pageArea = Double(pixels.width * pixels.height)
 
         for component in components {
-            let stats = ConnectedComponents.stats(for: component, mask: masks.ink,
+            let stats = ConnectedComponents.stats(for: component, mask: signatureMask,
                                                   width: pixels.width, height: pixels.height)
             guard stats.area > 120 else { continue }
 
@@ -242,6 +310,26 @@ public struct BuiltInVisionProvider: SecurityElementsProviding {
         if stats.minY <= margin { touchedEdges += 1 }
         if stats.maxY >= height - margin { touchedEdges += 1 }
         return touchedEdges > 0
+    }
+
+    private func dilated(_ mask: [Bool], width: Int, height: Int, radius: Int) -> [Bool] {
+        guard radius > 0 else { return mask }
+        var result = mask
+        for y in 0..<height {
+            for x in 0..<width where mask[y * width + x] {
+                for dy in -radius...radius {
+                    for dx in -radius...radius {
+                        guard abs(dx) + abs(dy) <= radius else { continue }
+                        let nx = x + dx
+                        let ny = y + dy
+                        if nx >= 0, nx < width, ny >= 0, ny < height {
+                            result[ny * width + nx] = true
+                        }
+                    }
+                }
+            }
+        }
+        return result
     }
 
 
@@ -343,7 +431,7 @@ public struct BuiltInVisionProvider: SecurityElementsProviding {
         // bottom-left-origin box maps directly onto our bottom-origin convention.
         NormalizedRect(
             x: Double(max(0, boundingBox.minX)),
-            y: Double(max(0, min(1 - boundingBox.height, 1))),
+            y: Double(max(0, min(boundingBox.minY, 1))),
             width: Double(min(1, boundingBox.width)),
             height: Double(min(1, boundingBox.height)))
     }

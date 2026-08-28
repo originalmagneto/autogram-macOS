@@ -22,11 +22,6 @@ public struct EmbeddedFileService: Sendable {
         guard let catalogDict = PDFObjectScanner.catalogDictionary(number: root.objectNumber, in: pdf) else {
             throw PDFAError.catalogNotFound(root.objectNumber)
         }
-        guard !catalogDict.contains("/EmbeddedFiles") && !catalogDict.contains("/Names") else {
-            return try appendAsUnreferencedAttachment(attachment, into: pdf, catalogDict: catalogDict,
-                                                      root: root)
-        }
-
         let maxNumber = max(PDFObjectScanner.maxObjectNumber(in: pdf), root.objectNumber)
         let fileNumber = maxNumber + 1
         let specNumber = maxNumber + 2
@@ -41,14 +36,16 @@ public struct EmbeddedFileService: Sendable {
         let ufHex = attachment.fileName.utf16.map { String(format: "%04X", $0) }.joined()
         let escapedDesc = attachment.mimeType.replacingOccurrences(of: "(", with: "")
 
-        let specBody = "<< /Type /Filespec /F (\(nameASCII)) /UF <FEFF\(ufHex)> /Desc (\(escapedDesc))" +
+        let specBody = "<< /Type /Filespec /F (\(nameASCII)) /UF <FEFF\(ufHex)>" +
+            " /AFRelationship /Data /Desc (\(escapedDesc))" +
             " /EF << /F \(fileNumber) 0 R /UF \(fileNumber) 0 R >> >>"
         let specObj = Data("\n\(specNumber) 0 obj\n\(specBody)\nendobj\n".utf8)
 
-        let namesSuffix = " /Names << /EmbeddedFiles << /Names [(\(nameASCII)) \(specNumber) 0 R] >> >>"
-
-        var augmented = catalogDict
-        augmented = PDFObjectScanner.augmentDictionary(augmented, appending: namesSuffix)
+        var augmented = Self.addAttachmentToCatalog(catalogDict,
+                                                    fileName: nameASCII,
+                                                    specificationNumber: specNumber)
+        augmented = Self.addAssociatedFileToCatalog(augmented,
+                                                    specificationNumber: specNumber)
         let catalogObj = Data("\n\(newCatalogNumber) 0 obj\n\(augmented)\nendobj\n".utf8)
 
         var out = pdf
@@ -83,32 +80,33 @@ public struct EmbeddedFileService: Sendable {
         return out
     }
 
-    private func appendAsUnreferencedAttachment(_ attachment: Attachment,
-                                                into pdf: Data,
-                                                catalogDict: String,
-                                                root: PDFObjectScanner.RootRef) throws -> Data {
-        let maxNumber = max(PDFObjectScanner.maxObjectNumber(in: pdf), root.objectNumber)
-        let fileNumber = maxNumber + 1
+    private static func addAttachmentToCatalog(_ catalog: String,
+                                               fileName: String,
+                                               specificationNumber: Int) -> String {
+        let entry = "(\(fileName)) \(specificationNumber) 0 R"
+        if let embeddedRange = catalog.range(of: "/EmbeddedFiles"),
+           let namesRange = catalog.range(of: "/Names", range: embeddedRange.upperBound..<catalog.endIndex),
+           let bracketRange = catalog.range(of: "[", range: namesRange.upperBound..<catalog.endIndex),
+           let closingRange = catalog.range(of: "]", range: bracketRange.upperBound..<catalog.endIndex) {
+            var updated = catalog
+            updated.insert(contentsOf: "\(entry) ", at: closingRange.lowerBound)
+            return updated
+        }
 
-        var fileObj = Data("\n\(fileNumber) 0 obj\n<< /Type /EmbeddedFile /Subtype /\(attachment.mimeType) /Length \(attachment.data.count) >>\nstream\n".utf8)
-        fileObj.append(attachment.data)
-        fileObj.append(Data("\nendstream\nendobj\n".utf8))
+        let namesSuffix = " /Names << /EmbeddedFiles << /Names [\(entry)] >> >>"
+        return PDFObjectScanner.augmentDictionary(catalog, appending: namesSuffix)
+    }
 
-        let xrefOffset = pdf.count + fileObj.count
-        var out = pdf
-        out.append(fileObj)
-
-        var xref = Data("xref\n\(fileNumber) 1\n".utf8)
-        xref.append(Data(String(format: "%010d %05d n \n", pdf.count, 0).utf8))
-        xref.append(Data("""
-        trailer
-        << /Size \(fileNumber + 1) >>
-        startxref
-        \(xrefOffset)
-        %%EOF
-
-        """.utf8))
-        out.append(xref)
-        return out
+    private static func addAssociatedFileToCatalog(_ catalog: String,
+                                                   specificationNumber: Int) -> String {
+        if let afRange = catalog.range(of: "/AF"),
+           let bracketRange = catalog.range(of: "[", range: afRange.upperBound..<catalog.endIndex),
+           let closingRange = catalog.range(of: "]", range: bracketRange.upperBound..<catalog.endIndex) {
+            var updated = catalog
+            updated.insert(contentsOf: "\(specificationNumber) 0 R ", at: closingRange.lowerBound)
+            return updated
+        }
+        return PDFObjectScanner.augmentDictionary(catalog,
+                                                  appending: " /AF [\(specificationNumber) 0 R]")
     }
 }

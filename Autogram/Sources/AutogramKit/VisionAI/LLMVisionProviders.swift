@@ -144,10 +144,17 @@ public enum LLMVisionParser {
             guard let box = raw.box, box.count == 4 else { return nil }
             let resolvedKind = kind ?? .other
             let page = max((raw.page ?? 1) - 1, 0)
-            let rect = NormalizedRect(x: min(max(box[0], 0), 1),
-                                      y: min(max(box[1], 0), 1),
-                                      width: min(max(box[2], 0), 1),
-                                      height: min(max(box[3], 0), 1))
+            let x = min(max(box[0], 0), 1)
+            let width = min(max(box[2], 0), 1 - x)
+            let height = min(max(box[3], 0), 1)
+            let topOriginY = min(max(box[1], 0), 1 - height)
+            // The UI and XML domain use PDF coordinates (y=0 at the bottom),
+            // while the model prompt intentionally asks for image coordinates
+            // (y=0 at the top). Convert exactly once at the parser boundary.
+            let rect = NormalizedRect(x: x,
+                                      y: 1 - topOriginY - height,
+                                      width: width,
+                                      height: height)
             return SecurityElement(
                 kind: resolvedKind,
                 pageIndex: page,

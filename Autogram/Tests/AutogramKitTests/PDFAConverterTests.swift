@@ -23,6 +23,65 @@ final class PDFAConverterTests: XCTestCase {
                       "Textová vrstva musí zostať zachovaná pri vektorovom režime")
     }
 
+    func testConversionOutputNamingUsesOriginalDocumentAndSiblingDirectory() throws {
+        XCTAssertEqual(
+            ConversionOutputNaming.pdfFileName(
+                originalDocumentName: "Brezinová_diplom.pdf",
+                requestedDocumentName: "Diplom PDF"),
+            "Brezinová_diplom-Diplom PDF.pdf")
+        XCTAssertEqual(
+            ConversionOutputNaming.xdcfFileName(
+                originalDocumentName: "Brezinová_diplom.pdf",
+                pdfFileName: "Brezinová_diplom-Diplom PDF.pdf",
+                evidenceNumber: "1563-260828-1"),
+            "Brezinová_diplom-Diplom PDF-1563-260828-1.xml.xdcf")
+
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zako-output-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let source = directory.appendingPathComponent("origin.pdf")
+        try Data("pdf".utf8).write(to: source)
+        XCTAssertEqual(ConversionOutputNaming.outputDirectory(sourceURL: source, fallback: URL(fileURLWithPath: "/tmp")), directory)
+    }
+
+    func testEngineNormalizationIsAvailableWhenBundledEngineIsInstalled() throws {
+        let source = try XCTUnwrap(PDFDocument(data: TestPDFBuilder.typicalContractPDF()))
+        let sourceData = try XCTUnwrap(source.dataRepresentation())
+        guard JavaEngineLocator().locate() != nil else {
+            throw XCTSkip("Bundled Java engine nie je nainštalovaný.")
+        }
+
+        let normalized = try XCTUnwrap(PDFAConverter.normalizeWithEngine(sourceData, title: "Test"))
+        XCTAssertTrue(normalized.starts(with: Data("%PDF-".utf8)))
+        XCTAssertTrue(String(decoding: normalized, as: UTF8.self).contains("pdfaid:part=\"2\""))
+        XCTAssertEqual(PDFAValidator().validate(normalized).isValid, true,
+                       "Java/PDFBox normalizovaný výstup musí prejsť lokálnou validáciou")
+    }
+
+    func testNormalizeForDeliveryRepairsAttachedPDF() throws {
+        let source = try XCTUnwrap(PDFDocument(data: TestPDFBuilder.typicalContractPDF()))
+        let converted = try PDFAConverter().convert(document: source)
+        let attached = try EmbeddedFileService().embed(
+            .init(fileName: "osvedcovacia-dolozka.xml", mimeType: "application#2Fxml", data: Data("<x/>".utf8)),
+            into: converted)
+        let delivered = try PDFAConverter().normalizeForDelivery(attached, title: "Test")
+
+        XCTAssertEqual(PDFAValidator().validate(delivered).isValid, true)
+        XCTAssertEqual(PDFDocument(data: delivered)?.pageCount, source.pageCount)
+    }
+
+    func testAttachedPDFKeepsValidPDFStructure() throws {
+        let source = try XCTUnwrap(PDFDocument(data: TestPDFBuilder.typicalContractPDF()))
+        let converted = try PDFAConverter().convert(document: source)
+        let attached = try EmbeddedFileService().embed(
+            .init(fileName: "osvedcovacia-dolozka.xml", mimeType: "application#2Fxml", data: Data("<x/>".utf8)),
+            into: converted)
+        let delivered = try PDFAConverter().normalizeForDelivery(attached, title: "Test")
+        XCTAssertEqual(PDFDocument(data: delivered)?.pageCount, source.pageCount)
+        XCTAssertTrue(String(decoding: delivered, as: UTF8.self).contains("pdfaid:part=\"2\""))
+    }
+
     func testRasterModeFlattensAndPreservesPageCount() throws {
         let source = try XCTUnwrap(PDFDocument(data: TestPDFBuilder.typicalContractPDF()))
         let converter = PDFAConverter()
@@ -103,6 +162,8 @@ final class PDFAConverterTests: XCTestCase {
 
         let text = String(decoding: withAttachment, as: UTF8.self)
         XCTAssertTrue(text.contains("/EmbeddedFiles"))
+        XCTAssertTrue(text.contains("/AFRelationship /Data"))
+        XCTAssertTrue(text.contains("/AF ["))
         XCTAssertTrue(text.contains("osvedcovacia-dolozka.xml"))
         XCTAssertTrue(text.contains(xmlPayload))
 

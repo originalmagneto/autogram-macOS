@@ -89,20 +89,55 @@ struct ZakoFlowView: View {
             return false
         }
 
-        provider.loadDataRepresentation(forTypeIdentifier: typeIdentifier) { data, _ in
+        provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
+            let sourceURL: URL?
+            if let url = item as? URL {
+                sourceURL = url
+            } else if let url = item as? NSURL {
+                sourceURL = url as URL
+            } else if let data = item as? Data {
+                sourceURL = URL(dataRepresentation: data, relativeTo: nil)
+            } else {
+                sourceURL = nil
+            }
+
+            if let sourceURL, isPDF {
+                let sourcePath = sourceURL.path
+                let sourceDirectory = sourceURL.deletingLastPathComponent()
+                Task { @MainActor in
+                    await store.loadDocument(at: URL(fileURLWithPath: sourcePath),
+                                             outputDirectory: sourceDirectory,
+                                             sourceName: sourceURL.deletingPathExtension().lastPathComponent)
+                }
+                return
+            }
+
+            provider.loadDataRepresentation(forTypeIdentifier: typeIdentifier) { data, _ in
             guard let data else { return }
             Task { @MainActor in
                 let tempURL = FileManager.default.temporaryDirectory
                     .appendingPathComponent("zako-import-\(UUID().uuidString).pdf")
 
                 if isPDF || data.starts(with: Data("%PDF".utf8)) {
-                    try? data.write(to: tempURL)
+                    do {
+                        try data.write(to: tempURL)
+                    } catch {
+                        store.lastError = "Import dokumentu sa nepodaril: \(error.localizedDescription)"
+                        return
+                    }
                 } else if let converted = ImageToPDFConverter.pdf(fromImageData: data) {
-                    try? converted.write(to: tempURL)
+                    do {
+                        try converted.write(to: tempURL)
+                    } catch {
+                        store.lastError = "Prevod obrázka sa nepodaril: \(error.localizedDescription)"
+                        return
+                    }
                 } else {
+                    store.lastError = "Vstupný súbor sa nepodarilo previesť do PDF."
                     return
                 }
                 await store.loadDocument(at: tempURL)
+            }
             }
         }
         return true

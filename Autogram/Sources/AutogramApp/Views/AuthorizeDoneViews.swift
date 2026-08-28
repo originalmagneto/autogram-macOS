@@ -387,15 +387,18 @@ struct DoneView: View {
     private func exportAs() {
         exportError = nil
         guard let directory = store.outputDirectory else { return }
+        let fileName = store.evidenceStore.record(id: store.currentRecordID)?.pdfFileName
+            ?? ConversionOutputNaming.pdfFileName(
+                originalDocumentName: store.attestation.originalDocumentName,
+                requestedDocumentName: store.attestation.newDocumentName)
+        let pdf = directory.appendingPathComponent(fileName)
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.pdf]
-        panel.nameFieldStringValue = (store.attestation.newDocumentName.isEmpty ? "dokument" : store.attestation.newDocumentName) + "-konvertovane"
+        panel.nameFieldStringValue = pdf.lastPathComponent
         panel.begin { response in
             guard response == .OK, let url = panel.url else { return }
             do {
-                let files = try FileManager.default.contentsOfDirectory(at: directory,
-                                                                         includingPropertiesForKeys: nil)
-                guard let pdf = files.first(where: { $0.pathExtension.lowercased() == "pdf" }) else {
+                guard FileManager.default.fileExists(atPath: pdf.path) else {
                     throw CocoaError(.fileNoSuchFile, userInfo: [NSLocalizedDescriptionKey: "PDF výstup sa nenašiel."])
                 }
                 try FileManager.default.copyItem(at: pdf, to: url)

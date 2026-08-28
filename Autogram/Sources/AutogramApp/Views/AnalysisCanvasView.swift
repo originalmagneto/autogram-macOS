@@ -100,9 +100,6 @@ struct AnalysisCanvasView: View {
             renderPage()
         }
         .toolbar {
-            ToolbarItemGroup(placement: .principal) {
-                markupToolbar
-            }
             ToolbarItemGroup(placement: .secondaryAction) {
                 detectionProviderPicker
                 sheetCountMenu
@@ -172,7 +169,7 @@ struct AnalysisCanvasView: View {
 
     // MARK: - Markup Toolbar
     private var markupToolbar: some View {
-        HStack(spacing: 2) {
+        HStack(spacing: 4) {
             toolButton(kind: nil, title: "Vybrať", icon: "arrow.up.left.and.arrow.down.right")
             Divider().frame(height: 16)
             toolButton(kind: .officialStamp, title: "Pečiatka", icon: "seal.fill")
@@ -180,7 +177,14 @@ struct AnalysisCanvasView: View {
             toolButton(kind: .embossedSeal, title: "Pečať", icon: "rosette")
             toolButton(kind: .initial, title: "Parafa", icon: "text.badge.checkmark")
         }
-        .liquidGlass(cornerRadius: 12, padding: 3)
+        .padding(.horizontal, 4)
+        .padding(.vertical, 3)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(Color.accentColor.opacity(0.5), lineWidth: 1)
+        }
+        .shadow(color: .black.opacity(0.16), radius: 8, y: 3)
     }
 
     /// Indicator + inline switcher for the detection provider. Apple Vision
@@ -315,6 +319,38 @@ struct AnalysisCanvasView: View {
                 } else {
                     Text("Žiadna strana na zobrazenie")
                         .foregroundStyle(.secondary)
+                }
+
+                VStack(spacing: 0) {
+                    HStack {
+                        Label("Označte bezpečnostné prvky",
+                              systemImage: "shield.checkerboard")
+                            .font(.callout.weight(.semibold))
+                        Spacer()
+                        Text("AI nálezy môžete skontrolovať a upraviť")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 9)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .strokeBorder(Color.accentColor.opacity(0.35), lineWidth: 1)
+                    }
+                    .padding(12)
+                    .allowsHitTesting(false)
+
+                    Spacer()
+                }
+
+                VStack {
+                    HStack {
+                        Spacer()
+                        markupToolbar
+                    }
+                    .padding(14)
+                    Spacer()
                 }
 
                 if let tool = store.activeTool {
@@ -765,12 +801,21 @@ struct ElementRow: View {
                 .accessibilityValue("\(UXLabels.confidenceLabel(for: element.confidence)); \(isSelected ? "Vybraný" : "Nevybraný")")
                 .accessibilityAddTraits(isSelected ? .isSelected : [])
 
-                Picker("Typ prvku", selection: Binding(get: { element.kind }, set: { onKindChange($0) })) {
+                Menu {
                     ForEach(SecurityElement.Kind.allCases, id: \.self) { kind in
-                        Text(kind.rawValue).tag(kind)
+                        Button {
+                            onKindChange(kind)
+                        } label: {
+                            Label(kind.rawValue, systemImage: kind.sfSymbol)
+                        }
                     }
+                } label: {
+                    Label("Typ prvku", systemImage: "arrow.left.arrow.right")
+                        .lineLimit(1)
+                        .truncationMode(.tail)
                 }
-                .pickerStyle(.menu)
+                .menuStyle(.borderedButton)
+                .layoutPriority(1)
                 .accessibilityLabel("Typ prvku")
                 .accessibilityValue(element.kind.rawValue)
 
