@@ -140,7 +140,7 @@ struct IntakeView: View {
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
                 }
-                .keyboardShortcut("o", modifiers: .command)
+                .keyboardShortcut("o", modifiers: [.command, .option])
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
                 .tint(.indigo)
