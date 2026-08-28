@@ -504,12 +504,21 @@ final class ZakoSessionStore {
                 into: pdfaData)
 
             analysisProgressText = "Autorizujem kvalifikovaným podpisom…"
+            if isCertificateTypePending {
+                analysisProgressText = "Overujem certifikát na karte…"
+                let resolved = await signingProvider.resolveIdentities(pin: signingPIN)
+                guard let resolved, !resolved.isEmpty else {
+                    throw SigningError.identityUnavailable
+                }
+                identities = resolved
+                selectedIdentityID = resolved.first(where: { $0.isMandateCertificate })?.id
+                    ?? resolved.first?.id
+            }
             guard let identityID = selectedIdentityID else {
                 throw SigningError.identityUnavailable
             }
             if requiresMandateOverride {
                 lastError = "Zvolený certifikát nie je mandátnym certifikátom pre zaručenú konverziu. Pokračovanie je možné len s výslovným override (audit záznam)."
-                analysisProgressText = ""
                 return
             }
             if includeQualifiedTimestamp,

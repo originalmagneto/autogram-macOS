@@ -82,4 +82,29 @@ final class AttestationValidatorTests: XCTestCase {
 
         XCTAssertTrue(errors.contains(.originNotConfirmed))
     }
+    func testPreflightBlocksResolvedNonMandateIdentity() {
+        var data = validAttestationData()
+        data.originConfirmed = true
+
+        let result = AttestationPreflight.evaluate(
+            data,
+            securityElements: validElements,
+            hasSelectedIdentity: true,
+            mandateRequirementSatisfied: false)
+
+        XCTAssertFalse(result.isComplete)
+    }
+
+    func testPreflightAllowsResolvedMandateIdentity() {
+        var data = validAttestationData()
+        data.originConfirmed = true
+
+        let result = AttestationPreflight.evaluate(
+            data,
+            securityElements: validElements,
+            hasSelectedIdentity: true,
+            mandateRequirementSatisfied: true)
+
+        XCTAssertTrue(result.isComplete)
+    }
 }
