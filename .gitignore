@@ -6,6 +6,7 @@
 
 # Swift / SPM
 .build/
+.worktrees/
 DerivedData/
 *.xcodeproj
 *.xcworkspace
