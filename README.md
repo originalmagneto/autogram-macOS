@@ -6,21 +6,23 @@
 
 **Natívna SwiftUI aplikácia na elektronické podpisovanie dokumentov** so štandardným režimom podpisovania (KEP + kvalifikovaná časová pečiatka) a **advanced režimom Zaručená konverzia** podľa § 35-39 zákona č. 305/2013 Z. z. o e-Governmente a vyhlášky MIRRI č. 70/2021 Z. z.
 
-`macOS 26+` (Liquid Glass) · `SwiftUI + @Observable` · `0 Swift package závislostí` · `Swift 6 strict concurrency` · `86 testov (83 prešlo, 3 live skipped) ✅`
+`macOS 27 only` (native Liquid Glass) · `SwiftUI + @Observable` · `0 Swift package dependencies` · `Swift 6 strict concurrency` · `102 tests passed, 3 live skipped`
 
-> 📋 Implementačná dokumentácia fáz 1-4 vrátane validácií a limitov: [`docs/PHASES.md`](docs/PHASES.md)
+> Implementačná dokumentácia fáz 1 až 4: [`docs/PHASES.md`](docs/PHASES.md)
+>
+> Aktuálny handoff pre ďalšieho AI agenta: [`docs/SESSION_HANDOFF_2026-08-28.md`](docs/SESSION_HANDOFF_2026-08-28.md)
 
 ---
 
 ## Prehľad: jeden nástroj, dva režimy
 
-### ✍️ Štandardný režim: Podpisovanie
-Klasická autorizácia dokumentov v štýle moderného macOS štúdia: vlož PDF, pozri náhľad, voliteľne umiestni vizuálnu pečiatku podpisu priamo do stránky a podpíš KEP s kvalifikovanou časovou pečiatkou. Hlavné akčné tlačidlo je trvalo ukotvené v spodnej lište (Sticky Action Bar).
+### Štandardný režim: Podpisovanie
+Vložte PDF alebo obrazový sken, skontrolujte náhľad, voliteľne umiestnite vizuálnu pečiatku a podpíšte dokument kvalifikovaným elektronickým podpisom a časovou pečiatkou. Primárne akcie používajú natívnu macOS 27 toolbar a inspector hierarchiu.
 
-### 🏛️ Advanced režim: Zaručená konverzia
-Zaručená konverzia je slovenský ekvivalent osvedčovania listín u notára: papierový dokument sa prevedie do elektronickej podoby tak, že nový dokument má **právne účinky osvedčenej kópie**. Advokát na to potrebuje mandátny certifikát a kvalifikované časové pečiatky: aplikácia sa postará o všetko ostatné. V tomto režime sa nepoužívajú grafické podpisy; autorizáciou je KEP s mandátnym atribútom nad celým balíkom.
+### Rozšírený režim: Zaručená konverzia
+Papierový dokument sa prevedie do elektronickej podoby s účinkami osvedčenej kópie. Aplikácia pripraví analýzu, osvedčovaciu doložku a právny preflight. Autorizácia vyžaduje mandátny certifikát a kvalifikovanú časovú pečiatku.
 
-Kým existujúce nástroje (Podpisuj.sk, D.Convert) sú Java aplikácie s desiatkami manuálne vypĺňaných polí, Autogram robí z konverzie **2-3 kliky**: automaticky rozpozná strany, listy aj bezpečnostné prvky, stiahne evidenčné číslo z EZZK, vygeneruje živú osvedčovaciu doložku a celé to autorizuje.
+Flow oddeľuje vytvorenie a podpísanie súborov od zápisu do centrálnej evidencie CEZZK. Ak sa odoslanie do CEZZK zaradí do fronty, completion obrazovka to zobrazí ako samostatný stav s lehotou a možnosťou opakovania.
 
 ---
 
@@ -28,7 +30,7 @@ Kým existujúce nástroje (Podpisuj.sk, D.Convert) sú Java aplikácie s desiat
 
 <img src="docs/diagrams/architecture.svg" alt="Architektúra Autogram macOS" width="100%">
 
-Tri vrstvy: natívna SwiftUI prezentácia (`AutogramApp`) s dvoma reaktívnymi session store (`@Observable SigningSessionStore` pre štandardný podpis a `ZakoSessionStore` pre advanced režim) a testovateľná knižnica `AutogramKit`: enginy, dokumentové služby a infraštruktúra. Bez externých balíkových závislostí; PDF/A zápis, XML generátor aj ZIP/ASiC-E packager sú vlastná implementácia. Reálne tokenové podpisovanie používa natívny CryptoTokenKit alebo EngineBridge s Java/DSS engine pre PKCS#11 tokeny.
+Tri vrstvy tvoria natívna SwiftUI prezentácia (`AutogramApp`) so zdieľaným `AutogramAppModel`, dva reaktívne session store (`SigningSessionStore` pre štandardné podpisovanie a `ZakoSessionStore` pre zaručenú konverziu) a testovateľná knižnica `AutogramKit` s enginmi, dokumentovými službami a infraštruktúrou. Bez externých balíčkových závislostí; PDF/A zápis, XML generátor aj ZIP/ASiC-E packager sú vlastná implementácia. Reálne tokenové podpisovanie používa natívny CryptoTokenKit alebo EngineBridge s Java/DSS engine pre PKCS#11 tokeny.
 
 ---
 
@@ -38,14 +40,14 @@ Tri vrstvy: natívna SwiftUI prezentácia (`AutogramApp`) s dvoma reaktívnymi s
 
 | # | Krok | Kto |
 |---|---|---|
-| 01 | Sken papierového originálu (drag & drop) | advokát |
-| 02 | Analýza strán, listov, formátu listiny | Autogram |
+| 01 | Sken papierového originálu alebo osvedčenej kópie | advokát |
+| 02 | Analýza strán, listov a formátu listiny | Autogram |
 | 03 | AI Vision detekcia pečiatok a podpisov | Autogram |
-| 04 | Potvrdenie údajov (1 klik namiesto 30 polí) | advokát |
-| 05 | Jednorazové evidenčné číslo + serverový čas | IS EZZK |
-| 06 | PDF/A-2b konverzia + XML EmbeddedFile | Autogram |
-| 07 | Autorizácia KEP mandátnym certifikátom + QTS | advokát |
-| 08 | Zápis záznamu do centrálnej evidencie ≤ 24 h | CEZZK |
+| 04 | Právny preflight a potvrdenie údajov | advokát |
+| 05 | Evidenčné číslo a dôveryhodný serverový čas | IS EZZK |
+| 06 | PDF/A-2b konverzia a XML EmbeddedFile | Autogram |
+| 07 | Autorizácia KEP mandátnym certifikátom a QTS | advokát |
+| 08 | Zápis záznamu do centrálnej evidencie do 24 h | CEZZK |
 
 ---
 
@@ -53,7 +55,7 @@ Tri vrstvy: natívna SwiftUI prezentácia (`AutogramApp`) s dvoma reaktívnymi s
 
 <img src="docs/diagrams/state-machine.svg" alt="Stavový automat evidencie konverzií" width="100%">
 
-Každá konverzia prechádza stavmi od konceptu po potvrdenie v centrálnej evidencii. Aplikácia stráži zákonné lehoty: neodoslané záznamy po 20 hodinách indikuje varovný stav v dashboarde.
+Každá konverzia prechádza od konceptu k zápisu v centrálnej evidencii. Aplikácia sleduje zákonnú 24-hodinovú lehotu. Výraznejšie varovanie po 20 hodinách a pulzujúci indikátor po lehote zostávajú otvorenou follow-up úlohou.
 
 ---
 
@@ -90,9 +92,9 @@ On-device počítačové videnie (farebné/tmavé masky, connected components, r
 
 ## Ako začať (advokát)
 
-1. **Podpísať bežný dokument?** → sidebar *Podpisovanie*: pretiahni PDF (`⌘O`), voliteľne umiestni pečiatku, klikni **Podpísať KEP** (`⌘⏎`). Alebo označ súbory priamo vo Finderi → *Rýchle akcie* → **Podpísať s QES + QTS (Autogram)**.
-2. **Previesť papierový originál do elektronickej podoby?** → sidebar *Zaručená konverzia*: pretiahni sken originálu, skontroluj AI-detekované prvky cez plávajúci markup panel, over doložku v živom náhľade, klikni **Autorizovať konverziu**.
-3. **Spravovať evidenciu a CEZZK?** → sidebar *Register konverzií* → odoslať dávku alebo exportovať CSV.
+1. **Sign a normal document?** → sidebar *Signing*: choose a PDF (`⌘O`), optionally place a visual signature, and select **Sign KEP** (`⌘⏎`). Or select files in Finder → *Quick Actions* → **Sign with QES + QTS (Autogram)**.
+2. **Convert a paper original to electronic form?** → sidebar *Guaranteed conversion*: drop the scan, review AI-detected elements in the native macOS 27 toolbar and inspector, verify the live attestation preview, complete the legal preflight, and select **Authorize conversion**. ZaKo intake uses `⌘⌥O`.
+3. **Manage evidence and CEZZK?** → sidebar *Conversion register* → submit the queue or export CSV.
 
 > Bez nastaveného EZZK beží evidencia v DEMO režime; bez pripojeného kvalifikovaného podpisového modulu podpisuje DEMO podpisovač (jasne označený).
 
@@ -100,65 +102,98 @@ On-device počítačové videnie (farebné/tmavé masky, connected components, r
 
 ## Funkcie
 
-### ✍️ Modul Podpisovanie (štandard)
-- Drag & drop **PDF aj obrázkové skeny** (JPEG/PNG/TIFF/HEIC s automatickou konverziou do PDF)
-- Voliteľný **vizuálny podpis**: interaktívne umiestnenie na plátne dokumentu
-- KEP podpis + QTS, identity z Keychainu / eID karty (CryptoTokenKit) alebo PKCS#11 tokenu cez EngineBridge
-- Ukotvené akčné tlačidlá (`StickyActionBar`) s klávesovou skratkou `⌘⏎`
-- Výstup: podpísané PDF (+ ASiC-E kontajner), priame akcie pre Finder a otvorenie
-- **Finder Quick Action:** označené PDF alebo priečinky vo Finderi sa podpíšu pravým klikom (*Rýchle akcie* → Podpísať s QES + QTS) bez nutnosti otvárať okno appky
+### Modul Podpisovanie
+- Drag and drop PDF aj obrazové skeny: JPEG, PNG, TIFF a HEIC s automatickou konverziou do PDF
+- Voliteľná vizuálna pečiatka s umiestnením na plátne dokumentu
+- KEP podpis a QTS cez CryptoTokenKit, Keychain alebo PKCS#11 EngineBridge
+- Primárne akcie v natívnej macOS 27 toolbar hierarchii s klávesovou skratkou `⌘⏎`
+- Výstupný podpísaný PDF súbor a ASiC-E kontajner
+- Finder Quick Action pre podpisovanie označených PDF
 
-### 🏛️ Modul Zaručená konverzia (advanced)
-- 5-krokový plynulý workflow stepper (`FlowStepBar`)
-- Plávajúci segmentovaný markup toolbar (Výber, Pečiatka, Podpis, Pečať, Parafa)
-- Ľavý pás miniatúr stránok (Thumbnail Strip) pre pohodlnú navigáciu vo viacstranových spisoch
-- Živý náhľad Osvedčovacej doložky (Live Clause Preview) počas písania
-- Automatické počítadlá: strany / neprázdne strany / listy / veľkosť listiny
-- AI nálezy sa zlučujú s manuálnymi (manuálne úpravy prežívajú re-analýzu)
-- Šablóny doložiek a správa profilu advokáta (SAK reg. č., IČO)
+### Modul Zaručená konverzia
+- Päťfázový workflow stepper vrátane dokončenia
+- Natívny macOS 27 toolbar pre výber, markup, AI providera, listy a navigáciu strán
+- Zbaliteľný inspector pre pozíciu a veľkosť bezpečnostných prvkov
+- Ľavý pás miniatúr stránok s počtom prvkov
+- Živý náhľad osvedčovacej doložky
+- Automatické počítadlá strán, neprázdnych strán, listov a veľkosti listiny
+- AI nálezy sa zlučujú s manuálnymi nálezmi a manuálne úpravy prežívajú re-analýzu
+- Šablóny doložiek a profily advokáta
 
-### 🤖 Modul AI Vision (voliteľný boost)
-- **On-device detekcia beží vždy** (farebné/tmavé masky, connected components, radial coverage)
-- **oMLX (Apple Silicon MLX):** natívna integrácia lokálneho MLX servovania (`http://localhost:8000/v1`) s modelmi Qwen2.5-VL / Llama-3.2-Vision; GPU akcelerácia priamo na Macu
-- **Lokálny LLM:** Ollama (`llava`, `llama3.2-vision`, `qwen2-vl`) s offline spracovaním
-- **API:** ľubovoľný OpenAI-compatible endpoint s bezpečným kľúčom v Keychain
-- **Editovateľný klasifikačný prompt**: pokrýva § 37 typy (pečiatka so znakom, reliéfna pečať, parafa)
-- IoU deduplikácia: LLM dopĺňa vstavané nálezy
-- Výber providera cez prehľadné karty v Nastaveniach (konfigurácia sa zobrazí pod zvoleným režimom)
+### AI Vision
+- On-device detekcia beží vždy
+- Voliteľné režimy oMLX, Ollama a OpenAI-compatible API
+- API kľúče sa ukladajú do Keychain
+- Editovateľný klasifikačný prompt
+- Confidence a pôvod nálezu sú viditeľné v inspectore prvku
+- Konfigurácia providera sa zobrazuje progresívne
 
-### 🔐 Bezpečnosť a autorizácia
-- **Reálny KEP podpis**: XAdES-B/T v ASiC-E alebo PAdES-B/T priamo v PDF cez SecKey (CryptoTokenKit) alebo EngineBridge
-- **Slovenská eID karta** (Cosmo 9.2 / eID_klient): certifikát a privátny kľúč sa čítajú z tokenu cez CryptoTokenKit; PIN sa zadáva v systémovom dialógu
-- **I.CA SecureStore / Starcos**: kvalifikovaný certifikát a podpis cez PKCS#11 EngineBridge
-- **Live detekcia smartkarty** v spodnom paneli sidebaru (`SmartcardHUDStatus`)
-- **Mandátna brána**: Zaručená konverzia kontroluje mandátny certifikát SAK pred autorizáciou
+### Bezpečnosť a autorizácia
+- KEP podpis cez CryptoTokenKit alebo EngineBridge
+- Slovenská eID karta a PKCS#11 tokeny
+- Explicitný preflight mandátneho certifikátu
+- Potvrdenie pôvodu listiny pred autorizáciou
+- SHA-256, QTS, serverový čas a stav CEZZK v konverznom flow
 
-### 🗂️ Register a evidencia
-- Lokálny register konverzií so SQLite/JSON úložiskom a CSV exportom
-- Dashboard: sumárne karty, segmentovaný filter podľa stavu, časová os spracovania
-- Kontextové menu pre rýchle kopírovanie evidenčného čísla a SHA-256 odtlačku
-- Bezpečný potvrdzovací dialóg pred vymazaním záznamu z evidencie
-- Hromadné odosielanie čakajúcich záznamov do IS EZZK priamo z dashboardu
+### Register a evidencia
+- Lokálny register konverzií
+- Vyhľadávanie a filtrovanie podľa stavu
+- Kopírovanie evidenčného čísla a SHA-256 odtlačku
+- Natívny confirmation dialog pred zmazaním záznamu
+- Hromadné odosielanie záznamov do CEZZK s viditeľným úspechom alebo chybou
 
 ---
 
-## Build & spustenie
+## Build, test and local installation
 
 ```bash
 cd Autogram
 
-# knižnica + appka (debug)
+# Debug build
 DEVELOPER_DIR=/Applications/Xcode-26.5.app/Contents/Developer swift build
 
-# testy (86 testov, 83 prejde, 3 live testy sú voliteľné a bez hardvéru sa preskočia)
+# Full test suite
 DEVELOPER_DIR=/Applications/Xcode-26.5.app/Contents/Developer swift test
 
-# .app bundle (release)
+# Build the macOS 27 application bundle
+DEVELOPER_DIR=/Applications/Xcode-26.5.app/Contents/Developer ./build_app.sh
+
+# Build the release bundle
 DEVELOPER_DIR=/Applications/Xcode-26.5.app/Contents/Developer ./build_app.sh --release
-open .build/arm64-apple-macosx/release/Autogram.app
 ```
 
-Aplikácia je tiež nainštalovaná v systéme: `/Applications/Autogram macOS.app`.
+The debug bundle is created at `.build/arm64-apple-macosx/debug/Autogram.app`.
+
+To install the locally built debug app for manual testing:
+
+```bash
+ditto --rsrc --extattr --acl \
+  .build/arm64-apple-macosx/debug/Autogram.app \
+  "/Applications/Autogram macOS.app"
+open "/Applications/Autogram macOS.app"
+```
+
+The current verification result is 102 tests passed, 3 optional live engine tests skipped, and `LSMinimumSystemVersion=27.0`. The live tests require `AUTOGRAM_ENGINE_LIVE_TEST=1` and the external signing engine.
+
+The current debug bundle is installed at `/Applications/Autogram macOS.app` and was launched successfully for a direct smoke check.
+
+---
+
+## Current macOS 27 UX state
+
+The current branch is macOS 27 only. The main window uses a shared app model, native Settings scene, native menu commands, macOS 27 toolbar groups, collapsible inspectors, and restrained native Liquid Glass.
+
+The ZaKo flow now includes:
+
+- origin or certified-copy confirmation
+- live inline validation
+- automatic and retryable EZZK evidence-number acquisition
+- preflight before server time, PDF/A conversion, and signing
+- mandate-certificate enforcement after pending card identity resolution
+- explicit signed-file versus queued CEZZK completion state
+- accessible element descriptions, confidence, provenance, and keyboard movement controls
+
+Open follow-up work is documented in [`docs/SESSION_HANDOFF_2026-08-28.md`](docs/SESSION_HANDOFF_2026-08-28.md). The most important remaining verification is a real macOS 27 GUI pass with VoiceOver, Full Keyboard Access, Reduce Transparency, Reduce Motion, Increase Contrast, and multiple window sizes.
 
 ---
 
