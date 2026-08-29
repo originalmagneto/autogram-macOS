@@ -10,11 +10,15 @@ Autogram je natívna macOS aplikácia v SwiftUI na elektronické podpisovanie do
 - **Zaručená konverzia (ZaKo):** analýza dokumentu, označenie bezpečnostných prvkov, osvedčovacia doložka, PDF/A-2b, autorizácia mandátnym certifikátom a evidencia CEZZK.
 - **Register:** lokálne uložené záznamy konverzií, fronta odoslania do CEZZK, vyhľadávanie, filtrovanie a CSV export.
 
+> **Compliance note:** Aktuálny build je implementačný P -> E pilot. Generuje PDF/A-2b, kým externé požiadavky na PDF/A-1a alebo PNG, aktívne verzie formulárov a produkčný EZZK kontrakt nebudú autoritatívne potvrdené a nezávisle overené. Porovnanie a plán sú v [`docs/ZAKO_EXTERNAL_REQUIREMENTS_SPEC_2026-08-28.md`](docs/ZAKO_EXTERNAL_REQUIREMENTS_SPEC_2026-08-28.md) a [`Autogram/docs/superpowers/plans/2026-08-28-zako-external-requirements.md`](Autogram/docs/superpowers/plans/2026-08-28-zako-external-requirements.md).
+
 `macOS 27 only` · `Swift 6` · `SwiftUI + @Observable` · `0 Swift package dependencies` · `107 tests executed` · `3 skipped` · `0 failures`
 
 > Implementačná dokumentácia: [`docs/PHASES.md`](docs/PHASES.md)
 >
 > Posledný odovzdávací záznam: [`docs/SESSION_HANDOFF_2026-08-28.md`](docs/SESSION_HANDOFF_2026-08-28.md)
+>
+> Posledná revízia externých ZaKo požiadaviek: [`docs/SESSION_HANDOFF_2026-08-28-ZAKO-SPEC.md`](docs/SESSION_HANDOFF_2026-08-28-ZAKO-SPEC.md)
 
 ---
 

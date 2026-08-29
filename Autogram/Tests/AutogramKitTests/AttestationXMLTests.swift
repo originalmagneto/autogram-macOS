@@ -133,6 +133,83 @@ final class AttestationXMLTests: XCTestCase {
                        "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad")
     }
 
+    func testExplicitFormPackGenerationUsesPackNamespaceAndFormat() throws {
+        let input = sampleInput()
+        let customFormat = ZakoCodelistItem(code: "TEST_FORMAT", skName: "Test format")
+        let pack = ConversionFormPack(
+            id: "explicit-test-pack",
+            direction: .paperToElectronic,
+            recordVersion: "test-record",
+            clauseVersion: "test-clause",
+            namespace: "https://example.invalid/forms/test",
+            eFormIdentifier: "example/test",
+            effectiveFrom: Date(timeIntervalSince1970: 0),
+            verificationState: .unverified,
+            acceptanceState: .unknown,
+            renderer: .legacySwift,
+            newDocumentFormatItem: customFormat,
+            fingerprintMethodItem: ZakoCodelists.sha256Item)
+
+        let xml = try AttestationClauseGenerator().generateXML(input: input, formPack: pack)
+
+        XCTAssertTrue(xml.contains("xmlns=\"https://example.invalid/forms/test\""))
+        XCTAssertTrue(xml.contains("<ItemCode>TEST_FORMAT</ItemCode>"))
+        XCTAssertFalse(xml.contains(AttestationXMLConstants.namespaceP2E))
+    }
+
+    func testValidatorRequiresNamespaceOnRootElement() throws {
+        let input = sampleInput()
+        let pack = FormPackRepository.currentLegacyUnverified
+        let xml = try AttestationClauseGenerator().generateXML(input: input, formPack: pack)
+        let wrongNamespaceXML = xml.replacingOccurrences(
+            of: "xmlns=\"\(pack.namespace)\"",
+            with: "xmlns=\"https://example.invalid/wrong\"")
+
+        let issues = AttestationXMLValidator().validate(
+            wrongNamespaceXML,
+            context: .init(fingerprintSHA256Hex: input.newDocumentFingerprintSHA256Hex,
+                           securityElementCount: input.securityElements.count),
+            formPack: pack)
+
+        XCTAssertTrue(issues.contains { $0.contains("namespace") })
+    }
+
+    func testExplicitFormPackGenerationRejectsMalformedFingerprint() {
+        var input = sampleInput(fingerprintHex: "not-a-sha256")
+
+        XCTAssertThrowsError(try AttestationClauseGenerator().generateXML(
+            input: input,
+            formPack: FormPackRepository.currentLegacyUnverified)) { error in
+            XCTAssertEqual(error as? AttestationGenerationError, .invalidFingerprint)
+        }
+        input.newDocumentFingerprintSHA256Hex = String(repeating: "a", count: 64)
+        XCTAssertNoThrow(try AttestationClauseGenerator().generateXML(
+            input: input,
+            formPack: FormPackRepository.currentLegacyUnverified))
+    }
+
+    func testExplicitFormPackGenerationRejectsNonPaperToElectronicPack() {
+        let pack = ConversionFormPack(
+            id: "e-to-p-test-pack",
+            direction: .electronicToPaper,
+            recordVersion: "1.0",
+            clauseVersion: "1.0",
+            namespace: "https://example.invalid/e-to-p",
+            eFormIdentifier: "example/e-to-p",
+            effectiveFrom: Date(timeIntervalSince1970: 0),
+            verificationState: .verified,
+            acceptanceState: .accepted,
+            renderer: .legacySwift,
+            newDocumentFormatItem: ZakoCodelists.pdfa2FormatItem,
+            fingerprintMethodItem: ZakoCodelists.sha256Item)
+
+        XCTAssertThrowsError(try AttestationClauseGenerator().generateXML(
+            input: sampleInput(),
+            formPack: pack)) { error in
+            XCTAssertEqual(error as? FormPackError, .unsupportedDirection(.electronicToPaper))
+        }
+    }
+
     func testValidatorFlagsMissingFields() {
         var data = AttestationData()
         let errors = AttestationValidator.validate(data, securityElements: [], qualifiedTimestampTime: nil)

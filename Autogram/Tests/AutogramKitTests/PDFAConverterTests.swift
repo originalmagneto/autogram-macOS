@@ -23,6 +23,21 @@ final class PDFAConverterTests: XCTestCase {
                       "Textová vrstva musí zostať zachovaná pri vektorovom režime")
     }
 
+    func testUnimplementedOutputProfilesAreRejected() throws {
+        let document = try XCTUnwrap(PDFDocument(data: TestPDFBuilder.typicalContractPDF()))
+        let proposedProfile = ConversionOutputProfile.proposedPDFA1a
+
+        XCTAssertThrowsError(try PDFAConverter().convert(
+            document: document,
+            profile: proposedProfile)) { error in
+            XCTAssertEqual(error as? PDFAError,
+                           .unsupportedOutputProfile(proposedProfile.id))
+        }
+        let validation = PDFAValidator().validate(Data(), profile: proposedProfile)
+        XCTAssertFalse(validation.isValid)
+        XCTAssertTrue(validation.issues.contains { $0.contains("nie je implementovaný") })
+    }
+
     func testConversionOutputNamingUsesOriginalDocumentAndSiblingDirectory() throws {
         XCTAssertEqual(
             ConversionOutputNaming.pdfFileName(

@@ -94,6 +94,7 @@ struct AuthorizeView: View {
         let qtsReady = !store.includeQualifiedTimestamp ||
             !store.settings.selectedTSAURL.trimmingCharacters(in: .whitespaces).isEmpty
         return [
+            inputSignatureChecklistItem,
             (store.attestation.originConfirmed,
              "Originál alebo úradne osvedčená kópia potvrdená", "checkmark.seal"),
             (!store.attestation.originalDocumentName.trimmingCharacters(in: .whitespaces).isEmpty,
@@ -102,8 +103,10 @@ struct AuthorizeView: View {
              "Názov elektronického dokumentu vyplnený", "doc.badge.gearshape"),
             (store.effectiveSheetCount > 0,
              "Počet listov určený (\(store.effectiveSheetCount))", "rectangle.stack"),
-            (store.securityElements.count > 0,
-             "Bezpečnostné prvky potvrdené (\(store.securityElements.count))", "shield.checkerboard"),
+            (store.confirmedSecurityElements.count > 0 && store.pendingSecurityElementCount == 0,
+             "Bezpečnostné prvky potvrdené (\(store.confirmedSecurityElements.count))", "shield.checkerboard"),
+            (store.unreviewedNonEmptyPages.isEmpty && store.analysis.nonEmptyPages > 0,
+             "Všetky neprázdne strany skontrolované", "doc.text.magnifyingglass"),
             ((store.attestation.evidenceNumber ?? "").trimmingCharacters(in: .whitespaces).isEmpty == false,
              "Evidenčné číslo z EZZK", "number.square.fill"),
             (!store.attestation.performingPerson.fullName.trimmingCharacters(in: .whitespaces).isEmpty,
@@ -115,6 +118,19 @@ struct AuthorizeView: View {
             (qtsReady, store.includeQualifiedTimestamp
                 ? "QTS pripravená s TSA službou" : "QTS nepoužitá", "clock.badge.checkmark")
         ]
+    }
+
+    private var inputSignatureChecklistItem: (Bool, String, String) {
+        switch store.inputSignatureInspection.state {
+        case .valid:
+            return (true, "Vstupné podpisy overené", "signature.badge.checkmark")
+        case .invalid:
+            return (false, "Vstup obsahuje neplatný elektronický podpis", "xmark.seal")
+        case .unknown:
+            return (false, "Vstupné podpisy sa nepodarilo jednoznačne overiť", "questionmark.seal")
+        case .unavailable:
+            return (false, "Overenie vstupných podpisov nie je dostupné", "exclamationmark.triangle")
+        }
     }
 
     private var checklistCard: some View {
@@ -134,6 +150,12 @@ struct AuthorizeView: View {
                         .font(.callout)
                 }
             }
+            Text(store.inputSignatureInspection.detail)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityLabel("Detail overenia vstupných podpisov")
+                .accessibilityValue(store.inputSignatureInspection.detail)
         }
         .glassCard(cornerRadius: 14, padding: 14)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -178,7 +200,9 @@ struct AuthorizeView: View {
                           systemImage: "exclamationmark.triangle.fill")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.orange)
-                    Toggle(isOn: $store.allowNonMandateOverride) {
+                    Toggle(isOn: Binding(
+                        get: { store.hasValidMandateOverride },
+                        set: { store.setMandateOverride($0) })) {
                         Text("Rozumiem: pokračovať s ne-mandátnym certifikátom")
                             .font(.caption2)
                     }

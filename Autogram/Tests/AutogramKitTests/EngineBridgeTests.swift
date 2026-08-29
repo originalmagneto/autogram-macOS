@@ -300,6 +300,18 @@ final class SigningProviderDispatchTests: XCTestCase {
     }
 }
 
+final class EngineInspectionContractTests: XCTestCase {
+    func testIncompleteEngineInspectionCannotBeAcceptedAsCompleted() {
+        let inspection = PDFInspection(files: [
+            InspectedPDF(id: "inspect", isSignable: false)
+        ])
+
+        XCTAssertThrowsError(
+            try EngineBridgeSigningProvider.requireInspectableFile(
+                in: [inspection]))
+    }
+}
+
 final class JavaEngineLiveProcessTests: XCTestCase {
     private var liveTestEnabled: Bool {
         ProcessInfo.processInfo.environment["AUTOGRAM_ENGINE_LIVE_TEST"] == "1"

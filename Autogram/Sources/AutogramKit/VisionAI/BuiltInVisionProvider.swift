@@ -19,6 +19,13 @@ public struct BuiltInVisionProvider: SecurityElementsProviding {
     public var minSignatureWidthRatio: Double = 0.08
     public var maxSignatureWidthRatio: Double = 0.62
 
+    /// Small local bridge used to join anti-aliased or broken strokes belonging
+    /// to one printed security element. The bridge is applied only while
+    /// grouping components. Bounds and shape statistics still use the original
+    /// mask, so the overlay does not grow into the surrounding page.
+    public var stampComponentGapRatio: Double = 0.012
+    public var signatureComponentGapRatio: Double = 0.018
+
     /// Rendered page width used for analysis (px).
     public var renderTargetWidth: Int = 760
 
@@ -49,7 +56,8 @@ public struct BuiltInVisionProvider: SecurityElementsProviding {
                     boundingBox: barcode,
                     confidence: 0.9,
                     verbalDescription: "Čiarový kód / QR (notárska pripojka)",
-                    detectedByAI: false))
+                    detectedByAI: false,
+                    reviewState: .pending))
             }
         }
         return elements
@@ -111,9 +119,14 @@ public struct BuiltInVisionProvider: SecurityElementsProviding {
 
     private func detectStamps(masks: Masks, pixels: PixelMap, pageIndex: Int,
                               exclusions: VisionExclusions) -> [SecurityElement] {
-        let components = ConnectedComponents.label(mask: masks.colored,
-                                                   width: pixels.width,
-                                                   height: pixels.height)
+        let bridgeRadius = componentBridgeRadius(ratio: stampComponentGapRatio,
+                                                  pixels: pixels,
+                                                  minimum: 2,
+                                                  maximum: 8)
+        let components = groupedComponents(mask: masks.colored,
+                                           width: pixels.width,
+                                           height: pixels.height,
+                                           bridgeRadius: bridgeRadius)
         var stamps: [SecurityElement] = []
         let pageArea = Double(pixels.width * pixels.height)
 
@@ -122,8 +135,13 @@ public struct BuiltInVisionProvider: SecurityElementsProviding {
                                                   width: pixels.width, height: pixels.height)
             guard stats.area > 60 else { continue }
 
-            let box = normalizedRect(stats: stats, pixels: pixels)
-            guard !exclusions.overlapsTextOrBarcode(box) else { continue }
+            let box = normalizedRect(stats: stats, pixels: pixels, padding: 2)
+            // Official stamps commonly contain text around the ring. OCR must
+            // not reject the enclosing circular element. Barcodes remain a
+            // hard exclusion because they are handled separately as `.other`.
+            guard !exclusions.barcodeBoxes.contains(where: {
+                Self.overlapFraction(box, $0) > 0.35
+            }) else { continue }
 
             let diameter = Double(max(stats.bboxWidth, stats.bboxHeight))
             let relativeDiameter = diameter / Double(pixels.width)
@@ -190,9 +208,14 @@ public struct BuiltInVisionProvider: SecurityElementsProviding {
                                  width: pixels.width,
                                  height: pixels.height,
                                  radius: 1)
-        let components = ConnectedComponents.label(mask: reliefMask,
-                                                    width: pixels.width,
-                                                    height: pixels.height)
+        let bridgeRadius = componentBridgeRadius(ratio: stampComponentGapRatio,
+                                                  pixels: pixels,
+                                                  minimum: 2,
+                                                  maximum: 8)
+        let components = groupedComponents(mask: reliefMask,
+                                           width: pixels.width,
+                                           height: pixels.height,
+                                           bridgeRadius: bridgeRadius)
         var seals: [SecurityElement] = []
         let pageArea = Double(pixels.width * pixels.height)
 
@@ -215,8 +238,12 @@ public struct BuiltInVisionProvider: SecurityElementsProviding {
             guard fillRatio > 0.25, fillRatio < 0.70,
                   Double(stats.area) / pageArea > 0.00025 else { continue }
 
-            let box = normalizedRect(stats: stats, pixels: pixels)
-            guard !exclusions.overlapsTextOrBarcode(box, threshold: 0.25),
+            let box = normalizedRect(stats: stats, pixels: pixels, padding: 2)
+            // A seal can contain engraved/printed lettering just like an
+            // official stamp. Only barcode overlap is disqualifying here.
+            guard !exclusions.barcodeBoxes.contains(where: {
+                      Self.overlapFraction(box, $0) > 0.25
+                  }),
                   !stampBoxes.contains(where: { Self.overlapFraction(box, $0) > 0.5 }) else { continue }
 
             let coverage = Self.radialCoverage(stats: stats, mask: reliefMask,
@@ -242,9 +269,14 @@ public struct BuiltInVisionProvider: SecurityElementsProviding {
                                     width: pixels.width,
                                     height: pixels.height,
                                     radius: 1)
-        let components = ConnectedComponents.label(mask: signatureMask,
-                                                   width: pixels.width,
-                                                   height: pixels.height)
+        let bridgeRadius = componentBridgeRadius(ratio: signatureComponentGapRatio,
+                                                  pixels: pixels,
+                                                  minimum: 4,
+                                                  maximum: 14)
+        let components = groupedComponents(mask: signatureMask,
+                                           width: pixels.width,
+                                           height: pixels.height,
+                                           bridgeRadius: bridgeRadius)
         var signatures: [SecurityElement] = []
         let pageArea = Double(pixels.width * pixels.height)
 
@@ -260,7 +292,7 @@ public struct BuiltInVisionProvider: SecurityElementsProviding {
                 continue
             }
 
-            let box = normalizedRect(stats: stats, pixels: pixels)
+            let box = normalizedRect(stats: stats, pixels: pixels, padding: 2)
             // Text lines (from Vision OCR) and stamp/barcode regions are not signatures.
             guard !exclusions.overlapsTextOrBarcode(box, threshold: 0.3) else { continue }
             guard !stampBoxes.contains(where: { Self.overlapFraction(box, $0) > 0.5 }) else { continue }
@@ -293,6 +325,49 @@ public struct BuiltInVisionProvider: SecurityElementsProviding {
                 confidence: min(confidence, 0.92)))
         }
         return signatures
+    }
+
+    private func componentBridgeRadius(ratio: Double,
+                                       pixels: PixelMap,
+                                       minimum: Int,
+                                       maximum: Int) -> Int {
+        let scaled = Int((Double(pixels.width) * max(ratio, 0)).rounded())
+        return min(max(scaled, minimum), maximum)
+    }
+
+    /// Groups nearby connected components without changing the geometry used
+    /// for scoring. This is important for scanned handwriting: anti-aliasing,
+    /// paper noise, and compression frequently leave separate pieces of one
+    /// signature stroke. The bridge mask is used only to discover the group;
+    /// the returned points are always pixels from the original mask.
+    private func groupedComponents(mask: [Bool], width: Int, height: Int,
+                                   bridgeRadius: Int) -> [[(x: Int, y: Int)]] {
+        guard bridgeRadius > 0 else {
+            return ConnectedComponents.label(mask: mask, width: width, height: height)
+        }
+
+        let bridged = dilated(mask, width: width, height: height, radius: bridgeRadius)
+        let bridgeComponents = ConnectedComponents.label(mask: bridged,
+                                                          width: width,
+                                                          height: height)
+        guard !bridgeComponents.isEmpty else { return [] }
+
+        var groupByPixel = [Int](repeating: -1, count: width * height)
+        for (groupIndex, component) in bridgeComponents.enumerated() {
+            for point in component {
+                groupByPixel[point.y * width + point.x] = groupIndex
+            }
+        }
+
+        var groups = bridgeComponents.map { _ in [(x: Int, y: Int)]() }
+        for y in 0..<height {
+            for x in 0..<width where mask[y * width + x] {
+                let groupIndex = groupByPixel[y * width + x]
+                guard groupIndex >= 0 else { continue }
+                groups[groupIndex].append((x: x, y: y))
+            }
+        }
+        return groups.filter { !$0.isEmpty }
     }
 
     static func overlapFraction(_ a: NormalizedRect, _ b: NormalizedRect) -> Double {
@@ -333,14 +408,19 @@ public struct BuiltInVisionProvider: SecurityElementsProviding {
     }
 
 
-    private func normalizedRect(stats: ComponentStats, pixels: PixelMap) -> NormalizedRect {
+    private func normalizedRect(stats: ComponentStats, pixels: PixelMap,
+                                padding: Int = 0) -> NormalizedRect {
         // PixelMap rows are TOP-origin for CGImage-derived bitmaps; convert to
         // the domain convention (normalized y=0 = page BOTTOM).
-        NormalizedRect(
-            x: Double(stats.minX) / Double(pixels.width),
-            y: 1 - (Double(stats.minY) + Double(stats.bboxHeight)) / Double(pixels.height),
-            width: Double(stats.bboxWidth) / Double(pixels.width),
-            height: Double(stats.bboxHeight) / Double(pixels.height))
+        let minX = max(stats.minX - padding, 0)
+        let maxX = min(stats.maxX + padding, pixels.width - 1)
+        let minY = max(stats.minY - padding, 0)
+        let maxY = min(stats.maxY + padding, pixels.height - 1)
+        return NormalizedRect(
+            x: Double(minX) / Double(pixels.width),
+            y: 1 - Double(maxY + 1) / Double(pixels.height),
+            width: Double(maxX - minX + 1) / Double(pixels.width),
+            height: Double(maxY - minY + 1) / Double(pixels.height))
     }
     // MARK: - Rendering
 

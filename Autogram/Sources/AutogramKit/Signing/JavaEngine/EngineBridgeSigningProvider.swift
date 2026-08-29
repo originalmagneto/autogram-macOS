@@ -99,32 +99,60 @@ public final class EngineBridgeSigningProvider: QualifiedSigningProviding, @unch
         identityCache.withLock { $0 = nil }
     }
 
+    public func inspectInputSignatures(in fileURL: URL) async -> InputSignatureInspectionResult {
+        let canonical = EnginePaths.canonical(fileURL)
+        guard FileManager.default.fileExists(atPath: canonical.path) else {
+            return .unavailable(detail: "Vstupný dokument nie je dostupný.")
+        }
+        do {
+            return .completed(signatures: try await inspectEngineSignatures(at: canonical))
+        } catch {
+            logger.info("Input signature inspection failed: \(error.localizedDescription, privacy: .public)")
+            return .unavailable(detail: error.localizedDescription)
+        }
+    }
+
     public func inspectSignatures(in fileURL: URL) async -> [DocumentSignatureInfo] {
         let canonical = EnginePaths.canonical(fileURL)
         guard FileManager.default.fileExists(atPath: canonical.path) else { return [] }
         do {
-            let inspections = try await engine.inspect(files: [
-                PDFItemDescriptor(id: "inspect", sourceURL: canonical)
-            ])
-            return inspections.flatMap(\.files).flatMap(\.signatures).map { signature in
-                let state: DocumentSignatureInfo.State
-                switch signature.validationState {
-                case .valid: state = .valid
-                case .invalid: state = .invalid
-                case .indeterminate: state = .indeterminate
-                }
-                return DocumentSignatureInfo(
-                    id: signature.id,
-                    signerDisplayName: signature.signerDisplayName ?? "Neznámy podpisovateľ",
-                    format: signature.format,
-                    signingTime: signature.signingTime,
-                    hasQualifiedTimestamp: signature.hasQualifiedTimestamp,
-                    state: state,
-                    detail: signature.validationReason ?? signature.subIndication)
-            }
+            return try await inspectEngineSignatures(at: canonical)
         } catch {
             logger.info("Inspection failed: \(error.localizedDescription, privacy: .public)")
             return []
+        }
+    }
+
+    static func requireInspectableFile(in inspections: [PDFInspection]) throws -> InspectedPDF {
+        guard let inspected = inspections
+            .flatMap(\.files)
+            .first(where: { $0.id == "inspect" }),
+              inspected.isSignable else {
+            throw SigningFailure.engine("Engine nevrátil dokončenú kontrolu vstupného dokumentu.")
+        }
+        return inspected
+    }
+
+    private func inspectEngineSignatures(at sourceURL: URL) async throws -> [DocumentSignatureInfo] {
+        let inspections = try await engine.inspect(files: [
+            PDFItemDescriptor(id: "inspect", sourceURL: sourceURL)
+        ])
+        let inspected = try Self.requireInspectableFile(in: inspections)
+        return inspected.signatures.map { signature in
+            let state: DocumentSignatureInfo.State
+            switch signature.validationState {
+            case .valid: state = .valid
+            case .invalid: state = .invalid
+            case .indeterminate: state = .indeterminate
+            }
+            return DocumentSignatureInfo(
+                id: signature.id,
+                signerDisplayName: signature.signerDisplayName ?? "Neznámy podpisovateľ",
+                format: signature.format,
+                signingTime: signature.signingTime,
+                hasQualifiedTimestamp: signature.hasQualifiedTimestamp,
+                state: state,
+                detail: signature.validationReason ?? signature.subIndication)
         }
     }
 

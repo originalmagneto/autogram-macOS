@@ -13,6 +13,7 @@ final class ZakoSessionStore {
     var document: PDFDocument?
     var analysis: DocumentAnalysis = .empty()
     var securityElements: [SecurityElement] = []
+    var reviewedNonEmptyPages: Set<Int> = []
     var attestation = AttestationData()
     var sheetMethod: SheetCountingMethod = .duplexEstimate
     var manualSheetCount: Int?
@@ -24,11 +25,13 @@ final class ZakoSessionStore {
     var selectedIdentityID: String?
     var includeQualifiedTimestamp = true
     var allowNonMandateOverride = false
+    private var mandateOverrideIdentityID: String?
     var signingPIN = ""
     var evidenceNumberRequested = false
     var fetchingEvidenceNumber = false
     var evidenceNumberError: String?
     var isAuthorizing = false
+    private var reviewUpdatedAt: Date?
 
     var activeTool: SecurityElement.Kind?
     var previewPageIndex: Int = 0
@@ -42,6 +45,8 @@ final class ZakoSessionStore {
     var outputDirectory: URL?
     var lastError: String?
     var serverTimeUsed: Date?
+    var inputSignatureInspection = InputSignatureInspectionResult.unavailable(
+        detail: "Kontrola podpisov ešte neprebehla.")
 
     var isPreflightComplete: Bool {
         let result = AttestationPreflight.evaluate(
@@ -49,8 +54,10 @@ final class ZakoSessionStore {
             securityElements: securityElements,
             hasSelectedIdentity: selectedIdentityID != nil,
             mandateRequirementSatisfied: mandateRequirementSatisfied
-                || allowNonMandateOverride
-                || isCertificateTypePending)
+                || hasValidMandateOverride
+                || isCertificateTypePending,
+            inputSignatureInspection: inputSignatureInspection,
+            unreviewedNonEmptyPages: unreviewedNonEmptyPages)
         return result.isComplete && preflightErrors.isEmpty && evidenceNumberError == nil
     }
     var hasUnresolvedPreflightErrors: Bool {
@@ -58,8 +65,37 @@ final class ZakoSessionStore {
             attestation,
             securityElements: securityElements,
             hasSelectedIdentity: selectedIdentityID != nil,
-            mandateRequirementSatisfied: mandateRequirementSatisfied
+            mandateRequirementSatisfied: mandateRequirementSatisfied,
+            inputSignatureInspection: inputSignatureInspection,
+            unreviewedNonEmptyPages: unreviewedNonEmptyPages
         ).errors.isEmpty || evidenceNumberError != nil
+    }
+
+    var pendingSecurityElementCount: Int {
+        securityElements.filter { $0.reviewState == .pending }.count
+    }
+
+    var confirmedSecurityElements: [SecurityElement] {
+        securityElements.filter { $0.reviewState == .confirmed }
+    }
+
+    var securityReviewStamp: SecurityReviewStamp {
+        SecurityReviewStamp(
+            checkedNonEmptyPageIndices: Array(reviewedNonEmptyPages),
+            confirmedElementCount: confirmedSecurityElements.count,
+            rejectedElementCount: securityElements.filter { $0.reviewState == .rejected }.count,
+            elementDecisions: securityElements.map {
+                SecurityReviewElement(id: $0.id, state: $0.reviewState,
+                                      kind: $0.kind, pageIndex: $0.pageIndex,
+                                      boundingBox: $0.boundingBox)
+            },
+            reviewedAt: reviewUpdatedAt ?? Date())
+    }
+
+    var unreviewedNonEmptyPages: [Int] {
+        analysis.pageAnalyses
+            .filter { !$0.isEmpty && !reviewedNonEmptyPages.contains($0.pageIndex) }
+            .map(\.pageIndex)
     }
 
     let settingsStore: AppSettingsStore
@@ -67,6 +103,8 @@ final class ZakoSessionStore {
     let pdfaConverter: PDFAConverter
     let clauseGenerator: AttestationClauseGenerator
     let embeddedFileService: EmbeddedFileService
+    let formPackRepository: FormPackRepository
+    private(set) var selectedFormPack: ConversionFormPack
     var ezzkService: any EZZKServicing { settingsStore.ezzkService }
     var signingProvider: any QualifiedSigningProviding { settingsStore.signingProvider }
     var evidenceStore: LocalEvidenceStore { settingsStore.evidenceStore }
@@ -78,11 +116,16 @@ final class ZakoSessionStore {
     var profilePersister: ((AdvocateProfile) -> Void)?
     private(set) var currentRecordID = UUID()
 
-    init(settingsStore: AppSettingsStore) {
+    init(settingsStore: AppSettingsStore,
+         formPackRepository: FormPackRepository = FormPackRepository()) {
         self.settingsStore = settingsStore
         self.pdfaConverter = PDFAConverter()
         self.clauseGenerator = AttestationClauseGenerator()
         self.embeddedFileService = EmbeddedFileService()
+        self.formPackRepository = formPackRepository
+        self.selectedFormPack = formPackRepository.packs.first {
+            $0.direction == .paperToElectronic && $0.isActive(at: Date())
+        } ?? FormPackRepository.currentLegacyUnverified
         self.currentRecordID = UUID()
         self.profilePersister = { [weak settingsStore] profile in
             guard let settingsStore else { return }
@@ -162,6 +205,7 @@ final class ZakoSessionStore {
 
     func runAnalysis() async {
         guard let document else { return }
+        let analysisRecordID = currentRecordID
         isAnalyzing = true
         analysisProgressText = "Analyzujem stránky…"
         let doc = UncheckedSendable(document)
@@ -169,12 +213,14 @@ final class ZakoSessionStore {
             let engine = PDFAnalysisEngine()
             return engine.analyze(document: doc.value)
         }.value ?? .empty()
+        guard analysisRecordID == currentRecordID, !Task.isCancelled else { return }
 
         analysisProgressText = "Detegujem bezpečnostné prvky…"
         let pipeline = Self.buildPipeline(settings: settings)
         let detected = await Task.detached(priority: .userInitiated) { [doc, pipeline] in
             await pipeline.detect(in: doc.value, pageAnalyses: baseAnalysis.pageAnalyses)
         }.value
+        guard analysisRecordID == currentRecordID, !Task.isCancelled else { return }
 
         let manualElements = securityElements.filter { !$0.detectedByAI }
         var merged = enrich(detected)
@@ -191,9 +237,23 @@ final class ZakoSessionStore {
             suggestedTitle: baseAnalysis.suggestedTitle,
             analyzedAt: Date())
         securityElements = merged
+        reviewedNonEmptyPages = []
+        reviewUpdatedAt = nil
         sheetMethod = .duplexEstimate
         manualSheetCount = nil
         prepareAttestationPrefill()
+        inputSignatureInspection = .unavailable(
+            detail: "Kontrola vstupných elektronických podpisov prebieha.")
+        if let sourceURL {
+            let inspection = await InputSignatureVerificationService(
+                provider: signingProvider).inspect(inputURL: sourceURL)
+            guard SessionResultGuard.accepts(
+                resultFor: analysisRecordID,
+                currentRecordID: currentRecordID,
+                taskIsCancelled: Task.isCancelled) else { return }
+            inputSignatureInspection = inspection
+            recomputePreflight()
+        }
         isAnalyzing = false
         analysisProgressText = ""
     }
@@ -254,9 +314,57 @@ final class ZakoSessionStore {
             boundingBox: rect,
             confidence: 1.0,
             verbalDescription: "",
-            detectedByAI: false)
+            detectedByAI: false,
+            reviewState: .pending)
         securityElements.append(enrich([element]).first!)
+        touchReview()
+        unmarkPageReviewed(pageIndex)
         selectedElementID = element.id
+    }
+
+    func confirmSecurityElement(id: UUID) {
+        updateReviewState(id: id, state: .confirmed)
+    }
+
+    func rejectSecurityElement(id: UUID) {
+        updateReviewState(id: id, state: .rejected)
+    }
+
+    func returnSecurityElementToReview(id: UUID) {
+        updateReviewState(id: id, state: .pending)
+    }
+
+    func markPageReviewed(_ pageIndex: Int) {
+        guard analysis.pageAnalyses.contains(where: { $0.pageIndex == pageIndex && !$0.isEmpty }) else {
+            return
+        }
+        reviewedNonEmptyPages.insert(pageIndex)
+        touchReview()
+        recomputePreflight()
+    }
+
+    func unmarkPageReviewed(_ pageIndex: Int) {
+        reviewedNonEmptyPages.remove(pageIndex)
+        touchReview()
+        recomputePreflight()
+    }
+
+    private func updateReviewState(id: UUID, state: SecurityElementReviewState) {
+        guard let index = securityElements.firstIndex(where: { $0.id == id }) else { return }
+        securityElements[index].reviewState = state
+        touchReview()
+        recomputePreflight()
+    }
+
+    private func invalidateReview(for index: Int) {
+        guard securityElements.indices.contains(index) else { return }
+        securityElements[index].reviewState = .pending
+        touchReview()
+        recomputePreflight()
+    }
+
+    private func touchReview() {
+        reviewUpdatedAt = Date()
     }
 
     @discardableResult
@@ -266,10 +374,12 @@ final class ZakoSessionStore {
         var copy = source
         copy.id = UUID()
         copy.detectedByAI = false
+        copy.reviewState = .pending
         copy.boundingBox = ElementGeometry.moved(copy.boundingBox, center:
             NormalizedPoint(x: copy.boundingBox.midX + 0.04,
                             y: copy.boundingBox.midY + 0.06))
         securityElements.insert(copy, at: index + 1)
+        unmarkPageReviewed(copy.pageIndex)
         selectedElementID = copy.id
         return copy.id
     }
@@ -279,6 +389,8 @@ final class ZakoSessionStore {
             lastDeletedElement = (removed, securityElements.firstIndex(where: { $0.id == id }) ?? 0)
         }
         securityElements.removeAll { $0.id == id }
+        touchReview()
+        recomputePreflight()
     }
 
     func undoDelete() {
@@ -287,8 +399,11 @@ final class ZakoSessionStore {
         if !securityElements.contains(where: { $0.id == restored.id }) {
             let insertAt = min(index, securityElements.count)
             securityElements.insert(restored, at: insertAt)
+            touchReview()
+            unmarkPageReviewed(restored.pageIndex)
         }
         lastDeletedElement = nil
+        recomputePreflight()
     }
 
     func placeElement(kind: SecurityElement.Kind, at center: NormalizedPoint, pageIndex: Int? = nil) -> UUID {
@@ -299,8 +414,11 @@ final class ZakoSessionStore {
             boundingBox: ElementGeometry.clampedCentered(center: center),
             confidence: 1.0,
             verbalDescription: "",
-            detectedByAI: false)
+            detectedByAI: false,
+            reviewState: .pending)
         securityElements.append(enrich([element]).first!)
+        touchReview()
+        unmarkPageReviewed(targetPage)
         selectedElementID = element.id
         return element.id
     }
@@ -308,6 +426,7 @@ final class ZakoSessionStore {
     func drawElement(id: UUID, from anchor: NormalizedPoint, to corner: NormalizedPoint) {
         guard let index = securityElements.firstIndex(where: { $0.id == id }) else { return }
         securityElements[index].boundingBox = ElementGeometry.resized(from: anchor, to: corner)
+        invalidateReview(for: index)
     }
 
     func moveElement(id: UUID, center: NormalizedPoint) {
@@ -316,6 +435,7 @@ final class ZakoSessionStore {
             ElementGeometry.moved(securityElements[index].boundingBox, center: center)
         securityElements[index].verbalDescription = securityElements[index]
             .locationDescription(pageSizePt: .zero) + "."
+        invalidateReview(for: index)
     }
 
     func elementID(at point: NormalizedPoint, pageIndex: Int) -> UUID? {
@@ -335,18 +455,21 @@ final class ZakoSessionStore {
             securityElements[index].pageIndex = pageIndex
             securityElements[index].verbalDescription = securityElements[index]
                 .locationDescription(pageSizePt: .zero) + "."
+            invalidateReview(for: index)
         }
     }
 
     func updateElementKind(id: UUID, kind: SecurityElement.Kind) {
         if let index = securityElements.firstIndex(where: { $0.id == id }) {
             securityElements[index].kind = kind
+            invalidateReview(for: index)
         }
     }
 
     func updateElementDescription(id: UUID, text: String) {
         if let index = securityElements.firstIndex(where: { $0.id == id }) {
             securityElements[index].verbalDescription = text
+            invalidateReview(for: index)
         }
     }
 
@@ -362,6 +485,7 @@ final class ZakoSessionStore {
             y: min(clamped.y, 1 - clamped.height),
             width: min(clamped.width, 1),
             height: min(clamped.height, 1))
+        invalidateReview(for: index)
     }
 
     func refreshIdentities() async {
@@ -392,9 +516,19 @@ final class ZakoSessionStore {
     }
 
     var requiresMandateOverride: Bool {
-        guard !signingProviderIsDemo else { return !allowNonMandateOverride }
+        guard !signingProviderIsDemo else { return !hasValidMandateOverride }
         if isCertificateTypePending { return false }
-        return !mandateRequirementSatisfied && !allowNonMandateOverride
+        return !mandateRequirementSatisfied && !hasValidMandateOverride
+    }
+
+    var hasValidMandateOverride: Bool {
+        allowNonMandateOverride && mandateOverrideIdentityID == selectedIdentityID
+    }
+
+    func setMandateOverride(_ enabled: Bool) {
+        allowNonMandateOverride = enabled
+        mandateOverrideIdentityID = enabled ? selectedIdentityID : nil
+        recomputePreflight()
     }
 
     var signingProviderIsDemo: Bool {
@@ -406,7 +540,11 @@ final class ZakoSessionStore {
             attestation,
             securityElements: securityElements,
             hasSelectedIdentity: selectedIdentityID != nil,
-            mandateRequirementSatisfied: mandateRequirementSatisfied)
+            mandateRequirementSatisfied: mandateRequirementSatisfied
+                || hasValidMandateOverride
+                || isCertificateTypePending,
+            inputSignatureInspection: inputSignatureInspection,
+            unreviewedNonEmptyPages: unreviewedNonEmptyPages)
         preflightErrors = result.errors
         validationErrors = result.errors
     }
@@ -453,10 +591,19 @@ final class ZakoSessionStore {
     func validate() -> [AttestationValidationError] {
         let stampTime: Date? = includeQualifiedTimestamp ? serverTimeUsed : nil
         let errors = AttestationValidator.validate(attestation,
-                                                   securityElements: securityElements,
+                                                   securityElements: confirmedSecurityElements,
                                                    qualifiedTimestampTime: stampTime)
-        validationErrors = errors
-        return errors
+        let reviewResult = AttestationPreflight.evaluate(
+            attestation,
+            securityElements: securityElements,
+            hasSelectedIdentity: selectedIdentityID != nil,
+            mandateRequirementSatisfied: mandateRequirementSatisfied,
+            inputSignatureInspection: inputSignatureInspection,
+            unreviewedNonEmptyPages: unreviewedNonEmptyPages)
+        let reviewErrors = reviewResult.errors.filter { !errors.contains($0) }
+        let allErrors = errors + reviewErrors
+        validationErrors = allErrors
+        return allErrors
     }
     func authorizeAndSign() async {
         guard !isAuthorizing else { return }
@@ -470,12 +617,18 @@ final class ZakoSessionStore {
         validationErrors = []
         await preparePreflight()
         guard isPreflightComplete else { return }
+        let confirmedElementsSnapshot = confirmedSecurityElements
+        let securityReviewSnapshot = securityReviewStamp
 
         do {
             analysisProgressText = "Zisťujem dôveryhodný čas…"
             let conversionTime = try await ezzkService.serverTime()
             serverTimeUsed = conversionTime
             attestation.conversionExecutionDateTime = conversionTime
+            selectedFormPack = try formPackRepository.pack(
+                for: .paperToElectronic,
+                at: conversionTime,
+                policy: .allowUnverifiedPilot)
 
             // § 3 vyhlášky č. 70/2021 Z. z.: formát listiny je povinnou náležitosťou doložky.
             // Ak klasifikácia analýzy nevyplnila rozpad (napr. netypická veľkosť strany),
@@ -494,20 +647,23 @@ final class ZakoSessionStore {
             analysisProgressText = "Konvertujem do PDF/A…"
             guard let document else { throw PDFAError.emptyDocument }
             let pdfaData = try pdfaConverter.convert(document: document,
+                                                     profile: selectedFormPack.outputProfile,
                                                      mode: settings.pdfaMode,
                                                      title: attestation.newDocumentName)
 
             let fingerprint = AttestationClauseGenerator.sha256Hex(of: pdfaData)
             let xmlInput = AttestationClauseGenerator.Input(
                 attestation: attestation,
-                securityElements: securityElements,
+                securityElements: confirmedElementsSnapshot,
                 newDocumentFingerprintSHA256Hex: fingerprint)
-            let xml = clauseGenerator.generateXML(input: xmlInput)
+            let xml = try clauseGenerator.generateXML(input: xmlInput,
+                                                      formPack: selectedFormPack)
 
             let xmlIssues = AttestationXMLValidator().validate(
                 xml,
                 context: .init(fingerprintSHA256Hex: fingerprint,
-                               securityElementCount: securityElements.count))
+                               securityElementCount: confirmedElementsSnapshot.count),
+                formPack: selectedFormPack)
             guard xmlIssues.isEmpty else {
                 throw ComplianceValidationError(domain: "Osvedčovacia doložka", issues: xmlIssues)
             }
@@ -529,7 +685,8 @@ final class ZakoSessionStore {
             // Validate the actual artifact that will be signed and written. The
             // XML attachment is part of the final PDF/A deliverable, so checking
             // only the pre-attachment bytes can produce a false green result.
-            let pdfaCheck = PDFAValidator().validate(finalPDF)
+            let pdfaCheck = PDFAValidator().validate(finalPDF,
+                                                     profile: selectedFormPack.outputProfile)
             guard pdfaCheck.isValid else {
                 throw ComplianceValidationError(domain: "PDF/A-2b", issues: pdfaCheck.issues)
             }
@@ -618,10 +775,12 @@ final class ZakoSessionStore {
                 attestationXML: xml,
                 conversionTime: conversionTime,
                 performingPersonName: attestation.performingPerson.fullName,
-                securityElementCount: securityElements.count,
+                securityElementCount: confirmedElementsSnapshot.count,
                 totalPages: analysis.totalPages,
                 totalSheets: attestation.numberOfSheets,
-                pdfFileName: pdfTarget.lastPathComponent)
+                pdfFileName: pdfTarget.lastPathComponent,
+                formPack: FormPackStamp(pack: selectedFormPack),
+                securityReview: securityReviewSnapshot)
             evidenceStore.upsert(record)
 
             let envelope = ConversionRecordEnvelope(
@@ -631,7 +790,9 @@ final class ZakoSessionStore {
                 newDocumentName: attestation.newDocumentName,
                 attestationXML: xml,
                 fingerprintSHA256Hex: fingerprint,
-                conversionTime: conversionTime)
+                conversionTime: conversionTime,
+                formPack: FormPackStamp(pack: selectedFormPack),
+                securityReview: securityReviewSnapshot)
             do {
                 try await ezzkService.submit(envelope)
                 var updated = record
@@ -720,11 +881,10 @@ final class ZakoSessionStore {
         return settings.profiles.first ?? .empty
     }
 
-        var unconfirmedNonEmptyPages: [Int] {
-        analysis.pageAnalyses.filter { page in
-            !page.isEmpty &&
-            !securityElements.contains(where: { $0.pageIndex == page.pageIndex })
-        }.map(\.pageIndex)
+    var unconfirmedNonEmptyPages: [Int] {
+        analysis.pageAnalyses
+            .filter { !$0.isEmpty && !reviewedNonEmptyPages.contains($0.pageIndex) }
+            .map(\.pageIndex)
     }
 
 func resetSession(keepingProfile: Bool) {
@@ -738,6 +898,7 @@ func resetSession(keepingProfile: Bool) {
         document = nil
         analysis = .empty()
         securityElements = []
+        reviewedNonEmptyPages = []
         activeTool = nil
         previewPageIndex = 0
         lastDeletedElement = nil
@@ -749,11 +910,14 @@ func resetSession(keepingProfile: Bool) {
         selectedIdentityID = nil
         signingPIN = ""
         allowNonMandateOverride = false
+        mandateOverrideIdentityID = nil
         evidenceNumberRequested = false
         evidenceNumberError = nil
         fetchingEvidenceNumber = false
         evidenceRequestID = nil
         isAuthorizing = false
+        isAnalyzing = false
+        analysisProgressText = ""
         preflightErrors = []
         validationErrors = []
         submissionStatus = nil
@@ -763,6 +927,9 @@ func resetSession(keepingProfile: Bool) {
         sourceNameOverride = nil
         lastError = nil
         serverTimeUsed = nil
+        inputSignatureInspection = .unavailable(
+            detail: "Kontrola podpisov ešte neprebehla.")
+        reviewUpdatedAt = nil
         currentRecordID = UUID()
     }
 

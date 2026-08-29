@@ -1,6 +1,6 @@
 import Foundation
 
-public struct ZakoCodelistItem: Hashable, Sendable {
+public struct ZakoCodelistItem: Codable, Hashable, Sendable {
     public var code: String
     public var skName: String
 

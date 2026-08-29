@@ -48,6 +48,61 @@ public struct PageAnalysis: Codable, Hashable, Sendable, Identifiable {
     }
 }
 
+public enum SecurityElementReviewState: String, Codable, CaseIterable, Sendable {
+    case pending
+    case confirmed
+    case rejected
+
+    public var label: String {
+        switch self {
+        case .pending: return "Čaká na kontrolu"
+        case .confirmed: return "Potvrdený"
+        case .rejected: return "Odmietnutý"
+        }
+    }
+}
+
+public struct SecurityReviewElement: Codable, Hashable, Sendable {
+    public let id: UUID
+    public let state: SecurityElementReviewState
+    public let kind: SecurityElement.Kind
+    public let pageIndex: Int
+    public let boundingBox: NormalizedRect
+
+    public init(id: UUID, state: SecurityElementReviewState,
+                kind: SecurityElement.Kind, pageIndex: Int,
+                boundingBox: NormalizedRect) {
+        self.id = id
+        self.state = state
+        self.kind = kind
+        self.pageIndex = pageIndex
+        self.boundingBox = boundingBox
+    }
+}
+
+public struct SecurityReviewStamp: Codable, Hashable, Sendable {
+    public let checkedNonEmptyPageIndices: [Int]
+    public let confirmedElementCount: Int
+    public let rejectedElementCount: Int
+    public let elementDecisions: [SecurityReviewElement]
+    public let detectorIdentifier: String
+    public let reviewedAt: Date
+
+    public init(checkedNonEmptyPageIndices: [Int],
+                confirmedElementCount: Int,
+                rejectedElementCount: Int,
+                elementDecisions: [SecurityReviewElement] = [],
+                detectorIdentifier: String = "BuiltInVisionProvider",
+                reviewedAt: Date = Date()) {
+        self.checkedNonEmptyPageIndices = checkedNonEmptyPageIndices.sorted()
+        self.confirmedElementCount = confirmedElementCount
+        self.rejectedElementCount = rejectedElementCount
+        self.elementDecisions = elementDecisions
+        self.detectorIdentifier = detectorIdentifier
+        self.reviewedAt = reviewedAt
+    }
+}
+
 public struct SecurityElement: Codable, Hashable, Identifiable, Sendable {
     public enum Kind: String, Codable, CaseIterable, Identifiable, Sendable {
         case handwrittenSignature = "Vlastnoručný podpis"
@@ -92,10 +147,17 @@ public struct SecurityElement: Codable, Hashable, Identifiable, Sendable {
     public var confidence: Double
     public var verbalDescription: String
     public var detectedByAI: Bool
+    public var reviewState: SecurityElementReviewState
+
+    private enum CodingKeys: String, CodingKey {
+        case id, kind, pageIndex, boundingBox, confidence, verbalDescription,
+             detectedByAI, reviewState
+    }
 
     public init(id: UUID = UUID(), kind: Kind, pageIndex: Int,
                 boundingBox: NormalizedRect, confidence: Double,
-                verbalDescription: String = "", detectedByAI: Bool = true) {
+                 verbalDescription: String = "", detectedByAI: Bool = true,
+                 reviewState: SecurityElementReviewState? = nil) {
         self.id = id
         self.kind = kind
         self.pageIndex = pageIndex
@@ -103,6 +165,22 @@ public struct SecurityElement: Codable, Hashable, Identifiable, Sendable {
         self.confidence = confidence
         self.verbalDescription = verbalDescription
         self.detectedByAI = detectedByAI
+        self.reviewState = reviewState ?? (detectedByAI ? .pending : .confirmed)
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(UUID.self, forKey: .id)
+        self.kind = try container.decode(Kind.self, forKey: .kind)
+        self.pageIndex = try container.decode(Int.self, forKey: .pageIndex)
+        self.boundingBox = try container.decode(NormalizedRect.self, forKey: .boundingBox)
+        self.confidence = try container.decode(Double.self, forKey: .confidence)
+        self.verbalDescription = try container.decodeIfPresent(String.self, forKey: .verbalDescription) ?? ""
+        self.detectedByAI = try container.decodeIfPresent(Bool.self, forKey: .detectedByAI) ?? true
+        // Old session/register data has no human-review decision. Treat it as
+        // pending regardless of provenance so it cannot bypass the new gate.
+        self.reviewState = try container.decodeIfPresent(SecurityElementReviewState.self,
+                                                         forKey: .reviewState) ?? .pending
     }
 
     public func locationDescription(pageSizePt: CGSize) -> String {

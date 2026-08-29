@@ -143,7 +143,10 @@ public enum AttestationValidationError: LocalizedError, Equatable, Sendable {
     case missingRegistrationNumber
     case invalidSheetCount
     case noSecurityElementsConfirmed
+    case securityElementsNeedReview(count: Int)
+    case unreviewedNonEmptyPages(pages: [Int])
     case missingEvidenceNumber
+    case inputSignatureVerificationRequired(state: InputSignatureInspectionResult.State)
     case timestampBeforeConversionTime(conversionTime: Date, stampTime: Date)
 
     public var errorDescription: String? {
@@ -162,8 +165,15 @@ public enum AttestationValidationError: LocalizedError, Equatable, Sendable {
             return "Počet listov musí byť aspoň 1."
         case .noSecurityElementsConfirmed:
             return "Potvrďte bezpečnostné prvky pôvodného dokumentu."
+        case .securityElementsNeedReview(let count):
+            return "Skontrolujte a potvrďte alebo odmietnite všetky navrhnuté bezpečnostné prvky (zostáva \(count))."
+        case .unreviewedNonEmptyPages(let pages):
+            let labels = pages.map { "str. \($0 + 1)" }.joined(separator: ", ")
+            return "Skontrolujte každú neprázdnu stranu dokumentu: \(labels)."
         case .missingEvidenceNumber:
             return "Získajte evidenčné číslo záznamu z evidencie záznamov (EZZK)."
+        case .inputSignatureVerificationRequired(let state):
+            return "Autorizácia vyžaduje platné overenie vstupných podpisov (stav: \(state.rawValue))."
         case .timestampBeforeConversionTime(let c, let t):
             return "Časová pečiatka (\(t)) predchádza času konverzie (\(c)). Zápis by bol v EZZK zamietnutý."
         }

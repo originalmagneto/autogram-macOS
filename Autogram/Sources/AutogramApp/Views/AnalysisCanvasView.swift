@@ -448,6 +448,8 @@ struct AnalysisCanvasView: View {
                         unconfirmedWarning
                     }
 
+                    reviewProgressCard
+
                     let pageElements = store.securityElements
                         .filter { $0.pageIndex == store.previewPageIndex }
                         .sorted { $0.boundingBox.y < $1.boundingBox.y }
@@ -467,6 +469,13 @@ struct AnalysisCanvasView: View {
                                        store.removeSecurityElement(id: element.id)
                                    },
                                    onDuplicate: { _ = store.duplicateElement(id: element.id) },
+                                   onReviewStateChange: { state in
+                                       switch state {
+                                       case .confirmed: store.confirmSecurityElement(id: element.id)
+                                       case .rejected: store.rejectSecurityElement(id: element.id)
+                                        case .pending: store.returnSecurityElementToReview(id: element.id)
+                                       }
+                                   },
                                    onKindChange: { kind in store.updateElementKind(id: element.id, kind: kind) },
                                    onDescriptionChange: { text in
                                        store.updateElementDescription(id: element.id, text: text)
@@ -495,6 +504,36 @@ struct AnalysisCanvasView: View {
         .overlay(alignment: .leading) {
             Rectangle().fill(Color.primary.opacity(0.08)).frame(width: 1)
         }
+    }
+
+    private var reviewProgressCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("Kontrola bezpečnostných prvkov", systemImage: "checkmark.shield")
+                .font(.footnote.weight(.semibold))
+            Text("Potvrdené: \(store.confirmedSecurityElements.count) · čaká na kontrolu: \(store.pendingSecurityElementCount) · odmietnuté: \(store.securityElements.filter { $0.reviewState == .rejected }.count)")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            HStack(spacing: 8) {
+                Button("Označiť stranu ako skontrolovanú") {
+                    store.markPageReviewed(store.previewPageIndex)
+                }
+                .disabled(store.analysis.pageAnalyses.first(where: { $0.pageIndex == store.previewPageIndex })?.isEmpty != false ||
+                          store.reviewedNonEmptyPages.contains(store.previewPageIndex))
+                .controlSize(.small)
+                if store.reviewedNonEmptyPages.contains(store.previewPageIndex) {
+                    Label("Strana skontrolovaná", systemImage: "checkmark.circle.fill")
+                        .font(.caption2)
+                        .foregroundStyle(.green)
+                    Button("Zrušiť") {
+                        store.unmarkPageReviewed(store.previewPageIndex)
+                    }
+                    .controlSize(.small)
+                }
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.accentColor.opacity(0.07), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
     @ViewBuilder
@@ -607,7 +646,7 @@ struct AnalysisCanvasView: View {
 
     private var unconfirmedWarning: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Label("Neprázdne strany bez potvrdených prvkov:", systemImage: "exclamationmark.triangle.fill")
+            Label("Neskontrolované neprázdne strany:", systemImage: "exclamationmark.triangle.fill")
                 .font(.footnote.weight(.semibold))
                 .foregroundStyle(.orange)
             FlowChips(pages: store.unconfirmedNonEmptyPages) { pageIndex in
@@ -791,6 +830,7 @@ struct ElementRow: View {
     let onSelect: () -> Void
     let onDelete: () -> Void
     let onDuplicate: () -> Void
+    let onReviewStateChange: (SecurityElementReviewState) -> Void
     let onKindChange: (SecurityElement.Kind) -> Void
     let onDescriptionChange: (String) -> Void
     @State private var showDeleteConfirmation = false
@@ -810,7 +850,7 @@ struct ElementRow: View {
                     }
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("\(element.kind.rawValue), \(UXLabels.provenanceLabel(detectedByAI: element.detectedByAI))")
+                .accessibilityLabel("\(element.kind.rawValue), stav: \(element.reviewState.label), \(UXLabels.provenanceLabel(detectedByAI: element.detectedByAI))")
                 .accessibilityValue("\(UXLabels.confidenceLabel(for: element.confidence)); \(isSelected ? "Vybraný" : "Nevybraný")")
                 .accessibilityAddTraits(isSelected ? .isSelected : [])
 
@@ -847,10 +887,28 @@ struct ElementRow: View {
             .accessibilityLabel("Popis prvku")
 
             HStack(alignment: .center, spacing: 6) {
-                Label(UXLabels.provenanceLabel(detectedByAI: element.detectedByAI), systemImage: "info.circle")
+                Label(element.reviewState.label, systemImage: reviewIcon)
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(reviewColor)
                 Spacer()
+                if element.reviewState == .pending {
+                    Button("Potvrdiť") {
+                        onReviewStateChange(.confirmed)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    Button("Odmietnuť") {
+                        onReviewStateChange(.rejected)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                } else if element.reviewState == .rejected {
+                    Button("Vrátiť na kontrolu") {
+                        onReviewStateChange(.pending)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
                 Button {
                     onDuplicate()
                 } label: {
@@ -882,6 +940,22 @@ struct ElementRow: View {
             Button("Zrušiť", role: .cancel) {}
         } message: {
             Text("Prvok bude odstránený z doložky. Túto zmenu môžete vrátiť tlačidlom Späť.")
+        }
+    }
+
+    private var reviewIcon: String {
+        switch element.reviewState {
+        case .pending: return "questionmark.circle"
+        case .confirmed: return "checkmark.circle.fill"
+        case .rejected: return "xmark.circle.fill"
+        }
+    }
+
+    private var reviewColor: Color {
+        switch element.reviewState {
+        case .pending: return .orange
+        case .confirmed: return .green
+        case .rejected: return .secondary
         }
     }
 }

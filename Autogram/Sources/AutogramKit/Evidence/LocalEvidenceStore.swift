@@ -50,6 +50,8 @@ public struct EvidenceRecord: Codable, Identifiable, Sendable {
     public var totalPages: Int
     public var totalSheets: Int
     public var pdfFileName: String?
+    public var formPack: FormPackStamp?
+    public var securityReview: SecurityReviewStamp?
 
     public var evidenceURI: String? {
         guard let evidenceNumber, !evidenceNumber.isEmpty else { return nil }
@@ -79,7 +81,9 @@ public struct EvidenceRecord: Codable, Identifiable, Sendable {
             newDocumentName: newDocumentName,
             attestationXML: attestationXML,
             fingerprintSHA256Hex: fingerprintSHA256Hex,
-            conversionTime: conversionTime)
+            conversionTime: conversionTime,
+            formPack: formPack,
+            securityReview: securityReview)
     }
 
     public init(id: UUID = UUID(), createdAt: Date = Date(), status: Status,
@@ -88,7 +92,9 @@ public struct EvidenceRecord: Codable, Identifiable, Sendable {
                 fingerprintSHA256Hex: String, attestationXML: String,
                 conversionTime: Date, performingPersonName: String,
                 securityElementCount: Int, totalPages: Int, totalSheets: Int,
-                pdfFileName: String? = nil) {
+                 pdfFileName: String? = nil,
+                 formPack: FormPackStamp? = nil,
+                 securityReview: SecurityReviewStamp? = nil) {
         self.id = id
         self.createdAt = createdAt
         self.updatedAt = createdAt
@@ -105,6 +111,8 @@ public struct EvidenceRecord: Codable, Identifiable, Sendable {
         self.totalPages = totalPages
         self.totalSheets = totalSheets
         self.pdfFileName = pdfFileName
+        self.formPack = formPack
+        self.securityReview = securityReview
     }
 }
 

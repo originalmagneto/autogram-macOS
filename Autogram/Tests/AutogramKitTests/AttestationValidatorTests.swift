@@ -52,7 +52,8 @@ final class AttestationValidatorTests: XCTestCase {
             data,
             securityElements: validElements,
             hasSelectedIdentity: true,
-            mandateRequirementSatisfied: true)
+            mandateRequirementSatisfied: true,
+            inputSignatureInspection: .completed(signatures: []))
 
         XCTAssertFalse(result.isComplete)
         XCTAssertTrue(result.errors.contains(.originNotConfirmed))
@@ -90,7 +91,8 @@ final class AttestationValidatorTests: XCTestCase {
             data,
             securityElements: validElements,
             hasSelectedIdentity: true,
-            mandateRequirementSatisfied: false)
+            mandateRequirementSatisfied: false,
+            inputSignatureInspection: .completed(signatures: []))
 
         XCTAssertFalse(result.isComplete)
     }
@@ -103,8 +105,105 @@ final class AttestationValidatorTests: XCTestCase {
             data,
             securityElements: validElements,
             hasSelectedIdentity: true,
-            mandateRequirementSatisfied: true)
+            mandateRequirementSatisfied: true,
+            inputSignatureInspection: .completed(signatures: []))
 
         XCTAssertTrue(result.isComplete)
+    }
+
+    func testPreflightRequiresReviewOfElementsAndNonEmptyPages() {
+        var data = validAttestationData()
+        data.originConfirmed = true
+        let pending = SecurityElement(
+            kind: .officialStamp,
+            pageIndex: 0,
+            boundingBox: NormalizedRect(x: 0.4, y: 0.2, width: 0.2, height: 0.2),
+            confidence: 0.8,
+            detectedByAI: true)
+
+        let blocked = AttestationPreflight.evaluate(
+            data,
+            securityElements: [pending],
+            hasSelectedIdentity: true,
+            mandateRequirementSatisfied: true,
+            inputSignatureInspection: .completed(signatures: []),
+            unreviewedNonEmptyPages: [0])
+
+        XCTAssertFalse(blocked.isComplete)
+        XCTAssertTrue(blocked.errors.contains { error in
+            if case .securityElementsNeedReview(1) = error { return true }
+            return false
+        })
+        XCTAssertTrue(blocked.errors.contains { error in
+            if case .unreviewedNonEmptyPages([0]) = error { return true }
+            return false
+        })
+
+        var confirmed = pending
+        confirmed.reviewState = .confirmed
+        let complete = AttestationPreflight.evaluate(
+            data,
+            securityElements: [confirmed],
+            hasSelectedIdentity: true,
+            mandateRequirementSatisfied: true,
+            inputSignatureInspection: .completed(signatures: []),
+            unreviewedNonEmptyPages: [])
+        XCTAssertTrue(complete.isComplete)
+    }
+
+    func testRejectedElementDoesNotSatisfyConfirmedElementRequirement() {
+        var data = validAttestationData()
+        data.originConfirmed = true
+        let rejected = SecurityElement(
+            kind: .officialStamp,
+            pageIndex: 0,
+            boundingBox: .zero,
+            confidence: 1,
+            detectedByAI: true,
+            reviewState: .rejected)
+
+        let result = AttestationPreflight.evaluate(
+            data,
+            securityElements: [rejected],
+            hasSelectedIdentity: true,
+            mandateRequirementSatisfied: true,
+            inputSignatureInspection: .completed(signatures: []),
+            unreviewedNonEmptyPages: [])
+
+        XCTAssertFalse(result.isComplete)
+        XCTAssertTrue(result.errors.contains(.noSecurityElementsConfirmed))
+    }
+
+    func testLegacySecurityElementDecodesAsPending() throws {
+        let element = SecurityElement(
+            kind: .handwrittenSignature,
+            pageIndex: 0,
+            boundingBox: .zero,
+            confidence: 0.5,
+            detectedByAI: false)
+        let encoded = try JSONEncoder().encode(element)
+        var object = try XCTUnwrap(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+        object.removeValue(forKey: "reviewState")
+        let legacy = try JSONSerialization.data(withJSONObject: object)
+
+        let decoded = try JSONDecoder().decode(SecurityElement.self, from: legacy)
+
+        XCTAssertEqual(decoded.reviewState, .pending)
+    }
+
+    func testSecurityReviewStampSortsPagesAndRoundTrips() throws {
+        let stamp = SecurityReviewStamp(
+            checkedNonEmptyPageIndices: [3, 0, 2],
+            confirmedElementCount: 2,
+            rejectedElementCount: 1,
+            detectorIdentifier: "test-detector",
+            reviewedAt: Date(timeIntervalSince1970: 1_700_000_000))
+
+        let encoded = try JSONEncoder().encode(stamp)
+        let decoded = try JSONDecoder().decode(SecurityReviewStamp.self, from: encoded)
+
+        XCTAssertEqual(decoded, stamp)
+        XCTAssertEqual(decoded.checkedNonEmptyPageIndices, [0, 2, 3])
+        XCTAssertEqual(decoded.detectorIdentifier, "test-detector")
     }
 }

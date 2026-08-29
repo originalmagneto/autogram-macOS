@@ -5,6 +5,43 @@
 Tento dokument popisuje, čo presne implementujú jednotlivé fázy modulu Zaručená konverzia
 (ZaKo) a štandardného podpisovania, aké rozhodnutia boli prijaté a kde sú limity.
 
+## Externá revízia požiadaviek z 28. 8. 2026
+
+Pracovné podklady dodané po implementácii uvádzajú pre P -> E PDF/A-1a alebo PNG, zatiaľ čo
+aktuálny runtime pipeline a testy používajú PDF/A-2b. Tento rozdiel je release-blocking
+rozhodnutie, nie dôvod na slepé prepnutie čísel v validátore. Rovnako nie sú v repozitári
+potvrdené aktuálne produkčné EZZK API, verzie formulárov ani požiadavky na overenie cudzích
+podpisov.
+
+Autoritatívny register, porovnanie a akceptačné gates:
+
+- [`docs/ZAKO_EXTERNAL_REQUIREMENTS_SPEC_2026-08-28.md`](ZAKO_EXTERNAL_REQUIREMENTS_SPEC_2026-08-28.md)
+- [`Autogram/docs/superpowers/plans/2026-08-28-zako-external-requirements.md`](../Autogram/docs/superpowers/plans/2026-08-28-zako-external-requirements.md)
+- [`docs/SESSION_HANDOFF_2026-08-28-ZAKO-SPEC.md`](SESSION_HANDOFF_2026-08-28-ZAKO-SPEC.md)
+
+Kým neprejdú Fáza 0 a externé validačné gates, označenie produktu zostáva kontrolovaný
+technický pilot P -> E.
+
+### Stav Fázy 0 a začiatok Fázy 1
+
+Fáza 0 je uzavretá ako dokončený discovery gate s negatívnym externým výsledkom: verejné
+zdroje overené 28. 8. 2026 neposkytli autoritatívne XSD/XSLT ani produkčný EZZK kontrakt.
+Preto sa nezmenil PDF/A profil ani produkčný transport.
+
+Bezpečná časť Fázy 1 je implementovaná ako provenance vrstva:
+
+- `ConversionFormPack` rozlišuje verziu záznamu a doložky, účinnosť, renderer, artefakty,
+  stav overenia a stav prijatia,
+- `FormPackRepository` podporuje effective-date výber, historické lookup a produkčný gate,
+- existujúci P -> E pack je explicitne `unverified` a `unknown`,
+- generátor má pack-aware API s kontrolou fingerprintu a zachovaným legacy overloadom,
+- `EvidenceRecord` a `ConversionRecordEnvelope` ukladajú `FormPackStamp`.
+- `ConversionOutputProfile` oddeľuje implementovaný pilotný PDF/A-2b profil od navrhovaného
+  PDF/A-1a a PNG profilu; neimplementované profily konvertor aj validátor odmietnu.
+
+Fáza 1 nie je externá XSD validácia. Ďalším krokom je vloženie autoritatívnych artefaktov do
+form packu a ich nezávislé overenie.
+
 ---
 
 ## Fáza 1 - Výstupná pipeline podľa špecifikácie

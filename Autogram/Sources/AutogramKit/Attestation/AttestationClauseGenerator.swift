@@ -7,6 +7,17 @@ public struct AttestationXMLConstants: Sendable {
     public static let conversionRecordURIBase = "https://data.gov.sk/id/egov/conversion-record/"
 }
 
+public enum AttestationGenerationError: LocalizedError, Equatable, Sendable {
+    case invalidFingerprint
+
+    public var errorDescription: String? {
+        switch self {
+        case .invalidFingerprint:
+            return "SHA-256 otlačok musí obsahovať presne 64 hexadecimálnych znakov."
+        }
+    }
+}
+
 public struct AttestationClauseGenerator: Sendable {
     public init() {}
 
@@ -25,7 +36,29 @@ public struct AttestationClauseGenerator: Sendable {
     }
 
     public func generateXML(input: Input) -> String {
-        let ns = AttestationXMLConstants.namespaceP2E
+        renderXML(input: input, formPack: FormPackRepository.currentLegacyUnverified)
+    }
+
+    /// Generates a clause using the selected form pack. The legacy overload
+    /// above remains source-compatible for existing pilot callers, while new
+    /// conversion code must provide explicit pack provenance.
+    public func generateXML(input: Input, formPack: ConversionFormPack) throws -> String {
+        guard formPack.direction == .paperToElectronic else {
+            throw FormPackError.unsupportedDirection(formPack.direction)
+        }
+        guard formPack.renderer == .legacySwift else {
+            throw FormPackError.unsupportedRenderer(formPack.renderer)
+        }
+        let fingerprint = input.newDocumentFingerprintSHA256Hex
+        guard fingerprint.count == 64,
+              fingerprint.allSatisfy({ $0.isHexDigit }) else {
+            throw AttestationGenerationError.invalidFingerprint
+        }
+        return renderXML(input: input, formPack: formPack)
+    }
+
+    private func renderXML(input: Input, formPack: ConversionFormPack) -> String {
+        let ns = formPack.namespace
         let d = input.attestation
 
         var xml = """
@@ -71,10 +104,10 @@ public struct AttestationClauseGenerator: Sendable {
           <NewDocumentInfo>
             <NewDocumentName>\(Self.escape(d.newDocumentName))</NewDocumentName>
             <NewDocumentFormat>\(Self.codelist(ZakoCodelists.newDocumentFormat,
-                                               item: ZakoCodelists.pdfa2FormatItem))</NewDocumentFormat>
+                                               item: formPack.newDocumentFormatItem))</NewDocumentFormat>
             <ElectronicFingerprintValue>\(Self.fingerprintBase64(hex: input.newDocumentFingerprintSHA256Hex))</ElectronicFingerprintValue>
             <ElectronicFingerprintCalculationMethod>\(Self.codelist(ZakoCodelists.fingerprintMethod,
-                                                                    item: ZakoCodelists.sha256Item))</ElectronicFingerprintCalculationMethod>
+                                                                    item: formPack.fingerprintMethodItem))</ElectronicFingerprintCalculationMethod>
           </NewDocumentInfo>
         """
 

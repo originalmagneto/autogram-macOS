@@ -12,6 +12,7 @@ public enum PDFAConversionMode: String, Codable, CaseIterable, Identifiable, Sen
 
 public enum PDFAError: LocalizedError, Equatable, Sendable {
     case emptyDocument
+    case unsupportedOutputProfile(String)
     case missingSRGBProfile(path: String)
     case rootNotFound
     case catalogNotFound(Int)
@@ -22,6 +23,8 @@ public enum PDFAError: LocalizedError, Equatable, Sendable {
     public var errorDescription: String? {
         switch self {
         case .emptyDocument: return "Dokument je prázdny."
+        case .unsupportedOutputProfile(let profileID):
+            return "Výstupný profil \(profileID) zatiaľ nie je implementovaný alebo overený."
         case .missingSRGBProfile(let path): return "Chýba sRGB ICC profil: \(path)"
         case .rootNotFound: return "PDF nemá čitateľný koreňový katalóg."
         case .catalogNotFound(let num): return "Katalógová objekt #\(num) sa nepodarilo načítať."
@@ -42,6 +45,18 @@ public struct PDFAConverter: Sendable {
     }
 
     public static let sRGBProfileSystemPath = "/System/Library/ColorSync/Profiles/sRGB Profile.icc"
+
+    public func convert(document: PDFDocument,
+                        profile: ConversionOutputProfile,
+                        mode: PDFAConversionMode = .vectorPreserving,
+                        title: String = "") throws -> Data {
+        guard profile.container == .pdf,
+              profile.isImplemented,
+              profile.id == ConversionOutputProfile.pilotPDFA2b.id else {
+            throw PDFAError.unsupportedOutputProfile(profile.id)
+        }
+        return try convert(document: document, mode: mode, title: title)
+    }
 
     public func convert(document: PDFDocument,
                         mode: PDFAConversionMode = .vectorPreserving,

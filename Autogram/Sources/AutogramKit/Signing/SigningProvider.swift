@@ -271,10 +271,15 @@ public protocol QualifiedSigningProviding: Sendable {
     func resolveIdentities(pin: String) async -> [SigningIdentityInfo]?
     func sign(_ request: SigningRequest) async throws -> SignedConversionResult
     func inspectSignatures(in fileURL: URL) async -> [DocumentSignatureInfo]
+    func inspectInputSignatures(in fileURL: URL) async -> InputSignatureInspectionResult
 }
 
 extension QualifiedSigningProviding {
     public func inspectSignatures(in fileURL: URL) async -> [DocumentSignatureInfo] { [] }
+
+    public func inspectInputSignatures(in fileURL: URL) async -> InputSignatureInspectionResult {
+        .unavailable(detail: "Overenie podpisov vstupného dokumentu nie je dostupné.")
+    }
 
     /// Načíta reálne certifikáty z vloženej karty ešte pred podpisom.
     public func resolveIdentities(pin: String) async -> [SigningIdentityInfo]? { nil }

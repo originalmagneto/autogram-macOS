@@ -10,6 +10,24 @@ public struct PDFAValidator: Sendable {
 
     public init() {}
 
+    public func validate(_ data: Data,
+                         profile: ConversionOutputProfile) -> Result {
+        guard profile.isImplemented else {
+            return .init(isValid: false,
+                         issues: ["Výstupný profil \(profile.id) ešte nie je implementovaný."])
+        }
+        guard profile.container == .pdf else {
+            return .init(isValid: false,
+                         issues: ["Výstupný profil \(profile.id) nie je PDF profil."])
+        }
+        guard let part = profile.pdfaPart,
+              let conformance = profile.pdfaConformance else {
+            return .init(isValid: false,
+                         issues: ["Výstupný profil \(profile.id) nemá PDF/A validačný kontrakt."])
+        }
+        return validate(data, expectedPart: part, expectedConformance: conformance)
+    }
+
     public func validate(_ data: Data, expectedPart: Int = 2, expectedConformance: String = "B") -> Result {
         var issues: [String] = []
         let bytes = [UInt8](data)

@@ -270,7 +270,7 @@ struct AttestationFormView: View {
         2. Druh pôvodného dokumentu: \(store.attestation.originalDocumentTypeLabel)
         3. Počet listov pôvodného dokumentu: \(store.effectiveSheetCount)
         4. Počet neprázdnych strán pôvodného dokumentu: \(store.analysis.nonEmptyPages)
-        5. Bezpečnostné prvky pôvodného dokumentu: \(store.securityElements.count) potvrdených prvkov
+        5. Bezpečnostné prvky pôvodného dokumentu: \(store.confirmedSecurityElements.count) potvrdených prvkov
         6. Osoba vykonávajúca konverziu: \(person), advokát, ev. č. SAK: \(sak)
         7. Evidenčné číslo záznamu o zaručenej konverzii: \(evidence)
         8. Čas konverzie: bude určený časovou pečiatkou QTS pri autorizácii

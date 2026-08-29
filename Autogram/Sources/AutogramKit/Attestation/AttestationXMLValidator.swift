@@ -29,6 +29,14 @@ public struct AttestationXMLValidator: Sendable {
     }
 
     public func validate(_ xml: String, context: Context) -> [String] {
+        validate(xml,
+                 context: context,
+                 formPack: FormPackRepository.currentLegacyUnverified)
+    }
+
+    public func validate(_ xml: String,
+                         context: Context,
+                         formPack: ConversionFormPack) -> [String] {
         var issues: [String] = []
         guard let document = try? XMLDocument(xmlString: xml,
                                               options: [.nodeLoadExternalEntitiesNever]),
@@ -39,9 +47,9 @@ public struct AttestationXMLValidator: Sendable {
         if root.localName != "ConversionRecord" {
             issues.append("Koreňový element má byť ConversionRecord, je \(root.localName ?? "?").")
         }
-        let expectedNamespace = AttestationXMLConstants.namespaceP2E
-        if !xml.contains(expectedNamespace) {
-            issues.append("Chýba očakávaný namespace formulára 1.0.")
+        let expectedNamespace = formPack.namespace
+        if root.uri != expectedNamespace {
+            issues.append("Chýba očakávaný namespace form packu \(formPack.id).")
         }
 
         guard let info = child(root, "OriginalDocumentInfo") else {

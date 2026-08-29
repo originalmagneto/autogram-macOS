@@ -12,6 +12,8 @@ public struct ConversionRecordEnvelope: Codable, Sendable, Identifiable {
     public var conversionTime: Date
     public var signedAt: Date?
     public var submittedToCEZZKAt: Date?
+    public var formPack: FormPackStamp?
+    public var securityReview: SecurityReviewStamp?
 
     public init(id: UUID = UUID(), evidenceNumber: String, direction: ConversionDirection,
                 originalName: String, newDocumentName: String,
@@ -27,6 +29,22 @@ public struct ConversionRecordEnvelope: Codable, Sendable, Identifiable {
         self.conversionTime = conversionTime
         self.signedAt = nil
         self.submittedToCEZZKAt = nil
+        self.formPack = nil
+        self.securityReview = nil
+    }
+
+    public init(id: UUID = UUID(), evidenceNumber: String, direction: ConversionDirection,
+                originalName: String, newDocumentName: String,
+                attestationXML: String, fingerprintSHA256Hex: String,
+                conversionTime: Date, formPack: FormPackStamp?,
+                securityReview: SecurityReviewStamp? = nil) {
+        self.init(id: id, evidenceNumber: evidenceNumber, direction: direction,
+                  originalName: originalName, newDocumentName: newDocumentName,
+                  attestationXML: attestationXML,
+                  fingerprintSHA256Hex: fingerprintSHA256Hex,
+                  conversionTime: conversionTime)
+        self.formPack = formPack
+        self.securityReview = securityReview
     }
 }
 
