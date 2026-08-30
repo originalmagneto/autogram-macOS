@@ -236,3 +236,48 @@ No EZZK evidence numbers were generated and no conversion was submitted. No inst
 - EZZK boundaries: `Sources/AutogramKit/EZZK/EZZKService.swift`
 - Conformance tests: `Tests/AutogramKitTests/P2EConformanceTests.swift`
 - EZZK and packaging tests: `Tests/AutogramKitTests/EvidenceAndPackagingTests.swift`
+
+## Task 6 integration and verification update (2026-08-30)
+
+### Implemented and verified
+
+- `EZZKEnvironment` remains fixed-authority: sandbox is `https://ezzk-test.iomo.sk`, production is `https://ezzk.iomo.sk`, and the app's production authority gate is closed.
+- `EZZKSessionController` owns OAuth-backed session state. The default OAuth configuration has no native callback, so login remains unavailable until the operator registers and supplies a confirmed native redirect URI and callback scheme.
+- `SettingsView` presents only fixed environment identities, OAuth session controls, and migration contact metadata. It does not present an EZZK password login, arbitrary EZZK endpoint input, OAuth token values, or a mock fallback after OAuth failure.
+- `EZZKClient` uses the fixed sandbox API host by environment, Bearer tokens from the dedicated EZZK token store, authenticated server `Date` values, bounded retries for read-only requests only, and a non-retrying consequential POST.
+- Consequential submit decoding requires a non-empty `EZZKSubmissionReceipt.receipt`. A 2xx response with an unknown body is rejected as `invalidResponse`, and transport timeout remains an uncertainty rather than a submission.
+- Focused receipt tests now prove that a confirmed receipt does not mutate a local evidence row by itself, that an unknown successful response leaves a signed row non-submitted, and that a submit timeout leaves a signed row non-submitted.
+- The legacy exported `HTTPSEZZKService` and `EZZKCredentials` types remain only for source compatibility. No application wiring selects them; `AppSettingsStore` does not construct a password-authenticated service. Legacy password storage is read only to prevent an old credentialed installation from entering demo mode and is not used for OAuth or REST requests.
+- Demo-only `MockEZZKService` behavior is retained. Dashboard success feedback identifies demo submissions as local preparation rather than CEZZK acceptance.
+
+### Exact verification
+
+```text
+DEVELOPER_DIR="/Applications/Xcode-26.5.app/Contents/Developer" swift test --filter EZZKHTTPClientTests
+```
+
+Result: 19 tests passed, 0 failures.
+
+```text
+DEVELOPER_DIR="/Applications/Xcode-26.5.app/Contents/Developer" swift test
+```
+
+Result: 185 tests executed, 3 skipped, 0 failures.
+
+```text
+DEVELOPER_DIR="/Applications/Xcode-26.5.app/Contents/Developer" ./build_app.sh
+```
+
+Result: successful debug build at `Autogram/.build/arm64-apple-macosx/debug/Autogram.app`. Existing warnings remain in unrelated app and signing support code.
+
+The app was launched from the built bundle. Screen capture produced no usable app surface in this session, so interactive Settings verification was not feasible. Source and build evidence confirm the sandbox default, closed production gate, callback-gated login, no EZZK password-login controls, and disabled signed ASiC-E submission control.
+
+### Blockers and uncertainty
+
+- **Native callback blocker:** the operator has not supplied a registered native redirect URI and callback scheme. The observed web redirect is explicitly rejected, so login remains blocked closed.
+- **Sandbox account blocker:** no non-production EZZK test account or credentials were available for an authenticated sandbox smoke test. No evidence-number request or conversion POST was made.
+- **Unconfirmed POST receipt schema:** the portal bundle confirms the `.asice` `files` payload and `POST /api/zzkservice/v1/zzk`, but the authoritative success body and complete error mapping were not confirmed from an operator-backed sandbox transaction. The client therefore accepts only the typed non-empty `receipt` shape as a narrow defensive boundary and does not claim interoperability.
+- **Local evidence integration gap:** the current app workflow does not produce and validate the separate signed record ASiC required for EZZK submission, and `EZZKClient` is not yet adapted to `EZZKServicing.submit(ConversionRecordEnvelope)`. The Settings ASiC submission control remains disabled. The app-target test boundary also prevents a direct XCTest of `EZZKSessionController.logout()` preserving rows; `LocalEvidenceStore` persists independently and existing persistence coverage remains green.
+- **Demo status limitation:** the demo mock intentionally retains its existing local submission behavior for compatibility. It is not evidence of CEZZK acceptance; dashboard feedback now labels that outcome as demo-local.
+
+Production readiness is not claimed.

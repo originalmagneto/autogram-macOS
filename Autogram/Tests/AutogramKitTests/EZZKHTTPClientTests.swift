@@ -260,6 +260,77 @@ final class EZZKHTTPClientTests: XCTestCase {
         }
     }
 
+    func testConfirmedReceiptRequiresExplicitLocalRecordTransition() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ezzk-receipt-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = LocalEvidenceStore(directory: directory)
+        let record = makeLocalRecord()
+        store.upsert(record)
+
+        let transport = RecordingEZZKTransport(responses: [
+            .success(response(statusCode: 200, body: #"{ "receipt": "accepted-4" }"#))
+        ])
+        let client = makeClient(transport: transport)
+        let files = validFiles()
+
+        let receipt = try await client.submit(files: files)
+
+        XCTAssertEqual(receipt, EZZKSubmissionReceipt(receipt: "accepted-4"))
+        XCTAssertEqual(store.record(id: record.id)?.status, .signed)
+
+        var submitted = record
+        submitted.status = .submitted
+        store.upsert(submitted)
+        XCTAssertEqual(store.record(id: record.id)?.status, .submitted)
+    }
+
+    func testUnknownSuccessfulSubmitResponseLeavesLocalRecordNonSubmitted() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ezzk-unknown-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = LocalEvidenceStore(directory: directory)
+        let record = makeLocalRecord()
+        store.upsert(record)
+
+        let transport = RecordingEZZKTransport(responses: [
+            .success(response(statusCode: 200, body: #"{"message":"ok"}"#))
+        ])
+        let client = makeClient(transport: transport)
+
+        do {
+            _ = try await client.submit(files: validFiles())
+            XCTFail("Expected invalid response")
+        } catch let error as EZZKError {
+            XCTAssertEqual(error, .invalidResponse)
+        }
+        XCTAssertEqual(store.record(id: record.id)?.status, .signed)
+    }
+
+    func testSubmitTransportTimeoutLeavesLocalRecordNonSubmitted() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ezzk-timeout-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = LocalEvidenceStore(directory: directory)
+        let record = makeLocalRecord()
+        store.upsert(record)
+
+        let transport = RecordingEZZKTransport(responses: [
+            .failure(URLError(.timedOut))
+        ])
+        let client = makeClient(transport: transport)
+
+        do {
+            _ = try await client.submit(files: validFiles())
+            XCTFail("Expected network failure")
+        } catch let error as EZZKError {
+            guard case .networkFailure = error else {
+                return XCTFail("Expected network failure, got \(error)")
+            }
+        }
+        XCTAssertEqual(store.record(id: record.id)?.status, .signed)
+    }
+
     func testReadOnlyRoutesReturnOpaqueDataAndPreserveHistoryQuery() async throws {
         let transport = RecordingEZZKTransport(responses: [
             .success(response(statusCode: 200, body: "consumed")),
@@ -309,6 +380,31 @@ final class EZZKHTTPClientTests: XCTestCase {
         XCTAssertEqual(transport.requests[1].value(forHTTPHeaderField: "Content-Type"), "application/json")
         let requestBody = try XCTUnwrap(transport.requests[0].httpBody)
         XCTAssertEqual(try JSONSerialization.jsonObject(with: requestBody) as? [String: Int], ["count": 1])
+    }
+
+    private func validFiles() -> EZZKFilesRequest {
+        EZZKFilesRequest(files: [
+            EZZKFilePayload(
+                fileName: "record.asice",
+                fileType: "application/vnd.etsi.asic-e+zip",
+                value: "YWJj")
+        ])
+    }
+
+    private func makeLocalRecord() -> EvidenceRecord {
+        EvidenceRecord(
+            status: .signed,
+            direction: .paperToElectronic,
+            originalName: "source.pdf",
+            newDocumentName: "converted.pdf",
+            evidenceNumber: "1563-260830-1",
+            fingerprintSHA256Hex: String(repeating: "a", count: 64),
+            attestationXML: "<ConversionRecord/>",
+            conversionTime: Date(),
+            performingPersonName: "Test User",
+            securityElementCount: 1,
+            totalPages: 1,
+            totalSheets: 1)
     }
 
     private func makeClient(transport: RecordingEZZKTransport) -> EZZKClient {

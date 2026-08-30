@@ -50,6 +50,7 @@ final class EZZKSessionController {
     var hasNativeCallbackConfiguration: Bool {
         oauthConfiguration?.isNativeCallbackConfigured == true
     }
+    var isDemoMode: Bool { demoMode }
 
     var canStartLogin: Bool {
         !demoMode &&

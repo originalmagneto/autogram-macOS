@@ -234,7 +234,6 @@ struct EvidenceDashboardView: View {
             .buttonStyle(.bordered)
             .disabled(selectedRecordID == nil)
             .keyboardShortcut(.defaultAction)
-
             Button {
                 submitPending()
             } label: {
@@ -249,6 +248,7 @@ struct EvidenceDashboardView: View {
             }
             .buttonStyle(.borderedProminent)
             .disabled(isSubmitting || !records.contains(where: \.isSubmissionPending))
+
 
             Button {
                 exportCSV()
@@ -334,7 +334,6 @@ struct EvidenceDashboardView: View {
             Task { @MainActor in reload() }
         }
     }
-
     private func submitPending() {
         isSubmitting = true
         submitFeedback = nil
@@ -363,11 +362,14 @@ struct EvidenceDashboardView: View {
                 reload()
                 isSubmitting = false
                 submitFeedback = failedCount == 0
-                    ? "✓ Odoslaných \(submittedCount) záznamov do CEZZK."
+                    ? (settingsStore.ezzkSessionController.isDemoMode
+                        ? "✓ Demo: lokálne pripravených \(submittedCount) záznamov."
+                        : "✓ Odoslaných \(submittedCount) záznamov do CEZZK.")
                     : "⚠ \(submittedCount) úspešných, \(failedCount) zlyhalo."
             }
         }
     }
+
 
     private func exportCSV() {
         exportError = nil
