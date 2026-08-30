@@ -7,12 +7,12 @@
 Autogram je natívna macOS aplikácia v SwiftUI na elektronické podpisovanie dokumentov a zaručenú konverziu listinných dokumentov do elektronickej podoby.
 
 - **Podpisovanie:** KEP alebo PAdES podpis, kvalifikovaná časová pečiatka a ASiC-E kontajner.
-- **Zaručená konverzia (ZaKo):** analýza dokumentu, označenie bezpečnostných prvkov, osvedčovacia doložka, PDF/A-2b, autorizácia mandátnym certifikátom a evidencia CEZZK.
+- **Zaručená konverzia (ZaKo):** analýza dokumentu, označenie bezpečnostných prvkov, osvedčovacia doložka, PDF/A-2b pilotný profil, autorizácia mandátnym certifikátom a lokálna evidencia CEZZK.
 - **Register:** lokálne uložené záznamy konverzií, fronta odoslania do CEZZK, vyhľadávanie, filtrovanie a CSV export.
 
-> **Compliance note:** Aktuálny build je implementačný P -> E pilot. Generuje PDF/A-2b, kým externé požiadavky na PDF/A-1a alebo PNG, aktívne verzie formulárov a produkčný EZZK kontrakt nebudú autoritatívne potvrdené a nezávisle overené. Porovnanie a plán sú v [`docs/ZAKO_EXTERNAL_REQUIREMENTS_SPEC_2026-08-28.md`](docs/ZAKO_EXTERNAL_REQUIREMENTS_SPEC_2026-08-28.md) a [`Autogram/docs/superpowers/plans/2026-08-28-zako-external-requirements.md`](Autogram/docs/superpowers/plans/2026-08-28-zako-external-requirements.md).
+> **Compliance note:** Aktuálny build je implementačný P -> E pilot. Generuje PDF/A-2b, kým externé požiadavky na PDF/A-1a alebo PNG, aktívne verzie formulárov a produkčný EZZK kontrakt nebudú autoritatívne potvrdené a nezávisle overené. P2E cieľová doložka je oficiálna verzia v1.3, zatiaľ čo aktuálny CEZZK záznam je verzia 1.0. Porovnanie a plán sú v [`Autogram/docs/P2E-EZZK-FINDINGS.md`](Autogram/docs/P2E-EZZK-FINDINGS.md) a [`Autogram/docs/superpowers/plans/2026-08-29-ezzk-oauth-rest-ui.md`](Autogram/docs/superpowers/plans/2026-08-29-ezzk-oauth-rest-ui.md).
 
-`macOS 27 only` · `Swift 6` · `SwiftUI + @Observable` · `0 Swift package dependencies` · `107 tests executed` · `3 skipped` · `0 failures`
+`macOS 27 only` · `Swift 6` · `SwiftUI + @Observable` · `0 Swift package dependencies` · `187 tests executed` · `3 skipped` · `0 failures`
 
 > Implementačná dokumentácia: [`docs/PHASES.md`](docs/PHASES.md)
 >
@@ -28,7 +28,7 @@ Autogram je natívna macOS aplikácia v SwiftUI na elektronické podpisovanie do
 - Apple Silicon alebo Intel Mac podporovaný použitým Xcode toolchainom
 - Xcode 26.5 a Swift 6 pre zostavenie zo zdrojov
 - pre reálny podpis: kompatibilná eID karta, advokátsky preukaz alebo iný PKCS#11/CryptoTokenKit token
-- pre produkčné CEZZK odoslanie: účet a sieťové pripojenie k príslušnej službe
+- pre produkčné CEZZK odoslanie: EZZK účet, potvrdený native OAuth callback, sandboxové overenie a sieťové pripojenie k príslušnej službe
 - pre PDFBox normalizáciu: nainštalovaný Autogram macOS 2 engine s Java runtime; bez neho sa použije lokálny fallback iba vtedy, ak výsledok prejde lokálnou kontrolou
 
 Aplikácia je cielene zostavená pre macOS 27. `Package.swift` preto deklaruje platformu `.macOS("27.0")` a build script zapisuje `LSMinimumSystemVersion=27.0`.
@@ -55,9 +55,9 @@ ZaKo používa päť krokov:
 2. **Analýza:** formát strán, neprázdne strany, listy a návrh názvu dokumentu.
 3. **Označenie:** AI Vision a manuálne označenie podpisov, pečiatok, reliéfnych pečatí, paraf a iných prvkov.
 4. **Osvedčovacia doložka:** údaje osoby, počítadlá, lokalizácia prvkov, XML náhľad a právny preflight.
-5. **Autorizácia a dokončenie:** evidenčné číslo, dôveryhodný čas, PDF/A, podpis, lokálna evidencia a odoslanie do CEZZK.
+5. **Autorizácia a dokončenie:** evidenčné číslo cez explicitnú EZZK akciu, dôveryhodný serverový čas, PDF/A, podpis, lokálna evidencia a odoslanie do CEZZK až po validácii podpísaných ASiC artefaktov a potvrdeného receipt.
 
-Odoslanie do CEZZK je oddelené od vytvorenia súborov. Ak sieťové odoslanie zlyhá, podpísané súbory zostanú k dispozícii a záznam prejde do fronty s manuálnou možnosťou opakovania.
+Odoslanie do CEZZK je oddelené od vytvorenia súborov. Aktuálna OAuth integrácia má typed transport a guarded UI, ale odoslanie zostáva zablokované, kým workflow nevytvorí a nevaliduje samostatný podpísaný record ASiC a kým nebude potvrdený sandboxový receipt kontrakt.
 
 ### Procesný diagram
 
@@ -153,12 +153,12 @@ Native Settings scene obsahuje všetky konfiguračné oblasti v štyroch tabuľk
 
 1. **AI Vision:** on-device, oMLX, Ollama, vlastné OpenAI-compatible API, vypnutie asistenta, endpointy, modely, Keychain API kľúč a vlastný klasifikačný prompt.
 2. **Konverzia PDF/A:** vektorový alebo rasterizovaný režim, aktívna RFC 3161 TSA, vlastné TSA servery a test spojenia.
-3. **EZZK:** IČO, prihlasovacie meno, heslo v Keychain, notifikačný e-mail a adresa eDesk.
+3. **EZZK:** OAuth2 session cez Keycloak, fixné Sandbox a Production identity, stav prihlásenia, explicitná žiadosť o evidenčné číslo, Demo režim a migračné kontaktné údaje.
 4. **Profily advokáta:** viac profilov, aktívny profil, meno, funkcia, SAK číslo, IČO, kancelária, adresa a právnická osoba.
 
 Settings okno má natívnu predvolenú veľkosť `1080 × 820` a obsah tabuľky sa nezabalí do vnútorného vertikálneho `ScrollView`. Záložky sú preto navrhnuté ako vysoké, roztiahnuté plochy s priamym prístupom k voľbám. Pri viacerých uložených profiloch sa zobrazia všetky profily v poradí uloženia.
 
-Tajomstvá sa neukladajú do JSON nastavení. AI API kľúč a EZZK heslo idú do systémovej Kľúčenky. Ostatné nastavenia sa ukladajú do UserDefaults ako verzované JSON.
+Tajomstvá sa neukladajú do JSON nastavení. AI API kľúč, EZZK heslo z legacy migrácie a OAuth tokeny idú do systémovej Kľúčenky. Ostatné nastavenia sa ukladajú do UserDefaults ako verzované JSON.
 
 ---
 
@@ -188,7 +188,7 @@ Projekt má tri hlavné vrstvy:
 2. **Session stores:** `SigningSessionStore` riadi štandardné podpisovanie a `ZakoSessionStore` riadi päťkrokový ZaKo workflow.
 3. **AutogramKit:** testovateľná doménová a dokumentová logika, PDF analýza, Vision pipeline, XML doložka, PDF/A, podpisovanie, ASiC-E a evidencia.
 
-Dáta lokálneho registra sa ukladajú do `register.json` v `~/Library/Application Support/Autogram/Evidence`. Nejde o Core Data ani SQLite databázu. CEZZK je abstrahované cez `EZZKServicing`, ktoré má demo implementáciu a HTTPS kostru.
+Dáta lokálneho registra sa ukladajú do `register.json` v `~/Library/Application Support/Autogram/Evidence`. Nejde o Core Data ani SQLite databázu. CEZZK je abstrahované cez `EZZKServicing`; Demo používa lokálny mock, zatiaľ čo OAuth2 EZZK session používa typed REST klient s fail-closed hranicami.
 
 Java/PDFBox je voliteľná runtime infraštruktúra pre čistú PDF/A normalizáciu. Pri chýbajúcom engine sa použije Swift fallback iba po úspešnej lokálnej validácii.
 
@@ -198,7 +198,7 @@ Java/PDFBox je voliteľná runtime infraštruktúra pre čistú PDF/A normalizá
 
 <img src="docs/diagrams/state-machine.svg" alt="Stavový automat evidencie konverzií" width="100%">
 
-Záznam prechádza stavmi konceptu, čakania na číslo, pripravenosti na autorizáciu, autorizácie, fronty odoslania a zápisu v CEZZK. Sieťové zlyhanie vedie na manuálne opakovanie z dashboardu. Záznamy majú 24-hodinovú lehotu od času konverzie; 20-hodinové varovanie je ešte otvorený UX follow-up.
+Záznam prechádza stavmi konceptu, čakania na číslo, pripravenosti na autorizáciu, autorizácie, fronty odoslania a zápisu v CEZZK. Demo operácie zostávajú lokálne a záznamy ostávajú pending. Sieťové zlyhanie vedie na manuálne opakovanie až po potvrdení reálneho submission kontraktu. Záznamy majú 24-hodinovú lehotu od času konverzie; 20-hodinové varovanie je ešte otvorený UX follow-up.
 
 ---
 
@@ -230,7 +230,7 @@ Záznam prechádza stavmi konceptu, čakania na číslo, pripravenosti na autori
 - miniatúry strán, počítadlá listov a formátov
 - XML doložka ConversionRecord 1.0 podľa codelistov
 - PDF/A-2b, finálna validácia a EmbeddedFile asociácia
-- lokálny register, fronta CEZZK a CSV export
+- lokálny register, OAuth2 EZZK session, guarded REST transport a CSV export
 
 ### Nastavenia a súkromie
 
@@ -275,7 +275,7 @@ ditto --rsrc --extattr --acl \
 open "/Applications/Autogram macOS.app"
 ```
 
-Aktuálny overený výsledok je 107 vykonaných testov, 3 voliteľné live engine testy skipped a 0 failures. Live testy vyžadujú `AUTOGRAM_ENGINE_LIVE_TEST=1` a externý signing engine. Build script zároveň vloží PDFBox dependency classpath do `Contents/app/dependency-jars` pri inštalácii Autogram macOS 2 engine.
+Aktuálny overený výsledok je 187 vykonaných testov, 3 voliteľné live engine testy skipped a 0 failures. EZZK OAuth2, typed REST transport a guarded Settings UI sú implementované, ale produkčná interoperability zostáva zablokovaná externými EZZK kontraktmi. Build script zároveň vloží PDFBox dependency classpath do `Contents/app/dependency-jars` pri inštalácii Autogram macOS 2 engine.
 
 ---
 
@@ -283,7 +283,7 @@ Aktuálny overený výsledok je 107 vykonaných testov, 3 voliteľné live engin
 
 - Manuálna kontrola bezpečnostných prvkov zostáva potrebná. Slabý kontrast, reliéf a rukopis nemusia byť spoľahlivo rozpoznané vstavaným detectorom.
 - Lokálny `PDFAValidator` je štrukturálny a heuristický. Finálny release artefakt treba overiť v Acrobat Preflight alebo veraPDF.
-- Produkčné CEZZK API je zatiaľ reprezentované Mock + HTTPS kostrou, pretože oficiálna OpenAPI špecifikácia nie je súčasťou repozitára.
+- Produkčné EZZK API už má OAuth2 klienta, typed REST transport, fixed-host redirect ochranu a guarded Settings UI. Native callback, sandboxový účet, POST receipt kontrakt a signed ASiC workflow zostávajú externé alebo implementačné blokácie.
 - XAdES chain/LTA archivácia je obmedzená na aktuálny signing flow; plná B-LT archivácia je budúce rozšírenie.
 - Presný OID mandátneho certifikátu treba doplniť po overení reálneho SAK certifikátu.
 
@@ -293,14 +293,19 @@ Aktuálny overený výsledok je 107 vykonaných testov, 3 voliteľné live engin
 
 <img src="docs/diagrams/roadmap-open-work.svg" alt="Roadmap otvorených follow-up úloh" width="100%">
 
-Hotové položky z predchádzajúcej roadmapy, vrátane päťkrokového ZaKo steppera a pipeline/output zmien, sú označené ako dokončené. Aktívne follow-upy sú:
+Hotové položky z predchádzajúcej roadmapy, vrátane päťkrokového ZaKo steppera, P2E v1.3 conformance profilu, OAuth2 EZZK session, typed REST transportu a guarded Demo/Sandbox UI, sú označené ako dokončené. Aktívne follow-upy sú:
 
-1. GUI pass na macOS 27 s VoiceOver, Full Keyboard Access, Increase Contrast, Reduce Transparency a Reduce Motion.
-2. Overenie viacerých veľkostí okna, focus order a toolbar command routing.
-3. Posúdenie voliteľného AppKit overlay pre presné umiestnenie viditeľného podpisu.
-4. Nahradenie zostávajúcich nekritických `try?` miest actionable error UI.
-5. 20-hodinové varovanie v CEZZK dashboarde.
-6. Externá PDF/A-2b a EmbeddedFile validácia reálneho finálneho artefaktu.
+1. Potvrdiť native OAuth redirect URI alebo callback scheme s prevádzkovateľom EZZK.
+2. Získať sandboxový EZZK účet a vykonať neprodukčný smoke test.
+3. Potvrdiť kompletné `POST /ec` a `POST /zzk` response, receipt, error a idempotency pravidlá.
+4. Vytvoriť a validovať samostatný podpísaný record ASiC v conversion workflow.
+5. Získať a spracovať oficiálne v1.3 XSD/XSLT/data artefakty pred produkčným rendererom.
+6. GUI pass na macOS 27 s VoiceOver, Full Keyboard Access, Increase Contrast, Reduce Transparency a Reduce Motion.
+7. Overenie viacerých veľkostí okna, focus order a toolbar command routing.
+8. Posúdenie voliteľného AppKit overlay pre presné umiestnenie viditeľného podpisu.
+9. Nahradenie zostávajúcich nekritických `try?` miest actionable error UI.
+10. 20-hodinové varovanie v CEZZK dashboarde.
+11. Externá PDF/A-2b a EmbeddedFile validácia reálneho finálneho artefaktu.
 
 Editovateľný zdroj roadmap diagramu: [`docs/diagrams/roadmap-open-work.excalidraw`](docs/diagrams/roadmap-open-work.excalidraw).
 

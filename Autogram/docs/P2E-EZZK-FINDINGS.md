@@ -191,46 +191,38 @@ The existing legacy Swift form renderer and `FormPackRepository.currentLegacyUnv
 
 ## Verification record
 
-Executed in the worktree branch:
-
-```text
-DEVELOPER_DIR="/Applications/Xcode-26.5.app/Contents/Developer" swift test --filter P2EConformanceTests
-```
-
-Result: 7 tests passed, 0 failures.
+The implementation was completed on branch `codex/ezzk-oauth-rest-ui` and merged locally into `main`.
 
 ```text
 DEVELOPER_DIR="/Applications/Xcode-26.5.app/Contents/Developer" swift test
 ```
 
-Result: 146 tests passed, 3 skipped, 0 failures.
+Result on the merged `main`: 187 tests executed, 3 skipped, 0 failures.
 
 ```text
 DEVELOPER_DIR="/Applications/Xcode-26.5.app/Contents/Developer" ./build_app.sh
 ```
 
-Result: successful build. App output:
+Result on the merged `main`: successful debug build at `Autogram/.build/arm64-apple-macosx/debug/Autogram.app`.
 
-`/Users/Magneto/PROJECTS/AUTOGRAM macOS UI/.worktrees/zako-production-readiness/Autogram/.build/arm64-apple-macosx/debug/Autogram.app`
-
-The build emitted existing unrelated warnings in `PDFPlacementOverlayView.swift` and test/support code. No current verification output reported a failure.
+The app was launched from the built bundle. Screen capture produced no usable app surface in the verification session, so interactive Settings verification was not feasible. Source and build evidence confirm the sandbox default, closed production gate, callback-gated login, no EZZK password-login controls, disabled signed ASiC-E submission control, and demo rows remaining pending.
 
 No EZZK evidence numbers were generated and no conversion was submitted. No installed Podpisuj application was modified.
 
-## Open work and update triggers
+## Current open work and update triggers
 
-1. Implement native OAuth2 login with `ASWebAuthenticationSession`, Keychain storage, refresh handling, cancellation, and logout.
-2. Implement a typed EZZK REST transport against `/api/zzkservice/v1`.
-3. Integrate only with `https://ezzk-test.iomo.sk` first and obtain a non-production test account or test credentials through the official operator.
-4. Define the complete conversion submission model, including the signed clause ASiC, the separate signed record ASiC, and the exact server response/error mapping.
-5. Obtain and inspect the full official v1.3 XSD/XSLT/data artefacts and implement an official-compatible clause renderer before production eligibility.
-6. Add end-to-end test fixtures generated from official datasets and a test-environment submission smoke test that never runs against production by default.
-7. Re-check the MIRRI documentation and Slovensko.sk dataset when record version 1.2 is announced or on 2027-01-01, whichever is required by the integration release process. Update `P2EConformanceProfile` and fixtures only from the official dataset.
-8. Add a visible UI state that distinguishes pilot output, structurally validated output, and EZZK-accepted output.
+1. Obtain operator confirmation for a native redirect URI or callback scheme for `login-app`.
+2. Obtain a non-production EZZK sandbox account.
+3. Confirm the complete `POST /ec` contract and response.
+4. Confirm the complete `POST /zzk` request, receipt, error, retry, and idempotency contract.
+5. Produce and validate the separate signed record ASiC in the conversion workflow before enabling submission.
+6. Obtain and inspect the full official v1.3 XSD/XSLT/data artefacts and implement an official-compatible clause renderer before production eligibility.
+7. Re-check the MIRRI documentation and Slovensko.sk dataset when record version 1.2 is announced or on 2027-01-01.
+8. Add a visible UI state distinguishing pilot output, structurally validated output, and EZZK-accepted output.
 
 ## Repository references
 
-- Plan: `docs/superpowers/plans/2026-08-29-p2e-conformance-and-ezzk-boundaries.md`
+- Plan: `docs/superpowers/plans/2026-08-29-ezzk-oauth-rest-ui.md`
 - Clause profile: `Sources/AutogramKit/Attestation/P2EConformanceProfile.swift`
 - Validator: `Sources/AutogramKit/Attestation/P2EConformanceValidator.swift`
 - EZZK boundaries: `Sources/AutogramKit/EZZK/EZZKService.swift`
@@ -273,9 +265,9 @@ Result: 187 tests executed, 3 skipped, 0 failures.
 DEVELOPER_DIR="/Applications/Xcode-26.5.app/Contents/Developer" ./build_app.sh
 ```
 
-Result: successful debug build at `Autogram/.build/arm64-apple-macosx/debug/Autogram.app`. Existing warnings remain in unrelated app and signing support code.
+Result: successful debug build at `/Users/Magneto/PROJECTS/AUTOGRAM macOS UI/Autogram/.build/arm64-apple-macosx/debug/Autogram.app`. Existing warnings remain in unrelated app and signing support code.
 
-The app was launched from the built bundle. Screen capture produced no usable app surface in this session, so interactive Settings verification was not feasible. Source and build evidence confirm the sandbox default, closed production gate, callback-gated login, no EZZK password-login controls, and disabled signed ASiC-E submission control.
+The verified debug bundle was installed at `/Applications/Autogram macOS.app`. The app was launched from the built bundle. Screen capture produced no usable app surface in this session, so interactive Settings verification was not feasible. Source and build evidence confirm the sandbox default, closed production gate, callback-gated login, no EZZK password-login controls, and disabled signed ASiC-E submission control.
 
 ### Blockers and uncertainty
 

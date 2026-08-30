@@ -459,3 +459,13 @@ The implementation may be considered locally complete only when all tests and th
 4. The complete `POST /zzk` request, receipt, error, retry, and idempotency contract is captured from sandbox.
 5. Signed clause and record ASiC artefacts are supplied by the conversion pipeline.
 6. The authority register records sandbox evidence and production release approval.
+
+## Execution status
+
+Completed on `main` after local fast-forward merge from `codex/ezzk-oauth-rest-ui`.
+
+- Tasks 1 through 6 completed and reviewed.
+- Final branch review completed with all Important findings fixed.
+- Merged verification: 187 tests executed, 3 skipped, 0 failures.
+- Merged build: `Autogram/.build/arm64-apple-macosx/debug/Autogram.app`.
+- Production remains blocked by the external release boundary above.
