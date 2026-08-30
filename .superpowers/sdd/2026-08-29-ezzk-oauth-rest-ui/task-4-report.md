@@ -42,3 +42,4 @@ Only focused tests and app builds were run. Existing project warnings remain out
 - Added an explicit non-empty client ID and scope validation before any OAuth-backed client can be created, in addition to the native callback gate.
 - Added publication guards so an in-flight restoration or login cannot replace an already active client.
 - Rebuilt the Autogram product after the hardening change: PASS.
+- Re-ran `swift test --build-path /tmp/ezzk-task4-final-tests-2 --filter EZZKHTTPClientTests`: PASS, 16 tests, 0 failures.
