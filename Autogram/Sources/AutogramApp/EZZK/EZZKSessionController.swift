@@ -60,7 +60,7 @@ final class EZZKSessionController {
             state = .failed("Produkčné pripojenie EZZK ešte nie je povolené.")
             return
         }
-        guard let oauthConfiguration, oauthConfiguration.isNativeCallbackConfigured else {
+        guard let oauthConfiguration, isUsable(oauthConfiguration) else {
             state = .failed("Prihlásenie do EZZK nie je dostupné. Vyžaduje sa potvrdené natívne presmerovanie.")
             return
         }
@@ -98,7 +98,7 @@ final class EZZKSessionController {
             state = .failed("Produkčné pripojenie EZZK ešte nie je povolené.")
             return
         }
-        guard let oauthConfiguration, oauthConfiguration.isNativeCallbackConfigured else {
+        guard let oauthConfiguration, isUsable(oauthConfiguration) else {
             state = .failed("Obnovenie relácie EZZK nie je dostupné bez potvrdeného natívneho presmerovania.")
             return
         }
@@ -127,7 +127,7 @@ final class EZZKSessionController {
             state = .failed("Produkčné pripojenie EZZK ešte nie je povolené.")
             return
         }
-        guard let oauthConfiguration, oauthConfiguration.isNativeCallbackConfigured else {
+        guard let oauthConfiguration, isUsable(oauthConfiguration) else {
             state = .failed("Test pripojenia EZZK nie je dostupný bez potvrdeného natívneho presmerovania.")
             return
         }
@@ -168,7 +168,7 @@ final class EZZKSessionController {
     private func restoreFromKeychain() async {
         guard isEnvironmentAvailable,
               let oauthConfiguration,
-              oauthConfiguration.isNativeCallbackConfigured else {
+              isUsable(oauthConfiguration) else {
             return
         }
         do {
@@ -222,6 +222,15 @@ final class EZZKSessionController {
             return error == .authenticationFailed
         }
         return error is EZZKAuthenticationError
+    }
+
+    private func isUsable(_ oauthConfiguration: EZZKOAuthConfiguration) -> Bool {
+        !oauthConfiguration.clientID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        !oauthConfiguration.scopes.isEmpty &&
+        oauthConfiguration.scopes.allSatisfy {
+            !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        } &&
+        oauthConfiguration.isNativeCallbackConfigured
     }
 
     private func message(for error: Error) -> String {

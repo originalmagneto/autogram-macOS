@@ -36,3 +36,9 @@ Only focused tests and app builds were run. Existing project warnings remain out
 - Production selection remains disabled until the authority register and release gate are populated.
 - The existing Settings EZZK tab still presents legacy credential fields until the dedicated Settings UI task replaces them. Those values no longer select or authenticate an EZZK service.
 - The authenticated adapter intentionally rejects legacy `ConversionRecordEnvelope` submission because the validated signed ASiC upload and authoritative receipt boundary are not yet wired.
+
+## Follow-up hardening
+
+- Added an explicit non-empty client ID and scope validation before any OAuth-backed client can be created, in addition to the native callback gate.
+- Added publication guards so an in-flight restoration or login cannot replace an already active client.
+- Rebuilt the Autogram product after the hardening change: PASS.
