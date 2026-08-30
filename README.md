@@ -337,16 +337,17 @@ Výstupný bundle:
 Autogram/.build/arm64-apple-macosx/debug/Autogram.app
 ```
 
-Manuálna inštalácia existujúceho debug bundle:
+Manuálna inštalácia existujúceho debug bundle s čistou náhradou:
 
 ```bash
+rm -rf "/Applications/Autogram macOS.app"
 ditto --rsrc --extattr --acl \
   .build/arm64-apple-macosx/debug/Autogram.app \
   "/Applications/Autogram macOS.app"
 open "/Applications/Autogram macOS.app"
 ```
 
-Overený výsledok na aktuálnom zdrojovom strome: 236 testov, 3 voliteľné live engine testy skipped a 0 failures. Debug bundle má verziu `0.2.2`. Build vytvorí `.build/arm64-apple-macosx/debug/Autogram.app` a pri dostupnom Autogram macOS 2 engine vloží PDFBox dependency classpath do `Contents/app/dependency-jars`.
+Overený výsledok na aktuálnom zdrojovom strome: 236 testov, 3 voliteľné live engine testy skipped a 0 failures. Debug bundle má verziu `0.2.2`. `./build_app.sh install` vykoná čistú náhradu bundle v `/Applications/Autogram macOS.app`, aby v inštalácii nezostali staré súbory. Build vytvorí `.build/arm64-apple-macosx/debug/Autogram.app` a pri dostupnom Autogram macOS 2 engine vloží PDFBox dependency classpath do `Contents/app/dependency-jars`.
 
 ## Diagramy
 
@@ -391,6 +392,7 @@ Dokončené v aktuálnom workflow update:
 - Finder Quick Action napojená na rovnaký signing engine.
 - EZZK OAuth2/PKCE login s natívnym callbackom `autogram://ezzk/callback`, OIDC discovery a zrušením autentizácie,
 - Keychain token store, obnova session po štarte, odhlásenie a typed REST transport s fail-closed hranicami.
+- explicitný `build_app.sh install` príkaz s čistou náhradou aplikácie v `/Applications`,
 
 <details open>
   <summary><strong>Otvorené follow-upy a release blokátory</strong> · <a href="docs/diagrams/roadmap-open-work.svg">diagram</a> · <a href="docs/diagrams/roadmap-open-work.excalidraw">editovateľný zdroj</a></summary>

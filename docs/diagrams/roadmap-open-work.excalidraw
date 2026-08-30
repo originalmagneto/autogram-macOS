@@ -198,7 +198,7 @@
       "updated": 1788116993654,
       "link": null,
       "locked": false,
-      "text": "Settings · AI prompts · EZZK OAuth · output buttons · recent docs · batch",
+      "text": "Settings · AI prompts · EZZK OAuth · output buttons · clean install",
       "fontSize": 9,
       "fontFamily": 3,
       "textAlign": "center",
@@ -206,7 +206,7 @@
       "containerId": null,
       "lineHeight": 1.25,
       "baseline": 8,
-      "originalText": "Settings · AI prompts · EZZK OAuth · output buttons · recent docs · batch",
+      "originalText": "Settings · AI prompts · EZZK OAuth · output buttons · clean install",
       "autoResize": true
     },
     {

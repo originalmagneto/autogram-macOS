@@ -212,6 +212,8 @@ Aktuálny macOS 27 build obsahuje tieto používateľské zmeny:
 - voľba PAdES alebo ASiC-E/XAdES používa priame tlačidlá v podpisovom workflow,
 - recent documents, dávkové preflight fázy, progress, cancel, stop, retry a Finder
   Quick Action sú napojené na existujúce workflow stores.
+- `build_app.sh install` robí čistú náhradu bundle v `/Applications/Autogram macOS.app`;
+  samostatný build bez argumentu mení iba `.build` výstup.
 
 ---
 

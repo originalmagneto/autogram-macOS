@@ -20,7 +20,7 @@
 
   <rect x="760" y="40" width="368" height="60" rx="8" fill="rgba(235,108,54,0.08)" stroke="#eb6c36" stroke-width="1.2"/>
   <text x="944" y="64" text-anchor="middle" font-family="-apple-system, 'Helvetica Neue', Arial, sans-serif" font-size="13" font-weight="600" fill="#2d3142">Aktuálny workflow update</text>
-  <text x="944" y="84" text-anchor="middle" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="9" fill="#4f5d75">Settings · AI prompts · EZZK OAuth · output buttons · recent docs · batch</text>
+  <text x="944" y="84" text-anchor="middle" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="9" fill="#4f5d75">Settings · AI prompts · EZZK OAuth · output buttons · clean install</text>
 
   <rect x="32" y="124" width="320" height="296" rx="8" fill="rgba(45,49,66,0.02)" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
   <rect x="420" y="124" width="320" height="296" rx="8" fill="rgba(45,49,66,0.02)" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
