@@ -7,31 +7,25 @@ final class AppSettingsStore {
     var settings: AppSettings {
         didSet {
             settings.save()
-            rebuildServices()
         }
     }
+    // Kept for legacy settings migration. It is not used to authenticate EZZK.
     var ezzkPassword: String
 
-    private(set) var ezzkService: any EZZKServicing
+    let ezzkSessionController: EZZKSessionController
+    var ezzkService: any EZZKServicing {
+        ezzkSessionController.service
+    }
     private(set) var signingProvider: any QualifiedSigningProviding
     private(set) var evidenceStore: LocalEvidenceStore
 
     init() {
         let loaded = AppSettings.load()
         self.settings = loaded
-        let storedPassword = KeychainStore.load(account: "ezzk.password") ?? ""
-        self.ezzkPassword = storedPassword
+        self.ezzkPassword = KeychainStore.load(account: "ezzk.password") ?? ""
+        self.ezzkSessionController = EZZKSessionController()
         self.evidenceStore = LocalEvidenceStore()
-
-        let credentials = EZZKCredentials(ico: loaded.ezzkICO,
-                                         username: loaded.ezzkUsername,
-                                         password: storedPassword,
-                                         notificationEmail: loaded.ezzkNotificationEmail,
-                                         edeskAddress: loaded.ezzkEdeskAddress)
-        ezzkService = credentials.isConfigured
-            ? HTTPSEZZKService(credentials: credentials)
-            : MockEZZKService()
-        signingProvider = SigningProviderFactory.makeDefault()
+        self.signingProvider = SigningProviderFactory.makeDefault()
     }
 
     func saveEZZKPassword() {
@@ -40,21 +34,9 @@ final class AppSettingsStore {
         } else {
             _ = KeychainStore.save(secret: ezzkPassword, account: "ezzk.password")
         }
-        rebuildServices()
     }
 
     func useRealSigningProvider(_ provider: any QualifiedSigningProviding) {
         signingProvider = provider
-    }
-
-    private func rebuildServices() {
-        let credentials = EZZKCredentials(ico: settings.ezzkICO,
-                                         username: settings.ezzkUsername,
-                                         password: ezzkPassword,
-                                         notificationEmail: settings.ezzkNotificationEmail,
-                                         edeskAddress: settings.ezzkEdeskAddress)
-        ezzkService = credentials.isConfigured
-            ? HTTPSEZZKService(credentials: credentials)
-            : MockEZZKService()
     }
 }

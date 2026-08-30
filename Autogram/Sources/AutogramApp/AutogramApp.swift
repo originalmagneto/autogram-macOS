@@ -7,10 +7,12 @@ final class AutogramAppModel {
     let settingsStore: AppSettingsStore
     let signingStore: SigningSessionStore
     let zakoStore: ZakoSessionStore
+    let ezzkSessionController: EZZKSessionController
 
     init() {
         let settings = AppSettingsStore()
         settingsStore = settings
+        ezzkSessionController = settings.ezzkSessionController
         signingStore = SigningSessionStore(
             signingProvider: settings.signingProvider,
             settingsStore: settings)
@@ -43,6 +45,7 @@ struct AutogramApp: App {
     var body: some Scene {
         WindowGroup {
             RootView(model: model)
+                .environment(model.ezzkSessionController)
                 .frame(minWidth: MacOS27Layout.rootMinimumWidth, minHeight: 640)
                 .frame(idealWidth: 1320, idealHeight: 860)
         }
@@ -54,6 +57,7 @@ struct AutogramApp: App {
 
         Settings {
             SettingsView(settingsStore: model.settingsStore)
+                .environment(model.ezzkSessionController)
         }
         .defaultSize(width: 1080, height: 940)
         .windowResizability(.contentSize)
