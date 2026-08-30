@@ -32,3 +32,9 @@
 - The complete sandbox contracts for `POST /ec` and `POST /zzk` remain externally unconfirmed. The client accepts the observed evidence-number response variants and only treats a response with a non-empty `receipt` field as a successful submission receipt; unknown successful bodies remain `invalidResponse`.
 - A native callback registration and a non-production sandbox account are still required before live authentication or consequential smoke testing.
 - Swift test output includes pre-existing warnings outside these files; no formatter, linter, or full project suite was run.
+
+### Follow-up fix
+
+- `adf05fc1` also needed a stricter issuer response check. `isValidIssuerResponseURL` now compares normalized ports, rejecting same-host HTTPS responses on non-default ports.
+- Added `testRefreshRejectsIssuerResponseOnNonDefaultHTTPSPort`, which failed before the fix and passes afterward.
+- Re-ran focused suites: `EZZKAPIModelsTests` 4 passed and `EZZKHTTPClientTests` 16 passed.
