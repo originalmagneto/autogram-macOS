@@ -53,6 +53,7 @@ final class EZZKSessionController {
 
     var canStartLogin: Bool {
         !demoMode &&
+        state != .authenticating &&
         client == nil &&
         isEnvironmentAvailable &&
         oauthConfiguration.map(isUsableForLogin) == true

@@ -26,3 +26,8 @@ Existing project warnings remain in unrelated files and were not changed.
 - Production remains intentionally unavailable behind the closed authority gate.
 - The signed ASiC-E upload and authoritative receipt capability is not yet exposed by the current workflow, so the Settings submission control remains disabled.
 - No additional UI test target exists in this package. The focused AutogramKit environment tests cover the fixed identity and native callback prerequisites; app-target presentation state was verified through the successful product build.
+
+## Review fix
+
+- Guarded `canStartLogin` against the `.authenticating` state so a second click cannot start a concurrent OAuth attempt or invalidate the first login operation.
+- No AutogramApp test target exists, and the requested focused tests are scoped to AutogramKit, so this app-state regression has no feasible isolated XCTest coverage without changing package boundaries.
