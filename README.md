@@ -323,6 +323,12 @@ DEVELOPER_DIR=/Applications/Xcode-26.5.app/Contents/Developer ./build_app.sh
 
 # Release .app bundle
 DEVELOPER_DIR=/Applications/Xcode-26.5.app/Contents/Developer ./build_app.sh --release
+
+# Debug build and install into /Applications
+DEVELOPER_DIR=/Applications/Xcode-26.5.app/Contents/Developer ./build_app.sh install
+
+# Release build and install into /Applications
+DEVELOPER_DIR=/Applications/Xcode-26.5.app/Contents/Developer ./build_app.sh --release install
 ```
 
 Výstupný bundle:
@@ -331,7 +337,7 @@ Výstupný bundle:
 Autogram/.build/arm64-apple-macosx/debug/Autogram.app
 ```
 
-Lokálna inštalácia debug bundle:
+Manuálna inštalácia existujúceho debug bundle:
 
 ```bash
 ditto --rsrc --extattr --acl \

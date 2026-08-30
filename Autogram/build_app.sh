@@ -1,14 +1,26 @@
 #!/bin/bash
 set -euo pipefail
 
-# Autogram.app build script — assembly of release binary into a macOS app bundle.
+# Autogram.app build script - assembly of a macOS app bundle.
 #
 # Usage:
-#   ./build_app.sh              # debug build (fast)
-#   ./build_app.sh --release    # release build
+#   ./build_app.sh                    # debug build (fast)
+#   ./build_app.sh --release          # release build
+#   ./build_app.sh install            # debug build and install into /Applications
+#   ./build_app.sh --release install  # release build and install into /Applications
 
 MODE="debug"
-if [[ "${1:-}" == "--release" ]]; then MODE="release"; fi
+INSTALL=false
+for argument in "$@"; do
+    case "$argument" in
+        --release) MODE="release" ;;
+        install) INSTALL=true ;;
+        *)
+            echo "Usage: $0 [--release] [install]" >&2
+            exit 2
+            ;;
+    esac
+done
 
 export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode-26.5.app/Contents/Developer}"
 export MACOSX_DEPLOYMENT_TARGET="27.0"
@@ -148,3 +160,9 @@ codesign --force --deep --sign - "$APP_DIR" >/dev/null 2>&1 || true
 
 echo "✔ Hotovo: $APP_DIR"
 echo "  Spustenie: open \"$APP_DIR\""
+
+if [[ "$INSTALL" == true ]]; then
+    INSTALL_DIR="/Applications/Autogram macOS.app"
+    ditto --rsrc --extattr --acl "$APP_DIR" "$INSTALL_DIR"
+    echo "✔ Nainštalované: $INSTALL_DIR"
+fi
