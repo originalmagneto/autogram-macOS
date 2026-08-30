@@ -116,6 +116,26 @@ final class EZZKHTTPClientTests: XCTestCase {
         XCTAssertEqual(transport.requests.count, 3)
     }
 
+    func testRefreshRejectsIssuerResponseOnNonDefaultHTTPSPort() async throws {
+        let nonDefaultPort = URL(string: "https://ezzk.iomo.sk:444/sso/auth/realms/ezzk/protocol/openid-connect/token")!
+        let transport = RecordingEZZKTransport(responses: [
+            .success(response(statusCode: 401, body: "{}")),
+            .success(Self.response(
+                url: nonDefaultPort,
+                statusCode: 200,
+                body: #"{"access_token":"new-token","refresh_token":"new-refresh","expires_in":3600,"token_type":"Bearer"}"#))
+        ])
+        let client = makeClient(transport: transport)
+
+        do {
+            _ = try await client.availableEvidenceNumbers()
+            XCTFail("Expected authentication failure for an unexpected issuer port")
+        } catch let error as EZZKError {
+            XCTAssertEqual(error, .authenticationFailed)
+        }
+        XCTAssertEqual(transport.requests.count, 2)
+    }
+
     func testMissingTokenDoesNotFallBackToLegacyCredentials() async throws {
         let transport = RecordingEZZKTransport(responses: [])
         let client = EZZKClient(

@@ -368,6 +368,7 @@ public actor EZZKClient: EZZKServerClock, EZZKEvidenceNumberProvider {
     private func isSecureIssuerEndpoint(_ url: URL) -> Bool {
         url.scheme?.caseInsensitiveCompare("https") == .orderedSame &&
         url.host == oauth.issuerURL.host &&
+        normalizedPort(url) == normalizedPort(oauth.issuerURL) &&
         url.user == nil &&
         url.password == nil
     }
