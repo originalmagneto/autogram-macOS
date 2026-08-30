@@ -163,6 +163,7 @@ echo "  Spustenie: open \"$APP_DIR\""
 
 if [[ "$INSTALL" == true ]]; then
     INSTALL_DIR="/Applications/Autogram macOS.app"
+    rm -rf "$INSTALL_DIR"
     ditto --rsrc --extattr --acl "$APP_DIR" "$INSTALL_DIR"
     echo "✔ Nainštalované: $INSTALL_DIR"
 fi
