@@ -51,3 +51,9 @@ Only focused tests and app builds were run. Existing project warnings remain out
 - Authentication failures from `testConnection()` now clear the active capability, remove the stored token, and transition to `expired`.
 - Mock service use is limited to explicit demo mode. Non-demo signed-out, failed, and expired states expose an unavailable fail-closed service instead of the mock.
 - Re-ran focused EZZKHTTPClientTests: PASS, 16 tests, 0 failures. Rebuilt the Autogram product: PASS.
+
+## Re-review fix
+
+- Initial demo-mode inference now checks the dedicated Keychain token namespace across fixed environments. An empty legacy settings record cannot force demo mode when a persisted OAuth token exists, so relaunch proceeds through token restoration and read-only connectivity validation.
+- Existing Autogram tests are scoped to the AutogramKit target and cannot instantiate `AppSettingsStore` without changing package target boundaries. The token-store suite already verifies fresh-store persistence and environment separation; no misleading duplicate test was added.
+- Re-ran focused EZZKHTTPClientTests: PASS, 16 tests, 0 failures. Rebuilt the Autogram product: PASS.
