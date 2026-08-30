@@ -1,5 +1,6 @@
 import XCTest
-@testable import AutogramKit
+import CryptoKit
+import AutogramKit
 
 final class EZZKEnvironmentTests: XCTestCase {
     func testSandboxIdentityUsesFixedPortalAndAPIURLs() {
@@ -67,5 +68,75 @@ final class EZZKEnvironmentTests: XCTestCase {
 
         XCTAssertFalse(observedWebRedirect.isNativeCallbackConfigured)
         XCTAssertFalse(mismatchedScheme.isNativeCallbackConfigured)
+    }
+    func testPKCEChallengeUsesS256AndCryptographicallyRandomValues() {
+        let first = EZZKPKCEChallenge.generate()
+        let second = EZZKPKCEChallenge.generate()
+
+        XCTAssertNotEqual(first, second)
+        XCTAssertFalse(first.verifier.isEmpty)
+        XCTAssertFalse(first.challenge.isEmpty)
+        XCTAssertFalse(first.state.isEmpty)
+        XCTAssertFalse(first.verifier.contains("="))
+        XCTAssertFalse(first.challenge.contains("="))
+        XCTAssertFalse(first.state.contains("="))
+
+        let expectedChallenge = Data(SHA256.hash(data: Data(first.verifier.utf8)))
+            .base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .trimmingCharacters(in: CharacterSet(charactersIn: "="))
+        XCTAssertEqual(first.challenge, expectedChallenge)
+    }
+
+    func testOAuthCallbackParserRequiresCodeAndMatchingState() throws {
+        let callback = try EZZKOAuthCallback.parse(
+            url: URL(string: "autogram://ezzk/callback?code=abc%2F123&state=state-1")!,
+            expectedState: "state-1"
+        )
+
+        XCTAssertEqual(callback.authorizationCode, "abc/123")
+        XCTAssertEqual(callback.state, "state-1")
+    }
+
+    func testOAuthCallbackParserRejectsMissingDuplicateAndMismatchedValues() {
+        let cases: [(String, EZZKOAuthCallbackError)] = [
+            ("autogram://ezzk/callback?state=state-1", .missingCode),
+            ("autogram://ezzk/callback?code=abc", .missingState),
+            ("autogram://ezzk/callback?code=abc&code=def&state=state-1", .duplicateParameter),
+            ("autogram://ezzk/callback?code=abc&state=wrong", .stateMismatch),
+            ("autogram://ezzk/callback?code=&state=state-1", .malformedParameter)
+        ]
+
+        for (urlString, expectedError) in cases {
+            XCTAssertThrowsError(
+                try EZZKOAuthCallback.parse(
+                    url: URL(string: urlString)!,
+                    expectedState: "state-1"
+                )
+            ) { error in
+                XCTAssertEqual(error as? EZZKOAuthCallbackError, expectedError)
+            }
+        }
+    }
+
+    func testOAuthErrorCallbackMapsToTypedErrorWithoutReturningCode() {
+        XCTAssertThrowsError(
+            try EZZKOAuthCallback.parse(
+                url: URL(string: "autogram://ezzk/callback?error=access_denied&state=state-1")!,
+                expectedState: "state-1"
+            )
+        ) { error in
+            XCTAssertEqual(error as? EZZKOAuthCallbackError, .cancelled)
+        }
+
+        XCTAssertThrowsError(
+            try EZZKOAuthCallback.parse(
+                url: URL(string: "autogram://ezzk/callback?error=server_error&state=state-1")!,
+                expectedState: "state-1"
+            )
+        ) { error in
+            XCTAssertEqual(error as? EZZKOAuthCallbackError, .authenticationFailed)
+        }
     }
 }
