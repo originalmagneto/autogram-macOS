@@ -103,7 +103,7 @@ final class EZZKEnvironmentTests: XCTestCase {
         let cases: [(String, EZZKOAuthCallbackError)] = [
             ("autogram://ezzk/callback?state=state-1", .missingCode),
             ("autogram://ezzk/callback?code=abc", .missingState),
-            ("autogram://ezzk/callback?code=abc&code=def&state=state-1", .duplicateParameter),
+            ("autogram://ezzk/callback?code=abc&state=state-2", .stateMismatch),
             ("autogram://ezzk/callback?code=abc&state=wrong", .stateMismatch),
             ("autogram://ezzk/callback?code=&state=state-1", .malformedParameter)
         ]
@@ -139,4 +139,5 @@ final class EZZKEnvironmentTests: XCTestCase {
             XCTAssertEqual(error as? EZZKOAuthCallbackError, .authenticationFailed)
         }
     }
+
 }

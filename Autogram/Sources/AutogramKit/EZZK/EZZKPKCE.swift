@@ -78,7 +78,7 @@ public struct EZZKOAuthCallback: Equatable, Sendable {
         guard let state = parameters["state"] else {
             throw EZZKOAuthCallbackError.missingState
         }
-        guard state == expectedState else {
+        guard constantTimeEqual(state, expectedState) else {
             throw EZZKOAuthCallbackError.stateMismatch
         }
 
@@ -133,6 +133,18 @@ public struct EZZKOAuthCallback: Equatable, Sendable {
 
     private static func formDecode(_ value: String) -> String? {
         value.replacingOccurrences(of: "+", with: " ").removingPercentEncoding
+    }
+
+    private static func constantTimeEqual(_ lhs: String, _ rhs: String) -> Bool {
+        let lhsData = Data(lhs.utf8)
+        let rhsData = Data(rhs.utf8)
+        guard lhsData.count == rhsData.count else { return false }
+
+        var difference: UInt8 = 0
+        for index in lhsData.indices {
+            difference |= lhsData[index] ^ rhsData[index]
+        }
+        return difference == 0
     }
 
     private static func isValidValue(_ value: String) -> Bool {

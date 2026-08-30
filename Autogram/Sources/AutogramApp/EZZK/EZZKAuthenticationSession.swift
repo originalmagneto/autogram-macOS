@@ -9,6 +9,7 @@ protocol EZZKAuthenticationSessionRunning: AnyObject {
 
 enum EZZKAuthenticationError: Error, Equatable, Sendable {
     case nativeCallbackNotConfigured
+    case authenticationInProgress
     case discoveryFailed
     case issuerMismatch
     case insecureEndpoint
@@ -19,6 +20,37 @@ enum EZZKAuthenticationError: Error, Equatable, Sendable {
     case callback(EZZKOAuthCallbackError)
     case tokenExchangeFailed
     case malformedTokenResponse
+}
+
+private final class EZZKRedirectPolicy: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+    private let issuer: URL
+
+    init(issuer: URL) {
+        self.issuer = issuer
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        willPerformHTTPRedirection response: HTTPURLResponse,
+        newRequest request: URLRequest,
+        completionHandler: @Sendable @escaping (URLRequest?) -> Void
+    ) {
+        guard let destination = request.url,
+              destination.scheme?.caseInsensitiveCompare("https") == .orderedSame,
+              destination.host == issuer.host,
+              destination.user == nil,
+              destination.password == nil,
+              normalizedPort(destination) == normalizedPort(issuer) else {
+            completionHandler(nil)
+            return
+        }
+        completionHandler(request)
+    }
+
+    private func normalizedPort(_ url: URL) -> Int? {
+        url.port ?? (url.scheme?.caseInsensitiveCompare("https") == .orderedSame ? 443 : nil)
+    }
 }
 
 @MainActor
@@ -51,8 +83,12 @@ final class EZZKAuthenticationSession: NSObject, EZZKAuthenticationSessionRunnin
 
     private var webSession: ASWebAuthenticationSession?
     private var callbackContinuation: CheckedContinuation<URL, Error>?
+    private var authenticationInProgress = false
 
     func authenticate(configuration: EZZKOAuthConfiguration) async throws -> EZZKTokenSet {
+        guard !authenticationInProgress else {
+            throw EZZKAuthenticationError.authenticationInProgress
+        }
         guard configuration.isNativeCallbackConfigured,
               let redirectURI = configuration.redirectURI,
               let callbackScheme = configuration.callbackScheme?.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -60,11 +96,12 @@ final class EZZKAuthenticationSession: NSObject, EZZKAuthenticationSessionRunnin
             throw EZZKAuthenticationError.nativeCallbackNotConfigured
         }
 
+        authenticationInProgress = true
         defer {
+            authenticationInProgress = false
             webSession = nil
             callbackContinuation = nil
         }
-
         let discovery = try await discover(configuration: configuration)
         let pkce = EZZKPKCEChallenge.generate()
         let authorizationURL = try makeAuthorizationURL(
@@ -111,7 +148,10 @@ final class EZZKAuthenticationSession: NSObject, EZZKAuthenticationSessionRunnin
         }
 
         do {
-            let (data, response) = try await URLSession.shared.data(from: discoveryURL)
+            let (data, response) = try await requestData(
+                URLRequest(url: discoveryURL),
+                issuer: configuration.issuerURL
+            )
             guard let httpResponse = response as? HTTPURLResponse,
                   (200..<300).contains(httpResponse.statusCode) else {
                 throw EZZKAuthenticationError.discoveryFailed
@@ -131,6 +171,20 @@ final class EZZKAuthenticationSession: NSObject, EZZKAuthenticationSessionRunnin
             throw EZZKAuthenticationError.discoveryFailed
         }
     }
+    private func requestData(
+        _ request: URLRequest,
+        issuer: URL
+    ) async throws -> (Data, URLResponse) {
+        let policy = EZZKRedirectPolicy(issuer: issuer)
+        let session = URLSession(
+            configuration: .ephemeral,
+            delegate: policy,
+            delegateQueue: nil
+        )
+        defer { session.invalidateAndCancel() }
+        return try await session.data(for: request)
+    }
+
 
     private func startWebSession(
         authorizationURL: URL,
@@ -192,9 +246,6 @@ final class EZZKAuthenticationSession: NSObject, EZZKAuthenticationSessionRunnin
               components.fragment == nil else {
             throw EZZKAuthenticationError.invalidAuthorizationEndpoint
         }
-        guard components.queryItems?.isEmpty != false else {
-            throw EZZKAuthenticationError.invalidAuthorizationEndpoint
-        }
         components.queryItems = (components.queryItems ?? []) + [
             URLQueryItem(name: "client_id", value: configuration.clientID),
             URLQueryItem(name: "redirect_uri", value: redirectURI.absoluteString),
@@ -232,7 +283,7 @@ final class EZZKAuthenticationSession: NSObject, EZZKAuthenticationSessionRunnin
         ])
 
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await requestData(request, issuer: configuration.issuerURL)
             guard let httpResponse = response as? HTTPURLResponse,
                   (200..<300).contains(httpResponse.statusCode) else {
                 throw EZZKAuthenticationError.tokenExchangeFailed
