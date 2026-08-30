@@ -7,21 +7,25 @@
 - `Autogram/Sources/AutogramKit/EZZK/EZZKHTTPClient.swift`
   - Added injected `EZZKHTTPTransport` and `URLSessionEZZKHTTPTransport`.
   - Added serialized `EZZKClient` actor with fixed environment URL construction, HTTPS and host checks, Bearer authentication, refresh-token exchange, one-refresh and one-401-retry behavior, HTTP Date server time, read-only bounded exponential retry, status mapping, consequential request validation, opaque record/original responses, and strict unknown-receipt rejection.
+  - Added validation of final API and issuer response URLs so redirected responses cannot be accepted from an unexpected host, port, path, or insecure scheme.
 - `Autogram/Tests/AutogramKitTests/EZZKAPIModelsTests.swift`
   - Added model decoding and observed ASiC payload round-trip tests.
 - `Autogram/Tests/AutogramKitTests/EZZKHTTPClientTests.swift`
-  - Added injected-transport behavioral coverage for URL/header construction, routes, Date handling, refresh/retry limits, missing-token behavior, read-only timeout/rate-limit retries, status mapping, consequential validation, payloads, and receipt handling.
+  - Added injected-transport behavioral coverage for URL/header construction, routes, Date handling, refresh/retry limits, missing-token behavior, read-only timeout/rate-limit retries, status mapping, consequential validation, payloads, receipt handling, and final response host validation.
 
 `EZZKService.swift` was intentionally unchanged because the new typed client does not require a compatibility boundary change and the legacy mock/password service remains preserved.
 
-## Commit
+## Commits
 
 - `ec7bb773 feat: add typed EZZK REST client`
+- `bb4692ef docs: record typed EZZK REST client task`
+- `adf05fc1 fix: validate EZZK final response hosts`
 
 ## Tests
 
 - `DEVELOPER_DIR="/Applications/Xcode-26.5.app/Contents/Developer" swift test --filter EZZKAPIModelsTests` passed: 4 tests.
-- `DEVELOPER_DIR="/Applications/Xcode-26.5.app/Contents/Developer" swift test --filter EZZKHTTPClientTests` passed: 14 tests.
+- `DEVELOPER_DIR="/Applications/Xcode-26.5.app/Contents/Developer" swift test --filter EZZKHTTPClientTests` passed: 15 tests.
+- The redirect regression test was observed failing before the fix and passing afterward.
 
 ## Concerns
 
