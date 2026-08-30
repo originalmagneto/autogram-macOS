@@ -339,16 +339,19 @@ struct EvidenceDashboardView: View {
         submitFeedback = nil
         reload()
         let pending = records.filter(\.isSubmissionPending)
+        let isDemoMode = settingsStore.ezzkSessionController.isDemoMode
         Task {
             var submittedCount = 0
             var failedCount = 0
             for record in pending {
                 do {
                     try await settingsStore.ezzkService.submit(record.envelope())
-                    var updated = record
-                    updated.status = .submitted
-                    updated.updatedAt = Date()
-                    settingsStore.evidenceStore.upsert(updated)
+                    if !isDemoMode {
+                        var updated = record
+                        updated.status = .submitted
+                        updated.updatedAt = Date()
+                        settingsStore.evidenceStore.upsert(updated)
+                    }
                     submittedCount += 1
                 } catch {
                     var updated = record
@@ -362,7 +365,7 @@ struct EvidenceDashboardView: View {
                 reload()
                 isSubmitting = false
                 submitFeedback = failedCount == 0
-                    ? (settingsStore.ezzkSessionController.isDemoMode
+                    ? (isDemoMode
                         ? "✓ Demo: lokálne pripravených \(submittedCount) záznamov."
                         : "✓ Odoslaných \(submittedCount) záznamov do CEZZK.")
                     : "⚠ \(submittedCount) úspešných, \(failedCount) zlyhalo."

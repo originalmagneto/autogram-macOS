@@ -248,7 +248,7 @@ No EZZK evidence numbers were generated and no conversion was submitted. No inst
 - Consequential submit decoding requires a non-empty `EZZKSubmissionReceipt.receipt`. A 2xx response with an unknown body is rejected as `invalidResponse`, and transport timeout remains an uncertainty rather than a submission.
 - Focused receipt tests now prove that a confirmed receipt does not mutate a local evidence row by itself, that an unknown successful response leaves a signed row non-submitted, and that a submit timeout leaves a signed row non-submitted.
 - The legacy exported `HTTPSEZZKService` and `EZZKCredentials` types remain only for source compatibility. No application wiring selects them; `AppSettingsStore` does not construct a password-authenticated service. Legacy password storage is read only to prevent an old credentialed installation from entering demo mode and is not used for OAuth or REST requests.
-- Demo-only `MockEZZKService` behavior is retained. Dashboard success feedback identifies demo submissions as local preparation rather than CEZZK acceptance.
+- Demo-only `MockEZZKService` behavior is retained. Explicit demo submit calls remain local-only and leave the evidence row pending; dashboard success feedback identifies the local preparation rather than CEZZK acceptance.
 
 ### Exact verification
 
@@ -278,6 +278,6 @@ The app was launched from the built bundle. Screen capture produced no usable ap
 - **Sandbox account blocker:** no non-production EZZK test account or credentials were available for an authenticated sandbox smoke test. No evidence-number request or conversion POST was made.
 - **Unconfirmed POST receipt schema:** the portal bundle confirms the `.asice` `files` payload and `POST /api/zzkservice/v1/zzk`, but the authoritative success body and complete error mapping were not confirmed from an operator-backed sandbox transaction. The client therefore accepts only the typed non-empty `receipt` shape as a narrow defensive boundary and does not claim interoperability.
 - **Local evidence integration gap:** the current app workflow does not produce and validate the separate signed record ASiC required for EZZK submission, and `EZZKClient` is not yet adapted to `EZZKServicing.submit(ConversionRecordEnvelope)`. The Settings ASiC submission control remains disabled. The app-target test boundary also prevents a direct XCTest of `EZZKSessionController.logout()` preserving rows; `LocalEvidenceStore` persists independently and existing persistence coverage remains green.
-- **Demo status limitation:** the demo mock intentionally retains its existing local submission behavior for compatibility. It is not evidence of CEZZK acceptance; dashboard feedback now labels that outcome as demo-local.
+- **Demo status limitation:** the demo mock is still called for compatibility, but both the dashboard and conversion workflow now leave demo rows pending instead of assigning `.submitted`. It is not evidence of CEZZK acceptance; dashboard feedback labels the outcome as demo-local.
 
 Production readiness is not claimed.

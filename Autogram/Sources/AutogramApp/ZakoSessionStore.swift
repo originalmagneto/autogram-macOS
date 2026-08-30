@@ -795,11 +795,19 @@ final class ZakoSessionStore {
                 securityReview: securityReviewSnapshot)
             do {
                 try await ezzkService.submit(envelope)
-                var updated = record
-                updated.status = .submitted
-                updated.updatedAt = Date()
-                evidenceStore.upsert(updated)
-                submissionStatus = .submitted
+                if settingsStore.ezzkSessionController.isDemoMode {
+                    var queued = record
+                    queued.status = .queuedForSubmission
+                    queued.updatedAt = Date()
+                    evidenceStore.upsert(queued)
+                    submissionStatus = .queuedForSubmission
+                } else {
+                    var updated = record
+                    updated.status = .submitted
+                    updated.updatedAt = Date()
+                    evidenceStore.upsert(updated)
+                    submissionStatus = .submitted
+                }
             } catch {
                 var queued = record
                 queued.status = .queuedForSubmission
@@ -820,11 +828,19 @@ final class ZakoSessionStore {
               record.status != .submitted else { return }
         do {
             try await ezzkService.submit(record.envelope())
-            var updated = record
-            updated.status = .submitted
-            updated.updatedAt = Date()
-            evidenceStore.upsert(updated)
-            submissionStatus = .submitted
+            if settingsStore.ezzkSessionController.isDemoMode {
+                var queued = record
+                queued.status = .queuedForSubmission
+                queued.updatedAt = Date()
+                evidenceStore.upsert(queued)
+                submissionStatus = .queuedForSubmission
+            } else {
+                var updated = record
+                updated.status = .submitted
+                updated.updatedAt = Date()
+                evidenceStore.upsert(updated)
+                submissionStatus = .submitted
+            }
             lastError = nil
         } catch {
             var queued = record
