@@ -31,3 +31,8 @@ Existing project warnings remain in unrelated files and were not changed.
 
 - Guarded `canStartLogin` against the `.authenticating` state so a second click cannot start a concurrent OAuth attempt or invalidate the first login operation.
 - No AutogramApp test target exists, and the requested focused tests are scoped to AutogramKit, so this app-state regression has no feasible isolated XCTest coverage without changing package boundaries.
+
+## Re-review fix
+
+- Added the same `.authenticating` guard at the start of `login()`, not only in the presentation-facing `canStartLogin` property. This closes the race where two unstructured Tasks enter the method before SwiftUI reflects the disabled button.
+- Re-ran focused AutogramKit tests and rebuilt the Autogram product successfully.

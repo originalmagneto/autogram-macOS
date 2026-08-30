@@ -96,6 +96,7 @@ final class EZZKSessionController {
     }
 
     func login() async {
+        guard state != .authenticating else { return }
         guard !demoMode, client == nil else { return }
         guard isEnvironmentAvailable else {
             state = .failed("Produkčné pripojenie EZZK ešte nie je povolené.")
