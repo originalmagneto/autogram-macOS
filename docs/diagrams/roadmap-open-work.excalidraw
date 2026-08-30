@@ -175,9 +175,9 @@
     {
       "id": "text-1006",
       "type": "text",
-      "x": 768,
+      "x": 784,
       "y": 76,
-      "width": 352,
+      "width": 320,
       "height": 16,
       "angle": 0,
       "strokeColor": "#4f5d75",
@@ -198,7 +198,7 @@
       "updated": 1788116993654,
       "link": null,
       "locked": false,
-      "text": "Settings · AI prompts · EZZK OAuth · output buttons · clean install",
+      "text": "Settings · AI · EZZK OAuth · output buttons · clean install",
       "fontSize": 9,
       "fontFamily": 3,
       "textAlign": "center",
@@ -206,7 +206,7 @@
       "containerId": null,
       "lineHeight": 1.25,
       "baseline": 8,
-      "originalText": "Settings · AI prompts · EZZK OAuth · output buttons · clean install",
+      "originalText": "Settings · AI · EZZK OAuth · output buttons · clean install",
       "autoResize": true
     },
     {

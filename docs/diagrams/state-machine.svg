@@ -69,7 +69,7 @@
   <!-- labels -->
   <g font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="9" fill="#4f5d75">
     <text x="222" y="170">analýza</text>
-    <text x="438" y="170">evidenčné číslo</text>
+    <text x="460" y="170" text-anchor="middle">číslo</text>
     <text x="660" y="170">sign()</text>
     <text x="888" y="248">enqueue</text>
     <text x="1000" y="250">submit OK</text>

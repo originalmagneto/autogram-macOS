@@ -84,7 +84,7 @@
     <text x="504" y="462" text-anchor="middle">PDFAConverter</text>
     <text x="504" y="478" text-anchor="middle" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="8.5" font-weight="400" fill="#4f5d75">XMP · OutputIntent · validácia</text>
     <rect x="592" y="444" width="160" height="44" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="0.8"/>
-    <text x="672" y="462" text-anchor="middle">AttestationClauseGenerator</text>
+    <text x="672" y="462" text-anchor="middle" font-size="10" font-weight="600" fill="#2d3142">AttestationClauseGenerator</text>
     <text x="672" y="478" text-anchor="middle" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="8.5" font-weight="400" fill="#7a8399">XML schéma · SHA-256</text>
     <rect x="424" y="500" width="160" height="44" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="0.8"/>
     <text x="504" y="518" text-anchor="middle">EmbeddedFileService</text>
