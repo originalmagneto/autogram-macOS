@@ -7,12 +7,14 @@ struct SettingsView: View {
     @State private var newTSAURL = ""
     @State private var tsaTestStatus: String?
     @State private var isTestingTSA = false
-    @State private var ezzkSavedHint = false
     @State private var tsaToDelete: String?
     @State private var showTSADeleteConfirmation = false
     @State private var profileToDelete: UUID?
     @State private var showProfileDeleteConfirmation = false
-
+    @State private var ezzkEvidenceCount = "1"
+    @State private var ezzkEvidenceValidation: String?
+    @State private var pendingEZZKEvidenceCount = 0
+    @State private var showEZZKEvidenceConfirmation = false
     var body: some View {
         TabView {
             settingsTabContent(aiTab)
@@ -59,6 +61,21 @@ struct SettingsView: View {
             Button("Zrušiť", role: .cancel) { profileToDelete = nil }
         } message: {
             Text("Profil a jeho údaje budú odstránené z tejto aplikácie.")
+        }
+        .confirmationDialog(
+            "Vyžiadať evidenčné čísla z EZZK?",
+            isPresented: $showEZZKEvidenceConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Vyžiadať \(pendingEZZKEvidenceCount) čísel") {
+                Task {
+                    await settingsStore.ezzkSessionController.requestEvidenceNumbers(
+                        count: pendingEZZKEvidenceCount)
+                }
+            }
+            Button("Zrušiť", role: .cancel) {}
+        } message: {
+            Text("EZZK pridelí \(pendingEZZKEvidenceCount) nových evidenčných čísel. Pokračovať?")
         }
     }
 
@@ -444,45 +461,192 @@ struct SettingsView: View {
 
     // MARK: - Tab 3: EZZK
     private var ezzkTab: some View {
-        VStack(alignment: .leading, spacing: 18) {
+        let controller = settingsStore.ezzkSessionController
+
+        return VStack(alignment: .leading, spacing: 18) {
             VStack(alignment: .leading, spacing: 14) {
                 Label("Centrálna evidencia záznamov o konverzii (IS EZZK)", systemImage: "number.square")
                     .font(.headline)
 
-                Text("Údaje z registrácie na portáli ezzk.iomo.sk. Bez vyplnených údajov beží evidencia v lokálnom DEMO režime.")
+                Text("EZZK používa pevne určené OAuth a REST identity. Nastavenia IČO, používateľského mena a hesla nie sú prihlasovacími údajmi pre OAuth.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                VStack(alignment: .leading, spacing: 10) {
+                    Picker("Prostredie", selection: Binding(
+                        get: { controller.selectedEnvironment },
+                        set: { controller.selectedEnvironment = $0 }
+                    )) {
+                        Text("Sandbox").tag(EZZKEnvironment.sandbox)
+                        Text("Produkcia (uzavreté)")
+                            .tag(EZZKEnvironment.production)
+                            .disabled(!controller.canSelectProduction)
+                    }
+                    .pickerStyle(.segmented)
+                    .disabled(!controller.canChangeEnvironment)
+
+                    Text("Sandbox je predvolené prostredie. Produkčné prostredie zostáva deaktivované, kým nie je otvorená autorizačná brána.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 8) {
+                    GridRow {
+                        Text("Portál")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .frame(width: 180, alignment: .leading)
+                        Text(controller.selectedEnvironment.portalBaseURL.absoluteString)
+                            .font(.callout.monospaced())
+                            .textSelection(.enabled)
+                    }
+
+                    GridRow {
+                        Text("REST API")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                        Text(controller.selectedEnvironment.apiBaseURL.absoluteString)
+                            .font(.callout.monospaced())
+                            .textSelection(.enabled)
+                    }
+
+                    GridRow {
+                        Text("Identita autority")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                        Text(controller.selectedEnvironment.authorityID)
+                            .font(.callout.monospaced())
+                            .textSelection(.enabled)
+                    }
+                }
+            }
+            .glassCard(cornerRadius: 14, padding: 16)
+
+            VStack(alignment: .leading, spacing: 14) {
+                Label("Relácia EZZK", systemImage: "person.badge.key")
+                    .font(.headline)
+
+                let statePresentation = ezzkStatePresentation(controller.state)
+                Label(statePresentation.title, systemImage: statePresentation.symbol)
+                    .foregroundStyle(statePresentation.color)
+
+                Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 8) {
+                    GridRow {
+                        Text("Posledná kontrola spojenia")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .frame(width: 180, alignment: .leading)
+                        Text(controller.lastConnectivityCheck.map {
+                            $0.formatted(date: .abbreviated, time: .shortened)
+                        } ?? "Zatiaľ neoverené")
+                            .font(.callout)
+                    }
+
+                    GridRow {
+                        Text("Dostupné evidenčné čísla")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                        Text(controller.availableEvidenceNumberCount.map(String.init) ?? "Zatiaľ neoverené")
+                            .font(.callout.monospacedDigit())
+                    }
+                }
+
+                HStack(spacing: 10) {
+                    Button {
+                        Task { await controller.login() }
+                    } label: {
+                        Label("Prihlásiť cez EZZK", systemImage: "rectangle.portrait.and.arrow.right")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(!controller.canStartLogin)
+
+                    Button {
+                        Task { await controller.refresh() }
+                    } label: {
+                        Label("Obnoviť session", systemImage: "arrow.clockwise")
+                    }
+                    .disabled(!controller.canRefresh)
+
+                    Button("Odhlásiť", role: .destructive) {
+                        controller.logout()
+                    }
+                    .disabled(!controller.hasActiveSession)
+                }
+
+                if !controller.hasNativeCallbackConfiguration {
+                    Label(
+                        "Prihlásenie je vypnuté. Vyžaduje sa konfigurácia operátora EZZK s natívnym callbackom.",
+                        systemImage: "info.circle"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+
+                if case .failed(let message) = controller.state {
+                    Text(message)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+            }
+            .glassCard(cornerRadius: 14, padding: 16)
+
+            VStack(alignment: .leading, spacing: 14) {
+                Label("Evidenčné čísla", systemImage: "number.square.fill")
+                    .font(.headline)
+
+                HStack(spacing: 10) {
+                    TextField("Počet", text: $ezzkEvidenceCount)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 100)
+                        .onChange(of: ezzkEvidenceCount) { _, _ in
+                            ezzkEvidenceValidation = nil
+                        }
+
+                    Button("Vyžiadať čísla") {
+                        requestEZZKEvidenceNumbers()
+                    }
+                    .disabled(!controller.hasActiveSession || controller.state == .authenticating)
+                }
+
+                if let validation = ezzkEvidenceValidation {
+                    Text(validation)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                } else {
+                    Text("Požiadavka sa odošle až po výslovnom potvrdení. Pri chybe sa lokálne evidenčné záznamy nemenia.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .glassCard(cornerRadius: 14, padding: 16)
+
+            VStack(alignment: .leading, spacing: 12) {
+                Label("Odoslanie podpísaného ASiC-E", systemImage: "arrow.up.doc")
+                    .font(.headline)
+
+                Button("Odoslať podpísaný ASiC-E") {}
+                    .disabled(true)
+
+                Text("Odoslanie je vypnuté. Aktuálny workflow neposkytuje overený podpísaný ASiC-E súbor a potrebnú EZZK capability. Metadáta ConversionRecordEnvelope sa neposielajú ako náhrada súboru.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .glassCard(cornerRadius: 14, padding: 16)
+
+            VStack(alignment: .leading, spacing: 10) {
+                Label("Kontaktné údaje pre migráciu", systemImage: "archivebox")
+                    .font(.headline)
+
+                Text("Staršie IČO, používateľské meno a heslo zostávajú iba ako migračné údaje. Nepoužívajú sa na OAuth autentifikáciu ani na zostavenie sandboxovej alebo produkčnej služby.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
                 Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 10) {
                     GridRow {
-                        Text("IČO kancelárie")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                            .frame(width: 170, alignment: .leading)
-                        TextField("IČO", text: $settingsStore.settings.ezzkICO)
-                            .textFieldStyle(.roundedBorder)
-                    }
-
-                    GridRow {
-                        Text("Prihlasovacie meno")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                        TextField("username", text: $settingsStore.settings.ezzkUsername)
-                            .textFieldStyle(.roundedBorder)
-                    }
-
-                    GridRow {
-                        Text("Heslo (Keychain)")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                        SecureField("heslo", text: $settingsStore.ezzkPassword)
-                            .textFieldStyle(.roundedBorder)
-                    }
-
-                    GridRow {
                         Text("Notifikačný e-mail")
                             .font(.callout)
                             .foregroundStyle(.secondary)
+                            .frame(width: 180, alignment: .leading)
                         TextField("advokat@kancelaria.sk", text: $settingsStore.settings.ezzkNotificationEmail)
                             .textFieldStyle(.roundedBorder)
                     }
@@ -495,28 +659,37 @@ struct SettingsView: View {
                             .textFieldStyle(.roundedBorder)
                     }
                 }
-
-                HStack {
-                    Button {
-                        settingsStore.saveEZZKPassword()
-                        ezzkSavedHint = true
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
-                            ezzkSavedHint = false
-                        }
-                    } label: {
-                        Label("Uložiť prístupy do Kľúčenky", systemImage: "lock.shield")
-                    }
-                    .buttonStyle(.borderedProminent)
-
-                    if ezzkSavedHint {
-                        Text("✓ Uložené")
-                            .font(.caption)
-                            .foregroundStyle(.green)
-                    }
-                }
-                .padding(.top, 4)
             }
             .glassCard(cornerRadius: 14, padding: 16)
+        }
+    }
+
+    private func requestEZZKEvidenceNumbers() {
+        let value = ezzkEvidenceCount.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let count = Int(value), count > 0 else {
+            ezzkEvidenceValidation = "Zadajte kladný počet evidenčných čísel."
+            return
+        }
+
+        ezzkEvidenceValidation = nil
+        pendingEZZKEvidenceCount = count
+        showEZZKEvidenceConfirmation = true
+    }
+
+    private func ezzkStatePresentation(
+        _ state: EZZKSessionController.State
+    ) -> (title: String, symbol: String, color: Color) {
+        switch state {
+        case .signedOut:
+            ("Odhlásené", "person.crop.circle", .secondary)
+        case .authenticating:
+            ("Overuje sa", "arrow.triangle.2.circlepath", .orange)
+        case .authenticated:
+            ("Prihlásené", "checkmark.seal.fill", .green)
+        case .expired:
+            ("Relácia vypršala", "clock.badge.exclamationmark", .orange)
+        case .failed:
+            ("Chyba relácie", "exclamationmark.triangle.fill", .red)
         }
     }
 

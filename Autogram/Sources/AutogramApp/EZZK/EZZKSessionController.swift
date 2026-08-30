@@ -14,6 +14,7 @@ final class EZZKSessionController {
     }
 
     private(set) var state: State = .signedOut
+    private(set) var lastConnectivityCheck: Date?
     private var environment: EZZKEnvironment = .sandbox
     private let oauthConfiguration: EZZKOAuthConfiguration?
     private let tokenStore: any EZZKTokenStoring
@@ -41,6 +42,39 @@ final class EZZKSessionController {
     }
 
     var canSelectProduction: Bool { Self.productionAuthorityGate }
+
+    var canChangeEnvironment: Bool {
+        client == nil && state != .authenticating
+    }
+
+    var hasNativeCallbackConfiguration: Bool {
+        oauthConfiguration?.isNativeCallbackConfigured == true
+    }
+
+    var canStartLogin: Bool {
+        !demoMode &&
+        client == nil &&
+        isEnvironmentAvailable &&
+        oauthConfiguration.map(isUsableForLogin) == true
+    }
+
+    var canRefresh: Bool {
+        !demoMode &&
+        state != .authenticating &&
+        isEnvironmentAvailable &&
+        oauthConfiguration.map(isUsableForClient) == true
+    }
+
+    var hasActiveSession: Bool {
+        if case .authenticated = state { return true }
+        return false
+    }
+
+    var availableEvidenceNumberCount: Int? {
+        guard case let .authenticated(_, count) = state else { return nil }
+        return count
+    }
+
 
     init(
         oauthConfiguration: EZZKOAuthConfiguration? = try? EZZKOAuthConfiguration(),
@@ -250,6 +284,7 @@ final class EZZKSessionController {
         state = .authenticated(
             environment: environment,
             availableEvidenceNumbers: availableEvidenceNumberCount)
+        lastConnectivityCheck = Date()
         return true
     }
 
