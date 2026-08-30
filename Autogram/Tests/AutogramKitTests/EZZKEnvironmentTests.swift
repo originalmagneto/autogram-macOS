@@ -28,14 +28,15 @@ final class EZZKEnvironmentTests: XCTestCase {
         XCTAssertEqual(try JSONDecoder().decode(EZZKEnvironment.self, from: data), .sandbox)
     }
 
-    func testOAuthDefaultsRemainWebOnlyUntilNativeCallbackIsConfirmed() throws {
+    func testOAuthDefaultsUseNativeCallback() throws {
         let configuration = try EZZKOAuthConfiguration()
 
         XCTAssertEqual(configuration.issuerURL.absoluteString, "https://ezzk.iomo.sk/sso/auth/realms/ezzk")
         XCTAssertEqual(configuration.clientID, "login-app")
-        XCTAssertNil(configuration.redirectURI)
-        XCTAssertNil(configuration.callbackScheme)
-        XCTAssertFalse(configuration.isNativeCallbackConfigured)
+        XCTAssertEqual(configuration.redirectURI, EZZKOAuthConfiguration.nativeRedirectURI)
+        XCTAssertEqual(configuration.callbackScheme, EZZKOAuthConfiguration.nativeCallbackScheme)
+        XCTAssertTrue(configuration.isNativeCallbackConfigured)
+        XCTAssertTrue(configuration.isAuthenticationCallbackConfigured)
     }
 
     func testOAuthConfigurationRejectsNonCanonicalIssuer() {
@@ -47,8 +48,11 @@ final class EZZKEnvironmentTests: XCTestCase {
 
     func testOAuthConfigurationRequiresBothNativeCallbackParts() throws {
         let redirectOnly = try EZZKOAuthConfiguration(
-            redirectURI: URL(string: "autogram://ezzk/callback"))
-        let schemeOnly = try EZZKOAuthConfiguration(callbackScheme: "autogram")
+            redirectURI: URL(string: "autogram://ezzk/callback"),
+            callbackScheme: nil)
+        let schemeOnly = try EZZKOAuthConfiguration(
+            redirectURI: nil,
+            callbackScheme: "autogram")
         let configured = try EZZKOAuthConfiguration(
             redirectURI: URL(string: "autogram://ezzk/callback"),
             callbackScheme: "autogram")
@@ -57,7 +61,6 @@ final class EZZKEnvironmentTests: XCTestCase {
         XCTAssertFalse(schemeOnly.isNativeCallbackConfigured)
         XCTAssertTrue(configured.isNativeCallbackConfigured)
     }
-
     func testNativeCallbackRejectsObservedWebRedirectAndMismatchedScheme() throws {
         let observedWebRedirect = try EZZKOAuthConfiguration(
             redirectURI: URL(string: "https://ezzk.iomo.sk/portal"),
@@ -67,7 +70,21 @@ final class EZZKEnvironmentTests: XCTestCase {
             callbackScheme: "other")
 
         XCTAssertFalse(observedWebRedirect.isNativeCallbackConfigured)
+        XCTAssertFalse(observedWebRedirect.isAuthenticationCallbackConfigured)
         XCTAssertFalse(mismatchedScheme.isNativeCallbackConfigured)
+        XCTAssertFalse(mismatchedScheme.isAuthenticationCallbackConfigured)
+    }
+
+    func testNativeCallbackRejectsHTTPAndHTTPSSchemes() throws {
+        let httpsCallback = try EZZKOAuthConfiguration(
+            redirectURI: URL(string: "https://client.example/callback"),
+            callbackScheme: "https")
+        let httpCallback = try EZZKOAuthConfiguration(
+            redirectURI: URL(string: "http://client.example/callback"),
+            callbackScheme: "http")
+
+        XCTAssertFalse(httpsCallback.isNativeCallbackConfigured)
+        XCTAssertFalse(httpCallback.isNativeCallbackConfigured)
     }
     func testPKCEChallengeUsesS256AndCryptographicallyRandomValues() {
         let first = EZZKPKCEChallenge.generate()

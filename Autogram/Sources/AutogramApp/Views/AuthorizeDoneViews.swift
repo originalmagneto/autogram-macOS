@@ -61,6 +61,12 @@ struct AuthorizeView: View {
             }
         }
         .task { await store.refreshIdentities() }
+        .task(id: store.signingPIN) {
+            guard !store.signingProviderIsDemo, !store.signingPIN.isEmpty else { return }
+            try? await Task.sleep(for: .milliseconds(350))
+            guard !Task.isCancelled else { return }
+            await store.refreshIdentities()
+        }
     }
 
     private var tokenStatusRow: some View {
@@ -178,10 +184,41 @@ struct AuthorizeView: View {
                 }
             }
 
+            if store.isResolvingCertificate {
+                ProgressView("Načítavam certifikáty z karty…")
+                    .controlSize(.small)
+            }
+
+            if let error = store.certificateLoadError {
+                Label(error, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption2)
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
             if !store.signingProviderIsDemo {
-                SecureField("PIN karty", text: $store.signingPIN)
-                    .textFieldStyle(.roundedBorder)
-                Label("Certifikát sa vyberie pri autorizácii. eID klient zobrazí natívny BOK dialóg až pri podpise.",
+                HStack(spacing: 8) {
+                    SecureField("PIN karty", text: $store.signingPIN)
+                        .textFieldStyle(.roundedBorder)
+                        .onSubmit {
+                            Task {
+                                await store.resolveCertificateForAuthorization(force: true)
+                            }
+                        }
+
+                    Button {
+                        Task {
+                            await store.resolveCertificateForAuthorization(force: true)
+                        }
+                    } label: {
+                        Label("Načítať certifikáty", systemImage: "arrow.clockwise")
+                    }
+                    .controlSize(.small)
+                    .disabled(store.signingPIN.isEmpty || store.isResolvingCertificate)
+                    .help("Načítať certifikáty z vloženej karty")
+                }
+
+                Label("Po zadaní PIN-u načítajte certifikáty ešte pred autorizáciou.",
                       systemImage: "key.horizontal")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
@@ -237,7 +274,7 @@ struct AuthorizeView: View {
         .buttonStyle(.borderedProminent)
         .controlSize(.large)
         .tint(.indigo)
-        .disabled(store.isAuthorizing || !store.isPreflightComplete)
+        .disabled(store.isAuthorizing || store.isResolvingCertificate || !store.isPreflightComplete)
         .keyboardShortcut(.defaultAction)
     }
 }

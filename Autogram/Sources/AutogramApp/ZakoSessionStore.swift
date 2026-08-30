@@ -618,11 +618,21 @@ final class ZakoSessionStore {
         guard force || !hasResolvedCertificate else { return }
         guard force || lastCertificateLoadPIN != signingPIN else { return }
 
+        let pin = signingPIN
         isResolvingCertificate = true
-        lastCertificateLoadPIN = signingPIN
-        defer { isResolvingCertificate = false }
+        lastCertificateLoadPIN = pin
+        let resolved = await signingProvider.resolveIdentities(pin: pin)
+        isResolvingCertificate = false
 
-        if let resolved = await signingProvider.resolveIdentities(pin: signingPIN), !resolved.isEmpty {
+        guard !Task.isCancelled else { return }
+        guard pin == signingPIN else {
+            lastCertificateLoadPIN = nil
+            guard !signingPIN.isEmpty else { return }
+            await resolveCertificateForAuthorization(force: true)
+            return
+        }
+
+        if let resolved, !resolved.isEmpty {
             identities = resolved
             selectedIdentityID = resolved.first(where: { $0.isMandateCertificate })?.id
                 ?? resolved.first?.id

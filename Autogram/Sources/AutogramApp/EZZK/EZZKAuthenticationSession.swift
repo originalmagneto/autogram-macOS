@@ -5,6 +5,11 @@ import Foundation
 @MainActor
 protocol EZZKAuthenticationSessionRunning: AnyObject {
     func authenticate(configuration: EZZKOAuthConfiguration) async throws -> EZZKTokenSet
+    func cancelAuthentication()
+}
+
+extension EZZKAuthenticationSessionRunning {
+    func cancelAuthentication() {}
 }
 
 enum EZZKAuthenticationError: Error, Equatable, Sendable {
@@ -81,21 +86,32 @@ final class EZZKAuthenticationSession: NSObject, EZZKAuthenticationSessionRunnin
         }
     }
 
+    typealias RequestData = @Sendable (URLRequest, URL) async throws -> (Data, URLResponse)
+
+    private let requestDataOverride: RequestData?
     private var webSession: ASWebAuthenticationSession?
     private var callbackContinuation: CheckedContinuation<URL, Error>?
     private var authenticationInProgress = false
+    private var authenticationGeneration: UInt64 = 0
+
+    init(requestData: RequestData? = nil) {
+        self.requestDataOverride = requestData
+        super.init()
+    }
 
     func authenticate(configuration: EZZKOAuthConfiguration) async throws -> EZZKTokenSet {
         guard !authenticationInProgress else {
             throw EZZKAuthenticationError.authenticationInProgress
         }
-        guard configuration.isNativeCallbackConfigured,
+        guard configuration.isAuthenticationCallbackConfigured,
               let redirectURI = configuration.redirectURI,
               let callbackScheme = configuration.callbackScheme?.trimmingCharacters(in: .whitespacesAndNewlines),
               !callbackScheme.isEmpty else {
             throw EZZKAuthenticationError.nativeCallbackNotConfigured
         }
 
+        authenticationGeneration &+= 1
+        let generation = authenticationGeneration
         authenticationInProgress = true
         defer {
             authenticationInProgress = false
@@ -103,6 +119,9 @@ final class EZZKAuthenticationSession: NSObject, EZZKAuthenticationSessionRunnin
             callbackContinuation = nil
         }
         let discovery = try await discover(configuration: configuration)
+        guard isCurrentAuthentication(generation) else {
+            throw EZZKAuthenticationError.cancelled
+        }
         let pkce = EZZKPKCEChallenge.generate()
         let authorizationURL = try makeAuthorizationURL(
             endpoint: discovery.authorizationEndpoint,
@@ -110,10 +129,16 @@ final class EZZKAuthenticationSession: NSObject, EZZKAuthenticationSessionRunnin
             redirectURI: redirectURI,
             pkce: pkce
         )
+        guard isCurrentAuthentication(generation) else {
+            throw EZZKAuthenticationError.cancelled
+        }
         let callbackURL = try await startWebSession(
             authorizationURL: authorizationURL,
             callbackScheme: callbackScheme
         )
+        guard isCurrentAuthentication(generation) else {
+            throw EZZKAuthenticationError.cancelled
+        }
         let callback: EZZKOAuthCallback
         do {
             callback = try EZZKOAuthCallback.parse(url: callbackURL, expectedState: pkce.state)
@@ -123,13 +148,30 @@ final class EZZKAuthenticationSession: NSObject, EZZKAuthenticationSessionRunnin
             throw EZZKAuthenticationError.authenticationFailed
         }
 
-        return try await exchange(
+        let tokenSet = try await exchange(
             code: callback.authorizationCode,
             verifier: pkce.verifier,
             configuration: configuration,
             redirectURI: redirectURI,
             tokenEndpoint: discovery.tokenEndpoint
         )
+        guard isCurrentAuthentication(generation) else {
+            throw EZZKAuthenticationError.cancelled
+        }
+        return tokenSet
+    }
+    func cancelAuthentication() {
+        authenticationGeneration &+= 1
+        webSession?.cancel()
+        webSession = nil
+        authenticationInProgress = false
+        guard let continuation = callbackContinuation else { return }
+        callbackContinuation = nil
+        continuation.resume(throwing: EZZKAuthenticationError.cancelled)
+    }
+
+    private func isCurrentAuthentication(_ generation: UInt64) -> Bool {
+        authenticationGeneration == generation
     }
 
     func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
@@ -175,6 +217,9 @@ final class EZZKAuthenticationSession: NSObject, EZZKAuthenticationSessionRunnin
         _ request: URLRequest,
         issuer: URL
     ) async throws -> (Data, URLResponse) {
+        if let requestDataOverride {
+            return try await requestDataOverride(request, issuer)
+        }
         let policy = EZZKRedirectPolicy(issuer: issuer)
         let session = URLSession(
             configuration: .ephemeral,
@@ -184,7 +229,6 @@ final class EZZKAuthenticationSession: NSObject, EZZKAuthenticationSessionRunnin
         defer { session.invalidateAndCancel() }
         return try await session.data(for: request)
     }
-
 
     private func startWebSession(
         authorizationURL: URL,
@@ -196,8 +240,11 @@ final class EZZKAuthenticationSession: NSObject, EZZKAuthenticationSessionRunnin
                 url: authorizationURL,
                 callbackURLScheme: callbackScheme
             ) { [weak self] callbackURL, error in
-                Task { @MainActor [weak self] in
-                    self?.finishWebSession(callbackURL: callbackURL, error: error)
+                DispatchQueue.main.async {
+                    guard let self else { return }
+                    MainActor.assumeIsolated {
+                        self.finishWebSession(callbackURL: callbackURL, error: error)
+                    }
                 }
             }
             session.presentationContextProvider = self

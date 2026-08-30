@@ -42,10 +42,21 @@ cat > "$CONTENTS/Info.plist" <<'PLIST'
     <string>Autogram</string>
     <key>CFBundleIdentifier</key>
     <string>sk.autogram.Autogram</string>
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>sk.autogram.Autogram.ezzk</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>autogram</string>
+            </array>
+        </dict>
+    </array>
     <key>CFBundleVersion</key>
-    <string>0.2.0</string>
+    <string>0.2.2</string>
     <key>CFBundleShortVersionString</key>
-    <string>0.2.0</string>
+    <string>0.2.2</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleExecutable</key>

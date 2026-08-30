@@ -26,6 +26,7 @@ final class EZZKSessionController {
     private var client: EZZKClient?
     private var activeService: EZZKClientServiceAdapter?
     private var operationGeneration: UInt64 = 0
+    private var restorationTask: Task<Void, Never>?
 
     var selectedEnvironment: EZZKEnvironment {
         get { environment }
@@ -46,9 +47,12 @@ final class EZZKSessionController {
     var canChangeEnvironment: Bool {
         client == nil && state != .authenticating
     }
-
     var hasNativeCallbackConfiguration: Bool {
         oauthConfiguration?.isNativeCallbackConfigured == true
+    }
+
+    var hasAuthenticationCallbackConfiguration: Bool {
+        oauthConfiguration?.isAuthenticationCallbackConfigured == true
     }
     var isDemoMode: Bool { demoMode }
 
@@ -90,13 +94,14 @@ final class EZZKSessionController {
         self.transport = transport
         self.authenticationSession = authenticationSession
         self.demoMode = demoMode
-
-        Task { [weak self] in
-            await self?.restoreFromKeychain()
+        let restorationGeneration = beginOperation()
+        restorationTask = Task { [weak self] in
+            await self?.restoreFromKeychain(generation: restorationGeneration)
         }
     }
 
     func login() async {
+        cancelInitialRestore()
         guard state != .authenticating else { return }
         guard !demoMode, client == nil else { return }
         guard isEnvironmentAvailable else {
@@ -127,6 +132,14 @@ final class EZZKSessionController {
             state = .failed(message(for: error))
         }
     }
+    func cancelLogin() {
+        guard state == .authenticating else { return }
+        authenticationSession.cancelAuthentication()
+        invalidateOperations()
+        client = nil
+        activeService = nil
+        state = .signedOut
+    }
 
     func logout() {
         invalidateOperations()
@@ -141,6 +154,7 @@ final class EZZKSessionController {
     }
 
     func refresh() async {
+        cancelInitialRestore()
         guard !demoMode else {
             state = .failed("Relácia EZZK nie je v demo režime dostupná.")
             return
@@ -153,6 +167,11 @@ final class EZZKSessionController {
         }
         guard let oauthConfiguration, isUsableForClient(oauthConfiguration) else {
             state = .failed("Obnovenie relácie EZZK nie je dostupné bez platnej konfigurácie.")
+            return
+        }
+
+        if !hasActiveSession {
+            await login()
             return
         }
 
@@ -243,12 +262,12 @@ final class EZZKSessionController {
         }
     }
 
-    private func restoreFromKeychain() async {
-        let generation = beginOperation()
+    private func restoreFromKeychain(generation: UInt64) async {
         guard !demoMode,
               isEnvironmentAvailable,
               let oauthConfiguration,
-              isUsableForClient(oauthConfiguration) else {
+              isUsableForClient(oauthConfiguration),
+              isCurrent(generation) else {
             return
         }
         do {
@@ -298,6 +317,16 @@ final class EZZKSessionController {
             tokenStore: tokenStore,
             transport: transport)
     }
+    private func cancelInitialRestore() {
+        guard restorationTask != nil else { return }
+        restorationTask?.cancel()
+        restorationTask = nil
+        invalidateOperations()
+        if client == nil, state == .authenticating {
+            state = .signedOut
+        }
+    }
+
 
     private func beginOperation() -> UInt64 {
         operationGeneration &+= 1
@@ -325,7 +354,7 @@ final class EZZKSessionController {
     }
 
     private func isUsableForLogin(_ oauthConfiguration: EZZKOAuthConfiguration) -> Bool {
-        isUsableForClient(oauthConfiguration) && oauthConfiguration.isNativeCallbackConfigured
+        isUsableForClient(oauthConfiguration) && oauthConfiguration.isAuthenticationCallbackConfigured
     }
 
     private func isAuthenticationFailure(_ error: Error) -> Bool {

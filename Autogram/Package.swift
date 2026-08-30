@@ -24,6 +24,10 @@ let package = Package(
         .testTarget(
             name: "AutogramKitTests",
             dependencies: ["AutogramKit"]
+        ),
+        .testTarget(
+            name: "AutogramAppTests",
+            dependencies: ["AutogramApp"]
         )
     ]
 )
