@@ -26,6 +26,23 @@ final class EZZKHTTPClientTests: XCTestCase {
         XCTAssertNil(request.httpBody)
     }
 
+    func testFinalResponseHostMustRemainSelectedEnvironmentHost() async throws {
+        let transport = RecordingEZZKTransport(responses: [
+            .success(Self.response(
+                url: URL(string: "https://attacker.example/api/zzkservice/v1/ec")!,
+                statusCode: 200,
+                body: #"{"availableEvidenceNumbers":[]}"#))
+        ])
+        let client = makeClient(transport: transport)
+
+        do {
+            _ = try await client.availableEvidenceNumbers()
+            XCTFail("Expected invalid response for a redirected host")
+        } catch let error as EZZKError {
+            XCTAssertEqual(error, .invalidResponse)
+        }
+    }
+
     func testServerTimeUsesAuthenticatedHTTPDateWithoutLocalFallback() async throws {
         let transport = RecordingEZZKTransport(responses: [
             .success(response(statusCode: 200, headers: ["Date": "Sun, 30 Aug 2026 12:34:56 GMT"], body: "{}"))
@@ -62,7 +79,7 @@ final class EZZKHTTPClientTests: XCTestCase {
         let newToken = tokenSet(accessToken: "new-token", refreshToken: "new-refresh", expiration: Date().addingTimeInterval(3600))
         let transport = RecordingEZZKTransport(responses: [
             .success(response(statusCode: 401, body: "{}")),
-            .success(response(statusCode: 200, body: #"{"access_token":"new-token","refresh_token":"new-refresh","expires_in":3600,"token_type":"Bearer"}"#)),
+            .success(Self.response(url: oauth.issuerURL.appendingPathComponent("protocol/openid-connect/token"), statusCode: 200, body: #"{"access_token":"new-token","refresh_token":"new-refresh","expires_in":3600,"token_type":"Bearer"}"#)),
             .success(response(statusCode: 200, body: #"{"availableEvidenceNumbers":["E-1"]}"#))
         ])
         let store = InMemoryEZZKTokenStore(token: oldToken)
@@ -85,7 +102,7 @@ final class EZZKHTTPClientTests: XCTestCase {
     func testSecondUnauthorizedResponseDoesNotTriggerSecondRefresh() async throws {
         let transport = RecordingEZZKTransport(responses: [
             .success(response(statusCode: 401, body: "{}")),
-            .success(response(statusCode: 200, body: #"{"access_token":"new-token","refresh_token":"new-refresh","expires_in":3600,"token_type":"Bearer"}"#)),
+            .success(Self.response(url: oauth.issuerURL.appendingPathComponent("protocol/openid-connect/token"), statusCode: 200, body: #"{"access_token":"new-token","refresh_token":"new-refresh","expires_in":3600,"token_type":"Bearer"}"#)),
             .success(response(statusCode: 401, body: "{}"))
         ])
         let client = makeClient(transport: transport)
@@ -301,6 +318,19 @@ final class EZZKHTTPClientTests: XCTestCase {
             httpVersion: nil,
             headerFields: headers)!)
     }
+    private static func response(
+        url: URL,
+        statusCode: Int,
+        headers: [String: String] = [:],
+        body: String
+    ) -> (Data, HTTPURLResponse) {
+        (Data(body.utf8), HTTPURLResponse(
+            url: url,
+            statusCode: statusCode,
+            httpVersion: nil,
+            headerFields: headers)!)
+    }
+
 
     private func response(
         statusCode: Int,

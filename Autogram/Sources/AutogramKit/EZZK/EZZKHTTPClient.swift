@@ -182,6 +182,9 @@ public actor EZZKClient: EZZKServerClock, EZZKEvidenceNumberProvider {
                 throw EZZKError.networkFailure(error.localizedDescription)
             }
 
+            guard isValidAPIResponseURL(response.1.url) else {
+                throw EZZKError.invalidResponse
+            }
             if response.1.statusCode == 401 {
                 guard !hasRefreshed else { throw EZZKError.authenticationFailed }
                 token = try await refresh(using: token)
@@ -249,7 +252,7 @@ public actor EZZKClient: EZZKServerClock, EZZKEvidenceNumberProvider {
         } catch {
             throw EZZKError.authenticationFailed
         }
-        guard (200..<300).contains(response.statusCode) else {
+        guard isValidIssuerResponseURL(response.url), (200..<300).contains(response.statusCode) else {
             throw EZZKError.authenticationFailed
         }
 
@@ -367,6 +370,33 @@ public actor EZZKClient: EZZKServerClock, EZZKEvidenceNumberProvider {
         url.host == oauth.issuerURL.host &&
         url.user == nil &&
         url.password == nil
+    }
+
+    private func isValidAPIResponseURL(_ url: URL?) -> Bool {
+        guard let url,
+              url.scheme?.caseInsensitiveCompare("https") == .orderedSame,
+              url.host == environment.portalBaseURL.host,
+              normalizedPort(url) == normalizedPort(environment.portalBaseURL),
+              url.user == nil,
+              url.password == nil else {
+            return false
+        }
+        let basePath = environment.apiBaseURL.path
+        guard url.path == basePath || url.path.hasPrefix(basePath + "/") else {
+            return false
+        }
+        let queryItems = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        return queryItems.allSatisfy(isSafeQueryItem)
+    }
+
+    private func isValidIssuerResponseURL(_ url: URL?) -> Bool {
+        guard let url, isSecureIssuerEndpoint(url) else { return false }
+        let issuerPath = oauth.issuerURL.path
+        return url.path == issuerPath || url.path.hasPrefix(issuerPath + "/")
+    }
+
+    private func normalizedPort(_ url: URL) -> Int? {
+        url.port ?? (url.scheme?.caseInsensitiveCompare("https") == .orderedSame ? 443 : nil)
     }
 
     private func formEncoded(_ values: [(String, String)]) -> Data? {
