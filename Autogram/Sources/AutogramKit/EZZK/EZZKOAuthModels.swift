@@ -1,6 +1,13 @@
 import Foundation
 
+public enum EZZKOAuthConfigurationError: Error, Equatable, Sendable {
+    case invalidIssuerURL
+}
+
 public struct EZZKOAuthConfiguration: Sendable, Equatable {
+    private static let fixedIssuerURL = URL(string: "https://ezzk.iomo.sk/sso/auth/realms/ezzk")!
+    private static let observedWebRedirect = URL(string: "https://ezzk.iomo.sk/portal")!
+
     public let issuerURL: URL
     public let clientID: String
     public let redirectURI: URL?
@@ -13,7 +20,11 @@ public struct EZZKOAuthConfiguration: Sendable, Equatable {
         redirectURI: URL? = nil,
         callbackScheme: String? = nil,
         scopes: [String] = ["openid"]
-    ) {
+    ) throws {
+        guard issuerURL == Self.fixedIssuerURL,
+              issuerURL.scheme?.caseInsensitiveCompare("https") == .orderedSame else {
+            throw EZZKOAuthConfigurationError.invalidIssuerURL
+        }
         self.issuerURL = issuerURL
         self.clientID = clientID
         self.redirectURI = redirectURI
@@ -23,11 +34,14 @@ public struct EZZKOAuthConfiguration: Sendable, Equatable {
 
     public var isNativeCallbackConfigured: Bool {
         guard let redirectURI,
-              let callbackScheme,
-              !callbackScheme.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+              redirectURI != Self.observedWebRedirect,
+              let redirectScheme = redirectURI.scheme,
+              let callbackScheme else {
             return false
         }
-        return redirectURI.scheme != nil
+        let normalizedCallbackScheme = callbackScheme.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedCallbackScheme.isEmpty else { return false }
+        return redirectScheme.caseInsensitiveCompare(normalizedCallbackScheme) == .orderedSame
     }
 }
 
