@@ -41,3 +41,25 @@ Result: PASS, Autogram product built successfully. Existing project warnings wer
 
 - Live ASWebAuthenticationSession and network token exchange are intentionally not exercised in focused unit tests because native callback configuration and operator-confirmed discovery metadata are not available in this workspace.
 - The broker intentionally keeps native login unavailable until both callback configuration values are confirmed.
+
+## Review fixes
+Review-fix commit: `803c4d5e` (`fix: harden EZZK OAuth broker`)
+
+- Replaced callback state equality with an equal-length byte-wise constant-time comparison. The focused callback regression now includes a same-length mismatch.
+- Added a URLSession redirect delegate that permits only HTTPS redirects retaining the issuer host and normalized port, so token POST data cannot follow a cross-authority redirect.
+- Added an `authenticationInProgress` guard set before discovery and cleared by `defer`, preventing overlapping authentication calls from overwriting the shared session continuation.
+- Authorization URL construction now preserves existing endpoint query items and appends the OAuth parameters.
+
+Review-fix verification:
+
+```text
+DEVELOPER_DIR="/Applications/Xcode-26.5.app/Contents/Developer" xcrun swift test --build-path /tmp/ezzk-oauth-fix-tests --filter EZZKEnvironmentTests
+```
+
+Result: PASS, 11 tests, 0 failures.
+
+```text
+DEVELOPER_DIR="/Applications/Xcode-26.5.app/Contents/Developer" xcrun swift build --build-path /tmp/ezzk-oauth-fix-build --product Autogram
+```
+
+Result: PASS, Autogram product built successfully. Existing project warnings remain.
