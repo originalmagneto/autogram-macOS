@@ -12,7 +12,7 @@
 
   <rect width="1160" height="500" fill="#f5f5f5"/>
   <text x="32" y="48" font-family="Georgia, 'Times New Roman', serif" font-size="30" fill="#2d3142">Otvorená roadmapa - čo ešte blokuje release</text>
-  <text x="32" y="72" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="10" letter-spacing="1.6" fill="#7a8399">233 TESTOV · 3 SKIPPED · 0 FAIL · macOS 27 · EXTERNÉ KONTRAKTY ZOSTÁVAJÚ OTVORENÉ</text>
+  <text x="32" y="72" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="10" letter-spacing="1.6" fill="#7a8399">236 TESTOV · 3 SKIPPED · 0 FAIL · macOS 27 · EXTERNÉ KONTRAKTY ZOSTÁVAJÚ OTVORENÉ</text>
 
   <path d="M944,100 V108 Q944,116 936,116 H192 Q184,116 184,124" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#roadmap-open-work-arrow)"/>
   <path d="M944,100 V124" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#roadmap-open-work-arrow)"/>
@@ -66,8 +66,8 @@
 
     <rect x="824" y="160" width="288" height="64" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
     <text x="840" y="184" fill="#eb6c36" font-size="9" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-weight="600">07</text>
-    <text x="868" y="184" fill="#2d3142" font-size="12" font-weight="600">Native OAuth callback</text>
-    <text x="868" y="204" fill="#4f5d75" font-size="9" font-family="ui-monospace, 'SF Mono', Menlo, monospace">redirect URI · callback scheme</text>
+    <text x="868" y="184" fill="#2d3142" font-size="12" font-weight="600">EZZK callback registration</text>
+    <text x="868" y="204" fill="#4f5d75" font-size="9" font-family="ui-monospace, 'SF Mono', Menlo, monospace">autogram://... · operator confirmation</text>
 
     <rect x="824" y="240" width="288" height="64" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
     <text x="840" y="264" fill="#eb6c36" font-size="9" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-weight="600">08</text>

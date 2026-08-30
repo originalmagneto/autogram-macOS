@@ -1,6 +1,6 @@
 # Autogram macOS - Implementačná dokumentácia fáz 1–4
 
-> Stav: august 2026 · 107 vykonaných testov · 3 skipped · 0 failures · Swift 6 strict concurrency · 0 Swift package dependencies
+> Stav: august 2026 · 236 vykonaných testov · 3 skipped · 0 failures · Swift 6 strict concurrency · 0 Swift package dependencies
 
 Tento dokument popisuje, čo presne implementujú jednotlivé fázy modulu Zaručená konverzia
 (ZaKo) a štandardného podpisovania, aké rozhodnutia boli prijaté a kde sú limity.
@@ -174,7 +174,7 @@ reálny provider (výstup označený ako právne záväzný), inak DEMO podpisov
 
 ---
 
-## Fáza 4 - Validácie a EZK dashboard
+## Fáza 4 - Validácie a EZZK dashboard
 
 ### Validačné vrstvy (hard gates pred/po autorizácii)
 
@@ -198,11 +198,30 @@ Všetky tri bežajú automaticky v `ZakoSessionStore.authorizeAndSign()`; zlyhan
 
 ---
 
+## EZZK OAuth2 a REST integrácia
+
+Aktuálny build obsahuje bezpečnostne ohraničenú OAuth2 integráciu pre EZZK:
+
+- pevné sandboxové a produkčné environmenty bez URL override v nastaveniach,
+- OIDC discovery s kontrolou issueru, HTTPS endpointov a rovnakého hostiteľa,
+- authorization-code flow s PKCE, `state` a `ASWebAuthenticationSession`,
+- natívny callback `autogram://ezzk/callback` registrovaný v hlavnom bundle,
+- Keychain token store s oddelením environmentov, obnovou session po štarte,
+  odhlásením a explicitným zrušením autentizácie,
+- typed REST klient pre dostupné evidenčné čísla a EZZK endpointy,
+- fail-closed spracovanie chýb, neúplných odpovedí a neovereného receipt.
+
+Lokálny mock zostáva dostupný pre demo režim. Produkčné odoslanie sa nepovažuje za
+hotové, kým nebude potvrdená registrácia callbacku, sandboxový účet, kompletný POST
+kontrakt a samostatný podpísaný ASiC record v konverznom workflow.
+
+---
+
 ## Obmedzenia a ďalšie kroky
 
 | Oblasť | Stav | Poznámka |
 |---|---|---|
-| EZZK API | Mock + HTTP kostra | oficiálna OpenAPI od MIRRI nie je publikovaná (špec § 11.1); endpointy `portal/api/*` sú best-effort |
+| EZZK API | Demo mock + typed OAuth2 REST client | registrácia callbacku, sandboxový receipt a oficiálny POST kontrakt zostávajú externými gate-mi |
 | Cert chain v XAdES | len podpisový cert | chain/LTA (B-LT archivácia) je V2 |
 | veraPDF | nahradené vlastným `PDFAValidator` | štrukturálna validácia; plná schémová validácia ostáva voliteľná via bundled CLI |
 | eID PKCS#11 | natívny SecKey funguje | oficiálny `libPkcs11.dylib` má 0 slotov; pri uviaznutom CTK reštartovať eID_klient |

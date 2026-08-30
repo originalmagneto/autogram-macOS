@@ -95,7 +95,7 @@
       "updated": 1788116993654,
       "link": null,
       "locked": false,
-      "text": "233 TESTOV · 3 SKIPPED · 0 FAIL · macOS 27 · EXTERNÉ KONTRAKTY ZOSTÁVAJÚ OTVORENÉ",
+      "text": "236 TESTOV · 3 SKIPPED · 0 FAIL · macOS 27 · EXTERNÉ KONTRAKTY ZOSTÁVAJÚ OTVORENÉ",
       "fontSize": 10,
       "fontFamily": 3,
       "textAlign": "left",
@@ -103,7 +103,7 @@
       "containerId": null,
       "lineHeight": 1.25,
       "baseline": 8,
-      "originalText": "233 TESTOV · 3 SKIPPED · 0 FAIL · macOS 27 · EXTERNÉ KONTRAKTY ZOSTÁVAJÚ OTVORENÉ",
+      "originalText": "236 TESTOV · 3 SKIPPED · 0 FAIL · macOS 27 · EXTERNÉ KONTRAKTY ZOSTÁVAJÚ OTVORENÉ",
       "autoResize": true
     },
     {
@@ -1484,7 +1484,7 @@
       "updated": 1788116993654,
       "link": null,
       "locked": false,
-      "text": "Native OAuth callback",
+      "text": "EZZK callback registration",
       "fontSize": 12,
       "fontFamily": 2,
       "textAlign": "left",
@@ -1492,7 +1492,7 @@
       "containerId": null,
       "lineHeight": 1.25,
       "baseline": 9,
-      "originalText": "Native OAuth callback",
+      "originalText": "EZZK callback registration",
       "autoResize": true
     },
     {
@@ -1521,7 +1521,7 @@
       "updated": 1788116993654,
       "link": null,
       "locked": false,
-      "text": "redirect URI · callback scheme",
+      "text": "autogram://... · operator confirmation",
       "fontSize": 9,
       "fontFamily": 3,
       "textAlign": "left",
@@ -1529,7 +1529,7 @@
       "containerId": null,
       "lineHeight": 1.25,
       "baseline": 8,
-      "originalText": "redirect URI · callback scheme",
+      "originalText": "autogram://... · operator confirmation",
       "autoResize": true
     },
     {
