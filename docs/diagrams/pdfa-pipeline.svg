@@ -76,7 +76,7 @@
     <path d="M392,268 H420 V232 H452" marker-end="url(#d-arr)"/>
     <path d="M672,208 H700 V138 H732" marker-end="url(#d-arr)"/>
     <path d="M896,150 H920 V192 H948" marker-end="url(#d-arr)"/>
-    <path d="M672,328 H1040 V292" marker-end="url(#d-arr)"/>
+    <path d="M672,328 H704 V392 Q704,400 712,400 H924 Q932,400 932,392 V340 Q932,332 940,332 H948" marker-end="url(#d-arr)"/>
     <path d="M1040,260 V300" marker-end="url(#d-arr-acc)"/>
   </g>
 
