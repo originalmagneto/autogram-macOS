@@ -84,7 +84,7 @@
 
   <!-- EZZK interactions -->
   <g stroke="#2e5aa8" stroke-width="1" fill="none" stroke-dasharray="3,3">
-    <path d="M648,372 V392 Q648,400 640,400 H128 Q120,400 120,408 V432" marker-end="url(#p-arr)"/>
+    <path d="M648,372 V380 Q648,388 640,388 H224 Q216,388 216,396 V432" marker-end="url(#p-arr)"/>
     <path d="M892,372 V424" marker-end="url(#p-arr)"/>
   </g>
   <g font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="8.5" fill="#2e5aa8">

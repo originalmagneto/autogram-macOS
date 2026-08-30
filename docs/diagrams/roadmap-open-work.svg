@@ -37,7 +37,7 @@
     <rect x="48" y="160" width="288" height="64" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
     <text x="64" y="184" fill="#eb6c36" font-size="9" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-weight="600">01</text>
     <text x="92" y="184" fill="#2d3142" font-size="12" font-weight="600">EZZK sandbox smoke test</text>
-    <text x="92" y="204" fill="#4f5d75" font-size="9" font-family="ui-monospace, 'SF Mono', Menlo, monospace">konto · redirect · receipt</text>
+    <text x="92" y="204" fill="#4f5d75" font-size="9" font-family="ui-monospace, 'SF Mono', Menlo, monospace">sandbox konto · /ec · serverTime</text>
 
     <rect x="48" y="240" width="288" height="64" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
     <text x="64" y="264" fill="#eb6c36" font-size="9" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-weight="600">02</text>
@@ -61,23 +61,23 @@
 
     <rect x="436" y="320" width="288" height="64" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
     <text x="452" y="344" fill="#eb6c36" font-size="9" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-weight="600">06</text>
-    <text x="480" y="344" fill="#2d3142" font-size="12" font-weight="600">Actionable error UI</text>
-    <text x="480" y="364" fill="#4f5d75" font-size="9" font-family="ui-monospace, 'SF Mono', Menlo, monospace">nahradiť nekritické try?</text>
+    <text x="480" y="344" fill="#2d3142" font-size="12" font-weight="600">Chyby a stavové UI</text>
+    <text x="480" y="364" fill="#4f5d75" font-size="9" font-family="ui-monospace, 'SF Mono', Menlo, monospace">pilot · validované · prijaté</text>
 
     <rect x="824" y="160" width="288" height="64" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
     <text x="840" y="184" fill="#eb6c36" font-size="9" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-weight="600">07</text>
-    <text x="868" y="184" fill="#2d3142" font-size="12" font-weight="600">EZZK callback registration</text>
-    <text x="868" y="204" fill="#4f5d75" font-size="9" font-family="ui-monospace, 'SF Mono', Menlo, monospace">autogram://... · operator confirmation</text>
+    <text x="868" y="184" fill="#2d3142" font-size="12" font-weight="600">Natívny callback EZZK</text>
+    <text x="868" y="204" fill="#4f5d75" font-size="9" font-family="ui-monospace, 'SF Mono', Menlo, monospace">autogram://ezzk/callback · registrácia</text>
 
     <rect x="824" y="240" width="288" height="64" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
     <text x="840" y="264" fill="#eb6c36" font-size="9" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-weight="600">08</text>
-    <text x="868" y="264" fill="#2d3142" font-size="12" font-weight="600">POST kontrakty EZZK</text>
-    <text x="868" y="284" fill="#4f5d75" font-size="9" font-family="ui-monospace, 'SF Mono', Menlo, monospace">receipt · error · idempotency</text>
+    <text x="868" y="264" fill="#2d3142" font-size="12" font-weight="600">POST /ec + /zzk kontrakty</text>
+    <text x="868" y="284" fill="#4f5d75" font-size="9" font-family="ui-monospace, 'SF Mono', Menlo, monospace">receipt · error · retry · idempotency</text>
 
     <rect x="824" y="320" width="288" height="64" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
     <text x="840" y="344" fill="#eb6c36" font-size="9" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-weight="600">09</text>
-    <text x="868" y="344" fill="#2d3142" font-size="12" font-weight="600">ASiC record a P2E v1.3</text>
-    <text x="868" y="364" fill="#4f5d75" font-size="9" font-family="ui-monospace, 'SF Mono', Menlo, monospace">podpis · XSD · XSLT · codelists</text>
+    <text x="868" y="344" fill="#2d3142" font-size="12" font-weight="600">Signed ASiC + P2E v1.3</text>
+    <text x="868" y="364" fill="#4f5d75" font-size="9" font-family="ui-monospace, 'SF Mono', Menlo, monospace">podpis · XSD/XSLT · codelists</text>
   </g>
 
   <line x1="32" y1="448" x2="1128" y2="448" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
