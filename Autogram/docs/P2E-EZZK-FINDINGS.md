@@ -249,6 +249,11 @@ No EZZK evidence numbers were generated and no conversion was submitted. No inst
 - Focused receipt tests now prove that a confirmed receipt does not mutate a local evidence row by itself, that an unknown successful response leaves a signed row non-submitted, and that a submit timeout leaves a signed row non-submitted.
 - The legacy exported `HTTPSEZZKService` and `EZZKCredentials` types remain only for source compatibility. No application wiring selects them; `AppSettingsStore` does not construct a password-authenticated service. Legacy password storage is read only to prevent an old credentialed installation from entering demo mode and is not used for OAuth or REST requests.
 - Demo-only `MockEZZKService` behavior is retained. Explicit demo submit calls remain local-only and leave the evidence row pending; dashboard success feedback identifies the local preparation rather than CEZZK acceptance.
+- `URLSessionEZZKHTTPTransport` uses a redirect-denying delegate, so Bearer headers and refresh-token POST bodies are never forwarded across HTTP redirects. The client also validates final API and issuer response authorities.
+- Conversion preflight no longer requests evidence numbers automatically. Evidence-number generation remains an explicit Settings action or explicit user action from the conversion form.
+- `AppSettingsStore` distinguishes empty, present, and unavailable OAuth token storage. Keychain errors fail closed and cannot classify an installation as demo or expose the mock service.
+- Demo is visible as `Demo (lokálne)` with no sandbox or production URL presented as the active service. Demo submission calls remain local and leave rows pending.
+- Validated OIDC discovery now carries its token endpoint in `EZZKTokenSet`; refresh uses that endpoint and rejects missing or untrusted endpoints instead of reconstructing a path.
 
 ### Exact verification
 
@@ -256,13 +261,13 @@ No EZZK evidence numbers were generated and no conversion was submitted. No inst
 DEVELOPER_DIR="/Applications/Xcode-26.5.app/Contents/Developer" swift test --filter EZZKHTTPClientTests
 ```
 
-Result: 19 tests passed, 0 failures.
+Result: 21 tests passed, 0 failures.
 
 ```text
 DEVELOPER_DIR="/Applications/Xcode-26.5.app/Contents/Developer" swift test
 ```
 
-Result: 185 tests executed, 3 skipped, 0 failures.
+Result: 187 tests executed, 3 skipped, 0 failures.
 
 ```text
 DEVELOPER_DIR="/Applications/Xcode-26.5.app/Contents/Developer" ./build_app.sh

@@ -50,17 +50,20 @@ public struct EZZKTokenSet: Codable, Sendable, Equatable {
     public let refreshToken: String?
     public let expiration: Date
     public let tokenType: String
+    public let tokenEndpoint: URL?
 
     public init(
         accessToken: String,
         refreshToken: String?,
         expiration: Date,
-        tokenType: String
+        tokenType: String,
+        tokenEndpoint: URL? = nil
     ) {
         self.accessToken = accessToken
         self.refreshToken = refreshToken
         self.expiration = expiration
         self.tokenType = tokenType
+        self.tokenEndpoint = tokenEndpoint
     }
 }
 public protocol EZZKTokenStoring: Sendable {

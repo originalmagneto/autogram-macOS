@@ -67,7 +67,7 @@ struct ZakoFlowView: View {
         case .attestation:
             AttestationFormView(store: store)
                 .task(id: store.currentRecordID) {
-                    await store.preparePreflight()
+                    store.preparePreflight()
                 }
         case .authorize:
             AuthorizeView(store: store)

@@ -25,6 +25,20 @@ final class EZZKHTTPClientTests: XCTestCase {
         XCTAssertEqual(request.value(forHTTPHeaderField: "Accept"), "application/json")
         XCTAssertNil(request.httpBody)
     }
+    func testHTTPTransportDoesNotFollowRedirects() async throws {
+        RedirectEZZKURLProtocol.reset()
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [RedirectEZZKURLProtocol.self]
+        let transport = URLSessionEZZKHTTPTransport(
+            session: URLSession(configuration: configuration))
+        let request = URLRequest(url: URL(string: "https://ezzk-test.iomo.sk/api/zzkservice/v1/ec")!)
+
+        let (_, response) = try await transport.send(request)
+
+        XCTAssertEqual(response.statusCode, 302)
+        XCTAssertEqual(RedirectEZZKURLProtocol.requestCount, 1)
+    }
+
 
     func testFinalResponseHostMustRemainSelectedEnvironmentHost() async throws {
         let transport = RecordingEZZKTransport(responses: [
@@ -98,6 +112,31 @@ final class EZZKHTTPClientTests: XCTestCase {
         XCTAssertEqual(store.savedToken?.refreshToken, newToken.refreshToken)
         XCTAssertEqual(store.savedToken?.tokenType, newToken.tokenType)
     }
+    func testRefreshUsesValidatedDiscoveredTokenEndpoint() async throws {
+        let discoveredEndpoint = URL(string: "https://ezzk.iomo.sk/sso/auth/realms/ezzk/custom/token")!
+        let oldToken = tokenSet(
+            accessToken: "old-token",
+            expiration: Date().addingTimeInterval(3600),
+            tokenEndpoint: discoveredEndpoint)
+        let transport = RecordingEZZKTransport(responses: [
+            .success(response(statusCode: 401, body: "{}")),
+            .success(Self.response(
+                url: discoveredEndpoint,
+                statusCode: 200,
+                body: #"{"access_token":"new-token","refresh_token":"new-refresh","expires_in":3600,"token_type":"Bearer"}"#)),
+            .success(response(statusCode: 200, body: #"{"availableEvidenceNumbers":[]}"#))
+        ])
+        let client = EZZKClient(
+            environment: .sandbox,
+            oauth: oauth,
+            tokenStore: InMemoryEZZKTokenStore(token: oldToken),
+            transport: transport)
+
+        _ = try await client.availableEvidenceNumbers()
+
+        XCTAssertEqual(transport.requests[1].url, discoveredEndpoint)
+    }
+
 
     func testSecondUnauthorizedResponseDoesNotTriggerSecondRefresh() async throws {
         let transport = RecordingEZZKTransport(responses: [
@@ -418,9 +457,15 @@ final class EZZKHTTPClientTests: XCTestCase {
     private func tokenSet(
         accessToken: String,
         refreshToken: String? = "refresh-token",
-        expiration: Date = Date().addingTimeInterval(3600)
+        expiration: Date = Date().addingTimeInterval(3600),
+        tokenEndpoint: URL = URL(string: "https://ezzk.iomo.sk/sso/auth/realms/ezzk/protocol/openid-connect/token")!
     ) -> EZZKTokenSet {
-        EZZKTokenSet(accessToken: accessToken, refreshToken: refreshToken, expiration: expiration, tokenType: "Bearer")
+        EZZKTokenSet(
+            accessToken: accessToken,
+            refreshToken: refreshToken,
+            expiration: expiration,
+            tokenType: "Bearer",
+            tokenEndpoint: tokenEndpoint)
     }
 
     private static func response(
@@ -508,4 +553,37 @@ private final class RecordingEZZKTransport: EZZKHTTPTransport, @unchecked Sendab
         }
         return try response.get()
     }
+}
+private final class RedirectEZZKURLProtocol: URLProtocol {
+    private static let lock = NSLock()
+    nonisolated(unsafe) private static var count = 0
+
+    static var requestCount: Int {
+        lock.withLock { count }
+    }
+
+    static func reset() {
+        lock.withLock { count = 0 }
+    }
+
+    override class func canInit(with request: URLRequest) -> Bool {
+        true
+    }
+
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest {
+        request
+    }
+
+    override func startLoading() {
+        Self.lock.withLock { Self.count += 1 }
+        let response = HTTPURLResponse(
+            url: request.url!,
+            statusCode: 302,
+            httpVersion: nil,
+            headerFields: ["Location": "https://attacker.example/steal"])!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
 }

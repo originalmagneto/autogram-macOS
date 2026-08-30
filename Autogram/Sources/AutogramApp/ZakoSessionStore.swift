@@ -549,11 +549,8 @@ final class ZakoSessionStore {
         validationErrors = result.errors
     }
 
-    func preparePreflight() async {
+    func preparePreflight() {
         evidenceNumberError = nil
-        if attestation.evidenceNumber?.trimmingCharacters(in: .whitespaces).isEmpty != false {
-            await fetchEvidenceNumber()
-        }
         recomputePreflight()
     }
 
@@ -615,7 +612,7 @@ final class ZakoSessionStore {
 
         lastError = nil
         validationErrors = []
-        await preparePreflight()
+        preparePreflight()
         guard isPreflightComplete else { return }
         let confirmedElementsSnapshot = confirmedSecurityElements
         let securityReviewSnapshot = securityReviewStamp

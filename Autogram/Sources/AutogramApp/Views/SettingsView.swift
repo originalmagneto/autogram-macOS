@@ -472,12 +472,21 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
+                if controller.isDemoMode {
+                    Label(
+                        "Demo režim: lokálna simulácia bez pripojenia k EZZK",
+                        systemImage: "theatermasks"
+                    )
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.orange)
+                }
                 VStack(alignment: .leading, spacing: 10) {
                     Picker("Prostredie", selection: Binding(
                         get: { controller.selectedEnvironment },
                         set: { controller.selectedEnvironment = $0 }
                     )) {
-                        Text("Sandbox").tag(EZZKEnvironment.sandbox)
+                        Text(controller.isDemoMode ? "Demo (lokálne)" : "Sandbox")
+                            .tag(EZZKEnvironment.sandbox)
                         Text("Produkcia (uzavreté)")
                             .tag(EZZKEnvironment.production)
                             .disabled(!controller.canSelectProduction)
@@ -485,7 +494,9 @@ struct SettingsView: View {
                     .pickerStyle(.segmented)
                     .disabled(!controller.canChangeEnvironment)
 
-                    Text("Sandbox je predvolené prostredie. Produkčné prostredie zostáva deaktivované, kým nie je otvorená autorizačná brána.")
+                    Text(controller.isDemoMode
+                         ? "Demo režim nepoužíva sandbox ani produkčné EZZK pripojenie."
+                         : "Sandbox je predvolené prostredie. Produkčné prostredie zostáva deaktivované, kým nie je otvorená autorizačná brána.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -496,7 +507,9 @@ struct SettingsView: View {
                             .font(.callout)
                             .foregroundStyle(.secondary)
                             .frame(width: 180, alignment: .leading)
-                        Text(controller.selectedEnvironment.portalBaseURL.absoluteString)
+                        Text(controller.isDemoMode
+                             ? "Nepoužíva sa v demo režime"
+                             : controller.selectedEnvironment.portalBaseURL.absoluteString)
                             .font(.callout.monospaced())
                             .textSelection(.enabled)
                     }
@@ -505,7 +518,9 @@ struct SettingsView: View {
                         Text("REST API")
                             .font(.callout)
                             .foregroundStyle(.secondary)
-                        Text(controller.selectedEnvironment.apiBaseURL.absoluteString)
+                        Text(controller.isDemoMode
+                             ? "Nepoužíva sa v demo režime"
+                             : controller.selectedEnvironment.apiBaseURL.absoluteString)
                             .font(.callout.monospaced())
                             .textSelection(.enabled)
                     }
@@ -514,7 +529,7 @@ struct SettingsView: View {
                         Text("Identita autority")
                             .font(.callout)
                             .foregroundStyle(.secondary)
-                        Text(controller.selectedEnvironment.authorityID)
+                        Text(controller.isDemoMode ? "Demo lokálne" : controller.selectedEnvironment.authorityID)
                             .font(.callout.monospaced())
                             .textSelection(.enabled)
                     }
@@ -526,7 +541,9 @@ struct SettingsView: View {
                 Label("Relácia EZZK", systemImage: "person.badge.key")
                     .font(.headline)
 
-                let statePresentation = ezzkStatePresentation(controller.state)
+                let statePresentation = controller.isDemoMode
+                    ? (title: "Demo lokálne", symbol: "theatermasks", color: Color.orange)
+                    : ezzkStatePresentation(controller.state)
                 Label(statePresentation.title, systemImage: statePresentation.symbol)
                     .foregroundStyle(statePresentation.color)
 

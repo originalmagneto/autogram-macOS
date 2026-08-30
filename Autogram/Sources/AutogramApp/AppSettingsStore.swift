@@ -22,11 +22,11 @@ final class AppSettingsStore {
     init() {
         let loaded = AppSettings.load()
         let storedPassword = KeychainStore.load(account: "ezzk.password") ?? ""
-        let hasStoredOAuthToken = Self.hasStoredOAuthToken()
+        let oauthTokenState = Self.oauthTokenState()
         let isInitialDemoSetup = loaded.ezzkICO.isEmpty &&
             loaded.ezzkUsername.isEmpty &&
             storedPassword.isEmpty
-        let isDemoMode = isInitialDemoSetup && !hasStoredOAuthToken
+        let isDemoMode = isInitialDemoSetup && oauthTokenState == .empty
         self.settings = loaded
         self.ezzkPassword = storedPassword
         self.ezzkSessionController = EZZKSessionController(demoMode: isDemoMode)
@@ -34,11 +34,24 @@ final class AppSettingsStore {
         self.signingProvider = SigningProviderFactory.makeDefault()
     }
 
-    private static func hasStoredOAuthToken() -> Bool {
+    private enum OAuthTokenState: Equatable {
+        case empty
+        case present
+        case unavailable
+    }
+
+    private static func oauthTokenState() -> OAuthTokenState {
         let tokenStore = EZZKTokenStore()
-        return EZZKEnvironment.allCases.contains { environment in
-            (try? tokenStore.load(environment: environment)) != nil
+        for environment in EZZKEnvironment.allCases {
+            do {
+                if try tokenStore.load(environment: environment) != nil {
+                    return .present
+                }
+            } catch {
+                return .unavailable
+            }
         }
+        return .empty
     }
 
     func saveEZZKPassword() {

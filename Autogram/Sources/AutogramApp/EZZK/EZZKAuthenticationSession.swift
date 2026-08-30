@@ -299,7 +299,8 @@ final class EZZKAuthenticationSession: NSObject, EZZKAuthenticationSessionRunnin
                 accessToken: token.accessToken,
                 refreshToken: token.refreshToken,
                 expiration: Date().addingTimeInterval(TimeInterval(token.expiresIn)),
-                tokenType: token.tokenType
+                tokenType: token.tokenType,
+                tokenEndpoint: tokenEndpoint
             )
         } catch let error as EZZKAuthenticationError {
             throw error

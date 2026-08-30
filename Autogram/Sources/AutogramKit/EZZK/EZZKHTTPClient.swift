@@ -7,8 +7,13 @@ public protocol EZZKHTTPTransport: Sendable {
 public struct URLSessionEZZKHTTPTransport: EZZKHTTPTransport, Sendable {
     private let session: URLSession
 
-    public init(session: URLSession = .shared) {
-        self.session = session
+    public init(session: URLSession? = nil) {
+        let configuration = session?.configuration ?? .ephemeral
+        let redirectPolicy = EZZKHTTPRedirectPolicy()
+        self.session = URLSession(
+            configuration: configuration,
+            delegate: redirectPolicy,
+            delegateQueue: nil)
     }
 
     public func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
@@ -17,6 +22,18 @@ public struct URLSessionEZZKHTTPTransport: EZZKHTTPTransport, Sendable {
             throw EZZKError.invalidResponse
         }
         return (data, httpResponse)
+    }
+}
+
+private final class EZZKHTTPRedirectPolicy: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+    func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        willPerformHTTPRedirection response: HTTPURLResponse,
+        newRequest request: URLRequest,
+        completionHandler: @Sendable @escaping (URLRequest?) -> Void
+    ) {
+        completionHandler(nil)
     }
 }
 
@@ -230,7 +247,7 @@ public actor EZZKClient: EZZKServerClock, EZZKEvidenceNumberProvider {
     private func refresh(using token: EZZKTokenSet) async throws -> EZZKTokenSet {
         guard let refreshToken = token.refreshToken,
               !refreshToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-              let endpoint = refreshEndpoint(),
+              let endpoint = token.tokenEndpoint,
               isSecureIssuerEndpoint(endpoint) else {
             throw EZZKError.authenticationFailed
         }
@@ -268,7 +285,8 @@ public actor EZZKClient: EZZKServerClock, EZZKEvidenceNumberProvider {
                 accessToken: decoded.accessToken,
                 refreshToken: decoded.refreshToken ?? refreshToken,
                 expiration: Date().addingTimeInterval(TimeInterval(decoded.expiresIn)),
-                tokenType: decoded.tokenType)
+                tokenType: decoded.tokenType,
+                tokenEndpoint: endpoint)
             do {
                 try tokenStore.save(refreshed, environment: environment)
             } catch {
@@ -361,9 +379,6 @@ public actor EZZKClient: EZZKServerClock, EZZKEvidenceNumberProvider {
         return !forbidden.contains(item.name.lowercased())
     }
 
-    private func refreshEndpoint() -> URL? {
-        oauth.issuerURL.appendingPathComponent("protocol/openid-connect/token")
-    }
 
     private func isSecureIssuerEndpoint(_ url: URL) -> Bool {
         url.scheme?.caseInsensitiveCompare("https") == .orderedSame &&
