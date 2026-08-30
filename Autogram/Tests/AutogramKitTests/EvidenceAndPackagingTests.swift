@@ -181,6 +181,29 @@ final class EvidenceAndPackagingTests: XCTestCase {
         let time = try await service.serverTime()
         XCTAssertEqual(time.timeIntervalSinceNow, 0, accuracy: 60)
     }
+    func testMockEZZKExposesTypedCapabilities() async throws {
+        let service = MockEZZKService()
+        let clock: any EZZKServerClock = service
+        let evidenceProvider: any EZZKEvidenceNumberProvider = service
+        let submission: any EZZKSubmissionTransport = service
+
+        let number = try await evidenceProvider.requestEvidenceNumbers(count: 1)[0]
+        let envelope = ConversionRecordEnvelope(
+            evidenceNumber: number,
+            direction: .paperToElectronic,
+            originalName: "source",
+            newDocumentName: "converted",
+            attestationXML: "<ConversionRecord/>",
+            fingerprintSHA256Hex: String(repeating: "a", count: 64),
+            conversionTime: Date())
+
+        try await submission.submit(envelope)
+        let serverTime = try await clock.serverTime()
+
+        XCTAssertEqual(service.submittedRecords.map(\.evidenceNumber), [number])
+        XCTAssertEqual(serverTime.timeIntervalSinceNow, 0, accuracy: 60)
+    }
+
 
     func testDemoSigningProducesASICAndDigest() async throws {
         let provider = DemoSigningProvider()

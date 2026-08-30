@@ -66,11 +66,19 @@ public enum EZZKError: LocalizedError, Equatable, Sendable {
     }
 }
 
-public protocol EZZKServicing: Sendable {
+public protocol EZZKServerClock: Sendable {
     func serverTime() async throws -> Date
+}
+
+public protocol EZZKEvidenceNumberProvider: Sendable {
     func requestEvidenceNumbers(count: Int) async throws -> [String]
+}
+
+public protocol EZZKSubmissionTransport: Sendable {
     func submit(_ envelope: ConversionRecordEnvelope) async throws
 }
+
+public protocol EZZKServicing: EZZKServerClock, EZZKEvidenceNumberProvider, EZZKSubmissionTransport {}
 
 public final class MockEZZKService: EZZKServicing, @unchecked Sendable {
     private struct State {
