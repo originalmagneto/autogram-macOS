@@ -16,7 +16,7 @@ Autogram je natívna macOS aplikácia v SwiftUI pre elektronické podpisovanie d
       <td><strong>FOCUS</strong><br><code>QES</code> · <code>ZaKo</code> · <code>PDF/A-2b</code></td>
     </tr>
   </table>
-  <sub><a href="#features">Funkcie</a> · <a href="#signing">Podpisovanie</a> · <a href="#zako">ZaKo</a> · <a href="#vision">AI Vision</a> · <a href="#pdfa">PDF/A</a> · <a href="#architecture">Architektúra</a> · <a href="#build">Build a testy</a></sub>
+  <sub><a href="#features">Funkcie</a> · <a href="#signing">Podpisovanie</a> · <a href="#zako">ZaKo</a> · <a href="#vision">AI Vision</a> · <a href="#settings">Nastavenia</a> · <a href="#pdfa">PDF/A</a> · <a href="#architecture">Architektúra</a> · <a href="#build">Build a testy</a></sub>
 </div>
 
 <a id="features"></a>
@@ -242,7 +242,7 @@ Záznam prechádza stavmi konceptu, čakania na číslo, pripravenosti na autori
 
 - PDF, JPEG, PNG, TIFF a HEIC vstupy s konverziou obrazu do PDF
 - vizuálny podpis a viditeľné PAdES umiestnenie
-- segmented voľba formátu KEP, PAdES alebo ASiC-E
+- priame tlačidlá voľby formátu PAdES alebo ASiC-E/XAdES
 - KEP, PAdES, QTS a ASiC-E podľa nastaveného formátu
 - CryptoTokenKit, Keychain identity scanner a PKCS#11 EngineBridge
 - preflight a progress UI pre dávkové podpisovanie
@@ -278,6 +278,33 @@ Záznam prechádza stavmi konceptu, čakania na číslo, pripravenosti na autori
     <tr><td><code>Cloud API</code></td><td>vlastný OpenAI-compatible endpoint</td><td>Obraz dokumentu môže opustiť Mac, preto treba posúdiť ochranu údajov</td></tr>
   </tbody>
 </table>
+
+<a id="settings"></a>
+## Nastavenia a AI Vision konfigurácia
+
+Natívne okno **Nastavenia** je rozdelené do štyroch kariet:
+
+- **AI Vision:** výber poskytovateľa, stav pripravenosti konfigurácie, bezpečné uloženie API kľúča a klasifikačný prompt,
+- **Konverzia PDF/A:** vektorový alebo rasterizovaný režim, výber TSA a správa vlastných RFC 3161 serverov,
+- **EZZK:** sandboxové alebo produkčné prostredie, OAuth2 session, dostupné evidenčné čísla a fail-closed odoslanie,
+- **Profily advokáta:** údaje osoby, identifikátory a uložené profily pre doložku.
+
+### AI Vision režimy a prompty
+
+Vstavaná on-device detekcia beží vždy. Voliteľný režim dopĺňa jej výsledky cez:
+
+- **oMLX:** lokálny OpenAI-compatible endpoint na Apple Silicon,
+- **Ollama:** lokálny vision server bez cloudového API,
+- **vlastné API:** OpenAI-compatible endpoint s API kľúčom v systémovej Kľúčenke,
+- **vypnuté:** iba vstavané pravidlá bez LLM asistencie.
+
+Nastavenia zobrazujú pripravenosť URL, modelu a pri vlastnom API aj Keychain kľúča. Klasifikačný prompt má predvoľby **Právne dokumenty**, **Konzervatívna kontrola**, **Podpisy a parafy**, **Pečiatky a reliéfne prvky** a **Vlastný prompt**. Prompt sa použije iba pre oMLX, Ollama a vlastné API; v internom a vypnutom režime sa nepoužíva. Tlačidlo **Obnoviť predvolený** vráti schválený prompt.
+
+### PDF/A a TSA
+
+Karta Konverzia PDF/A umožňuje prepnúť medzi vektorovou konverziou so zachovaním textovej vrstvy a rasterizovanou garanciou pri 200 dpi. TSA konfigurácia obsahuje vstavané servery, vlastné URL, výber aktívnej služby a tlačidlo **Otestovať spojenie**, ktoré odošle reálnu RFC 3161 požiadavku.
+
+Nastavenia zároveň riadia bezpečné bookmarky najviac ôsmich naposledy otvorených dokumentov. Ich obsah sa neukladá.
 
 <a id="build"></a>
 ## Zostavenie, testy a lokálna inštalácia
@@ -349,9 +376,10 @@ Diagramy používajú prístupný SVG kontrakt: `role="img"`, prefixed `title` a
 Dokončené v aktuálnom workflow update:
 
 - opravený focus a chevron v sidebar navigácii,
-- Settings gear a natívne odkazy do nastavení,
-- AI Vision guidance, readiness a prompt predvoľby,
-- segmented voľba podpisového formátu,
+- natívne Settings okno so štyrmi kartami: AI Vision, Konverzia PDF/A, EZZK a Profily advokáta,
+- AI Vision provider cards, readiness stavy, on-device fallback a predvoľby klasifikačných promptov,
+- PDF/A režim, vstavané a vlastné TSA servery, test RFC 3161 spojenia a bezpečné Keychain nastavenia,
+- priame tlačidlá voľby formátu PAdES alebo ASiC-E/XAdES,
 - recent documents cez bezpečné bookmarky,
 - preflight, progress, cancel, stop, continue a retry pre dávkové podpisovanie,
 - Finder Quick Action napojená na rovnaký signing engine.

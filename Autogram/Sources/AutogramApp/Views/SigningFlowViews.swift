@@ -549,13 +549,43 @@ struct SigningPrepareView: View {
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
 
-                    Picker("Formát výstupu", selection: $store.outputFormat) {
+                    HStack(spacing: 8) {
                         ForEach(SigningOutputFormatPresentation.allCases) { presentation in
-                            Text(presentation.label).tag(presentation.format)
+                            let isSelected = store.outputFormat == presentation.format
+                            Button {
+                                store.outputFormat = presentation.format
+                            } label: {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(presentation.label)
+                                        .font(.callout.weight(isSelected ? .semibold : .medium))
+                                    Text(presentation.format == .embeddedPAdES
+                                         ? "Podpis priamo v PDF"
+                                         : "Kontajner s XAdES")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 8)
+                                .background(
+                                    isSelected
+                                        ? Color.accentColor.opacity(0.12)
+                                        : Color.primary.opacity(0.03),
+                                    in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                                        .strokeBorder(
+                                            isSelected
+                                                ? Color.accentColor.opacity(0.55)
+                                                : Color.primary.opacity(0.10),
+                                            lineWidth: 1))
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Formát výstupu \(presentation.label)")
+                            .accessibilityValue(isSelected ? "Vybraný" : "Nevybraný")
+                            .accessibilityAddTraits(isSelected ? .isSelected : [])
                         }
                     }
-                    .labelsHidden()
-                    .pickerStyle(.segmented)
 
                     Text(selectedOutputFormatPresentation.explanation)
                         .font(.caption2)

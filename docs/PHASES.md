@@ -198,6 +198,23 @@ Všetky tri bežajú automaticky v `ZakoSessionStore.authorizeAndSign()`; zlyhan
 
 ---
 
+## Aktuálny UI workflow update
+
+Aktuálny macOS 27 build obsahuje tieto používateľské zmeny:
+
+- sidebar používa gear tlačidlo a natívny `Settings` scene namiesto samostatnej položky,
+- Settings scene má karty AI Vision, Konverzia PDF/A, EZZK a Profily advokáta,
+- AI Vision zobrazuje provider cards, readiness stav URL/modelu/Keychain kľúča a päť prompt režimov,
+- prompt predvoľby pokrývajú právne dokumenty, konzervatívnu kontrolu, podpisy a parafy,
+  pečiatky a reliéfne prvky aj vlastný prompt,
+- karta Konverzia PDF/A obsahuje vektorový a rasterizovaný režim, správu TSA serverov
+  a test RFC 3161 spojenia,
+- voľba PAdES alebo ASiC-E/XAdES používa priame tlačidlá v podpisovom workflow,
+- recent documents, dávkové preflight fázy, progress, cancel, stop, retry a Finder
+  Quick Action sú napojené na existujúce workflow stores.
+
+---
+
 ## EZZK OAuth2 a REST integrácia
 
 Aktuálny build obsahuje bezpečnostne ohraničenú OAuth2 integráciu pre EZZK:
