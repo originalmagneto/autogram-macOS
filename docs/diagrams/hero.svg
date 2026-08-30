@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1160" height="240" viewBox="0 0 1160 240" role="img" aria-labelledby="hero-title hero-desc">
   <title id="hero-title">Autogram macOS</title>
-  <desc id="hero-desc">Nativna SwiftUI aplikacia pre zaručenu konverziu dokumentov - advokátsky nástroj podľa zákona č. 305/2013 Z. z.</desc>
+  <desc id="hero-desc">Natívna SwiftUI aplikácia pre elektronické podpisovanie a zaručenú konverziu dokumentov podľa zákona č. 305/2013 Z. z.</desc>
   <rect width="1160" height="240" fill="#2d3142"/>
 
   <text x="56" y="86" font-family="Georgia, 'Times New Roman', serif" font-size="44" fill="#f5f5f5">Autogram <tspan font-style="italic" fill="#eb6c36">macOS</tspan></text>
@@ -15,7 +15,7 @@
     <text x="476" y="172" fill="#bfc0c0">AI VISION</text>
     <text x="600" y="172" fill="#bfc0c0">ASiC-E</text>
     <text x="700" y="172" fill="#bfc0c0">IS EZZK</text>
-    <text x="804" y="172" fill="#bfc0c0">107 TESTS · 0 FAIL</text>
+    <text x="804" y="172" fill="#bfc0c0">233 TESTY · 0 FAIL</text>
   </g>
 
   <!-- seal motif -->

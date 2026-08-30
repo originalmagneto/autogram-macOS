@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1160" height="380" viewBox="0 0 1160 380" role="img" aria-labelledby="st-title st-desc">
   <title id="st-title">Stavový automat záznamu o konverzii</title>
-  <desc id="st-desc">Stavy: koncept, čaká na evidenčné číslo, pripravené na autorizáciu, autorizované, vo fronte, zapísané v CEZZK; odoslanie môže zlyhať a opakovať sa.</desc>
+  <desc id="st-desc">Stavy konverzného záznamu od konceptu cez pridelenie čísla, autorizáciu a frontu až po CEZZK; zlyhané odoslanie sa vracia na manuálny retry.</desc>
   <defs>
     <marker id="s-arr" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0,0 L8,4 L0,8 z" fill="#4f5d75"/>
@@ -61,9 +61,8 @@
     <line x1="216" y1="180" x2="268" y2="180" marker-end="url(#s-arr)"/>
     <line x1="432" y1="180" x2="484" y2="180" marker-end="url(#s-arr)"/>
     <line x1="656" y1="180" x2="708" y2="180" marker-end="url(#s-arr)"/>
-    <path d="M880,214 V306 H684" marker-end="url(#s-arr)"/>
-    <path d="M680,306 H1092 V332 H1092" />
-    <path d="M1092,280 V206 H884" marker-end="url(#s-arr)"/>
+    <path d="M880,214 V248 Q880,256 872,256 H604 Q596,256 596,264 V272" marker-end="url(#s-arr)"/>
+    <path d="M680,306 H896" marker-end="url(#s-arr)"/>
   </g>
   <path d="M512,306 H412" stroke="#eb6c36" stroke-width="1" fill="none" marker-end="url(#s-arr-acc)"/>
 
@@ -79,9 +78,9 @@
 
   <!-- end dot -->
   <circle cx="1104" cy="356" r="6" fill="none" stroke="#2d3142" stroke-width="1.2"/>
-  <path d="M1088,306 V356 H1094" stroke="#4f5d75" stroke-width="1" fill="none" marker-end="url(#s-arr)"/>
+  <path d="M996,332 V348 Q996,356 1004,356 H1094" stroke="#4f5d75" stroke-width="1" fill="none" marker-end="url(#s-arr)"/>
 
   <g font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="9" fill="#7a8399">
-    <text x="32" y="366">POZNÁMKA: zápis CEZZK zamietne záznam ak čas QTS predchádza času konverzie, alebo evidenčné číslo už bolo použité (§ 9 vyhlášky 70/2021).</text>
+    <text x="32" y="366">POZNÁMKA: zápis CEZZK zamietne záznam pri neplatnom čase QTS alebo už použitom evidenčnom čísle (§ 9 vyhlášky 70/2021).</text>
   </g>
 </svg>

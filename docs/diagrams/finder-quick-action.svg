@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="1040" height="448" viewBox="0 0 1040 448" role="img" aria-labelledby="finder-quick-action-title finder-quick-action-desc">
   <title id="finder-quick-action-title">Finder Quick Action - podpis PDF s QES a QTS</title>
-  <desc id="finder-quick-action-desc">Diagram toku: označené PDF vo Finderi sa cez Quick Action pošlu do Autogramu, ktorý ich podpíše kvalifikovaným podpisom s casovou pečiatkou a uloží výstup.</desc>
+  <desc id="finder-quick-action-desc">Označené PDF súbory vo Finderi prejdú cez Quick Action, preflight a signing engine, ktorý vytvorí QES, časovú pečiatku a bezpečne pomenovaný výstup.</desc>
 
   <rect width="1040" height="448" fill="#f5f5f5"/>
 

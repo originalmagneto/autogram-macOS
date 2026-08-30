@@ -32,7 +32,7 @@
     <text x="236" y="290" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="8.5" fill="#7a8399">per-page CGContext → merge</text>
 
     <!-- surgery focal -->
-    <rect x="456" y="172" width="216 " height="88" rx="8" fill="rgba(235,108,54,0.08)" stroke="#eb6c36" stroke-width="1.2"/>
+    <rect x="456" y="172" width="216" height="88" rx="8" fill="rgba(235,108,54,0.08)" stroke="#eb6c36" stroke-width="1.2"/>
     <text x="468" y="194" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="9" fill="#eb6c36" font-weight="600">INKREMENTÁLNY ZÁPIS</text>
     <text x="468" y="212" font-size="11.5" font-weight="600" fill="#2d3142">%PDF-1.7 + pdfaid:part=2</text>
     <text x="468" y="228" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="8.5" fill="#4f5d75">+ XMP Metadata stream</text>

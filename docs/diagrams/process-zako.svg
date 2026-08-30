@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1160" height="460" viewBox="0 0 1160 460" role="img" aria-labelledby="proc-title proc-desc">
   <title id="proc-title">Proces zaručenej konverzie P→E</title>
-  <desc id="proc-desc">Osemkrokový proces: sken originálu, automatická analýza, detekcia prvkov, evidenčné číslo z EZZK, PDF/A konverzia, doložka, autorizácia KEP a zápis do CEZZK.</desc>
+  <desc id="proc-desc">Osemkrokový proces zaručenej konverzie: import a kontrola, automatická analýza, označenie prvkov, doložka, EZZK číslo a čas, PDF/A výstup, autorizácia a evidencia v CEZZK.</desc>
   <defs>
     <marker id="p-arr" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0,0 L8,4 L0,8 z" fill="#4f5d75"/>
@@ -16,7 +16,7 @@
 
   <!-- swimlane: advokát -->
   <line x1="32" y1="120" x2="1128" y2="120" stroke="#bfc0c0" stroke-width="1"/>
-  <text x="32" y="112" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="9" letter-spacing="1.4" fill="#7a8399">ADVOOKÁT</text>
+  <text x="32" y="112" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="9" letter-spacing="1.4" fill="#7a8399">ADVOKÁT</text>
   <!-- swimlane: autogram -->
   <line x1="32" y1="300" x2="1128" y2="300" stroke="#bfc0c0" stroke-width="1"/>
   <text x="32" y="292" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="9" letter-spacing="1.4" fill="#7a8399">AUTOGRAM - AUTOMATIKA</text>
@@ -74,12 +74,12 @@
   <!-- flow arrows -->
   <g stroke="#4f5d75" stroke-width="1" fill="none">
     <path d="M160,154 H192" marker-end="url(#p-arr)"/>
-    <path d="M272,176 V312" marker-end="url(#p-arr)"/>
+    <path d="M272,176 V296 Q272,304 280,304 V312" marker-end="url(#p-arr)"/>
     <path d="M348,344 H380" marker-end="url(#p-arr)"/>
-    <path d="M468,312 V182 H588" marker-end="url(#p-arr)"/>
+    <path d="M468,312 V194 Q468,186 476,186 H580 Q588,186 588,178" marker-end="url(#p-arr)"/>
     <path d="M552,344 H584" marker-end="url(#p-arr)"/>
-    <path d="M768,344 H800" marker-end="url(#p-arr)"/>
-    <path d="M892,312 V186 H768" marker-end="url(#p-arr-acc)"/>
+    <path d="M768,344 H792 Q800,344 800,336 V344" marker-end="url(#p-arr)"/>
+    <path d="M892,312 V194 Q892,186 884,186 H776 Q768,186 768,178" marker-end="url(#p-arr-acc)"/>
   </g>
 
   <!-- ezzk interactions -->

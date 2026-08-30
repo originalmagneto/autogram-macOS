@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1160" height="640" viewBox="0 0 1160 640" role="img" aria-labelledby="arch-title arch-desc">
   <title id="arch-title">Autogram macOS - architektúra</title>
-  <desc id="arch-desc">Vrstvená architektúra: SwiftUI aplikácia, session store a testovateľná knižnica AutogramKit s enginmi, dokumentovými službami a infraštruktúrou.</desc>
+  <desc id="arch-desc">Vrstvená architektúra Autogramu: SwiftUI aplikácia, session stores vrátane dávkového podpisovania a testovateľný AutogramKit s PDF, Vision, podpisovými a EZZK službami.</desc>
   <defs>
     <marker id="arr" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0,0 L8,4 L0,8 z" fill="#4f5d75"/>
@@ -43,14 +43,14 @@
   <!-- Focal store -->
   <rect x="352" y="276" width="456" height="56" rx="6" fill="rgba(235,108,54,0.08)" stroke="#eb6c36" stroke-width="1.2"/>
   <text x="580" y="300" text-anchor="middle" font-family="-apple-system, 'Helvetica Neue', Arial, sans-serif" font-size="13" font-weight="600" fill="#2d3142">@Observable session stores</text>
-  <text x="580" y="318" text-anchor="middle" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="9" fill="#4f5d75">SigningSessionStore · ZakoSessionStore · shared AppSettingsStore</text>
+  <text x="580" y="318" text-anchor="middle" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="9" fill="#4f5d75">SigningSessionStore · ZakoSessionStore · recent bookmarks</text>
 
   <!-- connectors views -> store -->
-  <line x1="250" y1="244" x2="420" y2="276" stroke="#4f5d75" stroke-width="1" marker-end="url(#arr)"/>
-  <line x1="407" y1="244" x2="480" y2="276" stroke="#4f5d75" stroke-width="1" marker-end="url(#arr)"/>
-  <line x1="571" y1="244" x2="580" y2="276" stroke="#4f5d75" stroke-width="1" marker-end="url(#arr)"/>
-  <line x1="728" y1="244" x2="690" y2="276" stroke="#4f5d75" stroke-width="1" marker-end="url(#arr)"/>
-  <line x1="882" y1="244" x2="720" y2="276" stroke="#4f5d75" stroke-width="1" marker-end="url(#arr)"/>
+  <path d="M250,244 V256 Q250,264 258,264 H384 Q392,264 392,272 V276" fill="none" stroke="#4f5d75" stroke-width="1" marker-end="url(#arr)"/>
+  <path d="M407,244 V252 Q407,260 415,260 H464 Q472,260 472,268 V276" fill="none" stroke="#4f5d75" stroke-width="1" marker-end="url(#arr)"/>
+  <path d="M571,244 V276" fill="none" stroke="#4f5d75" stroke-width="1" marker-end="url(#arr)"/>
+  <path d="M728,244 V252 Q728,260 720,260 H648 Q640,260 640,268 V276" fill="none" stroke="#4f5d75" stroke-width="1" marker-end="url(#arr)"/>
+  <path d="M882,244 V256 Q882,264 874,264 H728 Q720,264 720,272 V276" fill="none" stroke="#4f5d75" stroke-width="1" marker-end="url(#arr)"/>
 
   <!-- Layer 3: Kit -->
   <rect x="32" y="372" width="1096" height="236" rx="8" fill="#ececec" stroke="rgba(45,49,66,0.12)" stroke-width="1"/>
@@ -80,9 +80,9 @@
   <rect x="408" y="412" width="360" height="180" rx="8" fill="#f5f5f5" stroke="rgba(45,49,66,0.12)" stroke-width="1"/>
   <text x="424" y="434" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="9" letter-spacing="1.4" fill="#7a8399">DOKUMENTOVÉ SLUŽBY</text>
   <g font-family="-apple-system, 'Helvetica Neue', Arial, sans-serif" font-size="11.5" font-weight="600" fill="#2d3142">
-    <rect x="424" y="444" width="160 " height="44" rx="6" fill="rgba(235,108,54,0.08)" stroke="#eb6c36" stroke-width="1.2"/>
+    <rect x="424" y="444" width="160" height="44" rx="6" fill="rgba(235,108,54,0.08)" stroke="#eb6c36" stroke-width="1.2"/>
     <text x="504" y="462" text-anchor="middle">PDFAConverter</text>
-    <text x="504" y="478" text-anchor="middle" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="8.5" font-weight="400" fill="#4f5d75">XMP pdfaid · OutputIntent · validate</text>
+    <text x="504" y="478" text-anchor="middle" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="8.5" font-weight="400" fill="#4f5d75">XMP · OutputIntent · validácia</text>
     <rect x="592" y="444" width="160" height="44" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="0.8"/>
     <text x="672" y="462" text-anchor="middle">AttestationClauseGenerator</text>
     <text x="672" y="478" text-anchor="middle" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="8.5" font-weight="400" fill="#7a8399">XML schéma · SHA-256</text>
@@ -112,7 +112,7 @@
   </g>
 
   <!-- store -> kit connector -->
-  <line x1="580" y1="332" x2="588" y2="372" stroke="#eb6c36" stroke-width="1.2" marker-end="url(#arr-acc)"/>
+  <path d="M580,332 V348 Q580,356 588,356 V372" fill="none" stroke="#eb6c36" stroke-width="1.2" marker-end="url(#arr-acc)"/>
 
   <!-- legend -->
   <g font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="9" fill="#7a8399">
