@@ -49,13 +49,17 @@ struct SigningFlowView: View {
 
     @ViewBuilder
     private var stepContent: some View {
-        switch store.step {
-        case .intake:
-            SigningIntakeView(store: store)
-        case .prepare:
-            SigningPrepareView(store: store)
-        case .done:
-            SigningDoneView(store: store)
+        if store.batchPhase != .idle || !store.batchItems.isEmpty {
+            SigningBatchView(store: store)
+        } else {
+            switch store.step {
+            case .intake:
+                SigningIntakeView(store: store)
+            case .prepare:
+                SigningPrepareView(store: store)
+            case .done:
+                SigningDoneView(store: store)
+            }
         }
     }
 
@@ -173,13 +177,61 @@ struct SigningIntakeView: View {
         panel.begin { response in
             guard response == .OK else { return }
             Task { @MainActor in
-                await store.addDocuments(at: panel.urls)
+                let urls = panel.urls
+                if urls.count == 1 {
+                    await store.addDocuments(at: urls, selectLast: true)
+                } else {
+                    await store.addDocuments(at: urls, selectLast: false)
+                    let selectedURLs = Set(urls.map(\.standardizedFileURL))
+                    let ids = store.queue
+                        .filter {
+                            selectedURLs.contains($0.url.standardizedFileURL)
+                                && ($0.status == .ready || $0.status == .failed)
+                        }
+                        .map(\.id)
+                    await store.prepareBatch(ids: ids)
+                }
             }
         }
     }
 }
 
 // MARK: - Step 2: Prepare & Settings View
+enum SigningOutputFormatPresentation: CaseIterable, Identifiable {
+    case embeddedPAdES
+    case attachedASIC
+
+    var id: String { format.rawValue }
+
+    var format: SigningOutputFormat {
+        switch self {
+        case .embeddedPAdES:
+            .embeddedPAdES
+        case .attachedASIC:
+            .attachedASIC
+        }
+    }
+
+    var label: String {
+        switch self {
+        case .embeddedPAdES:
+            "PAdES"
+        case .attachedASIC:
+            "ASiC-E / XAdES"
+        }
+    }
+
+    var explanation: String {
+        switch self {
+        case .embeddedPAdES:
+            "PAdES vloží podpis priamo do PDF dokumentu."
+        case .attachedASIC:
+            "ASiC-E / XAdES vytvorí kontajner s podpísaným PDF dokumentom."
+        }
+    }
+}
+
+
 struct SigningPrepareView: View {
     @Bindable var store: SigningSessionStore
     @State private var customTSADraft = ""
@@ -406,6 +458,15 @@ struct SigningPrepareView: View {
         }
     }
 
+    private var selectedOutputFormatPresentation: SigningOutputFormatPresentation {
+        switch store.outputFormat {
+        case .embeddedPAdES:
+            .embeddedPAdES
+        case .attachedASIC:
+            .attachedASIC
+        }
+    }
+
     private var settingsContent: some View {
         VStack(alignment: .leading, spacing: 16) {
             // Section 1: Podpisový certifikát & PIN
@@ -437,8 +498,26 @@ struct SigningPrepareView: View {
                     if let selected = store.identities.first(where: { $0.id == store.selectedIdentityID }),
                        selected.requiresPIN {
                         VStack(alignment: .leading, spacing: 6) {
-                            SecureField("Zadajte PIN karty", text: $store.signingPIN)
-                                .textFieldStyle(.roundedBorder)
+                            HStack(spacing: 8) {
+                                SecureField("Zadajte PIN karty", text: $store.signingPIN)
+                                    .textFieldStyle(.roundedBorder)
+                                    .onSubmit {
+                                        Task {
+                                            await store.resolveCertificateForPreview(force: true)
+                                        }
+                                    }
+
+                                Button {
+                                    Task {
+                                        await store.resolveCertificateForPreview(force: true)
+                                    }
+                                } label: {
+                                    Label("Načítať certifikáty", systemImage: "arrow.clockwise")
+                                }
+                                .controlSize(.small)
+                                .disabled(store.signingPIN.isEmpty || store.isResolvingCertificate)
+                                .help("Načítať certifikáty z vloženej karty")
+                            }
 
                             Text("PIN sa používa iba na túto operáciu a neukladá sa.")
                                 .font(.caption2)
@@ -470,13 +549,17 @@ struct SigningPrepareView: View {
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
 
-                    Picker("", selection: $store.outputFormat) {
-                        ForEach(SigningOutputFormat.allCases) { format in
-                            Text(format.rawValue).tag(format)
+                    Picker("Formát výstupu", selection: $store.outputFormat) {
+                        ForEach(SigningOutputFormatPresentation.allCases) { presentation in
+                            Text(presentation.label).tag(presentation.format)
                         }
                     }
                     .labelsHidden()
-                    .pickerStyle(.menu)
+                    .pickerStyle(.segmented)
+
+                    Text(selectedOutputFormatPresentation.explanation)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
                 }
 
                 Divider().opacity(0.5)
@@ -747,5 +830,690 @@ struct SigningDoneView: View {
                 .padding(4)
             }
         }
+    }
+}
+
+// MARK: - Batch Review, Progress & Summary
+struct SigningBatchView: View {
+    @Bindable var store: SigningSessionStore
+
+    private var completedCount: Int {
+        store.batchItems.filter { $0.state == .signed }.count
+    }
+
+    private var failedCount: Int {
+        store.batchItems.filter { $0.state == .failed }.count
+    }
+
+    private var skippedCount: Int {
+        store.batchItems.filter { $0.state == .skipped }.count
+    }
+
+    private var cancelledCount: Int {
+        store.batchItems.filter { $0.state == .cancelled }.count
+    }
+
+    private var pendingCount: Int {
+        store.batchItems.filter { $0.state == .pending }.count
+    }
+
+    private var selectedIdentity: SigningIdentityInfo? {
+        store.identities.first { $0.id == store.selectedIdentityID }
+    }
+
+    private var requiresPIN: Bool {
+        selectedIdentity?.requiresPIN == true
+            || (!store.signingProviderIsDemo && store.batchSettingsSnapshot?.includeVisibleSignature == true)
+            || (!store.signingProviderIsDemo && store.identities.isEmpty)
+    }
+
+    private var pinMissing: Bool {
+        requiresPIN && store.signingPIN.isEmpty
+    }
+
+    private var hasBlockingItems: Bool {
+        store.batchItems.contains { $0.state == .failed }
+    }
+
+    private var canStart: Bool {
+        store.batchPhase == .ready && pendingCount > 0 && !hasBlockingItems && !pinMissing
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    header
+                    batchErrorBanner
+                    if store.batchPhase == .signing {
+                        progressCard
+                    }
+                    if store.batchPhase == .completed || store.batchPhase == .cancelled {
+                        summaryCard
+                    }
+                    settingsCard
+                    itemsCard
+                }
+                .padding(20)
+                .frame(maxWidth: 760)
+                .frame(maxWidth: .infinity)
+            }
+
+            StickyActionBar {
+                actionBar
+            }
+        }
+        .alert(item: $store.batchErrorDecisionRequest) { request in
+            Alert(
+                title: Text("Podpis dokumentu zlyhal"),
+                message: Text("\(request.displayName)\n\(request.errorMessage)"),
+                primaryButton: .default(Text("Pokračovať na ďalšie")) {
+                    store.decideBatchFailure(.continueBatch)
+                },
+                secondaryButton: .destructive(Text("Zastaviť dávku")) {
+                    store.decideBatchFailure(.stopBatch)
+                }
+            )
+        }
+    }
+
+    private var header: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: headerIcon)
+                .font(.title2)
+                .foregroundStyle(headerTint)
+                .frame(width: 38, height: 38)
+                .background(headerTint.opacity(0.12), in: Circle())
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(headerTitle)
+                    .font(.title2.weight(.bold))
+                Text(headerDetail)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Dávka podpisov")
+        .accessibilityValue("\(headerTitle). \(headerDetail)")
+    }
+
+    @ViewBuilder
+    private var batchErrorBanner: some View {
+        if let error = store.lastError, !error.isEmpty {
+            Label(error, systemImage: "exclamationmark.triangle.fill")
+                .font(.callout)
+                .foregroundStyle(.red)
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.red.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .strokeBorder(Color.red.opacity(0.18), lineWidth: 1)
+                )
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Chyba dávky")
+                .accessibilityValue(error)
+        }
+    }
+
+    private var settingsCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("Nastavenie dávky", systemImage: "slider.horizontal.3")
+                .font(.headline)
+
+            if requiresPIN {
+                VStack(alignment: .leading, spacing: 8) {
+                    SecureField("Zadajte PIN karty", text: $store.signingPIN)
+                        .textFieldStyle(.roundedBorder)
+                        .disabled(store.batchPhase == .preflighting || store.batchPhase == .signing)
+                        .accessibilityLabel("PIN podpisovej karty")
+                        .accessibilityValue(
+                            store.signingPIN.isEmpty ? "PIN nie je zadaný" : "PIN je zadaný"
+                        )
+
+                    HStack(spacing: 8) {
+                        Button {
+                            Task { await refreshCertificate() }
+                        } label: {
+                            Label("Obnoviť certifikát", systemImage: "arrow.clockwise")
+                        }
+                        .controlSize(.small)
+                        .disabled(store.batchPhase == .preflighting || store.batchPhase == .signing)
+                        .accessibilityLabel("Obnoviť podpisový certifikát")
+                        .accessibilityValue("Načítať certifikát z pripojenej karty")
+
+                        Text("PIN sa používa iba počas tejto operácie a neukladá sa.")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+            }
+
+            if let snapshot = store.batchSettingsSnapshot {
+                settingRow("Podpisový certifikát", value: snapshot.identityLabel)
+                settingRow("Formát výstupu", value: outputFormatLabel(snapshot.outputFormat))
+                settingRow(
+                    "Časová pečiatka",
+                    value: snapshot.includeQualifiedTimestamp
+                        ? (snapshot.tsaURL ?? "QTS zapnutá")
+                        : "Vypnutá"
+                )
+                settingRow("PDF/A", value: snapshot.convertToPDFA ? "Zapnuté" : "Vypnuté")
+                settingRow(
+                    "Vizuálna pečiatka",
+                    value: snapshot.includeVisibleSignature
+                        ? "Zapnutá"
+                        : "Vypnutá"
+                )
+            } else {
+                Text("Načítavam spoločné nastavenia a kontrolujem dokumenty…")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .glassCard(cornerRadius: 14, padding: 14)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Spoločné nastavenia dávky")
+    }
+
+    private func settingRow(_ title: String, value: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Spacer(minLength: 8)
+            Text(value)
+                .font(.caption.weight(.semibold))
+                .multilineTextAlignment(.trailing)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(title)
+        .accessibilityValue(value)
+    }
+
+    private var itemsCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Label("Dokumenty v dávke", systemImage: "doc.on.doc")
+                    .font(.headline)
+                Spacer()
+                Text("\(store.batchItems.count)")
+                    .font(.caption.weight(.semibold).monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
+
+            ForEach(store.batchItems) { item in
+                batchItemRow(item)
+            }
+        }
+        .glassCard(cornerRadius: 14, padding: 14)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Dokumenty v dávke, \(store.batchItems.count) položiek")
+    }
+
+    private func batchItemRow(_ item: SigningSessionStore.BatchItem) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(alignment: .top, spacing: 9) {
+                Image(systemName: itemIcon(item.state))
+                    .foregroundStyle(itemTint(item.state))
+                    .frame(width: 18)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(item.displayName)
+                        .font(.callout.weight(.medium))
+                        .lineLimit(2)
+                        .truncationMode(.middle)
+                    HStack(spacing: 6) {
+                        Text(itemStateLabel(item.state))
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(itemTint(item.state))
+                        Text(inputAvailability(item.url))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    if let inspectionState = item.inputSignatureState {
+                        Text("Podpisy vstupu: \(inputSignatureStateLabel(inspectionState))")
+                            .font(.caption2)
+                        .foregroundStyle(inspectionState == .valid ? Color.secondary : Color.red)
+                    }
+                    if let plannedOutputURL = item.plannedOutputURL {
+                        Text(
+                            item.outputURL == nil
+                                ? "Plánovaný výstup: \(plannedOutputURL.lastPathComponent)"
+                                : "Výstup: \(plannedOutputURL.lastPathComponent)"
+                        )
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    }
+                }
+
+                Spacer(minLength: 0)
+
+                if let outputURL = item.outputURL, item.state == .signed {
+                    Button {
+                        NSWorkspace.shared.activateFileViewerSelecting([outputURL])
+                    } label: {
+                        Image(systemName: "folder")
+                    }
+                    .buttonStyle(.borderless)
+                    .help("Ukázať výstup vo Finderi")
+                    .accessibilityLabel("Ukázať výstup dokumentu \(item.displayName) vo Finderi")
+                    .accessibilityValue(outputURL.lastPathComponent)
+                }
+            }
+
+            if let error = item.errorMessage, !error.isEmpty {
+                Label(error, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption2)
+                    .foregroundStyle(.red)
+                    .padding(.leading, 27)
+            }
+        }
+        .padding(.vertical, 5)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Dokument \(item.displayName)")
+        .accessibilityValue(itemAccessibilityValue(item))
+    }
+
+    private var progressCard: some View {
+        let total = max(store.batchItems.count, 1)
+        let currentName = store.batchCurrentIndex.flatMap { index in
+            store.batchItems.indices.contains(index) ? store.batchItems[index].displayName : nil
+        }
+
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Label("Priebeh podpisovania", systemImage: "arrow.triangle.2.circlepath")
+                    .font(.headline)
+                Spacer()
+                Text("\(completedCount) z \(store.batchItems.count)")
+                    .font(.caption.weight(.semibold).monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
+
+            ProgressView(value: Double(completedCount), total: Double(total))
+                .progressViewStyle(.linear)
+                .tint(.accentColor)
+
+            if let currentName {
+                Label("Aktuálny dokument: \(currentName)", systemImage: "signature")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            HStack(spacing: 12) {
+                progressMetric("Hotové", count: completedCount, tint: .green, symbol: "checkmark.circle.fill")
+                progressMetric("Zlyhania", count: failedCount, tint: .red, symbol: "xmark.circle.fill")
+            }
+        }
+        .glassCard(cornerRadius: 14, padding: 14)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Priebeh podpisovania")
+        .accessibilityValue(
+            "\(completedCount) z \(store.batchItems.count) hotových, \(failedCount) zlyhaní"
+            + (currentName.map { ", podpisuje sa \($0)" } ?? "")
+        )
+    }
+
+    private func progressMetric(_ title: String, count: Int, tint: Color, symbol: String) -> some View {
+        Label("\(title): \(count)", systemImage: symbol)
+            .font(.caption)
+            .foregroundStyle(tint)
+    }
+
+    private var summaryCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label(
+                store.batchPhase == .completed ? "Dávka dokončená" : "Dávka zrušená",
+                systemImage: store.batchPhase == .completed
+                    ? "checkmark.seal.fill"
+                    : "pause.circle.fill"
+            )
+            .font(.headline)
+            .foregroundStyle(store.batchPhase == .completed ? .green : .orange)
+
+            LazyVGrid(
+                columns: [
+                    GridItem(.flexible(), alignment: .leading),
+                    GridItem(.flexible(), alignment: .leading)
+                ],
+                spacing: 8
+            ) {
+                summaryMetric("Úspešné", count: completedCount, tint: .green)
+                summaryMetric("Neúspešné", count: failedCount, tint: .red)
+                summaryMetric("Preskočené", count: skippedCount, tint: .orange)
+                summaryMetric("Zrušené", count: cancelledCount, tint: .secondary)
+            }
+        }
+        .glassCard(cornerRadius: 14, padding: 14)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Záverečné zhrnutie dávky")
+        .accessibilityValue(
+            "\(completedCount) úspešných, \(failedCount) neúspešných, "
+            + "\(skippedCount) preskočených, \(cancelledCount) zrušených"
+        )
+    }
+
+    private func summaryMetric(_ title: String, count: Int, tint: Color) -> some View {
+        HStack(spacing: 7) {
+            Circle()
+                .fill(tint)
+                .frame(width: 8, height: 8)
+            Text("\(title): \(count)")
+                .font(.caption)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(title)
+        .accessibilityValue("\(count)")
+    }
+
+    @ViewBuilder
+    private var actionBar: some View {
+        switch store.batchPhase {
+        case .preflighting:
+            ProgressView("Kontrolujem dokumenty…")
+                .font(.callout)
+            Spacer()
+            Button("Zrušiť kontrolu") {
+                store.cancelBatch()
+            }
+            .buttonStyle(.bordered)
+            .accessibilityLabel("Zrušiť kontrolu dávky")
+            .accessibilityValue("Kontrola preflightu prebieha")
+        case .ready, .idle:
+            Button {
+                beginNewBatch()
+            } label: {
+                Label("Iná dávka", systemImage: "chevron.left")
+            }
+            .controlSize(.large)
+            .accessibilityLabel("Vybrať inú dávku")
+
+            if !store.batchItems.isEmpty {
+                Button {
+                    let ids = store.batchItems.map(\.id)
+                    Task { await store.prepareBatch(ids: ids) }
+                } label: {
+                    Label("Znova skontrolovať", systemImage: "arrow.clockwise")
+                }
+                .controlSize(.large)
+                .disabled(store.batchPhase == .preflighting || store.batchPhase == .signing)
+                .accessibilityLabel("Znova skontrolovať dávku")
+                .accessibilityValue("Spustiť preflight dokumentov a nastavení")
+            }
+
+            Spacer()
+
+            if canStart {
+                Button {
+                    Task { await store.startBatch() }
+                } label: {
+                    Label("Spustiť dávku", systemImage: "signature.badge.checkmark")
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .accessibilityLabel("Spustiť dávku podpisov")
+                .accessibilityValue("\(pendingCount) dokumentov čaká na podpis")
+            } else if store.batchPhase == .ready {
+                Text(
+                    pinMissing
+                        ? "Zadajte PIN a znova skontrolujte dávku."
+                        : "Odstráňte blokujúce problémy pred spustením."
+                )
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .accessibilityLabel("Dávku nie je možné spustiť")
+                    .accessibilityValue(
+                        pinMissing
+                            ? "Zadajte PIN a znova skontrolujte dávku"
+                            : "Odstráňte blokujúce problémy"
+                    )
+            }
+        case .signing:
+            Text("Podpisujem dokumenty…")
+                .font(.callout)
+            Spacer()
+            Button("Zrušiť dávku") {
+                store.cancelBatch()
+            }
+            .buttonStyle(.bordered)
+            .accessibilityLabel("Zrušiť podpisovanie dávky")
+            .accessibilityValue("Dávka je v priebehu")
+        case .completed, .cancelled:
+            Button {
+                beginNewBatch()
+            } label: {
+                Label("Nová dávka", systemImage: "plus")
+            }
+            .controlSize(.large)
+            .accessibilityLabel("Začať novú dávku")
+
+            Spacer()
+
+            if failedCount > 0 {
+                Button {
+                    Task { await store.retryFailedBatchItems() }
+                } label: {
+                    Label("Opakovať neúspešné", systemImage: "arrow.clockwise")
+                }
+                .controlSize(.large)
+                .accessibilityLabel("Opakovať neúspešné dokumenty")
+                .accessibilityValue("\(failedCount) dokumentov")
+            }
+
+            if store.batchItems.contains(where: { $0.outputURL != nil }) {
+                Button {
+                    revealOutputs()
+                } label: {
+                    Label("Ukázať výstupy", systemImage: "folder")
+                }
+                .controlSize(.large)
+                .accessibilityLabel("Ukázať podpísané výstupy vo Finderi")
+                .accessibilityValue("\(completedCount) súborov")
+            }
+
+            Button {
+                exportLog()
+            } label: {
+                Label("Exportovať protokol…", systemImage: "square.and.arrow.down")
+            }
+            .controlSize(.large)
+            .accessibilityLabel("Exportovať protokol dávky")
+            .accessibilityValue("Uložiť textový protokol do vybraného súboru")
+        }
+    }
+
+    private var headerTitle: String {
+        switch store.batchPhase {
+        case .preflighting: "Kontrola dávky"
+        case .ready: "Dávka pripravená na podpis"
+        case .signing: "Podpisovanie dávky"
+        case .completed: "Dávka dokončená"
+        case .cancelled: "Dávka zrušená"
+        case .idle: "Kontrola dávky"
+        }
+    }
+
+    private var headerDetail: String {
+        switch store.batchPhase {
+        case .preflighting:
+            "Overujem dostupnosť súborov a spoločné nastavenia."
+        case .ready:
+            hasBlockingItems
+                ? "Niektoré dokumenty obsahujú blokujúce problémy."
+                : "\(pendingCount) dokumentov je pripravených na podpis."
+        case .signing:
+            "Dokumenty sa podpisujú postupne. Výstupy sa ukladajú bezpečne."
+        case .completed:
+            "Skontrolujte výsledky a prípadne zopakujte neúspešné dokumenty."
+        case .cancelled:
+            "Podpisovanie bolo zastavené; hotové výstupy zostali zachované."
+        case .idle:
+            "Preflight dávky sa nedokončil."
+        }
+    }
+
+    private var headerIcon: String {
+        switch store.batchPhase {
+        case .preflighting: "checklist"
+        case .ready: "signature"
+        case .signing: "arrow.triangle.2.circlepath"
+        case .completed: "checkmark.seal.fill"
+        case .cancelled: "pause.circle.fill"
+        case .idle: "exclamationmark.triangle.fill"
+        }
+    }
+
+    private var headerTint: Color {
+        switch store.batchPhase {
+        case .preflighting, .signing: .accentColor
+        case .ready: .blue
+        case .completed: .green
+        case .cancelled: .orange
+        case .idle: .red
+        }
+    }
+
+    private func itemAccessibilityValue(_ item: SigningSessionStore.BatchItem) -> String {
+        var value = "\(itemStateLabel(item.state)); \(inputAvailability(item.url))"
+        if let inspectionState = item.inputSignatureState {
+            value += "; vstupné podpisy \(inputSignatureStateLabel(inspectionState))"
+        }
+        if let detail = item.inputSignatureDetail, !detail.isEmpty {
+            value += "; detail \(detail)"
+        }
+        if let error = item.errorMessage, !error.isEmpty {
+            value += "; blokovanie: \(error)"
+        }
+        if let planned = item.plannedOutputURL, item.outputURL == nil {
+            value += "; plánovaný výstup \(planned.lastPathComponent)"
+        }
+        if let output = item.outputURL {
+            value += "; výstup \(output.lastPathComponent)"
+        }
+        return value
+    }
+
+    private func inputAvailability(_ url: URL) -> String {
+        FileManager.default.isReadableFile(atPath: url.path) ? "Vstup dostupný" : "Vstup nedostupný"
+    }
+
+    private func inputSignatureStateLabel(
+        _ state: InputSignatureInspectionResult.State
+    ) -> String {
+        switch state {
+        case .valid: "Overené"
+        case .invalid: "Neplatné alebo konfliktné"
+        case .unknown: "Neznáme"
+        case .unavailable: "Nedostupné"
+        }
+    }
+
+    private func itemIcon(_ state: SigningSessionStore.BatchItemState) -> String {
+        switch state {
+        case .pending: "circle"
+        case .signing: "arrow.triangle.2.circlepath"
+        case .signed: "checkmark.circle.fill"
+        case .failed: "exclamationmark.triangle.fill"
+        case .skipped: "forward.end"
+        case .cancelled: "xmark.circle"
+        }
+    }
+
+    private func itemTint(_ state: SigningSessionStore.BatchItemState) -> Color {
+        switch state {
+        case .pending: .secondary
+        case .signing: .accentColor
+        case .signed: .green
+        case .failed: .red
+        case .skipped: .orange
+        case .cancelled: .secondary
+        }
+    }
+
+    private func itemStateLabel(_ state: SigningSessionStore.BatchItemState) -> String {
+        switch state {
+        case .pending: "Čaká"
+        case .signing: "Podpisuje sa"
+        case .signed: "Podpísané"
+        case .failed: "Zlyhalo"
+        case .skipped: "Preskočené"
+        case .cancelled: "Zrušené"
+        }
+    }
+
+    private func outputFormatLabel(_ format: SigningOutputFormat) -> String {
+        switch format {
+        case .embeddedPAdES: "PAdES"
+        case .attachedASIC: "ASiC-E / XAdES"
+        }
+    }
+
+    private func beginNewBatch() {
+        store.batchItems = []
+        store.batchPhase = .idle
+        store.batchErrorDecisionRequest = nil
+        store.reset()
+        store.step = .intake
+    }
+
+    private func refreshCertificate() async {
+        await store.refreshIdentities()
+        if !store.signingProviderIsDemo, !store.signingPIN.isEmpty {
+            await store.resolveCertificateForPreview(force: true)
+        }
+    }
+
+    private func revealOutputs() {
+        let outputs = store.batchItems.compactMap(\.outputURL)
+        guard !outputs.isEmpty else { return }
+        NSWorkspace.shared.activateFileViewerSelecting(outputs)
+    }
+
+    private func exportLog() {
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.plainText]
+        panel.allowsOtherFileTypes = false
+        panel.canCreateDirectories = true
+        panel.nameFieldStringValue = "autogram-davka.txt"
+        panel.message = "Vyberte miesto na uloženie protokolu dávky."
+        panel.begin { response in
+            guard response == .OK, let url = panel.url else { return }
+            do {
+                try batchLog().write(to: url, atomically: true, encoding: .utf8)
+            } catch {
+                store.lastError = "Protokol sa nepodarilo uložiť: \(error.localizedDescription)"
+            }
+        }
+    }
+
+    private func batchLog() -> String {
+        var lines = [
+            "Autogram: protokol podpisovania dávky",
+            "Stav: \(headerTitle)",
+            "Úspešné: \(completedCount)",
+            "Neúspešné: \(failedCount)",
+            "Preskočené: \(skippedCount)",
+            "Zrušené: \(cancelledCount)",
+            "",
+            "Dokumenty:"
+        ]
+
+        for item in store.batchItems {
+            lines.append("- \(item.displayName): \(itemStateLabel(item.state))")
+            lines.append("  Vstup: \(item.url.path)")
+            if let outputURL = item.outputURL {
+                lines.append("  Výstup: \(outputURL.path)")
+            }
+            if let error = item.errorMessage, !error.isEmpty {
+                lines.append("  Chyba: \(error)")
+            }
+        }
+        return lines.joined(separator: "\n") + "\n"
     }
 }

@@ -75,4 +75,25 @@ final class LLMVisionParserTests: XCTestCase {
                           "Default prompt musí pokrývať: \(keyword)")
         }
     }
+    func testDefaultPromptUsesStrictPhysicalVisibilityContract() {
+        let prompt = LLMVisionParser.systemPrompt.lowercased()
+        for instruction in [
+            "physically visible",
+            "do not infer text",
+            "tight bounding boxes",
+            "every occurrence",
+            "if uncertain, omit",
+            "json only"
+        ] {
+            XCTAssertTrue(prompt.contains(instruction), "Default prompt musí obsahovať: \(instruction)")
+        }
+    }
+
+    func testAIModePromptApplicability() {
+        XCTAssertTrue(AppSettings.AIMode.omlxLocal.supportsPromptOverride)
+        XCTAssertTrue(AppSettings.AIMode.ollamaLocal.supportsPromptOverride)
+        XCTAssertTrue(AppSettings.AIMode.customAPIKey.supportsPromptOverride)
+        XCTAssertFalse(AppSettings.AIMode.builtInOnDevice.supportsPromptOverride)
+        XCTAssertFalse(AppSettings.AIMode.disabled.supportsPromptOverride)
+    }
 }

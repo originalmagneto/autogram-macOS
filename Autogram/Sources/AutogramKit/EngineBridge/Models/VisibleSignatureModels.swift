@@ -16,6 +16,12 @@ public struct VisibleSignaturePlacement: Sendable, Equatable {
     public var pageIndex: Int
     public var pageRect: CGRect
     public var rotationDegrees: Double
+
+    public init(pageIndex: Int, pageRect: CGRect, rotationDegrees: Double) {
+        self.pageIndex = pageIndex
+        self.pageRect = pageRect
+        self.rotationDegrees = rotationDegrees
+    }
 }
 
 public struct VisibleSignatureCardContent: Sendable, Equatable {

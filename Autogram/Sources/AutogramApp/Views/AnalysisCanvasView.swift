@@ -39,6 +39,16 @@ struct AnalysisCanvasView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            if let warning = store.analysisWarning {
+                Label(warning, systemImage: "exclamationmark.triangle.fill")
+                    .font(.footnote)
+                    .foregroundStyle(.orange)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(Color.orange.opacity(0.1))
+            }
+
             HSplitView {
                 HStack(spacing: 0) {
                     if store.analysis.totalPages > 1 {

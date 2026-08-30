@@ -5,17 +5,21 @@ import AutogramKit
 @Observable
 final class AutogramAppModel {
     let settingsStore: AppSettingsStore
+    let recentDocumentStore: RecentDocumentStore
     let signingStore: SigningSessionStore
     let zakoStore: ZakoSessionStore
     let ezzkSessionController: EZZKSessionController
 
     init() {
         let settings = AppSettingsStore()
+        let recentDocuments = RecentDocumentStore(settingsStore: settings)
         settingsStore = settings
+        recentDocumentStore = recentDocuments
         ezzkSessionController = settings.ezzkSessionController
         signingStore = SigningSessionStore(
             signingProvider: settings.signingProvider,
-            settingsStore: settings)
+            settingsStore: settings,
+            recentDocumentStore: recentDocuments)
         zakoStore = ZakoSessionStore(settingsStore: settings)
     }
 }

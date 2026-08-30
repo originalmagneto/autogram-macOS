@@ -51,6 +51,16 @@ public struct AppSettings: Codable, Sendable {
         case disabled = "Vypnuté"
 
         public var id: String { rawValue }
+
+        /// The prompt is sent only to an explicitly selected external LLM.
+        public var supportsPromptOverride: Bool {
+            switch self {
+            case .omlxLocal, .ollamaLocal, .customAPIKey:
+                return true
+            case .builtInOnDevice, .disabled:
+                return false
+            }
+        }
     }
 
     public var aiMode: AIMode
@@ -70,6 +80,7 @@ public struct AppSettings: Codable, Sendable {
     public var ezzkUsername: String
     public var ezzkNotificationEmail: String
     public var ezzkEdeskAddress: String
+    public var retainRecentDocuments: Bool
 
     private enum CodingKeys: String, CodingKey {
         case aiMode, aiPrompt
@@ -79,6 +90,7 @@ public struct AppSettings: Codable, Sendable {
         case customTSAServers, selectedTSAURL, legacyTSAURL = "tsaURL"
         case pdfaMode, profiles, activeProfileID
         case ezzkICO, ezzkUsername, ezzkNotificationEmail, ezzkEdeskAddress
+        case retainRecentDocuments
     }
 
     public init(aiMode: AIMode = .builtInOnDevice,
@@ -97,7 +109,8 @@ public struct AppSettings: Codable, Sendable {
                 ezzkICO: String = "",
                 ezzkUsername: String = "",
                 ezzkNotificationEmail: String = "",
-                ezzkEdeskAddress: String = "") {
+                ezzkEdeskAddress: String = "",
+                retainRecentDocuments: Bool = false) {
         self.aiMode = aiMode
         self.aiPrompt = aiPrompt
         self.omlxURL = omlxURL
@@ -115,6 +128,7 @@ public struct AppSettings: Codable, Sendable {
         self.ezzkUsername = ezzkUsername
         self.ezzkNotificationEmail = ezzkNotificationEmail
         self.ezzkEdeskAddress = ezzkEdeskAddress
+        self.retainRecentDocuments = retainRecentDocuments
     }
 
     public init(from decoder: Decoder) throws {
@@ -155,6 +169,7 @@ public struct AppSettings: Codable, Sendable {
         self.ezzkUsername = try container.decodeIfPresent(String.self, forKey: .ezzkUsername) ?? ""
         self.ezzkNotificationEmail = try container.decodeIfPresent(String.self, forKey: .ezzkNotificationEmail) ?? ""
         self.ezzkEdeskAddress = try container.decodeIfPresent(String.self, forKey: .ezzkEdeskAddress) ?? ""
+        self.retainRecentDocuments = try container.decodeIfPresent(Bool.self, forKey: .retainRecentDocuments) ?? false
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -176,6 +191,7 @@ public struct AppSettings: Codable, Sendable {
         try container.encode(ezzkUsername, forKey: .ezzkUsername)
         try container.encode(ezzkNotificationEmail, forKey: .ezzkNotificationEmail)
         try container.encode(ezzkEdeskAddress, forKey: .ezzkEdeskAddress)
+        try container.encode(retainRecentDocuments, forKey: .retainRecentDocuments)
     }
 
     public var availableTSAServers: [TimestampAuthority] {

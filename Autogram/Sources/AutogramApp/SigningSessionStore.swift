@@ -23,7 +23,15 @@ final class SigningSessionStore {
     var selectedVisualAppearanceID = VisualSignatureAppearance.textID
     var convertToPDFA = false
     var outputFormat: SigningOutputFormat = .attachedASIC
-    var signingPIN = ""
+    var signingPIN = "" {
+        didSet {
+            guard oldValue != signingPIN, batchPhase == .ready else { return }
+            batchSettingsSnapshot = nil
+            batchPIN = nil
+            batchPhase = .idle
+            lastError = "PIN sa zmenil. Dávku znova skontrolujte pred spustením."
+        }
+    }
     var signaturePage: Int = 0
     var signatureRect = NormalizedRect(x: 0.58, y: 0.80, width: 0.30, height: 0.09)
 
@@ -46,6 +54,17 @@ final class SigningSessionStore {
 
     var queue: [SigningQueueItem] = []
     var selectedQueueID: UUID?
+
+    var batchPhase: BatchPhase = .idle
+    var batchItems: [BatchItem] = []
+    var batchCompletedCount = 0
+    var batchFailedCount = 0
+    var batchCurrentIndex: Int?
+    var batchErrorDecisionRequest: BatchFailureDecisionRequest?
+    private(set) var batchSettingsSnapshot: BatchSettingsSnapshot?
+    private var batchPIN: String?
+    private var batchGeneration = UUID()
+    private var batchDecisionContinuation: CheckedContinuation<BatchFailureDecision, Never>?
 
     struct SigningQueueItem: Identifiable, Hashable {
         enum Status: Hashable {
@@ -71,9 +90,96 @@ final class SigningSessionStore {
             self.errorMessage = errorMessage
         }
     }
+    enum BatchPhase: Equatable {
+        case idle
+        case preflighting
+        case ready
+        case signing
+        case completed
+        case cancelled
+    }
+
+    enum BatchFailureDecision {
+        case continueBatch
+        case stopBatch
+    }
+
+    enum BatchItemState: Equatable {
+        case pending
+        case signing
+        case signed
+        case failed
+        case skipped
+        case cancelled
+    }
+
+    struct BatchItem: Identifiable, Hashable {
+        let id: UUID
+        let displayName: String
+        let url: URL
+        var state: BatchItemState
+        var errorMessage: String?
+        var outputURL: URL?
+        var plannedOutputURL: URL?
+        var inputSignatureState: InputSignatureInspectionResult.State?
+        var inputSignatureDetail: String?
+
+        init(
+            id: UUID,
+            displayName: String,
+            url: URL,
+            state: BatchItemState = .pending,
+            errorMessage: String? = nil,
+            outputURL: URL? = nil,
+            plannedOutputURL: URL? = nil,
+            inputSignatureState: InputSignatureInspectionResult.State? = nil,
+            inputSignatureDetail: String? = nil
+        ) {
+            self.id = id
+            self.displayName = displayName
+            self.url = url
+            self.state = state
+            self.errorMessage = errorMessage
+            self.outputURL = outputURL
+            self.plannedOutputURL = plannedOutputURL
+            self.inputSignatureState = inputSignatureState
+            self.inputSignatureDetail = inputSignatureDetail
+        }
+
+        var plannedOutputLabel: String? {
+            plannedOutputURL?.lastPathComponent
+        }
+    }
+
+    struct BatchFailureDecisionRequest: Identifiable, Equatable {
+        let itemID: UUID
+        let displayName: String
+        let errorMessage: String
+
+        var id: UUID { itemID }
+    }
+
+    struct BatchSettingsSnapshot: Sendable, Equatable {
+        let outputFormat: SigningOutputFormat
+        let includeQualifiedTimestamp: Bool
+        let tsaURL: String?
+        let convertToPDFA: Bool
+        let pdfaMode: PDFAConversionMode
+        let selectedIdentityID: String
+        let identityLabel: String
+        let identityIsQualified: Bool
+        let includeVisibleSignature: Bool
+        let selectedVisualAppearanceID: String
+        let visualArtworkOverride: Data?
+        let visualPlacement: VisibleSignaturePlacement?
+        let signaturePage: Int
+        let signatureRect: NormalizedRect
+    }
 
     let signingProvider: any QualifiedSigningProviding
     let settingsStore: AppSettingsStore
+    let recentDocumentStore: RecentDocumentStore
+    let outputService = OutputService()
     let stamper = VisibleSignatureStamper()
 
     var settings: AppSettings { settingsStore.settings }
@@ -96,9 +202,14 @@ final class SigningSessionStore {
         }
     }
 
-    init(signingProvider: any QualifiedSigningProviding, settingsStore: AppSettingsStore) {
+    init(
+        signingProvider: any QualifiedSigningProviding,
+        settingsStore: AppSettingsStore,
+        recentDocumentStore: RecentDocumentStore
+    ) {
         self.signingProvider = signingProvider
         self.settingsStore = settingsStore
+        self.recentDocumentStore = recentDocumentStore
     }
 
     func loadDocument(at url: URL) async {
@@ -116,6 +227,7 @@ final class SigningSessionStore {
             }
             let item = SigningQueueItem(url: url)
             queue.append(item)
+            recentDocumentStore.record(url: url)
             lastID = item.id
         }
         if selectLast, let lastID {
@@ -160,11 +272,11 @@ final class SigningSessionStore {
         await refreshIdentities()
         await inspectExistingSignatures()
     }
-
     func removeQueueItem(_ id: UUID) {
+        guard batchPhase != .preflighting, batchPhase != .ready, batchPhase != .signing else { return }
         queue.removeAll { $0.id == id }
         if selectedQueueID == id {
-            selectedQueueID = queue.first?.id
+            selectedQueueID = nil
             document = nil
             sourceURL = nil
             if queue.isEmpty {
@@ -257,7 +369,7 @@ final class SigningSessionStore {
                         certificateLoadError ?? "Pred vizuálnym podpisom sa nepodarilo načítať certifikát.")
                 }
             }
-            // Pôvodné bajty súboru (ako v originálnom Autograme) — PDFKit rewrite až keď je nutný.
+            // Pôvodné bajty súboru (ako v originálnom Autograme): PDFKit rewrite až keď je nutný.
             var pdfData: Data
             if let sourceURL, let original = try? Data(contentsOf: sourceURL), !original.isEmpty {
                 pdfData = original
@@ -274,7 +386,7 @@ final class SigningSessionStore {
             if convertToPDFA, !pdfData.isEmpty {
                 statusText = "Konvertujem do PDF/A…"
                 let title = sourceURL?.deletingPathExtension().lastPathComponent ?? ""
-                // PAdES DSS rozbije vektorový incremental PDF/A — raster je jediný spoľahlivý vstup.
+                // PAdES DSS rozbije vektorový incremental PDF/A: raster je jediný spoľahlivý vstup.
                 let mode: PDFAConversionMode = outputFormat == .embeddedPAdES
                     ? .rasterGuaranteed
                     : pdfaMode
@@ -330,7 +442,7 @@ final class SigningSessionStore {
                     pageIndex: visualPlacement?.pageIndex ?? min(signaturePage, analysis.totalPages - 1),
                     normalizedRect: signatureRect,
                     imagePNG: artworkPNG,
-                    // Po PDF/A rasteri sú iné rozmery strany — vždy mapovať z normalizovaného rectu na aktuálne PDF.
+                    // Po PDF/A rasteri sú iné rozmery strany: vždy mapovať z normalizovaného rectu na aktuálne PDF.
                     pdfPageRect: convertToPDFA ? nil : visualPlacement?.pageRect,
                     rotationDegrees: visualPlacement?.rotationDegrees ?? 0,
                     qualification: identities.first(where: { $0.id == identityID })?.isQualified == true
@@ -426,6 +538,625 @@ final class SigningSessionStore {
         }
     }
 
+    func prepareBatch(ids: [UUID]) async {
+        guard batchPhase != .preflighting, batchPhase != .signing else { return }
+        invalidateBatchWork()
+        let generation = batchGeneration
+        batchPhase = .preflighting
+        batchItems = []
+        batchCompletedCount = 0
+        batchFailedCount = 0
+        batchCurrentIndex = nil
+        batchErrorDecisionRequest = nil
+        batchSettingsSnapshot = nil
+        batchPIN = nil
+        lastError = nil
+
+        var seenURLs = Set<URL>()
+        var selectedItems: [SigningQueueItem] = []
+        var inputErrors: [String] = []
+        for id in ids {
+            guard let item = queue.first(where: { $0.id == id }) else {
+                inputErrors.append("Dokument s identifikátorom \(id.uuidString) sa nenachádza vo fronte.")
+                continue
+            }
+            guard item.status == .ready || item.status == .failed else {
+                inputErrors.append("Dokument \(item.displayName) nie je pripravený na podpis.")
+                continue
+            }
+            let standardizedURL = item.url.standardizedFileURL
+            guard seenURLs.insert(standardizedURL).inserted else { continue }
+            selectedItems.append(item)
+        }
+
+        guard !selectedItems.isEmpty, inputErrors.isEmpty else {
+            if selectedItems.isEmpty, inputErrors.isEmpty {
+                inputErrors.append("Na podpisovanie nebol vybraný žiadny dokument.")
+            }
+            batchItems = selectedItems.map {
+                BatchItem(id: $0.id, displayName: $0.displayName, url: $0.url,
+                          state: .failed, errorMessage: inputErrors.first)
+            }
+            batchFailedCount = batchItems.count
+            batchPhase = .idle
+            lastError = inputErrors.joined(separator: " ")
+            return
+        }
+
+        batchItems = selectedItems.map {
+            BatchItem(id: $0.id, displayName: $0.displayName, url: $0.url)
+        }
+
+        var blockingErrors: [String] = inputErrors
+        guard batchGeneration == generation else { return }
+        var documents: [UUID: PDFDocument] = [:]
+        for item in selectedItems {
+            let secured = item.url.startAccessingSecurityScopedResource()
+            defer { if secured { item.url.stopAccessingSecurityScopedResource() } }
+            guard item.url.isFileURL,
+                  FileManager.default.isReadableFile(atPath: item.url.path),
+                  let document = PDFDocument(url: item.url),
+                  document.pageCount > 0 else {
+                let message = "Dokument \(item.displayName) sa nepodarilo načítať ako PDF."
+                if let batchIndex = batchItems.firstIndex(where: { $0.id == item.id }) {
+                    batchItems[batchIndex].state = .failed
+                    batchItems[batchIndex].errorMessage = message
+                }
+                continue
+            }
+            documents[item.id] = document
+        }
+
+        if documents.isEmpty {
+            let messages = batchItems.compactMap(\.errorMessage)
+            batchFailedCount = batchItems.count
+            batchPhase = .idle
+            lastError = messages.joined(separator: " ")
+            return
+        }
+
+        let discovered = await signingProvider.availableIdentities()
+        guard batchGeneration == generation else { return }
+        identities = discovered
+        if selectedIdentityID == nil {
+            selectedIdentityID = discovered.first(where: { $0.isMandateCertificate })?.id
+                ?? discovered.first?.id
+        }
+        guard batchGeneration == generation else { return }
+        guard let discoveredIdentityID = selectedIdentityID,
+              var identity = discovered.first(where: { $0.id == discoveredIdentityID }) else {
+            blockingErrors.append("Nie je dostupný podpisový certifikát.")
+            finishBatchPreflight(blockingErrors: blockingErrors)
+            return
+        }
+        guard identity.hasPrivateKey else {
+            blockingErrors.append("Vybraný certifikát nemá dostupný súkromný kľúč.")
+            finishBatchPreflight(blockingErrors: blockingErrors)
+            return
+        }
+
+        for item in selectedItems {
+            guard documents[item.id] != nil else { continue }
+            let secured = item.url.startAccessingSecurityScopedResource()
+            defer { if secured { item.url.stopAccessingSecurityScopedResource() } }
+            let inspection = await signingProvider.inspectInputSignatures(in: item.url)
+            guard batchGeneration == generation else { return }
+            guard let batchIndex = batchItems.firstIndex(where: { $0.id == item.id }) else {
+                continue
+            }
+            batchItems[batchIndex].inputSignatureState = inspection.state
+            batchItems[batchIndex].inputSignatureDetail = inspection.detail
+            guard inspection.state == .valid else {
+                batchItems[batchIndex].state = .failed
+                batchItems[batchIndex].errorMessage = inspection.detail
+                continue
+            }
+        }
+
+        let pin = signingPIN
+        let requiresCertificateResolution = identity.requiresPIN
+            || discoveredIdentityID.hasPrefix(EngineBridgeSigningProvider.syntheticIdentityIDPrefix)
+        guard !identity.requiresPIN || !pin.isEmpty else {
+            blockingErrors.append("Pre vybraný certifikát je potrebný PIN.")
+            finishBatchPreflight(blockingErrors: blockingErrors)
+            return
+        }
+        if requiresCertificateResolution {
+            let resolved = await signingProvider.resolveIdentities(pin: pin)
+            guard batchGeneration == generation else { return }
+            if let resolved, !resolved.isEmpty {
+                identities = resolved
+                if let matching = resolved.first(where: { $0.id == discoveredIdentityID }) {
+                    identity = matching
+                } else if discoveredIdentityID.hasPrefix(
+                    EngineBridgeSigningProvider.syntheticIdentityIDPrefix) {
+                    guard let authoritative = resolved.first(where: { $0.isMandateCertificate })
+                        ?? resolved.first else {
+                        blockingErrors.append("Po overení PIN nie je dostupný podpisový certifikát.")
+                        finishBatchPreflight(blockingErrors: blockingErrors)
+                        return
+                    }
+                    identity = authoritative
+                    selectedIdentityID = authoritative.id
+                } else {
+                    blockingErrors.append("Vybraný certifikát sa po overení PIN nedal nájsť.")
+                    finishBatchPreflight(blockingErrors: blockingErrors)
+                    return
+                }
+            } else {
+                identities = []
+                blockingErrors.append("Po overení PIN nie je dostupný podpisový certifikát.")
+            }
+        }
+
+        let identityID = identity.id
+        let effectiveVisualPage = visualPlacement?.pageIndex ?? signaturePage
+        let snapshot = BatchSettingsSnapshot(
+            outputFormat: outputFormat,
+            includeQualifiedTimestamp: includeQualifiedTimestamp,
+            tsaURL: includeQualifiedTimestamp ? selectedTSAURL : nil,
+            convertToPDFA: convertToPDFA,
+            pdfaMode: pdfaMode,
+            selectedIdentityID: identityID,
+            identityLabel: identity.label,
+            identityIsQualified: identity.isQualified,
+            includeVisibleSignature: includeVisibleSignature,
+            selectedVisualAppearanceID: selectedVisualAppearanceID,
+            visualArtworkOverride: visualArtworkOverride,
+            visualPlacement: visualPlacement,
+            signaturePage: effectiveVisualPage,
+            signatureRect: signatureRect)
+
+        if snapshot.includeQualifiedTimestamp,
+           snapshot.tsaURL.flatMap({ URL(string: $0)?.scheme }) == nil {
+            blockingErrors.append("Adresa služby časovej pečiatky nie je platná.")
+        }
+
+        if snapshot.includeVisibleSignature {
+            if let placementError = Self.validateBatchVisualPlacement(
+                placement: snapshot.visualPlacement,
+                normalizedRect: snapshot.signatureRect,
+                pageCount: nil) {
+                blockingErrors.append(placementError)
+            } else if let placement = snapshot.visualPlacement {
+                for item in selectedItems {
+                    guard let document = documents[item.id] else { continue }
+                    guard let placementError = Self.validateBatchVisualPlacement(
+                        placement: placement,
+                        normalizedRect: snapshot.signatureRect,
+                        pageCount: document.pageCount,
+                        pageBounds: document.page(at: placement.pageIndex)?.bounds(for: .cropBox)) else {
+                        continue
+                    }
+                    guard let batchIndex = batchItems.firstIndex(where: { $0.id == item.id }) else {
+                        continue
+                    }
+                    batchItems[batchIndex].state = .failed
+                    batchItems[batchIndex].errorMessage = placementError
+                }
+            }
+            if !signingProviderIsDemo && snapshot.selectedIdentityID.isEmpty {
+                blockingErrors.append("Certifikát pre vizuálny podpis nie je dostupný.")
+            }
+        }
+
+        var plannedURLs = Set<URL>()
+        let outputExtension = snapshot.outputFormat == .embeddedPAdES ? "pdf" : "asice"
+        for item in selectedItems {
+            guard documents[item.id] != nil else { continue }
+            guard let batchIndex = batchItems.firstIndex(where: { $0.id == item.id }) else {
+                continue
+            }
+            let location = outputLocation(for: item.url)
+            do {
+                let planned = try outputService.previewUniqueSibling(
+                    for: item.url,
+                    in: location.directory,
+                    stemSuffix: "_podpisane",
+                    outputExtension: outputExtension,
+                    occupiedURLs: plannedURLs)
+                batchItems[batchIndex].plannedOutputURL = planned
+                plannedURLs.insert(planned.standardizedFileURL)
+            } catch {
+                batchItems[batchIndex].state = .failed
+                batchItems[batchIndex].errorMessage = "Cieľový výstup sa nepodarilo pripraviť."
+            }
+        }
+
+        guard blockingErrors.isEmpty else {
+            finishBatchPreflight(blockingErrors: blockingErrors)
+            return
+        }
+
+        batchSettingsSnapshot = snapshot
+        batchPIN = pin.isEmpty ? nil : pin
+        batchPhase = .ready
+        }
+    private func finishBatchPreflight(blockingErrors: [String]) {
+        guard !blockingErrors.isEmpty else {
+            batchPhase = .ready
+            return
+        }
+        let message = blockingErrors.joined(separator: " ")
+        for index in batchItems.indices {
+            batchItems[index].state = .failed
+            batchItems[index].errorMessage = message
+        }
+        batchFailedCount = batchItems.count
+        batchPhase = .idle
+        lastError = message
+        batchSettingsSnapshot = nil
+        batchPIN = nil
+    }
+
+    func startBatch() async {
+        guard batchPhase == .ready,
+              let snapshot = batchSettingsSnapshot,
+              !batchItems.isEmpty else { return }
+
+        let generation = UUID()
+        batchGeneration = generation
+        batchErrorDecisionRequest = nil
+        batchPhase = .signing
+        lastError = nil
+        let pin = batchPIN
+
+        for index in batchItems.indices {
+            guard batchGeneration == generation else { return }
+            guard batchItems[index].state == .pending else { continue }
+            batchCurrentIndex = index
+            batchItems[index].state = .signing
+            batchItems[index].errorMessage = nil
+            if let queueIndex = queue.firstIndex(where: { $0.id == batchItems[index].id }) {
+                queue[queueIndex].status = .signing
+            }
+
+            do {
+                let output = try await signBatchItem(
+                    batchItems[index], snapshot: snapshot, pin: pin, generation: generation)
+                guard batchGeneration == generation else { return }
+                batchItems[index].state = .signed
+                batchItems[index].outputURL = output.outputURL
+                batchItems[index].errorMessage = nil
+                if let queueIndex = queue.firstIndex(where: { $0.id == batchItems[index].id }) {
+                    queue[queueIndex].status = .signed
+                    queue[queueIndex].signedOutputURL = output.outputURL
+                    queue[queueIndex].errorMessage = nil
+                }
+                batchCompletedCount = batchItems.filter { $0.state == .signed }.count
+                batchFailedCount = batchItems.filter { $0.state == .failed }.count
+            } catch is BatchCancellationError {
+                return
+            } catch {
+                guard batchGeneration == generation, batchPhase == .signing else { return }
+                let message = error.localizedDescription
+                batchItems[index].state = .failed
+                batchItems[index].errorMessage = message
+                if let queueIndex = queue.firstIndex(where: { $0.id == batchItems[index].id }) {
+                    queue[queueIndex].status = .failed
+                    queue[queueIndex].errorMessage = message
+                }
+                batchFailedCount = batchItems.filter { $0.state == .failed }.count
+                batchErrorDecisionRequest = BatchFailureDecisionRequest(
+                    itemID: batchItems[index].id,
+                    displayName: batchItems[index].displayName,
+                    errorMessage: message)
+                let decision = await withCheckedContinuation { continuation in
+                    batchDecisionContinuation = continuation
+                }
+                guard batchGeneration == generation else { return }
+                batchErrorDecisionRequest = nil
+                if decision == .stopBatch {
+                    for remaining in (index + 1)..<batchItems.count
+                    where batchItems[remaining].state == .pending {
+                        batchItems[remaining].state = .skipped
+                    }
+                    break
+                }
+            }
+        }
+
+        guard batchGeneration == generation else { return }
+        batchCurrentIndex = nil
+        batchPhase = .completed
+        batchCompletedCount = batchItems.filter { $0.state == .signed }.count
+        batchFailedCount = batchItems.filter { $0.state == .failed }.count
+        batchPIN = nil
+    }
+
+    func decideBatchFailure(_ decision: BatchFailureDecision) {
+        guard batchErrorDecisionRequest != nil else { return }
+        batchErrorDecisionRequest = nil
+        batchDecisionContinuation?.resume(returning: decision)
+        batchDecisionContinuation = nil
+    }
+
+    func cancelBatch() {
+        guard batchPhase == .preflighting || batchPhase == .ready || batchPhase == .signing else { return }
+        invalidateBatchWork()
+        var cancelledIDs = Set<UUID>()
+        for index in batchItems.indices where batchItems[index].state == .pending
+            || batchItems[index].state == .signing {
+            cancelledIDs.insert(batchItems[index].id)
+            batchItems[index].state = .cancelled
+        }
+        for index in queue.indices where cancelledIDs.contains(queue[index].id)
+            && queue[index].status != .signed {
+            queue[index].status = .ready
+            queue[index].errorMessage = nil
+        }
+        batchCurrentIndex = nil
+        batchErrorDecisionRequest = nil
+        batchPIN = nil
+        batchPhase = .cancelled
+        batchCompletedCount = batchItems.filter { $0.state == .signed }.count
+        batchFailedCount = batchItems.filter { $0.state == .failed }.count
+    }
+
+    func retryFailedBatchItems() async {
+        guard batchPhase == .completed || batchPhase == .cancelled else { return }
+        let previousItems = batchItems
+        let failedIDs = previousItems.filter { $0.state == .failed }.map(\.id)
+        guard !failedIDs.isEmpty else { return }
+        await prepareBatch(ids: failedIDs)
+        guard batchPhase == .ready else { return }
+        let preparedByID = Dictionary(uniqueKeysWithValues: batchItems.map { ($0.id, $0) })
+        batchItems = previousItems.map { preparedByID[$0.id] ?? $0 }
+        batchCompletedCount = batchItems.filter { $0.state == .signed }.count
+        batchFailedCount = batchItems.filter { $0.state == .failed }.count
+        await startBatch()
+    }
+
+    private func invalidateBatchWork() {
+        batchGeneration = UUID()
+        batchDecisionContinuation?.resume(returning: .stopBatch)
+        batchDecisionContinuation = nil
+    }
+
+    private struct BatchCancellationError: Error {}
+
+    private struct BatchSigningOutput {
+        let result: SignedConversionResult
+        let outputURL: URL
+        let outputDirectory: URL
+        let pdfaPrepared: Bool
+        let pdfaAfterSign: Bool
+    }
+
+    private func signBatchItem(
+        _ item: BatchItem,
+        snapshot: BatchSettingsSnapshot,
+        pin: String?,
+        generation: UUID
+    ) async throws -> BatchSigningOutput {
+        try checkBatchGeneration(generation)
+        let secured = item.url.startAccessingSecurityScopedResource()
+        defer { if secured { item.url.stopAccessingSecurityScopedResource() } }
+        guard let document = PDFDocument(url: item.url) else {
+            throw SigningError.signingFailed("Súbor sa nepodarilo otvoriť ako PDF.")
+        }
+        var pdfData: Data
+        if let original = try? Data(contentsOf: item.url), !original.isEmpty {
+            pdfData = original
+        } else {
+            let doc = UncheckedSendable(document)
+            pdfData = try await Task.detached(priority: .userInitiated) {
+                doc.value.dataRepresentation()
+            }.get() ?? Data()
+        }
+        guard !pdfData.isEmpty else {
+            throw SigningError.signingFailed("PDF dokument neobsahuje žiadne dáta.")
+        }
+        let originalPDFData = pdfData
+        var didPreparePDFA = false
+        var didFallbackToOriginal = false
+
+        if snapshot.convertToPDFA {
+            let mode: PDFAConversionMode = snapshot.outputFormat == .embeddedPAdES
+                ? .rasterGuaranteed : snapshot.pdfaMode
+            pdfData = try PDFAConverter().convert(
+                document: document, mode: mode,
+                title: item.url.deletingPathExtension().lastPathComponent)
+            var check = PDFAValidator().validate(pdfData)
+            if !check.isValid {
+                pdfData = try PDFAConverter().convert(
+                    document: document, mode: .rasterGuaranteed,
+                    title: item.url.deletingPathExtension().lastPathComponent)
+                check = PDFAValidator().validate(pdfData)
+            }
+            guard check.isValid else {
+                throw SigningError.signingFailed(
+                    "Konverzia do PDF/A zlyhala: \(check.issues.joined(separator: "; ")).")
+            }
+            didPreparePDFA = true
+        }
+
+        var attachedStamp: VisibleSignatureStamper.StampData?
+        if snapshot.includeVisibleSignature, snapshot.outputFormat == .attachedASIC {
+            let imageData = snapshot.visualArtworkOverride
+                ?? VisualSignatureStore.imageData(for: snapshot.selectedVisualAppearanceID)
+            let stamp = VisibleSignatureStamper.StampData(
+                fullName: snapshot.identityLabel,
+                timestamp: Date(),
+                pageIndex: snapshot.signaturePage,
+                normalizedRect: snapshot.signatureRect,
+                imagePNG: imageData)
+            attachedStamp = stamp
+            try checkBatchGeneration(generation)
+            pdfData = await Self.stampPDFData(
+                pdfData, stamp: stamp, includeTimestamp: snapshot.includeQualifiedTimestamp,
+                stamper: stamper)
+        }
+
+        try checkBatchGeneration(generation)
+        let visualStamp: VisualStampSpec?
+        if snapshot.includeVisibleSignature, snapshot.outputFormat == .embeddedPAdES {
+            visualStamp = VisualStampSpec(
+                fullName: snapshot.identityLabel,
+                timestamp: Date(),
+                pageIndex: snapshot.visualPlacement?.pageIndex ?? snapshot.signaturePage,
+                normalizedRect: snapshot.signatureRect,
+                imagePNG: snapshot.visualArtworkOverride
+                    ?? VisualSignatureStore.imageData(for: snapshot.selectedVisualAppearanceID),
+                // Batch placement is always relative to the current target page.
+                pdfPageRect: nil,
+                rotationDegrees: snapshot.visualPlacement?.rotationDegrees ?? 0,
+                qualification: snapshot.identityIsQualified
+                    ? "Kvalifikovaný elektronický podpis" : nil)
+        } else {
+            visualStamp = nil
+        }
+        let request = SigningRequest(
+            pdfData: pdfData,
+            identityID: snapshot.selectedIdentityID,
+            includeTimestamp: snapshot.includeQualifiedTimestamp,
+            tsaURL: snapshot.tsaURL,
+            outputFormat: snapshot.outputFormat,
+            pin: pin,
+            extraFiles: [ASiCEPackager.Entry(path: item.url.lastPathComponent, data: pdfData)],
+            visualStamp: visualStamp)
+        var signed: SignedConversionResult
+        do {
+            try checkBatchGeneration(generation)
+            signed = try await signingProvider.sign(request)
+            try checkBatchGeneration(generation)
+        } catch {
+            let text = error.localizedDescription
+            if snapshot.convertToPDFA, didPreparePDFA,
+               text.contains("SIGNING_UNAVAILABLE") || text.contains("SIGNING_FAILED") {
+                didFallbackToOriginal = true
+                var fallbackPDFData = originalPDFData
+                if let attachedStamp {
+                    try checkBatchGeneration(generation)
+                    fallbackPDFData = await Self.stampPDFData(
+                        fallbackPDFData, stamp: attachedStamp,
+                        includeTimestamp: snapshot.includeQualifiedTimestamp,
+                        stamper: stamper)
+                }
+                try checkBatchGeneration(generation)
+                signed = try await signingProvider.sign(SigningRequest(
+                    pdfData: fallbackPDFData,
+                    identityID: snapshot.selectedIdentityID,
+                    includeTimestamp: snapshot.includeQualifiedTimestamp,
+                    tsaURL: snapshot.tsaURL,
+                    outputFormat: snapshot.outputFormat,
+                    pin: pin,
+                    extraFiles: [ASiCEPackager.Entry(
+                        path: item.url.lastPathComponent, data: fallbackPDFData)],
+                    visualStamp: visualStamp))
+                try checkBatchGeneration(generation)
+            } else {
+                throw error
+            }
+        }
+
+        try checkBatchGeneration(generation)
+        let directory = outputLocation(for: item.url).directory
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try checkBatchGeneration(generation)
+        let outputData: Data
+        let outputExtension: String
+        if snapshot.outputFormat == .embeddedPAdES {
+            outputData = signed.pdfData
+            outputExtension = "pdf"
+        } else if let asic = signed.asicData {
+            outputData = asic
+            outputExtension = "asice"
+        } else {
+            outputData = signed.pdfData
+            outputExtension = "pdf"
+        }
+        let reservation = try outputService.reserveUniqueSibling(
+            for: item.url,
+            in: directory,
+            stemSuffix: "_podpisane",
+            outputExtension: outputExtension)
+        do {
+            try checkBatchGeneration(generation)
+            try outputData.write(to: reservation.temporaryURL, options: [.atomic])
+            try checkBatchGeneration(generation)
+            try outputService.finalize(reservation)
+        } catch {
+            try? FileManager.default.removeItem(at: reservation.temporaryURL)
+            throw error
+        }
+        return BatchSigningOutput(
+            result: signed,
+            outputURL: reservation.finalURL,
+            outputDirectory: directory,
+            pdfaPrepared: didPreparePDFA && !didFallbackToOriginal,
+            pdfaAfterSign: PDFAValidator().validate(signed.pdfData).isValid
+                || (signed.asicData != nil && didPreparePDFA && !didFallbackToOriginal))
+    }
+
+    static func validateBatchVisualPlacement(
+        placement: VisibleSignaturePlacement?,
+        normalizedRect: NormalizedRect,
+        pageCount: Int?,
+        pageBounds: CGRect? = nil
+    ) -> String? {
+        guard let placement else {
+            return "Vizuálny podpis vyžaduje explicitné umiestnenie."
+        }
+        guard placement.pageIndex >= 0,
+              placement.rotationDegrees.isFinite else {
+            return "Vizuálny podpis nemá platné umiestnenie."
+        }
+        guard normalizedRect.x.isFinite,
+              normalizedRect.y.isFinite,
+              normalizedRect.width.isFinite,
+              normalizedRect.height.isFinite,
+              normalizedRect.x >= 0,
+              normalizedRect.y >= 0,
+              normalizedRect.width > 0,
+              normalizedRect.height > 0,
+              normalizedRect.x + normalizedRect.width <= 1,
+              normalizedRect.y + normalizedRect.height <= 1 else {
+            return "Vizuálny podpis nemá platné relatívne umiestnenie."
+        }
+        if let pageCount, placement.pageIndex >= pageCount {
+            return "Umiestnenie vizuálneho podpisu nie je dostupné na tejto strane."
+        }
+        if pageCount != nil {
+            guard let pageBounds,
+                  pageBounds.width.isFinite,
+                  pageBounds.height.isFinite,
+                  pageBounds.width > 0,
+                  pageBounds.height > 0 else {
+                return "Cieľová strana PDF nemá platné rozmery."
+            }
+        }
+        return nil
+    }
+
+    private func checkBatchGeneration(_ generation: UUID) throws {
+        guard batchGeneration == generation else { throw BatchCancellationError() }
+    }
+
+    static func stampPDFData(
+        _ data: Data,
+        stamp: VisibleSignatureStamper.StampData,
+        includeTimestamp: Bool,
+        stamper: VisibleSignatureStamper
+    ) async -> Data {
+        guard let source = PDFDocument(data: data) else { return data }
+        let sendableSource = UncheckedSendable(source)
+        return await Task.detached(priority: .userInitiated) {
+            stamper.stamp(
+                document: sendableSource.value,
+                stamp: stamp,
+                includeTimestamp: includeTimestamp)
+        }.value ?? data
+    }
+
+    private func outputLocation(for url: URL) -> (directory: URL, stem: String) {
+        let directory = FileManager.default.isWritableFile(
+            atPath: url.deletingLastPathComponent().path)
+            ? url.deletingLastPathComponent() : Self.outputDirectoryURL()
+        return (directory, "\(url.deletingPathExtension().lastPathComponent)_podpisane")
+    }
+
+
     var stampDisplayName: String {
         displayName()
     }
@@ -450,8 +1181,11 @@ final class SigningSessionStore {
     }
 
     /// Entry point for the Finder Quick Action (NSServices).
-    /// Batch-signs the given PDFs with the current settings: QES + qualified timestamp (QTS).
+    /// A single PDF keeps the established direct signing flow. Multiple PDFs
+    /// are prepared and shown for review before any signing starts.
     func signFromFinder(_ urls: [URL]) async {
+        guard !urls.isEmpty else { return }
+        guard batchPhase != .preflighting, batchPhase != .signing else { return }
         await refreshIdentities()
         if selectedIdentityID == nil {
             selectedIdentityID = identities.first(where: \.isQualified)?.id ?? identities.first?.id
@@ -460,12 +1194,45 @@ final class SigningSessionStore {
             lastError = "Nie je pripojený podpisový certifikát. Pripojte eID kartu alebo advokátsky preukaz a opakujte Quick Action."
             return
         }
-        await addDocuments(at: urls)
-        await signAllUnsigned()
+
+        if urls.count == 1 {
+            let standardizedURL = urls[0].standardizedFileURL
+            await addDocuments(at: urls, selectLast: false)
+            guard let accepted = queue.first(where: {
+                $0.url.standardizedFileURL == standardizedURL
+            }) else {
+                lastError = "Dokument sa nepodarilo pridať do fronty podpisovania."
+                return
+            }
+
+            if accepted.status == .signed {
+                await selectQueueItem(accepted.id)
+                lastError = "Dokument \(accepted.displayName) už je podpísaný. Existujúci výstup zostal nezmenený."
+                return
+            }
+            guard accepted.status == .ready || accepted.status == .failed else {
+                lastError = "Dokument \(accepted.displayName) nie je pripravený na podpis."
+                return
+            }
+
+            await selectQueueItem(accepted.id)
+            await sign()
+            return
+        }
+        await addDocuments(at: urls, selectLast: false)
+        let standardizedURLs = Set(urls.map(\.standardizedFileURL))
+        let ids = queue
+            .filter {
+                standardizedURLs.contains($0.url.standardizedFileURL)
+                    && ($0.status == .ready || $0.status == .failed)
+            }
+            .map(\.id)
+        await prepareBatch(ids: ids)
     }
 
     func reset(keepingIdentity: Bool = true) {
         let identity = keepingIdentity ? selectedIdentityID : nil
+        selectedQueueID = nil
         step = queue.isEmpty ? .intake : .prepare
         sourceURL = nil
         sourceBookmark = nil

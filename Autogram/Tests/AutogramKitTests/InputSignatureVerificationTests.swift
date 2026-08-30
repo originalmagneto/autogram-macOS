@@ -63,6 +63,35 @@ final class InputSignatureVerificationTests: XCTestCase {
         XCTAssertFalse(result.detail.isEmpty)
     }
 
+    func testDefaultInspectionAllowsUnsignedPDF() async throws {
+        let inputURL = try temporaryInputFile(contents: Data("%PDF-1.7\n%%EOF\n".utf8))
+        let result = await InputSignatureVerificationService(
+            provider: DefaultInspectionProvider()).inspect(inputURL: inputURL)
+
+        XCTAssertEqual(result.state, .valid)
+        XCTAssertTrue(result.signatures.isEmpty)
+    }
+
+    func testDefaultInspectionBlocksStructurallySignedPDFAsUnknown() async throws {
+        let pdf = "%PDF-1.7\n1 0 obj\n<< /T#79pe\t/\0\tS#69g /ByteR#61nge\t[\t0 1 2 3] >>\nendobj\n%%EOF\n"
+        let inputURL = try temporaryInputFile(contents: Data(pdf.utf8))
+        let result = await InputSignatureVerificationService(
+            provider: DefaultInspectionProvider()).inspect(inputURL: inputURL)
+
+        XCTAssertEqual(result.state, .unknown)
+        XCTAssertTrue(result.signatures.first?.detail?.contains("kryptografické overenie") == true)
+    }
+
+    func testDefaultInspectionBlocksCompressedObjectStreamPDF() async throws {
+        let pdf = "%PDF-1.7\n1 0 obj\n<< /Type /ObjStm /N 1 /First 0 >>\nstream\ncompressed\nendstream\nendobj\n%%EOF\n"
+        let inputURL = try temporaryInputFile(contents: Data(pdf.utf8))
+        let result = await InputSignatureVerificationService(
+            provider: DefaultInspectionProvider()).inspect(inputURL: inputURL)
+
+        XCTAssertEqual(result.state, .unavailable)
+    }
+
+
     func testMissingInputReturnsUnavailableWithoutCallingProvider() async {
         let provider = CountingInspectionProvider()
         let missingURL = FileManager.default.temporaryDirectory
@@ -150,11 +179,11 @@ final class InputSignatureVerificationTests: XCTestCase {
             reviewState: .confirmed)
     }
 
-    private func temporaryInputFile() throws -> URL {
+    private func temporaryInputFile(contents: Data = Data("test".utf8)) throws -> URL {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("input-signature-")
             .appendingPathExtension("pdf")
-        try Data("test".utf8).write(to: url)
+        try contents.write(to: url)
         return url
     }
 }

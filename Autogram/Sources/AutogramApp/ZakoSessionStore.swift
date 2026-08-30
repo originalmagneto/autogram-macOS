@@ -21,12 +21,39 @@ final class ZakoSessionStore {
     var isAnalyzing = false
     var analysisProgressText = ""
 
+    enum AIVisionReadiness: Equatable, Sendable {
+        case builtInOnly(mode: AppSettings.AIMode)
+        case ready(provider: AppSettings.AIMode)
+        case unavailable(provider: AppSettings.AIMode, reason: String)
+
+        var message: String {
+            switch self {
+            case .builtInOnly:
+                return "Používa sa iba vstavaná on-device detekcia."
+            case .ready(let provider):
+                return "Konfigurácia \(provider.rawValue) je pripravená."
+            case .unavailable(let provider, let reason):
+                return "LLM \(provider.rawValue) nie je dostupné: \(reason) Vstavaná detekcia zostáva aktívna."
+            }
+        }
+    }
+
+    var aiVisionReadiness: AIVisionReadiness {
+        Self.aiVisionReadiness(for: settings)
+    }
+
+    var analysisWarning: String?
+
     var identities: [SigningIdentityInfo] = []
     var selectedIdentityID: String?
     var includeQualifiedTimestamp = true
     var allowNonMandateOverride = false
     private var mandateOverrideIdentityID: String?
     var signingPIN = ""
+    private var isRefreshingIdentities = false
+    private(set) var isResolvingCertificate = false
+    var certificateLoadError: String?
+    private var lastCertificateLoadPIN: String?
     var evidenceNumberRequested = false
     var fetchingEvidenceNumber = false
     var evidenceNumberError: String?
@@ -138,25 +165,83 @@ final class ZakoSessionStore {
         }
     }
 
+    static func aiVisionReadiness(for settings: AppSettings) -> AIVisionReadiness {
+        func validEndpoint(_ rawValue: String) -> Bool {
+            guard let url = URL(string: rawValue.trimmingCharacters(in: .whitespacesAndNewlines)),
+                  let scheme = url.scheme?.lowercased(),
+                  scheme == "http" || scheme == "https",
+                  url.host != nil else {
+                return false
+            }
+            return true
+        }
+
+        func missing(_ values: [(String, Bool)]) -> String? {
+            values.first(where: { !$0.1 })?.0
+        }
+
+        switch settings.aiMode {
+        case .builtInOnDevice, .disabled:
+            return .builtInOnly(mode: settings.aiMode)
+        case .omlxLocal:
+            if let reason = missing([
+                ("URL", validEndpoint(settings.omlxURL)),
+                ("model", !settings.omlxModel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            ]) {
+                return .unavailable(provider: .omlxLocal, reason: "Doplňte \(reason).")
+            }
+            return .ready(provider: .omlxLocal)
+        case .ollamaLocal:
+            if let reason = missing([
+                ("URL", validEndpoint(settings.ollamaURL)),
+                ("model", !settings.ollamaModel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            ]) {
+                return .unavailable(provider: .ollamaLocal, reason: "Doplňte \(reason).")
+            }
+            return .ready(provider: .ollamaLocal)
+        case .customAPIKey:
+            if let reason = missing([
+                ("Base URL", validEndpoint(settings.openAICompatibleBaseURL)),
+                ("model", !settings.openAICompatibleModel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty),
+                ("API kľúč v Kľúčenke", !(KeychainStore.load(account: "ai.apikey") ?? "")
+                    .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            ]) {
+                return .unavailable(provider: .customAPIKey, reason: "Doplňte \(reason).")
+            }
+            return .ready(provider: .customAPIKey)
+        }
+    }
+
     static func buildPipeline(settings: AppSettings) -> DetectionPipeline {
         let llmProvider: (any SecurityElementsProviding)?
         switch settings.aiMode {
         case .omlxLocal:
-            llmProvider = OpenAIVisionProvider(
-                baseURL: URL(string: settings.omlxURL) ?? URL(string: "http://localhost:8000/v1")!,
-                model: settings.omlxModel,
-                apiKey: "",
-                promptOverride: settings.aiPrompt)
-        case .ollamaLocal:
-            llmProvider = OllamaVisionProvider(
-                endpoint: URL(string: settings.ollamaURL) ?? URL(string: "http://localhost:11434")!,
-                model: settings.ollamaModel,
-                promptOverride: settings.aiPrompt)
-        case .customAPIKey:
-            if let apiKey = KeychainStore.load(account: "ai.apikey"), !apiKey.isEmpty {
+            if case .ready = aiVisionReadiness(for: settings),
+               let endpoint = URL(string: settings.omlxURL) {
                 llmProvider = OpenAIVisionProvider(
-                    baseURL: URL(string: settings.openAICompatibleBaseURL)
-                        ?? URL(string: "https://api.openai.com/v1")!,
+                    baseURL: endpoint,
+                    model: settings.omlxModel,
+                    apiKey: "",
+                    promptOverride: settings.aiPrompt)
+            } else {
+                llmProvider = nil
+            }
+        case .ollamaLocal:
+            if case .ready = aiVisionReadiness(for: settings),
+               let endpoint = URL(string: settings.ollamaURL) {
+                llmProvider = OllamaVisionProvider(
+                    endpoint: endpoint,
+                    model: settings.ollamaModel,
+                    promptOverride: settings.aiPrompt)
+            } else {
+                llmProvider = nil
+            }
+        case .customAPIKey:
+            if case .ready = aiVisionReadiness(for: settings),
+               let apiKey = KeychainStore.load(account: "ai.apikey"),
+               let baseURL = URL(string: settings.openAICompatibleBaseURL) {
+                llmProvider = OpenAIVisionProvider(
+                    baseURL: baseURL,
                     model: settings.openAICompatibleModel,
                     apiKey: apiKey,
                     promptOverride: settings.aiPrompt)
@@ -216,11 +301,24 @@ final class ZakoSessionStore {
         guard analysisRecordID == currentRecordID, !Task.isCancelled else { return }
 
         analysisProgressText = "Detegujem bezpečnostné prvky…"
-        let pipeline = Self.buildPipeline(settings: settings)
-        let detected = await Task.detached(priority: .userInitiated) { [doc, pipeline] in
-            await pipeline.detect(in: doc.value, pageAnalyses: baseAnalysis.pageAnalyses)
+        let selectedSettings = settings
+        let readiness = Self.aiVisionReadiness(for: selectedSettings)
+        analysisWarning = {
+            if case .unavailable = readiness {
+                return readiness.message
+            }
+            return nil
+        }()
+        let pipeline = Self.buildPipeline(settings: selectedSettings)
+        let detectionOutcome = await Task.detached(priority: .userInitiated) { [doc, pipeline] in
+            await pipeline.detectWithStatus(in: doc.value, pageAnalyses: baseAnalysis.pageAnalyses)
         }.value
         guard analysisRecordID == currentRecordID, !Task.isCancelled else { return }
+        if let failureMessage = detectionOutcome.failureMessage {
+            analysisWarning = "\(failureMessage) Vstavaná detekcia zostáva aktívna."
+        }
+        let detected = detectionOutcome.elements
+
 
         let manualElements = securityElements.filter { !$0.detectedByAI }
         var merged = enrich(detected)
@@ -485,19 +583,52 @@ final class ZakoSessionStore {
             y: min(clamped.y, 1 - clamped.height),
             width: min(clamped.width, 1),
             height: min(clamped.height, 1))
-        invalidateReview(for: index)
     }
 
     func refreshIdentities() async {
+        guard !isRefreshingIdentities else { return }
+        isRefreshingIdentities = true
+        defer { isRefreshingIdentities = false }
+
         identities = await signingProvider.availableIdentities()
         if identities.isEmpty {
             if !signingPIN.isEmpty { signingPIN = "" }
+            certificateLoadError = nil
+            lastCertificateLoadPIN = nil
             selectedIdentityID = nil
             return
         }
         if selectedIdentityID == nil || !identities.contains(where: { $0.id == selectedIdentityID }) {
             selectedIdentityID = identities.first(where: { $0.isMandateCertificate })?.id
                 ?? identities.first?.id
+        }
+        if !signingPIN.isEmpty, !hasResolvedCertificate {
+            await resolveCertificateForAuthorization()
+        }
+    }
+
+    var hasResolvedCertificate: Bool {
+        signingProviderIsDemo || identities.contains {
+            $0.id.hasPrefix(EngineBridgeSigningProvider.certificateIdentityPrefix)
+        }
+    }
+
+    func resolveCertificateForAuthorization(force: Bool = false) async {
+        guard !signingProviderIsDemo, !signingPIN.isEmpty, !isResolvingCertificate else { return }
+        guard force || !hasResolvedCertificate else { return }
+        guard force || lastCertificateLoadPIN != signingPIN else { return }
+
+        isResolvingCertificate = true
+        lastCertificateLoadPIN = signingPIN
+        defer { isResolvingCertificate = false }
+
+        if let resolved = await signingProvider.resolveIdentities(pin: signingPIN), !resolved.isEmpty {
+            identities = resolved
+            selectedIdentityID = resolved.first(where: { $0.isMandateCertificate })?.id
+                ?? resolved.first?.id
+            certificateLoadError = nil
+        } else {
+            certificateLoadError = "Načítanie certifikátov z karty zlyhalo."
         }
     }
 
@@ -939,6 +1070,7 @@ func resetSession(keepingProfile: Bool) {
         outputDirectoryOverride = nil
         sourceNameOverride = nil
         lastError = nil
+        analysisWarning = nil
         serverTimeUsed = nil
         inputSignatureInspection = .unavailable(
             detail: "Kontrola podpisov ešte neprebehla.")

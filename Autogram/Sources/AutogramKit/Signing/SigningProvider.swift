@@ -147,7 +147,7 @@ public enum SigningError: LocalizedError, Equatable, Sendable {
     public var errorDescription: String? {
         switch self {
         case .identityUnavailable:
-            return "Certifikát nie je dostupný — vložte kartu a overte PIN/BOK."
+            return "Certifikát nie je dostupný: vložte kartu a overte PIN/BOK."
         case .signingFailed(let detail): return "Podpisovanie zlyhalo: \(detail)"
         case .timestampFailed: return "Nepodarilo sa získať kvalifikovanú časovú pečiatku."
         }
@@ -278,7 +278,7 @@ extension QualifiedSigningProviding {
     public func inspectSignatures(in fileURL: URL) async -> [DocumentSignatureInfo] { [] }
 
     public func inspectInputSignatures(in fileURL: URL) async -> InputSignatureInspectionResult {
-        .unavailable(detail: "Overenie podpisov vstupného dokumentu nie je dostupné.")
+        InputSignatureVerificationService.structuralInspection(at: fileURL)
     }
 
     /// Načíta reálne certifikáty z vloženej karty ešte pred podpisom.
@@ -341,7 +341,7 @@ public final class DemoSigningProvider: QualifiedSigningProviding, @unchecked Se
         {
           "type": "autogram-demo-signature",
           "legallyBinding": false,
-          "note": "Vývojový podpis — nenahrádza KEP s mandátnym certifikátom.",
+          "note": "Vývojový podpis: nenahrádza KEP s mandátnym certifikátom.",
           "sequence": \(n),
           "identity": "\(request.identityID)",
           "sha256": "\(digest)",

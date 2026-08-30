@@ -29,7 +29,15 @@ struct RootView: View {
     }
 
     private var settingsStore: AppSettingsStore { model.settingsStore }
+    private var recentDocumentStore: RecentDocumentStore { model.recentDocumentStore }
+
     private var signingStore: SigningSessionStore { model.signingStore }
+
+    private var batchIsActive: Bool {
+        signingStore.batchPhase == .preflighting
+            || signingStore.batchPhase == .ready
+            || signingStore.batchPhase == .signing
+    }
     private var zakoStore: ZakoSessionStore { model.zakoStore }
 
     var body: some View {
@@ -45,6 +53,56 @@ struct RootView: View {
                     Label(SidebarSection.evidence.rawValue, systemImage: SidebarSection.evidence.symbol)
                         .tag(SidebarSection.evidence)
                 }
+
+                if recentDocumentStore.isEnabled && !recentDocumentStore.entries.isEmpty {
+                    Section {
+                        ForEach(recentDocumentStore.entries) { entry in
+                            let isAvailable = recentDocumentStore.isAvailable(entry)
+                            Button {
+                                guard isAvailable else { return }
+                                selection = .signing
+                                Task {
+                                    await recentDocumentStore.withResolvedURL(entry) { resolvedURL in
+                                        await signingStore.loadDocument(at: resolvedURL)
+                                    }
+                                }
+                            } label: {
+                                HStack(spacing: 8) {
+                                    Image(systemName: isAvailable ? "clock.arrow.circlepath" : "doc.badge.ellipsis")
+                                        .foregroundStyle(.secondary)
+                                        .frame(width: 16)
+                                    Text(entry.displayName)
+                                        .lineLimit(1)
+                                        .truncationMode(.middle)
+                                        .font(.callout)
+                                    if !isAvailable {
+                                        Spacer(minLength: 0)
+                                        Text("Nedostupný")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(!isAvailable)
+                            .accessibilityLabel("Nedávny dokument \(entry.displayName)")
+                            .accessibilityValue(isAvailable ? "Dostupný" : "Nedostupný")
+                            .contextMenu {
+                                Button("Odstrániť z nedávnych", role: .destructive) {
+                                    recentDocumentStore.remove(id: entry.id)
+                                }
+                            }
+                        }
+                    } header: {
+                        Text("Nedávne dokumenty")
+                            .contextMenu {
+                                Button("Vymazať všetky nedávne dokumenty", role: .destructive) {
+                                    recentDocumentStore.clear()
+                                }
+                            }
+                    }
+                }
+
 
                 if !signingStore.queue.isEmpty {
                     Section("Fronta podpisovania (\(signingStore.queue.count))") {
@@ -66,13 +124,14 @@ struct RootView: View {
                                 }
                             }
                             .buttonStyle(.plain)
+                            .focusEffectDisabled()
                             .accessibilityLabel("Dokument \(item.displayName)")
                             .accessibilityValue("\(queueStatusLabel(item.status)); \(isSelected ? "Vybraný" : "Nevybraný")")
                             .accessibilityAddTraits(isSelected ? .isSelected : [])
                             .padding(.vertical, 2)
                             .listRowBackground(
                                 isSelected
-                                    ? Color.accentColor.opacity(0.14)
+                                    ? Color.primary.opacity(0.08)
                                     : Color.clear
                             )
                             .contextMenu {
@@ -90,13 +149,15 @@ struct RootView: View {
                                     queueItemToDelete = item.id
                                     showQueueDeleteConfirmation = true
                                 }
+                                .disabled(batchIsActive)
                             }
                         }
 
                         if signingStore.unsignedQueueItems.count > 1 {
                             Button {
                                 selection = .signing
-                                Task { await signingStore.signAllUnsigned() }
+                                let ids = signingStore.unsignedQueueItems.map(\.id)
+                                Task { await signingStore.prepareBatch(ids: ids) }
                             } label: {
                                 Label("Podpísať všetky (\(signingStore.unsignedQueueItems.count))",
                                       systemImage: "signature.badge.checkmark")
@@ -104,16 +165,18 @@ struct RootView: View {
                                     .foregroundStyle(Color.accentColor)
                             }
                             .buttonStyle(.plain)
+                            .disabled(batchIsActive)
                             .padding(.top, 4)
+                            .accessibilityLabel("Pripraviť dávku podpisov")
+                            .accessibilityValue(
+                                batchIsActive
+                                    ? "Dávka už prebieha"
+                                    : "\(signingStore.unsignedQueueItems.count) dokumentov"
+                            )
                         }
                     }
                 }
 
-                Section("Predvoľby") {
-                    SettingsLink {
-                        Label("Nastavenia", systemImage: "gearshape.fill")
-                    }
-                }
             }
             .listStyle(.sidebar)
             .navigationTitle("Autogram")
@@ -174,6 +237,16 @@ struct RootView: View {
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
+
+            HStack {
+                SettingsLink {
+                    Image(systemName: "gearshape")
+                }
+                .buttonStyle(.borderless)
+                .accessibilityLabel("Nastavenia")
+                .help("Otvoriť nastavenia")
+                Spacer(minLength: 0)
+            }
         }
         .padding(12)
     }
@@ -243,6 +316,7 @@ struct RootView: View {
     }
 
     private func openMoreFiles() {
+        guard !batchIsActive else { return }
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.pdf]
         panel.allowsMultipleSelection = true
@@ -250,9 +324,27 @@ struct RootView: View {
             guard response == .OK else { return }
             Task { @MainActor in
                 selection = .signing
-                await signingStore.addDocuments(at: panel.urls)
+                let urls = panel.urls
+                if urls.count == 1 {
+                    await signingStore.addDocuments(at: urls, selectLast: true)
+                } else {
+                    await prepareReviewedBatch(for: urls)
+                }
             }
         }
+    }
+
+    private func prepareReviewedBatch(for urls: [URL]) async {
+        guard !batchIsActive else { return }
+        await signingStore.addDocuments(at: urls, selectLast: false)
+        let selectedURLs = Set(urls.map(\.standardizedFileURL))
+        let ids = signingStore.queue
+            .filter {
+                selectedURLs.contains($0.url.standardizedFileURL)
+                    && ($0.status == .ready || $0.status == .failed)
+            }
+            .map(\.id)
+        await signingStore.prepareBatch(ids: ids)
     }
 
     private func toggleSidebar() {

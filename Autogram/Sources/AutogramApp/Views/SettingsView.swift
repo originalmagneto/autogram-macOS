@@ -2,6 +2,34 @@ import SwiftUI
 import AutogramKit
 import AppKit
 
+enum AIPromptPreset: String, CaseIterable, Identifiable {
+    case legalDocuments = "Právne dokumenty"
+    case conservativeReview = "Konzervatívna kontrola"
+    case signaturesAndInitials = "Podpisy a parafy"
+    case stampsAndEmbossedElements = "Pečiatky a reliéfne prvky"
+    case customPrompt = "Vlastný prompt"
+
+    var id: String { rawValue }
+
+    var promptText: String? {
+        switch self {
+        case .legalDocuments:
+            return LLMVisionParser.systemPrompt
+        case .conservativeReview:
+            return LLMVisionParser.systemPrompt
+                + "\nBuď pri klasifikácii mimoriadne konzervatívny a prvok vynechaj pri akejkoľvek neistote."
+        case .signaturesAndInitials:
+            return LLMVisionParser.systemPrompt
+                + "\nZameraj sa najmä na každý fyzicky viditeľný podpis alebo parafu."
+        case .stampsAndEmbossedElements:
+            return LLMVisionParser.systemPrompt
+                + "\nZameraj sa najmä na každý fyzicky viditeľný výskyt pečiatky alebo reliéfneho prvku."
+        case .customPrompt:
+            return nil
+        }
+    }
+}
+
 struct SettingsView: View {
     @Bindable var settingsStore: AppSettingsStore
     @State private var newTSAURL = ""
@@ -14,6 +42,9 @@ struct SettingsView: View {
     @State private var ezzkEvidenceCount = "1"
     @State private var ezzkEvidenceValidation: String?
     @State private var pendingEZZKEvidenceCount = 0
+
+    @State private var selectedPromptPreset: AIPromptPreset = .legalDocuments
+
     @State private var showEZZKEvidenceConfirmation = false
     var body: some View {
         TabView {
@@ -133,10 +164,26 @@ struct SettingsView: View {
                     )
                 }
 
-                Text("Vstavané on-device pravidlá bežia vždy. Zvolený AI režim dopĺňa detekciu úradných pečiatok a vlastnoručných podpisov podľa § 37.")
+                Text("Vstavané on-device pravidlá bežia vždy. Klasifikačný prompt sa použije iba pre oMLX, Ollama a Custom API; zvolený AI režim dopĺňa detekciu bezpečnostných prvkov podľa § 37.")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .padding(.top, 2)
+
+                aiReadinessRows
+            }
+            .glassCard(cornerRadius: 14, padding: 16)
+
+            VStack(alignment: .leading, spacing: 10) {
+                Label("Naposledy otvorené dokumenty", systemImage: "clock.arrow.circlepath")
+                    .font(.headline)
+
+                Toggle(
+                    "Pamätať naposledy otvorené dokumenty",
+                    isOn: $settingsStore.settings.retainRecentDocuments)
+
+                Text("Uloží najviac osem bezpečných bookmarkov pre rýchly návrat po reštarte. Obsah dokumentov sa do zoznamu neukladá.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
             }
             .glassCard(cornerRadius: 14, padding: 16)
 
@@ -249,6 +296,7 @@ struct SettingsView: View {
                 .glassCard(cornerRadius: 14, padding: 16)
             }
 
+            let promptEnabled = settingsStore.settings.aiMode.supportsPromptOverride
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
                     Text("Klasifikačný prompt pre LLM")
@@ -256,13 +304,29 @@ struct SettingsView: View {
                     Spacer()
                     Button("Obnoviť predvolený") {
                         settingsStore.settings.aiPrompt = nil
+                        selectedPromptPreset = .legalDocuments
                     }
                     .controlSize(.small)
+                    .disabled(!promptEnabled)
+                }
+
+                Picker("Predvoľba promptu", selection: $selectedPromptPreset) {
+                    ForEach(AIPromptPreset.allCases) { preset in
+                        Text(preset.rawValue).tag(preset)
+                    }
+                }
+                .pickerStyle(.menu)
+                .disabled(!promptEnabled)
+                .onChange(of: selectedPromptPreset) { _, preset in
+                    if let promptText = preset.promptText {
+                        settingsStore.settings.aiPrompt = promptText
+                    }
                 }
 
                 TextEditor(text: Binding(
                     get: { settingsStore.settings.aiPrompt ?? "" },
                     set: { newValue in
+                        selectedPromptPreset = .customPrompt
                         settingsStore.settings.aiPrompt =
                             newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                                 ? nil : newValue
@@ -275,13 +339,79 @@ struct SettingsView: View {
                         RoundedRectangle(cornerRadius: 8)
                             .strokeBorder(Color.primary.opacity(0.1), lineWidth: 1)
                     )
+                    .disabled(!promptEnabled)
 
-                Text("Prázdne pole znamená predvolený prompt pre § 37 (pečiatky, vlastnoručné podpisy, reliéfne pečate, parafy).")
+                Text(promptEnabled
+                     ? "Prázdne pole znamená schválený predvolený prompt. Prompt sa použije iba pre oMLX, Ollama a vlastné API."
+                     : "Vstavaný detektor beží vždy. Prompt sa pre interný alebo vypnutý režim nepoužíva.")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
             .glassCard(cornerRadius: 14, padding: 16)
+            .onAppear {
+                let current = settingsStore.settings.aiPrompt
+                selectedPromptPreset = AIPromptPreset.allCases.first {
+                    $0.promptText == current
+                } ?? (current == nil ? .legalDocuments : .customPrompt)
+            }
         }
+    }
+
+    @ViewBuilder
+    private var aiReadinessRows: some View {
+        let mode = settingsStore.settings.aiMode
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Pripravenosť zvolenej konfigurácie")
+                .font(.caption.weight(.semibold))
+            switch mode {
+            case .omlxLocal:
+                readinessRow("oMLX URL", value: settingsStore.settings.omlxURL,
+                             isReady: validEndpoint(settingsStore.settings.omlxURL))
+                readinessRow("oMLX model", value: settingsStore.settings.omlxModel,
+                             isReady: !settingsStore.settings.omlxModel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            case .ollamaLocal:
+                readinessRow("Ollama URL", value: settingsStore.settings.ollamaURL,
+                             isReady: validEndpoint(settingsStore.settings.ollamaURL))
+                readinessRow("Ollama model", value: settingsStore.settings.ollamaModel,
+                             isReady: !settingsStore.settings.ollamaModel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            case .customAPIKey:
+                readinessRow("Custom API URL", value: settingsStore.settings.openAICompatibleBaseURL,
+                             isReady: validEndpoint(settingsStore.settings.openAICompatibleBaseURL))
+                readinessRow("Custom API model", value: settingsStore.settings.openAICompatibleModel,
+                             isReady: !settingsStore.settings.openAICompatibleModel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                readinessRow("Custom API keychain key", value: KeychainStore.load(account: "ai.apikey") == nil ? "Chýba" : "Uložený",
+                             isReady: !(KeychainStore.load(account: "ai.apikey") ?? "")
+                                .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            case .builtInOnDevice, .disabled:
+                Text("Vstavaný detektor beží vždy. Prompt sa v tomto režime nepoužíva.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private func readinessRow(_ label: String, value: String, isReady: Bool) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: isReady ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                .foregroundStyle(isReady ? .green : .orange)
+            Text(label)
+                .font(.caption2.weight(.medium))
+            Spacer()
+            Text(value)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
+    }
+
+    private func validEndpoint(_ value: String) -> Bool {
+        guard let url = URL(string: value.trimmingCharacters(in: .whitespacesAndNewlines)),
+              let scheme = url.scheme?.lowercased(),
+              scheme == "http" || scheme == "https",
+              url.host != nil else {
+            return false
+        }
+        return true
     }
 
     private func aiProviderRow(mode: AppSettings.AIMode, title: String, subtitle: String, icon: String) -> some View {
@@ -463,222 +593,285 @@ struct SettingsView: View {
     private var ezzkTab: some View {
         let controller = settingsStore.ezzkSessionController
 
-        return VStack(alignment: .leading, spacing: 18) {
-            VStack(alignment: .leading, spacing: 14) {
-                Label("Centrálna evidencia záznamov o konverzii (IS EZZK)", systemImage: "number.square")
-                    .font(.headline)
+        return VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 14) {
+                ezzkEnvironmentCard(controller)
+                ezzkSessionCard(controller)
+            }
 
-                Text("EZZK používa pevne určené OAuth a REST identity. Nastavenia IČO, používateľského mena a hesla nie sú prihlasovacími údajmi pre OAuth.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+            HStack(alignment: .top, spacing: 14) {
+                ezzkEvidenceCard(controller)
+                ezzkSubmissionCard
+            }
 
-                if controller.isDemoMode {
-                    Label(
-                        "Demo režim: lokálna simulácia bez pripojenia k EZZK",
-                        systemImage: "theatermasks"
-                    )
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.orange)
-                }
-                VStack(alignment: .leading, spacing: 10) {
-                    Picker("Prostredie", selection: Binding(
-                        get: { controller.selectedEnvironment },
-                        set: { controller.selectedEnvironment = $0 }
-                    )) {
-                        Text(controller.isDemoMode ? "Demo (lokálne)" : "Sandbox")
-                            .tag(EZZKEnvironment.sandbox)
-                        Text("Produkcia (uzavreté)")
-                            .tag(EZZKEnvironment.production)
-                            .disabled(!controller.canSelectProduction)
-                    }
-                    .pickerStyle(.segmented)
-                    .disabled(!controller.canChangeEnvironment)
+            ezzkMigrationCard
+        }
+        .frame(maxWidth: 960, alignment: .topLeading)
+    }
 
-                    Text(controller.isDemoMode
-                         ? "Demo režim nepoužíva sandbox ani produkčné EZZK pripojenie."
-                         : "Sandbox je predvolené prostredie. Produkčné prostredie zostáva deaktivované, kým nie je otvorená autorizačná brána.")
+    private func ezzkEnvironmentCard(_ controller: EZZKSessionController) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("Prostredie EZZK", systemImage: "server.rack")
+                .font(.headline)
+
+            Picker("Prostredie", selection: Binding(
+                get: { controller.selectedEnvironment },
+                set: { controller.selectedEnvironment = $0 }
+            )) {
+                Text(controller.isDemoMode ? "Demo (lokálne)" : "Sandbox")
+                    .tag(EZZKEnvironment.sandbox)
+                Text("Produkcia (uzavreté)")
+                    .tag(EZZKEnvironment.production)
+                    .disabled(!controller.canSelectProduction)
+            }
+            .pickerStyle(.segmented)
+            .disabled(!controller.canChangeEnvironment)
+
+            Text(controller.isDemoMode
+                 ? "Demo používa iba lokálnu simuláciu."
+                 : "Sandbox je testovacie prostredie. Produkcia sa sprístupní až po potvrdení autorizačnej brány.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Divider().opacity(0.5)
+
+            Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 6) {
+                ezzkEndpointRow(
+                    label: "Portál",
+                    value: controller.isDemoMode
+                        ? "Nepoužíva sa v demo režime"
+                        : controller.selectedEnvironment.portalBaseURL.absoluteString)
+                ezzkEndpointRow(
+                    label: "REST API",
+                    value: controller.isDemoMode
+                        ? "Nepoužíva sa v demo režime"
+                        : controller.selectedEnvironment.apiBaseURL.absoluteString)
+                ezzkEndpointRow(
+                    label: "Authority",
+                    value: controller.isDemoMode ? "Demo lokálne" : controller.selectedEnvironment.authorityID)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glassCard(cornerRadius: 14, padding: 16)
+    }
+
+    private func ezzkEndpointRow(label: String, value: String) -> some View {
+        GridRow {
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(width: 64, alignment: .leading)
+            Text(value)
+                .font(.caption.monospaced())
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .textSelection(.enabled)
+        }
+    }
+
+    private func ezzkSessionCard(_ controller: EZZKSessionController) -> some View {
+        let presentation = controller.isDemoMode
+            ? (title: "Demo lokálne", symbol: "theatermasks", color: Color.orange)
+            : ezzkStatePresentation(controller.state)
+
+        return VStack(alignment: .leading, spacing: 10) {
+            Label("Prístup k EZZK", systemImage: "person.badge.key")
+                .font(.headline)
+
+            Label(presentation.title, systemImage: presentation.symbol)
+                .font(.callout.weight(.semibold))
+                .foregroundStyle(presentation.color)
+
+            Text("Prihlásenie prebehne v zabezpečenom okne EZZK. Login ani heslo sa nezadávajú do nastavení Autogramu.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 6) {
+                GridRow {
+                    Text("Kontrola")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                    Text(controller.lastConnectivityCheck?.formatted(date: .abbreviated, time: .shortened)
+                         ?? "Zatiaľ neoverené")
+                        .font(.caption)
                 }
-
-                Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 8) {
-                    GridRow {
-                        Text("Portál")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                            .frame(width: 180, alignment: .leading)
-                        Text(controller.isDemoMode
-                             ? "Nepoužíva sa v demo režime"
-                             : controller.selectedEnvironment.portalBaseURL.absoluteString)
-                            .font(.callout.monospaced())
-                            .textSelection(.enabled)
-                    }
-
-                    GridRow {
-                        Text("REST API")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                        Text(controller.isDemoMode
-                             ? "Nepoužíva sa v demo režime"
-                             : controller.selectedEnvironment.apiBaseURL.absoluteString)
-                            .font(.callout.monospaced())
-                            .textSelection(.enabled)
-                    }
-
-                    GridRow {
-                        Text("Identita autority")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                        Text(controller.isDemoMode ? "Demo lokálne" : controller.selectedEnvironment.authorityID)
-                            .font(.callout.monospaced())
-                            .textSelection(.enabled)
-                    }
+                GridRow {
+                    Text("Čísla")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(controller.availableEvidenceNumberCount.map(String.init) ?? "Zatiaľ neoverené")
+                        .font(.caption.monospacedDigit())
                 }
             }
-            .glassCard(cornerRadius: 14, padding: 16)
 
-            VStack(alignment: .leading, spacing: 14) {
-                Label("Relácia EZZK", systemImage: "person.badge.key")
-                    .font(.headline)
+            HStack(spacing: 8) {
+                Button {
+                    Task { await controller.login() }
+                } label: {
+                    Label("Prihlásiť cez EZZK", systemImage: "rectangle.portrait.and.arrow.right")
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+                .disabled(!controller.canStartLogin)
 
-                let statePresentation = controller.isDemoMode
-                    ? (title: "Demo lokálne", symbol: "theatermasks", color: Color.orange)
-                    : ezzkStatePresentation(controller.state)
-                Label(statePresentation.title, systemImage: statePresentation.symbol)
-                    .foregroundStyle(statePresentation.color)
-
-                Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 8) {
-                    GridRow {
-                        Text("Posledná kontrola spojenia")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                            .frame(width: 180, alignment: .leading)
-                        Text(controller.lastConnectivityCheck.map {
-                            $0.formatted(date: .abbreviated, time: .shortened)
-                        } ?? "Zatiaľ neoverené")
-                            .font(.callout)
+                Button {
+                    Task { await controller.refresh() }
+                } label: {
+                    Label(
+                        controller.hasActiveSession ? "Obnoviť reláciu" : "Prihlásiť / obnoviť",
+                        systemImage: "arrow.clockwise")
+                }
+                .controlSize(.small)
+                .disabled(!controller.canRefresh)
+                if case .authenticating = controller.state {
+                    Button("Zrušiť čakanie", role: .cancel) {
+                        controller.cancelLogin()
                     }
-
-                    GridRow {
-                        Text("Dostupné evidenčné čísla")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                        Text(controller.availableEvidenceNumberCount.map(String.init) ?? "Zatiaľ neoverené")
-                            .font(.callout.monospacedDigit())
-                    }
+                    .controlSize(.small)
                 }
 
-                HStack(spacing: 10) {
-                    Button {
-                        Task { await controller.login() }
-                    } label: {
-                        Label("Prihlásiť cez EZZK", systemImage: "rectangle.portrait.and.arrow.right")
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(!controller.canStartLogin)
-
-                    Button {
-                        Task { await controller.refresh() }
-                    } label: {
-                        Label("Obnoviť session", systemImage: "arrow.clockwise")
-                    }
-                    .disabled(!controller.canRefresh)
-
+                if controller.hasActiveSession {
                     Button("Odhlásiť", role: .destructive) {
                         controller.logout()
                     }
-                    .disabled(!controller.hasActiveSession)
-                }
-
-                if !controller.hasNativeCallbackConfiguration {
-                    Label(
-                        "Prihlásenie je vypnuté. Vyžaduje sa konfigurácia operátora EZZK s natívnym callbackom.",
-                        systemImage: "info.circle"
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                }
-
-                if case .failed(let message) = controller.state {
-                    Text(message)
-                        .font(.caption)
-                        .foregroundStyle(.red)
+                    .controlSize(.small)
                 }
             }
-            .glassCard(cornerRadius: 14, padding: 16)
 
-            VStack(alignment: .leading, spacing: 14) {
-                Label("Evidenčné čísla", systemImage: "number.square.fill")
-                    .font(.headline)
-
-                HStack(spacing: 10) {
-                    TextField("Počet", text: $ezzkEvidenceCount)
-                        .textFieldStyle(.roundedBorder)
-                        .frame(width: 100)
-                        .onChange(of: ezzkEvidenceCount) { _, _ in
-                            ezzkEvidenceValidation = nil
-                        }
-
-                    Button("Vyžiadať čísla") {
-                        requestEZZKEvidenceNumbers()
-                    }
-                    .disabled(!controller.hasActiveSession || controller.state == .authenticating)
+            if !controller.hasAuthenticationCallbackConfiguration {
+                Label(
+                    "OAuth callback nie je nakonfigurovaný. Vyžaduje sa autogram://ezzk/callback.",
+                    systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption2)
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else if !controller.hasNativeCallbackConfiguration {
+                Label(
+                    "Používa sa zabezpečené webové presmerovanie portálu EZZK.",
+                    systemImage: "safari")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else if !controller.isDemoMode {
+                VStack(alignment: .leading, spacing: 4) {
+                    Label(
+                        "Vyžaduje sa nastavenie správcom EZZK",
+                        systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.orange)
+                    Text(
+                        "Správca musí povoliť callback autogram://ezzk/callback pre OAuth klienta login-app. Toto sa nedá nastaviť v Autograme.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
+            }
 
-                if let validation = ezzkEvidenceValidation {
-                    Text(validation)
-                        .font(.caption)
-                        .foregroundStyle(.red)
-                } else {
-                    Text("Požiadavka sa odošle až po výslovnom potvrdení. Pri chybe sa lokálne evidenčné záznamy nemenia.")
+            if case .authenticating = controller.state {
+                Label(
+                    "Autogram čaká na návrat z prihlasovacieho okna EZZK. Ak sa zobrazila chyba redirect_uri, zvoľte Zrušiť čakanie.",
+                    systemImage: "hourglass")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if case .failed(let message) = controller.state {
+                Text(message)
+                    .font(.caption2)
+                    .foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glassCard(cornerRadius: 14, padding: 16)
+    }
+
+    private func ezzkEvidenceCard(_ controller: EZZKSessionController) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("Evidenčné čísla", systemImage: "number.square.fill")
+                .font(.headline)
+
+            Text("Vyžiadajte čísla až po úspešnom prihlásení do EZZK.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            HStack(spacing: 8) {
+                TextField("Počet", text: $ezzkEvidenceCount)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 72)
+                    .onChange(of: ezzkEvidenceCount) { _, _ in
+                        ezzkEvidenceValidation = nil
+                    }
+
+                Button("Vyžiadať čísla") {
+                    requestEZZKEvidenceNumbers()
+                }
+                .controlSize(.small)
+                .disabled(!controller.hasActiveSession || controller.state == .authenticating)
+            }
+
+            if let validation = ezzkEvidenceValidation {
+                Text(validation)
+                    .font(.caption2)
+                    .foregroundStyle(.red)
+            } else {
+                Text("Každá požiadavka vyžaduje výslovné potvrdenie.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glassCard(cornerRadius: 14, padding: 16)
+    }
+
+    private var ezzkSubmissionCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("Odoslanie podpísaného ASiC-E", systemImage: "arrow.up.doc")
+                .font(.headline)
+
+            Label("Čaká na overený ASiC-E workflow", systemImage: "lock")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+
+            Text("Odoslanie zostáva vypnuté, kým workflow nevytvorí a neoverí samostatný podpísaný ASiC-E súbor.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glassCard(cornerRadius: 14, padding: 16)
+    }
+
+    private var ezzkMigrationCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("Kontaktné údaje pre migráciu", systemImage: "archivebox")
+                .font(.headline)
+
+            Text("Tieto údaje slúžia iba na migráciu. Nepoužívajú sa na OAuth prihlasovanie.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 8) {
+                GridRow {
+                    Text("Notifikačný e-mail")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                    TextField("advokat@kancelaria.sk", text: $settingsStore.settings.ezzkNotificationEmail)
+                        .textFieldStyle(.roundedBorder)
+                }
+
+                GridRow {
+                    Text("Adresa eDesk")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    TextField("elektronická schránka", text: $settingsStore.settings.ezzkEdeskAddress)
+                        .textFieldStyle(.roundedBorder)
                 }
             }
-            .glassCard(cornerRadius: 14, padding: 16)
-
-            VStack(alignment: .leading, spacing: 12) {
-                Label("Odoslanie podpísaného ASiC-E", systemImage: "arrow.up.doc")
-                    .font(.headline)
-
-                Button("Odoslať podpísaný ASiC-E") {}
-                    .disabled(true)
-
-                Text("Odoslanie je vypnuté. Aktuálny workflow neposkytuje overený podpísaný ASiC-E súbor a potrebnú EZZK capability. Metadáta ConversionRecordEnvelope sa neposielajú ako náhrada súboru.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            .glassCard(cornerRadius: 14, padding: 16)
-
-            VStack(alignment: .leading, spacing: 10) {
-                Label("Kontaktné údaje pre migráciu", systemImage: "archivebox")
-                    .font(.headline)
-
-                Text("Staršie IČO, používateľské meno a heslo zostávajú iba ako migračné údaje. Nepoužívajú sa na OAuth autentifikáciu ani na zostavenie sandboxovej alebo produkčnej služby.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 10) {
-                    GridRow {
-                        Text("Notifikačný e-mail")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                            .frame(width: 180, alignment: .leading)
-                        TextField("advokat@kancelaria.sk", text: $settingsStore.settings.ezzkNotificationEmail)
-                            .textFieldStyle(.roundedBorder)
-                    }
-
-                    GridRow {
-                        Text("Adresa eDesk")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                        TextField("elektronická schránka", text: $settingsStore.settings.ezzkEdeskAddress)
-                            .textFieldStyle(.roundedBorder)
-                    }
-                }
-            }
-            .glassCard(cornerRadius: 14, padding: 16)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glassCard(cornerRadius: 14, padding: 16)
     }
 
     private func requestEZZKEvidenceNumbers() {

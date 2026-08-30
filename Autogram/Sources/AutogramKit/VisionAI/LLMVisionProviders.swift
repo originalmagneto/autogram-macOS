@@ -57,25 +57,28 @@ public enum AIProviderError: LocalizedError, Equatable, Sendable {
 
 public enum LLMVisionParser {
     public static let systemPrompt = """
-    Analyzuj naskenovanú stranu právneho dokumentu a identifikuj bezpečnostné prvky podľa § 37 \
-    zákona č. 305/2013 Z. z. Klasifikuj VÝHRADNE tieto typy:
-    - "officialStamp" — okrúhla pečiatka (modrá, fialová, červená), zvyčajne so štátnym znakom, \
-    názvom inštitúcie alebo advokátskej kancelárie; aj neúplný otlačok.
-    - "handwrittenSignature" — vlastnoručný podpis: rukou písané stopy perom alebo guľôčkovým \
-    pisom, typicky v dolnej časti strany alebo pri paragrafoch.
-    - "embossedSeal" — reliéfna slepotlač: bezfarebný vtláčok viditeľný len ako tieň/relief.
-    - "initial" — parafa: krátka značka jednej alebo dvoch iniciál.
-    - "other" — iný bezpečnostný prvok (notárska pripojka, holografická poznámka, úradná nálepka).
-    Pravidlá:
-    1. Každý výskyt = jeden objekt poľa.
-    2. Odpovedaj VÝHRADNE JSON poľom, bez akéhokoľvek iného textu:
+    Inspect this scanned legal-document page and identify only security elements that are
+    physically visible in the image. Do not infer text, signatures, stamps, seals, or other
+    elements from OCR, context, expected placement, or legal assumptions.
+    Classify only these kinds:
+    - "officialStamp": a physically visible round official stamp, including a partial imprint.
+    - "handwrittenSignature": physically visible handwritten pen or ballpoint marks (vlastnoručný podpis).
+    - "embossedSeal": a physically visible colorless embossed impression or relief (slepotlač).
+    - "initial": a physically visible short handwritten initial or parafa.
+    - "other": another physically visible security element, such as a notarial attachment (notárska
+      pripojka), holographic note, or official sticker.
+    Rules:
+    1. Report every occurrence as a separate object, including partial occurrences.
+    2. Draw tight bounding boxes around the visible element only. Do not include surrounding
+       whitespace or unrelated text.
+    3. If uncertain, omit the element rather than guessing.
+    4. Return JSON only, with no explanation or markdown:
     [{"kind":"officialStamp","page":1,"box":[x,y,w,h],"confidence":0.9,"description_sk":"Úradná pečiatka ..."}]
-    3. kind ∈ officialStamp | handwrittenSignature | embossedSeal | initial | other
-    4. box je [x,y,w,h] normalizované na 0..1, počiatok v ľavom hornom rohu strany; \
-    box musí tesne obklopiť prvok.
-    5. confidence ∈ 0..1 — reálne odhadni istotu, pri pochybnostiach < 0.6.
-    6. description_sk — krátky slovný opis po slovensky vrátane polohy (napr. „v pravej dolnej časti“).
-    7. Ak sa na strane nenachádza žiadny prvok, odpovedaj [].
+    5. kind must be one of officialStamp, handwrittenSignature, embossedSeal, initial, other.
+    6. box is [x,y,w,h] normalized to 0..1, origin at the top-left of the page.
+    7. confidence must be in 0..1. description_sk is a short Slovak description of the
+       physically visible element and its position.
+    8. If no security element is physically visible, return [].
     """
 
     public static func effectivePrompt(_ override: String?) -> String {
@@ -163,10 +166,27 @@ public enum LLMVisionParser {
                 verbalDescription: raw.description_sk ?? "",
                 detectedByAI: true)
         }
+}
+}
+
+public struct LLMVisionDetectionOutcome: Sendable {
+    public let elements: [SecurityElement]
+    public let failureMessage: String?
+
+    public init(elements: [SecurityElement], failureMessage: String? = nil) {
+        self.elements = elements
+        self.failureMessage = failureMessage
     }
 }
 
-public struct OllamaVisionProvider: SecurityElementsProviding {
+public protocol LLMVisionProviderReporting: SecurityElementsProviding {
+    func detectWithStatus(in document: PDFDocument,
+                          pageAnalyses: [PageAnalysis]) async -> LLMVisionDetectionOutcome
+}
+
+
+
+public struct OllamaVisionProvider: LLMVisionProviderReporting {
     public var providerName: String { "Ollama (\(model))" }
 
     public let endpoint: URL
@@ -185,7 +205,13 @@ public struct OllamaVisionProvider: SecurityElementsProviding {
     }
 
     public func detect(in document: PDFDocument, pageAnalyses: [PageAnalysis]) async -> [SecurityElement] {
+        await detectWithStatus(in: document, pageAnalyses: pageAnalyses).elements
+    }
+
+    public func detectWithStatus(in document: PDFDocument,
+                                 pageAnalyses: [PageAnalysis]) async -> LLMVisionDetectionOutcome {
         var all: [SecurityElement] = []
+        var failureMessage: String?
         for pageIndex in 0..<document.pageCount {
             if let analysis = pageAnalyses.first(where: { $0.pageIndex == pageIndex }), analysis.isEmpty { continue }
             guard let page = document.page(at: pageIndex) else { continue }
@@ -203,23 +229,33 @@ public struct OllamaVisionProvider: SecurityElementsProviding {
                 let body = try JSONSerialization.data(withJSONObject: payload)
                 let data = try await transport.post(url: endpoint.appendingPathComponent("api/generate"),
                                                     headers: [:], body: body)
-                if let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                   let text = object["response"] as? String,
-                   let arrayJSON = LLMVisionParser.extractJSONArray(from: text) {
-                    let decoded = LLMVisionParser.decode(elements: arrayJSON).map {
-                        var element = $0; element.pageIndex = pageIndex; return element
-                    }
-                    all.append(contentsOf: decoded)
+                guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                      let text = object["response"] as? String,
+                      let arrayJSON = LLMVisionParser.extractJSONArray(from: text),
+                      let rawObject = try? JSONSerialization.jsonObject(with: arrayJSON),
+                      let rawArray = rawObject as? [Any] else {
+                    failureMessage = failureMessage ?? "\(providerName): Neplatná odpoveď AI servera."
+                    continue
                 }
+                let decoded = LLMVisionParser.decode(elements: arrayJSON).map {
+                    var element = $0
+                    element.pageIndex = pageIndex
+                    return element
+                }
+                if !rawArray.isEmpty && decoded.isEmpty {
+                    failureMessage = failureMessage ?? "\(providerName): Neplatná odpoveď AI servera."
+                    continue
+                }
+                all.append(contentsOf: decoded)
             } catch {
-                continue
+                failureMessage = failureMessage ?? "\(providerName): \(error.localizedDescription)"
             }
         }
-        return all
+        return LLMVisionDetectionOutcome(elements: all, failureMessage: failureMessage)
     }
 }
 
-public struct OpenAIVisionProvider: SecurityElementsProviding {
+public struct OpenAIVisionProvider: LLMVisionProviderReporting {
     public var providerName: String { "OpenAI-compatible (\(model))" }
 
     public let baseURL: URL
@@ -241,7 +277,13 @@ public struct OpenAIVisionProvider: SecurityElementsProviding {
     }
 
     public func detect(in document: PDFDocument, pageAnalyses: [PageAnalysis]) async -> [SecurityElement] {
+        await detectWithStatus(in: document, pageAnalyses: pageAnalyses).elements
+    }
+
+    public func detectWithStatus(in document: PDFDocument,
+                                 pageAnalyses: [PageAnalysis]) async -> LLMVisionDetectionOutcome {
         var all: [SecurityElement] = []
+        var failureMessage: String?
         for pageIndex in 0..<document.pageCount {
             if let analysis = pageAnalyses.first(where: { $0.pageIndex == pageIndex }), analysis.isEmpty { continue }
             guard let page = document.page(at: pageIndex) else { continue }
@@ -266,20 +308,59 @@ public struct OpenAIVisionProvider: SecurityElementsProviding {
                 let data = try await transport.post(url: baseURL.appendingPathComponent("chat/completions"),
                                                     headers: ["Authorization": "Bearer \(apiKey)"],
                                                     body: body)
-                if let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                   let choices = object["choices"] as? [[String: Any]],
-                   let message = choices.first?["message"] as? [String: Any],
-                   let content = message["content"] as? String,
-                   let arrayJSON = LLMVisionParser.extractJSONArray(from: content) {
-                    let decoded = LLMVisionParser.decode(elements: arrayJSON).map {
-                        var element = $0; element.pageIndex = pageIndex; return element
-                    }
-                    all.append(contentsOf: decoded)
+                guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                      let choices = object["choices"] as? [[String: Any]],
+                      let message = choices.first?["message"] as? [String: Any],
+                      let content = message["content"] as? String,
+                      let arrayJSON = LLMVisionParser.extractJSONArray(from: content),
+                      let rawObject = try? JSONSerialization.jsonObject(with: arrayJSON),
+                      let rawArray = rawObject as? [Any] else {
+                    failureMessage = failureMessage ?? "\(providerName): Neplatná odpoveď AI servera."
+                    continue
                 }
+                let decoded = LLMVisionParser.decode(elements: arrayJSON).map {
+                    var element = $0
+                    element.pageIndex = pageIndex
+                    return element
+                }
+                if !rawArray.isEmpty && decoded.isEmpty {
+                    failureMessage = failureMessage ?? "\(providerName): Neplatná odpoveď AI servera."
+                    continue
+                }
+                all.append(contentsOf: decoded)
             } catch {
-                continue
+                failureMessage = failureMessage ?? "\(providerName): \(error.localizedDescription)"
             }
         }
-        return all
+        return LLMVisionDetectionOutcome(elements: all, failureMessage: failureMessage)
+    }
+}
+public extension DetectionPipeline {
+    /// Runs built-in detection first and reports an external LLM failure separately.
+    /// Built-in findings remain available even when the augmentation is unavailable.
+    func detectWithStatus(in document: PDFDocument,
+                          pageAnalyses: [PageAnalysis]) async -> LLMVisionDetectionOutcome {
+        let builtinElements = await builtin.detect(in: document, pageAnalyses: pageAnalyses)
+        guard let llmProvider else {
+            return LLMVisionDetectionOutcome(elements: builtinElements)
+        }
+
+        let llmOutcome: LLMVisionDetectionOutcome
+        if let reportingProvider = llmProvider as? any LLMVisionProviderReporting {
+            llmOutcome = await reportingProvider.detectWithStatus(
+                in: document,
+                pageAnalyses: pageAnalyses)
+        } else {
+            llmOutcome = LLMVisionDetectionOutcome(
+                elements: await llmProvider.detect(in: document, pageAnalyses: pageAnalyses))
+        }
+        let merged = SecurityElementMerger.merge(
+            primary: builtinElements,
+            secondary: llmOutcome.elements)
+        return LLMVisionDetectionOutcome(
+            elements: merged.sorted {
+                ($0.pageIndex, $0.boundingBox.y) < ($1.pageIndex, $1.boundingBox.y)
+            },
+            failureMessage: llmOutcome.failureMessage)
     }
 }

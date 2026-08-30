@@ -9,6 +9,11 @@ public final class KeychainXAdESSigningProvider: QualifiedSigningProviding, @unc
         KeychainIdentityScanner.scanAll()
     }
 
+    public func resolveIdentities(pin: String) async -> [SigningIdentityInfo]? {
+        let identities = await availableIdentities()
+        return identities.isEmpty ? nil : identities
+    }
+
     public func sign(_ request: SigningRequest) async throws -> SignedConversionResult {
         let identities = await availableIdentities()
         guard let identity = identities.first(where: { $0.id == request.identityID }) else {
@@ -61,7 +66,7 @@ public final class KeychainXAdESSigningProvider: QualifiedSigningProviding, @unc
                 pdfData: signedPDF,
                 asicData: nil,
                 signedAt: Date(),
-                signatureLabel: "PAdES-B/T — \(summary)",
+                signatureLabel: "PAdES-B/T: \(summary)",
                 isLegallyBinding: true)
         case .attachedASIC:
             return try await signASIC(request: request,
@@ -118,7 +123,7 @@ public final class KeychainXAdESSigningProvider: QualifiedSigningProviding, @unc
             pdfData: request.pdfData,
             asicData: asic,
             signedAt: Date(),
-            signatureLabel: "KEP XAdES-B/T — \(summary)",
+            signatureLabel: "KEP XAdES-B/T: \(summary)",
             isLegallyBinding: true,
             timestampGenTime: result.timestampGenTime,
             timestampToken: nil)

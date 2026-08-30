@@ -1,12 +1,13 @@
 import Darwin
 import Foundation
 
-struct OutputReservation: Sendable {
-    let temporaryURL: URL
-    let finalURL: URL
+public struct OutputReservation: Sendable {
+    public let temporaryURL: URL
+    public let finalURL: URL
+
 }
 
-enum OutputServiceError: Error {
+public enum OutputServiceError: Error {
     case unsafeSource
     case unsafeTarget
     case sourceAndTargetAreIdentical
@@ -15,10 +16,12 @@ enum OutputServiceError: Error {
     case unableToFinalize
 }
 
-struct OutputService {
+public struct OutputService {
     private let validator = PDFArtifactValidator()
 
-    func reserve(
+    public init() {}
+
+    public func reserve(
         for sourceURL: URL,
         finalURL requestedFinalURL: URL? = nil,
         outputExtension: String? = nil
@@ -36,7 +39,71 @@ struct OutputService {
         return OutputReservation(temporaryURL: temporary, finalURL: destination)
     }
 
-    func finalize(_ reservation: OutputReservation) throws {
+    /// Reserves a unique sibling output using the supplied suffix.
+    ///
+    /// The returned temporary file must be finalized with `finalize(_:)`.
+    /// Finalization uses an exclusive move, so an output created concurrently
+    /// cannot be replaced.
+    public func reserveUniqueSibling(
+        for sourceURL: URL,
+        in directoryURL: URL? = nil,
+        stemSuffix: String = "_podpisane",
+        outputExtension: String? = nil
+    ) throws -> OutputReservation {
+        guard !isSymbolicLink(sourceURL) else { throw OutputServiceError.unsafeSource }
+        let source = canonicalURL(sourceURL)
+        let rawDirectory = directoryURL ?? sourceURL.deletingLastPathComponent()
+        guard !isSymbolicLink(rawDirectory) else { throw OutputServiceError.unsafeTarget }
+        let directory = canonicalURL(rawDirectory)
+        let stem = source.deletingPathExtension().lastPathComponent
+        let destinationExtension = outputExtension ?? source.pathExtension
+        var number = 1
+        while true {
+            let suffix = number == 1 ? stemSuffix : "\(stemSuffix) (\(number))"
+            let candidate = directory
+                .appending(path: stem + suffix)
+                .appendingPathExtension(destinationExtension)
+            if !pathExists(candidate) {
+                let temporary = try reserveTemporarySibling(of: candidate)
+                return OutputReservation(temporaryURL: temporary, finalURL: candidate)
+            }
+            number += 1
+        }
+    }
+
+    /// Resolves the next collision-safe sibling for review without reserving it.
+    ///
+    /// This is a display preview only. Call `reserveUniqueSibling` at execution
+    /// time because another process may create the previewed path meanwhile.
+    public func previewUniqueSibling(
+        for sourceURL: URL,
+        in directoryURL: URL? = nil,
+        stemSuffix: String = "_podpisane",
+        outputExtension: String? = nil,
+        occupiedURLs: Set<URL> = []
+    ) throws -> URL {
+        guard !isSymbolicLink(sourceURL) else { throw OutputServiceError.unsafeSource }
+        let source = canonicalURL(sourceURL)
+        let rawDirectory = directoryURL ?? sourceURL.deletingLastPathComponent()
+        guard !isSymbolicLink(rawDirectory) else { throw OutputServiceError.unsafeTarget }
+        let directory = canonicalURL(rawDirectory)
+        let stem = source.deletingPathExtension().lastPathComponent
+        let destinationExtension = outputExtension ?? source.pathExtension
+        let occupied = Set(occupiedURLs.map(canonicalURL))
+        var number = 1
+        while true {
+            let suffix = number == 1 ? stemSuffix : "\(stemSuffix) (\(number))"
+            let candidate = directory
+                .appending(path: stem + suffix)
+                .appendingPathExtension(destinationExtension)
+            if !pathExists(candidate) && !occupied.contains(canonicalURL(candidate)) {
+                return candidate
+            }
+            number += 1
+        }
+    }
+
+    public func finalize(_ reservation: OutputReservation) throws {
         guard !pathExists(reservation.finalURL) else { throw OutputServiceError.finalOutputAlreadyExists }
         try validator.validate(at: reservation.temporaryURL, fileExtension: reservation.finalURL.pathExtension)
         guard moveWithoutReplacing(reservation.temporaryURL, to: reservation.finalURL) else {
