@@ -43,3 +43,11 @@ Only focused tests and app builds were run. Existing project warnings remain out
 - Added publication guards so an in-flight restoration or login cannot replace an already active client.
 - Rebuilt the Autogram product after the hardening change: PASS.
 - Re-ran `swift test --build-path /tmp/ezzk-task4-final-tests-2 --filter EZZKHTTPClientTests`: PASS, 16 tests, 0 failures.
+
+## Review fixes
+
+- Keychain restoration now requires only a valid fixed OAuth client configuration and does not require a native callback. It still performs the authenticated read-only `/ec` check before publishing state.
+- Added an operation generation guard invalidated by logout across login, restoration, refresh, connectivity checks, and evidence-number requests. Stale tasks cannot republish authenticated state or reactivate a client.
+- Authentication failures from `testConnection()` now clear the active capability, remove the stored token, and transition to `expired`.
+- Mock service use is limited to explicit demo mode. Non-demo signed-out, failed, and expired states expose an unavailable fail-closed service instead of the mock.
+- Re-ran focused EZZKHTTPClientTests: PASS, 16 tests, 0 failures. Rebuilt the Autogram product: PASS.

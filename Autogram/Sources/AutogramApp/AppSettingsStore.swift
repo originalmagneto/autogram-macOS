@@ -21,9 +21,13 @@ final class AppSettingsStore {
 
     init() {
         let loaded = AppSettings.load()
+        let storedPassword = KeychainStore.load(account: "ezzk.password") ?? ""
+        let isDemoMode = loaded.ezzkICO.isEmpty &&
+            loaded.ezzkUsername.isEmpty &&
+            storedPassword.isEmpty
         self.settings = loaded
-        self.ezzkPassword = KeychainStore.load(account: "ezzk.password") ?? ""
-        self.ezzkSessionController = EZZKSessionController()
+        self.ezzkPassword = storedPassword
+        self.ezzkSessionController = EZZKSessionController(demoMode: isDemoMode)
         self.evidenceStore = LocalEvidenceStore()
         self.signingProvider = SigningProviderFactory.makeDefault()
     }

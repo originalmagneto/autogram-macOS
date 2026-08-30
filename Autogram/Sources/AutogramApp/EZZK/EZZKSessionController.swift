@@ -19,9 +19,12 @@ final class EZZKSessionController {
     private let tokenStore: any EZZKTokenStoring
     private let transport: any EZZKHTTPTransport
     private let authenticationSession: any EZZKAuthenticationSessionRunning
+    private let demoMode: Bool
     private let demoService = MockEZZKService()
+    private let unavailableService = UnavailableEZZKService()
     private var client: EZZKClient?
     private var activeService: EZZKClientServiceAdapter?
+    private var operationGeneration: UInt64 = 0
 
     var selectedEnvironment: EZZKEnvironment {
         get { environment }
@@ -33,7 +36,8 @@ final class EZZKSessionController {
     }
 
     var service: any EZZKServicing {
-        activeService ?? demoService
+        if demoMode { return demoService }
+        return activeService ?? unavailableService
     }
 
     var canSelectProduction: Bool { Self.productionAuthorityGate }
@@ -42,12 +46,14 @@ final class EZZKSessionController {
         oauthConfiguration: EZZKOAuthConfiguration? = try? EZZKOAuthConfiguration(),
         tokenStore: any EZZKTokenStoring = EZZKTokenStore(),
         transport: any EZZKHTTPTransport = URLSessionEZZKHTTPTransport(),
-        authenticationSession: any EZZKAuthenticationSessionRunning = EZZKAuthenticationSession()
+        authenticationSession: any EZZKAuthenticationSessionRunning = EZZKAuthenticationSession(),
+        demoMode: Bool = false
     ) {
         self.oauthConfiguration = oauthConfiguration
         self.tokenStore = tokenStore
         self.transport = transport
         self.authenticationSession = authenticationSession
+        self.demoMode = demoMode
 
         Task { [weak self] in
             await self?.restoreFromKeychain()
@@ -55,32 +61,38 @@ final class EZZKSessionController {
     }
 
     func login() async {
-        guard client == nil else { return }
+        guard !demoMode, client == nil else { return }
         guard isEnvironmentAvailable else {
             state = .failed("Produkčné pripojenie EZZK ešte nie je povolené.")
             return
         }
-        guard let oauthConfiguration, isUsable(oauthConfiguration) else {
+        guard let oauthConfiguration, isUsableForLogin(oauthConfiguration) else {
             state = .failed("Prihlásenie do EZZK nie je dostupné. Vyžaduje sa potvrdené natívne presmerovanie.")
             return
         }
 
+        let generation = beginOperation()
         state = .authenticating
         do {
             let tokenSet = try await authenticationSession.authenticate(configuration: oauthConfiguration)
+            guard isCurrent(generation) else { return }
             try tokenStore.save(tokenSet, environment: environment)
+            guard isCurrent(generation) else { return }
             let candidate = makeClient(oauthConfiguration: oauthConfiguration)
             let available = try await candidate.availableEvidenceNumbers()
+            guard isCurrent(generation) else { return }
             guard publishAuthenticated(
                 candidate,
-                availableEvidenceNumberCount: available.availableEvidenceNumbers.count) else { return }
+                availableEvidenceNumberCount: available.availableEvidenceNumbers.count,
+                generation: generation) else { return }
         } catch {
-            guard client == nil else { return }
+            guard isCurrent(generation), client == nil else { return }
             state = .failed(message(for: error))
         }
     }
 
     func logout() {
+        invalidateOperations()
         client = nil
         activeService = nil
         do {
@@ -92,25 +104,33 @@ final class EZZKSessionController {
     }
 
     func refresh() async {
+        guard !demoMode else {
+            state = .failed("Relácia EZZK nie je v demo režime dostupná.")
+            return
+        }
         guard isEnvironmentAvailable else {
             client = nil
             activeService = nil
             state = .failed("Produkčné pripojenie EZZK ešte nie je povolené.")
             return
         }
-        guard let oauthConfiguration, isUsable(oauthConfiguration) else {
-            state = .failed("Obnovenie relácie EZZK nie je dostupné bez potvrdeného natívneho presmerovania.")
+        guard let oauthConfiguration, isUsableForClient(oauthConfiguration) else {
+            state = .failed("Obnovenie relácie EZZK nie je dostupné bez platnej konfigurácie.")
             return
         }
 
+        let generation = beginOperation()
         state = .authenticating
         do {
             let candidate = client ?? makeClient(oauthConfiguration: oauthConfiguration)
             let available = try await candidate.availableEvidenceNumbers()
+            guard isCurrent(generation) else { return }
             guard publishAuthenticated(
                 candidate,
-                availableEvidenceNumberCount: available.availableEvidenceNumbers.count) else { return }
+                availableEvidenceNumberCount: available.availableEvidenceNumbers.count,
+                generation: generation) else { return }
         } catch {
+            guard isCurrent(generation) else { return }
             client = nil
             activeService = nil
             if isAuthenticationFailure(error) {
@@ -123,23 +143,34 @@ final class EZZKSessionController {
     }
 
     func testConnection() async {
+        guard !demoMode else {
+            state = .failed("Test pripojenia EZZK nie je v demo režime dostupný.")
+            return
+        }
         guard isEnvironmentAvailable else {
             state = .failed("Produkčné pripojenie EZZK ešte nie je povolené.")
             return
         }
-        guard let oauthConfiguration, isUsable(oauthConfiguration) else {
-            state = .failed("Test pripojenia EZZK nie je dostupný bez potvrdeného natívneho presmerovania.")
+        guard let oauthConfiguration, isUsableForClient(oauthConfiguration) else {
+            state = .failed("Test pripojenia EZZK nie je dostupný bez platnej konfigurácie.")
             return
         }
 
+        let generation = beginOperation()
         do {
             let candidate = client ?? makeClient(oauthConfiguration: oauthConfiguration)
             let available = try await candidate.availableEvidenceNumbers()
+            guard isCurrent(generation) else { return }
             guard publishAuthenticated(
                 candidate,
-                availableEvidenceNumberCount: available.availableEvidenceNumbers.count) else { return }
+                availableEvidenceNumberCount: available.availableEvidenceNumbers.count,
+                generation: generation) else { return }
         } catch {
-            if client == nil, isAuthenticationFailure(error) {
+            guard isCurrent(generation) else { return }
+            if isAuthenticationFailure(error) {
+                client = nil
+                activeService = nil
+                try? tokenStore.delete(environment: environment)
                 state = .expired
             } else {
                 state = .failed(message(for: error))
@@ -152,35 +183,50 @@ final class EZZKSessionController {
             state = .failed("Počet evidenčných čísel musí byť kladný.")
             return
         }
-        guard let client else {
+        guard !demoMode, let client else {
             state = .failed("Najprv sa prihláste do EZZK.")
             return
         }
 
+        let generation = beginOperation()
         do {
             let numbers = try await client.requestEvidenceNumbers(count: count)
+            guard isCurrent(generation) else { return }
             state = .authenticated(environment: environment, availableEvidenceNumbers: numbers.count)
         } catch {
-            state = .failed(message(for: error))
+            guard isCurrent(generation) else { return }
+            if isAuthenticationFailure(error) {
+                self.client = nil
+                activeService = nil
+                try? tokenStore.delete(environment: environment)
+                state = .expired
+            } else {
+                state = .failed(message(for: error))
+            }
         }
     }
 
     private func restoreFromKeychain() async {
-        guard isEnvironmentAvailable,
+        let generation = beginOperation()
+        guard !demoMode,
+              isEnvironmentAvailable,
               let oauthConfiguration,
-              isUsable(oauthConfiguration) else {
+              isUsableForClient(oauthConfiguration) else {
             return
         }
         do {
             guard try tokenStore.load(environment: environment) != nil else { return }
+            guard isCurrent(generation) else { return }
             state = .authenticating
             let candidate = makeClient(oauthConfiguration: oauthConfiguration)
             let available = try await candidate.availableEvidenceNumbers()
+            guard isCurrent(generation) else { return }
             guard publishAuthenticated(
                 candidate,
-                availableEvidenceNumberCount: available.availableEvidenceNumbers.count) else { return }
+                availableEvidenceNumberCount: available.availableEvidenceNumbers.count,
+                generation: generation) else { return }
         } catch {
-            guard client == nil else { return }
+            guard isCurrent(generation), client == nil else { return }
             if isAuthenticationFailure(error) {
                 state = .expired
             } else {
@@ -192,8 +238,10 @@ final class EZZKSessionController {
     @discardableResult
     private func publishAuthenticated(
         _ candidate: EZZKClient,
-        availableEvidenceNumberCount: Int
+        availableEvidenceNumberCount: Int,
+        generation: UInt64
     ) -> Bool {
+        guard isCurrent(generation) else { return false }
         if let client, client !== candidate { return false }
         if client == nil {
             client = candidate
@@ -213,8 +261,33 @@ final class EZZKSessionController {
             transport: transport)
     }
 
+    private func beginOperation() -> UInt64 {
+        operationGeneration &+= 1
+        return operationGeneration
+    }
+
+    private func invalidateOperations() {
+        operationGeneration &+= 1
+    }
+
+    private func isCurrent(_ generation: UInt64) -> Bool {
+        operationGeneration == generation
+    }
+
     private var isEnvironmentAvailable: Bool {
         environment != .production || Self.productionAuthorityGate
+    }
+
+    private func isUsableForClient(_ oauthConfiguration: EZZKOAuthConfiguration) -> Bool {
+        !oauthConfiguration.clientID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        !oauthConfiguration.scopes.isEmpty &&
+        oauthConfiguration.scopes.allSatisfy {
+            !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+    }
+
+    private func isUsableForLogin(_ oauthConfiguration: EZZKOAuthConfiguration) -> Bool {
+        isUsableForClient(oauthConfiguration) && oauthConfiguration.isNativeCallbackConfigured
     }
 
     private func isAuthenticationFailure(_ error: Error) -> Bool {
@@ -222,15 +295,6 @@ final class EZZKSessionController {
             return error == .authenticationFailed
         }
         return error is EZZKAuthenticationError
-    }
-
-    private func isUsable(_ oauthConfiguration: EZZKOAuthConfiguration) -> Bool {
-        !oauthConfiguration.clientID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        !oauthConfiguration.scopes.isEmpty &&
-        oauthConfiguration.scopes.allSatisfy {
-            !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        } &&
-        oauthConfiguration.isNativeCallbackConfigured
     }
 
     private func message(for error: Error) -> String {
@@ -271,6 +335,20 @@ final class EZZKSessionController {
     }
 
     private static let productionAuthorityGate = false
+}
+
+private struct UnavailableEZZKService: EZZKServicing, Sendable {
+    func serverTime() async throws -> Date {
+        throw EZZKError.notConfigured
+    }
+
+    func requestEvidenceNumbers(count: Int) async throws -> [String] {
+        throw EZZKError.notConfigured
+    }
+
+    func submit(_ envelope: ConversionRecordEnvelope) async throws {
+        throw EZZKError.notConfigured
+    }
 }
 
 private final class EZZKClientServiceAdapter: EZZKServicing, @unchecked Sendable {
