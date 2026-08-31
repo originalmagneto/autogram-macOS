@@ -1217,6 +1217,7 @@ final class SigningSessionStore {
         guard let entries = ASiCEContainerVerifier.readEntries(data),
               let pdfEntry = entries.first(where: {
                   $0.name.lowercased().hasSuffix(".pdf")
+                      || $0.data.starts(with: Data("%PDF-".utf8))
               }) else {
             return nil
         }
