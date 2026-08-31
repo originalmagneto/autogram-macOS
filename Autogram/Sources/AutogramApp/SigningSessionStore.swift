@@ -400,7 +400,8 @@ final class SigningSessionStore {
                     pdfData,
                     stamp: stamp,
                     includeTimestamp: includeQualifiedTimestamp,
-                    stamper: stamper)
+                    stamper: stamper,
+                    flattenAnnotations: true)
                 visualStampWasPreapplied = stampedData != pdfData
                 pdfData = stampedData
             }
@@ -1003,7 +1004,8 @@ final class SigningSessionStore {
                 pdfData,
                 stamp: stamp,
                 includeTimestamp: snapshot.includeQualifiedTimestamp,
-                stamper: stamper)
+                stamper: stamper,
+                flattenAnnotations: true)
             visualStampWasPreapplied = stampedData != pdfData
             if snapshot.outputFormat == .attachedASIC {
                 attachedStamp = stamp
