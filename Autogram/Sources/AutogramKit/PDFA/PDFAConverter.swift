@@ -256,9 +256,12 @@ public struct PDFAConverter: Sendable {
     static func renderPageImage(page: PDFPage, scale: CGFloat) -> CGImage? {
         let bounds = page.bounds(for: .mediaBox)
         guard bounds.width > 1, bounds.height > 1 else { return nil }
-        let width = max(Int(bounds.width * scale), 8)
-        let height = max(Int(bounds.height * scale), 8)
-
+        let rotation = ((page.pageRef?.rotationAngle ?? 0) % 360 + 360) % 360
+        let outputSize = rotation % 180 == 0
+            ? bounds.size
+            : CGSize(width: bounds.height, height: bounds.width)
+        let width = max(Int(outputSize.width * scale), 8)
+        let height = max(Int(outputSize.height * scale), 8)
         guard let ctx = CGContext(
             data: nil,
             width: width,
@@ -268,11 +271,20 @@ public struct PDFAConverter: Sendable {
             space: CGColorSpaceCreateDeviceRGB(),
             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
         ) else { return nil }
-
+        let outputRect = CGRect(origin: .zero, size: outputSize)
         ctx.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: 1))
         ctx.fill(CGRect(x: 0, y: 0, width: width, height: height))
         ctx.scaleBy(x: scale, y: scale)
-        page.draw(with: .mediaBox, to: ctx)
+        if page.annotations.isEmpty, let pageRef = page.pageRef {
+            ctx.concatenate(pageRef.getDrawingTransform(
+                .mediaBox,
+                rect: outputRect,
+                rotate: 0,
+                preserveAspectRatio: true))
+            ctx.drawPDFPage(pageRef)
+        } else {
+            page.draw(with: .mediaBox, to: ctx)
+        }
         return ctx.makeImage()
     }
 

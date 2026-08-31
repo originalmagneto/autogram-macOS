@@ -125,19 +125,22 @@ public final class SignaturePlacementState {
     // MARK: - Rendering
 
     public func defaultPlacement() -> VisibleSignaturePlacement? {
-        guard pageCount > 0, let page = document?.page(at: pageCount - 1),
-              let boundsCandidate = document?.page(at: 0) else { return nil }
-        _ = boundsCandidate
+        guard pageCount > 0, let page = document?.page(at: pageCount - 1) else { return nil }
         let cropBox = page.bounds(for: .cropBox)
         guard cropBox.width > 0, cropBox.height > 0 else { return nil }
-        let scale = min(1, cropBox.width / 420, cropBox.height / 260, 0.55)
-        let size = CGSize(width: 420 * scale, height: 260 * scale)
+        let aspectRatio = selectedAsset.flatMap {
+            NSImage(contentsOf: assetStore.fileURL(for: $0))?.size
+        }.map { max($0.width / max($0.height, 1), 1) } ?? (420.0 / 260.0)
+        let maxWidth = min(cropBox.width, 420)
+        let maxHeight = min(cropBox.height, 180)
+        let width = min(maxWidth, maxHeight * aspectRatio)
+        let height = width / aspectRatio
         return VisibleSignaturePlacement(
             pageIndex: pageCount - 1,
-            pageRect: CGRect(x: (cropBox.width - size.width) / 2,
-                             y: (cropBox.height - size.height) / 2,
-                             width: size.width,
-                             height: size.height),
+            pageRect: CGRect(x: (cropBox.width - width) / 2,
+                             y: (cropBox.height - height) / 2,
+                             width: width,
+                             height: height),
             rotationDegrees: 0)
     }
 
