@@ -75,6 +75,28 @@ cat > "$CONTENTS/Info.plist" <<'PLIST'
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+    <key>UTImportedTypeDeclarations</key>
+    <array>
+        <dict>
+            <key>UTTypeIdentifier</key>
+            <string>org.autogram.asice</string>
+            <key>UTTypeDescription</key>
+            <string>ASiC-E signed container</string>
+            <key>UTTypeConformsTo</key>
+            <array>
+                <string>public.zip-archive</string>
+            </array>
+            <key>UTTypeTagSpecification</key>
+            <dict>
+                <key>public.filename-extension</key>
+                <array>
+                    <string>asice</string>
+                </array>
+                <key>public.mime-type</key>
+                <string>application/vnd.etsi.asic-e+zip</string>
+            </dict>
+        </dict>
+    </array>
     <key>CFBundleIconFile</key>
     <string>Autogram</string>
     <key>CFBundleName</key>
@@ -116,6 +138,7 @@ cat > "$CONTENTS/Info.plist" <<'PLIST'
             <key>LSItemContentTypes</key>
             <array>
                 <string>com.adobe.pdf</string>
+                <string>org.autogram.asice</string>
             </array>
         </dict>
     </array>
@@ -134,6 +157,7 @@ cat > "$CONTENTS/Info.plist" <<'PLIST'
             <key>NSSendFileTypes</key>
             <array>
                 <string>com.adobe.pdf</string>
+                <string>org.autogram.asice</string>
             </array>
             <key>NSRequiredContext</key>
             <dict>
