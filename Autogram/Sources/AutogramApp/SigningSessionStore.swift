@@ -568,6 +568,14 @@ final class SigningSessionStore {
         }
     }
 
+    func invalidateBatchSettingsForEditing() {
+        guard batchPhase == .ready else { return }
+        batchSettingsSnapshot = nil
+        batchPIN = nil
+        batchPhase = .idle
+        lastError = nil
+    }
+
     func prepareBatch(ids: [UUID]) async {
         guard batchPhase != .preflighting, batchPhase != .signing else { return }
         invalidateBatchWork()
@@ -676,7 +684,7 @@ final class SigningSessionStore {
             }
             batchItems[batchIndex].inputSignatureState = inspection.state
             batchItems[batchIndex].inputSignatureDetail = inspection.detail
-            guard inspection.state == .valid else {
+            guard inspection.state != .invalid, inspection.state != .unavailable else {
                 batchItems[batchIndex].state = .failed
                 batchItems[batchIndex].errorMessage = inspection.detail
                 continue

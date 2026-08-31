@@ -1030,6 +1030,12 @@ struct SigningBatchView: View {
                 }
             )
         }
+        .onChange(of: store.outputFormat) { _, _ in
+            invalidateReadyBatchSettings()
+        }
+        .onChange(of: store.convertToPDFA) { _, _ in
+            invalidateReadyBatchSettings()
+        }
     }
 
     private var header: some View {
@@ -1107,6 +1113,61 @@ struct SigningBatchView: View {
                 }
             }
 
+            if store.batchSettingsSnapshot == nil || store.batchPhase == .ready {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Formát výstupu")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    HStack(spacing: 8) {
+                        ForEach(SigningOutputFormatPresentation.allCases) { presentation in
+                            let isSelected = store.outputFormat == presentation.format
+                            Button {
+                                store.outputFormat = presentation.format
+                            } label: {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(presentation.label)
+                                        .font(.callout.weight(isSelected ? .semibold : .medium))
+                                    Text(presentation.format == .embeddedPAdES
+                                         ? "Podpis priamo v PDF"
+                                         : "Kontajner s XAdES")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 8)
+                                .background(
+                                    isSelected
+                                        ? Color.accentColor.opacity(0.12)
+                                        : Color.primary.opacity(0.03),
+                                    in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                                        .strokeBorder(
+                                            isSelected
+                                                ? Color.accentColor.opacity(0.55)
+                                                : Color.primary.opacity(0.10),
+                                            lineWidth: 1))
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Formát výstupu \(presentation.label)")
+                            .accessibilityValue(isSelected ? "Vybraný" : "Nevybraný")
+                            .accessibilityAddTraits(isSelected ? .isSelected : [])
+                        }
+                    }
+                    Text(store.outputFormat == .embeddedPAdES
+                         ? "PAdES podpis priamo v každom PDF."
+                         : "Každý dokument sa vloží do vlastného ASiC-E kontajnera s XAdES podpisom.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    Divider().opacity(0.5)
+                    Toggle(isOn: $store.convertToPDFA) {
+                        Label("Konvertovať do PDF/A pred podpisom", systemImage: "doc.badge.arrow.up")
+                            .font(.callout)
+                    }
+                }
+                .disabled(store.batchPhase == .preflighting || store.batchPhase == .signing)
+            }
             if let snapshot = store.batchSettingsSnapshot {
                 settingRow("Podpisový certifikát", value: snapshot.identityLabel)
                 settingRow("Formát výstupu", value: outputFormatLabel(snapshot.outputFormat))
@@ -1605,6 +1666,9 @@ struct SigningBatchView: View {
                 store.lastError = "Protokol sa nepodarilo uložiť: \(error.localizedDescription)"
             }
         }
+    }
+    private func invalidateReadyBatchSettings() {
+        store.invalidateBatchSettingsForEditing()
     }
 
     private func batchLog() -> String {
