@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="sk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Autogram macOS | Vizuálny guide</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root { --paper:#f5f5f5; --paper-2:#ececec; --ink:#2d3142; --muted:#4f5d75; --soft:#7a8399; --rule:rgba(45,49,66,.12); --accent:#eb6c36; --accent-tint:rgba(235,108,54,.08); --link:#2e5aa8; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--paper); color:var(--ink); font-family:'Geist',system-ui,sans-serif; padding:48px 24px; }
+    main { max-width:1120px; margin:0 auto; }
+    .eyebrow { margin:0 0 8px; color:var(--muted); font:500 8px 'Geist Mono',monospace; letter-spacing:.18em; text-transform:uppercase; }
+    h1 { margin:0 0 12px; font:400 40px/1.1 'Instrument Serif',serif; letter-spacing:-.02em; }
+    .intro { max-width:720px; margin:0 0 40px; color:var(--muted); font-size:16px; line-height:1.55; }
+    section { margin:0 0 40px; }
+    h2 { margin:0 0 8px; font:400 28px/1.1 'Instrument Serif',serif; }
+    .caption { margin:0 0 16px; color:var(--soft); font:12px/1.5 'Geist Mono',monospace; }
+    .diagram { overflow-x:auto; border-top:1px solid var(--rule); border-bottom:1px solid var(--rule); padding:20px 0; }
+    svg { display:block; width:100%; min-width:920px; height:auto; }
+    .note { margin-top:16px; padding:16px; border-left:3px solid var(--accent); background:#fff; color:var(--muted); font-size:14px; line-height:1.5; }
+    footer { border-top:1px solid var(--rule); padding-top:16px; color:var(--soft); font:8px 'Geist Mono',monospace; letter-spacing:.08em; text-transform:uppercase; }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <p class="eyebrow">Autogram macOS · visual guide</p>
+    <h1>Podpisovanie a zaručená konverzia bez skrytých krokov.</h1>
+    <p class="intro">Dve mapy vysvetľujú hlavné hranice aplikácie: kde prebieha lokálna dokumentová logika a ako dávkové podpisovanie overuje vstupy pred tým, než sprístupní podpis.</p>
+  </header>
+
+  <section>
+    <h2>Architektúra aplikácie</h2>
+    <p class="caption">NATIVE SHELL → SESSION STORES → DOCUMENT ENGINE</p>
+    <div class="diagram">
+      <svg viewBox="0 0 1080 420" role="img" aria-labelledby="autogram-architecture-title autogram-architecture-desc" xmlns="http://www.w3.org/2000/svg">
+        <title id="autogram-architecture-title">Architektúra aplikácie Autogram macOS</title>
+        <desc id="autogram-architecture-desc">Diagram ukazuje tok medzi natívnym SwiftUI shellom, session stores, AutogramKit dokumentovým enginom, lokálnym registrom a voliteľným Java DSS helperom.</desc>
+        <defs>
+          <marker id="arch-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#4f5d75"/></marker>
+          <marker id="arch-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#eb6c36"/></marker>
+          <marker id="arch-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#2e5aa8"/></marker>
+        </defs>
+        <rect width="1080" height="420" fill="#f5f5f5"/>
+        <rect x="32" y="52" width="1016" height="132" rx="8" fill="rgba(45,49,66,.02)" stroke="rgba(45,49,66,.10)"/>
+        <rect x="32" y="224" width="1016" height="144" rx="8" fill="rgba(45,49,66,.02)" stroke="rgba(45,49,66,.10)"/>
+        <rect x="48" y="56" width="126" height="12" rx="2" fill="#f5f5f5"/>
+        <text x="111" y="65" text-anchor="middle" fill="#4f5d75" font-size="8" font-family="'Geist Mono',monospace" letter-spacing=".14em">APPLICATION</text>
+        <rect x="48" y="228" width="118" height="12" rx="2" fill="#f5f5f5"/>
+        <text x="107" y="237" text-anchor="middle" fill="#4f5d75" font-size="8" font-family="'Geist Mono',monospace" letter-spacing=".14em">DOCUMENT CORE</text>
+
+        <path d="M276 118 H324" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arch-arrow)"/>
+        <path d="M572 118 H620" fill="none" stroke="#eb6c36" stroke-width="1.2" marker-end="url(#arch-accent)"/>
+        <path d="M868 118 H916" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arch-arrow)"/>
+        <path d="M744 184 V252" fill="none" stroke="#2e5aa8" stroke-width="1.2" marker-end="url(#arch-link)"/>
+        <path d="M980 184 V252 H868" fill="none" stroke="#4f5d75" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arch-arrow)"/>
+        <path d="M404 184 V252 H324" fill="none" stroke="#4f5d75" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arch-arrow)"/>
+
+        <rect x="84" y="84" width="192" height="68" rx="6" fill="#fff" stroke="#2d3142"/>
+        <text x="180" y="112" text-anchor="middle" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist',sans-serif">SwiftUI shell</text>
+        <text x="180" y="132" text-anchor="middle" fill="#4f5d75" font-size="9" font-family="'Geist Mono',monospace">views · menu · Finder</text>
+        <rect x="380" y="84" width="192" height="68" rx="6" fill="#fff" stroke="#2d3142"/>
+        <text x="476" y="112" text-anchor="middle" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist',sans-serif">Session stores</text>
+        <text x="476" y="132" text-anchor="middle" fill="#4f5d75" font-size="9" font-family="'Geist Mono',monospace">signing · ZaKo · evidence</text>
+        <rect x="620" y="84" width="248" height="68" rx="6" fill="rgba(235,108,54,.08)" stroke="#eb6c36"/>
+        <text x="744" y="112" text-anchor="middle" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist',sans-serif">AutogramKit</text>
+        <text x="744" y="132" text-anchor="middle" fill="#4f5d75" font-size="9" font-family="'Geist Mono',monospace">PDF · XML · QES · PDF/A</text>
+        <rect x="916" y="84" width="112" height="68" rx="6" fill="#fff" stroke="#2d3142"/>
+        <text x="972" y="112" text-anchor="middle" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist',sans-serif">EZZK</text>
+        <text x="972" y="132" text-anchor="middle" fill="#4f5d75" font-size="9" font-family="'Geist Mono',monospace">OAuth · CEZZK</text>
+
+        <rect x="84" y="256" width="240" height="80" rx="6" fill="#fff" stroke="#2d3142"/>
+        <text x="204" y="286" text-anchor="middle" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist',sans-serif">Lokálny register</text>
+        <text x="204" y="308" text-anchor="middle" fill="#4f5d75" font-size="9" font-family="'Geist Mono',monospace">register.json · audit state</text>
+        <rect x="404" y="256" width="216" height="80" rx="6" fill="#fff" stroke="#2d3142"/>
+        <text x="512" y="286" text-anchor="middle" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist',sans-serif">Vision pipeline</text>
+        <text x="512" y="308" text-anchor="middle" fill="#4f5d75" font-size="9" font-family="'Geist Mono',monospace">Vision · oMLX · Ollama</text>
+        <rect x="700" y="256" width="216" height="80" rx="6" fill="#fff" stroke="#2d3142"/>
+        <text x="808" y="286" text-anchor="middle" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist',sans-serif">Java DSS helper</text>
+        <text x="808" y="308" text-anchor="middle" fill="#4f5d75" font-size="9" font-family="'Geist Mono',monospace">persistent machine session</text>
+      </svg>
+    </div>
+  </section>
+
+  <section>
+    <h2>Batch preflight podpisov</h2>
+    <p class="caption">INTAKE → ONE FULL VALIDATE → ITEM-LEVEL DECISION</p>
+    <div class="diagram">
+      <svg viewBox="0 0 1080 320" role="img" aria-labelledby="autogram-batch-title autogram-batch-desc" xmlns="http://www.w3.org/2000/svg">
+        <title id="autogram-batch-title">Optimalizovaný batch preflight podpisov</title>
+        <desc id="autogram-batch-desc">Diagram ukazuje, že viac dokumentov prejde jednou plnou validáciou a potom sa každý výsledok vyhodnotí samostatne.</desc>
+        <defs>
+          <marker id="batch-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#4f5d75"/></marker>
+          <marker id="batch-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#eb6c36"/></marker>
+          <marker id="batch-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#2e5aa8"/></marker>
+        </defs>
+        <rect width="1080" height="320" fill="#f5f5f5"/>
+        <path d="M244 104 H332" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#batch-arrow)"/>
+        <path d="M588 104 H676" fill="none" stroke="#eb6c36" stroke-width="1.2" marker-end="url(#batch-accent)"/>
+        <path d="M844 104 H920 V196 H844" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#batch-arrow)"/>
+        <path d="M844 196 H920 V104" fill="none" stroke="#4f5d75" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#batch-arrow)"/>
+        <path d="M760 152 V236 H620" fill="none" stroke="#2e5aa8" stroke-width="1.2" marker-end="url(#batch-link)"/>
+
+        <rect x="52" y="72" width="192" height="64" rx="6" fill="#fff" stroke="#2d3142"/>
+        <text x="148" y="100" text-anchor="middle" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist',sans-serif">Vybrané PDF</text>
+        <text x="148" y="120" text-anchor="middle" fill="#4f5d75" font-size="9" font-family="'Geist Mono',monospace">N dokumentov · dedup</text>
+        <rect x="332" y="72" width="256" height="64" rx="6" fill="rgba(235,108,54,.08)" stroke="#eb6c36"/>
+        <text x="460" y="100" text-anchor="middle" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist',sans-serif">Jedna plná validácia</text>
+        <text x="460" y="120" text-anchor="middle" fill="#4f5d75" font-size="9" font-family="'Geist Mono',monospace">persistent DSS helper</text>
+        <rect x="676" y="72" width="168" height="64" rx="6" fill="#fff" stroke="#2d3142"/>
+        <text x="760" y="100" text-anchor="middle" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist',sans-serif">Výsledky podľa ID</text>
+        <text x="760" y="120" text-anchor="middle" fill="#4f5d75" font-size="9" font-family="'Geist Mono',monospace">valid · invalid · unknown</text>
+        <rect x="676" y="196" width="168" height="64" rx="6" fill="#fff" stroke="#2d3142"/>
+        <text x="760" y="224" text-anchor="middle" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist',sans-serif">Podpisovanie</text>
+        <text x="760" y="244" text-anchor="middle" fill="#4f5d75" font-size="9" font-family="'Geist Mono',monospace">iba po preflighte</text>
+        <rect x="392" y="220" width="228" height="40" rx="6" fill="#fff" stroke="#4f5d75"/>
+        <text x="506" y="245" text-anchor="middle" fill="#4f5d75" font-size="9" font-family="'Geist Mono',monospace">INVALID → blokuje dokument</text>
+        <text x="40" y="300" fill="#4f5d75" font-size="8" font-family="'Geist Mono',monospace" letter-spacing=".08em">INDETERMINATE / TRUST SERVICE UNAVAILABLE → INFORMATÍVNE, PODPISOVANIE MÔŽE POKRAČOVAŤ</text>
+      </svg>
+    </div>
+    <p class="note">Plná validácia zostáva zachovaná. Optimalizácia odstraňuje opakované volanie engine pre každý dokument, nie samotnú kontrolu dôveryhodnosti.</p>
+  </section>
+
+  <footer>Autogram macOS · Swift 6 · native macOS 27 · static accessible diagrams</footer>
+</main>
+</body>
+</html>
