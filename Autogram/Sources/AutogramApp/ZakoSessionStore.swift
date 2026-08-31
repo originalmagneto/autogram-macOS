@@ -274,7 +274,15 @@ final class ZakoSessionStore {
         outputDirectoryOverride = outputDirectory
         sourceNameOverride = sourceName
 
-        guard let document = PDFDocument(url: url) else {
+        let document: PDFDocument?
+        if url.pathExtension.lowercased() == "asice",
+           let data = try? Data(contentsOf: url),
+           let pdfData = ASiCEContainerVerifier.extractPDFData(data) {
+            document = PDFDocument(data: pdfData)
+        } else {
+            document = PDFDocument(url: url)
+        }
+        guard let document else {
             if sourceAccessIsActive {
                 url.stopAccessingSecurityScopedResource()
                 sourceAccessIsActive = false

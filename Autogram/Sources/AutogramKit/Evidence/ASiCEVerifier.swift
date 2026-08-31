@@ -80,28 +80,38 @@ public struct ASiCEContainerVerifier: Sendable {
             case 0:
                 payload = Data(bytes[contentStart..<(contentStart + compressedSize)])
             case 8:
-                guard uncompressedSize > 0 else { return nil }
-                var dst = Data(count: uncompressedSize)
-                let written = dst.withUnsafeMutableBytes { (dstPtr: UnsafeMutableRawBufferPointer) -> Int in
-                    let srcSlice = bytes[contentStart..<(contentStart + compressedSize)]
-                    return srcSlice.withContiguousStorageIfAvailable { srcPtr -> Int in
-                        compression_decode_buffer(
-                            dstPtr.baseAddress!.assumingMemoryBound(to: UInt8.self),
-                            uncompressedSize,
-                            srcPtr.baseAddress!,
-                            compressedSize,
-                            nil,
-                            COMPRESSION_ZLIB)
-                    } ?? 0
+                if uncompressedSize == 0 {
+                    payload = Data()
+                } else {
+                    var dst = Data(count: uncompressedSize)
+                    let written = dst.withUnsafeMutableBytes { (dstPtr: UnsafeMutableRawBufferPointer) -> Int in
+                        let srcSlice = bytes[contentStart..<(contentStart + compressedSize)]
+                        return srcSlice.withContiguousStorageIfAvailable { srcPtr -> Int in
+                            compression_decode_buffer(
+                                dstPtr.baseAddress!.assumingMemoryBound(to: UInt8.self),
+                                uncompressedSize,
+                                srcPtr.baseAddress!,
+                                compressedSize,
+                                nil,
+                                COMPRESSION_ZLIB)
+                        } ?? 0
+                    }
+                    guard written == uncompressedSize else { return nil }
+                    payload = dst
                 }
-                guard written == uncompressedSize else { return nil }
-                payload = dst
             default:
                 return nil
             }
             result.append((name, payload))
         }
         return result.isEmpty ? nil : result
+    }
+    public static func extractPDFData(_ asic: Data) -> Data? {
+        guard let entries = readEntries(asic) else { return nil }
+        return entries.first(where: {
+            $0.name.lowercased().hasSuffix(".pdf")
+                || $0.data.starts(with: Data("%PDF-".utf8))
+        })?.data
     }
 
     public func verify(_ asic: Data) -> Verification {
