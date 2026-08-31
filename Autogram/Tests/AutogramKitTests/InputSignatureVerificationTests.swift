@@ -33,6 +33,19 @@ final class InputSignatureVerificationTests: XCTestCase {
         XCTAssertEqual(result.state, .unavailable)
         XCTAssertEqual(result.detail, "Verifier unavailable")
     }
+    func testDefaultBulkInputInspectionPreservesEachURLResult() async throws {
+        let first = FileManager.default.temporaryDirectory
+            .appendingPathComponent("bulk-first-\(UUID().uuidString).pdf")
+        let second = FileManager.default.temporaryDirectory
+            .appendingPathComponent("bulk-second-\(UUID().uuidString).pdf")
+        let provider = BulkInspectionProbeProvider()
+
+        let results = await provider.inspectInputSignatures(in: [first, second])
+
+        XCTAssertEqual(results[EnginePaths.canonical(first)]?.state, .valid)
+        XCTAssertEqual(results[EnginePaths.canonical(second)]?.state, .unknown)
+    }
+
 
     func testCompletedInspectionTracksOldestQualifiedTimestamp() {
         let older = DocumentSignatureInfo(
@@ -175,6 +188,7 @@ final class InputSignatureVerificationTests: XCTestCase {
             boundingBox: NormalizedRect(x: 0.2, y: 0.2, width: 0.2, height: 0.2),
             confidence: 1,
             verbalDescription: "Podpis",
+
             detectedByAI: false,
             reviewState: .confirmed)
     }
@@ -185,6 +199,25 @@ final class InputSignatureVerificationTests: XCTestCase {
             .appendingPathExtension("pdf")
         try contents.write(to: url)
         return url
+    }
+}
+private struct BulkInspectionProbeProvider: QualifiedSigningProviding {
+    func availableIdentities() async -> [SigningIdentityInfo] { [] }
+    func resolveIdentities(pin: String) async -> [SigningIdentityInfo]? { nil }
+    func sign(_ request: SigningRequest) async throws -> SignedConversionResult {
+        throw SigningError.identityUnavailable
+    }
+    func inspectSignatures(in fileURL: URL) async -> [DocumentSignatureInfo] { [] }
+    func inspectInputSignatures(in fileURL: URL) async -> InputSignatureInspectionResult {
+        if fileURL.lastPathComponent.hasPrefix("bulk-first-") {
+            return .completed(signatures: [])
+        }
+        return .completed(signatures: [
+            DocumentSignatureInfo(
+                id: "unknown",
+                signerDisplayName: "Unknown",
+                state: .indeterminate)
+        ])
     }
 }
 

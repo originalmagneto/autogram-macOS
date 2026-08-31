@@ -1392,7 +1392,7 @@ struct SigningBatchView: View {
     private var actionBar: some View {
         switch store.batchPhase {
         case .preflighting:
-            ProgressView("Kontrolujem dokumenty…")
+            ProgressView("Kontrolujem dokumenty a vstupné podpisy…")
                 .font(.callout)
             Spacer()
             Button("Zrušiť kontrolu") {
@@ -1518,7 +1518,7 @@ struct SigningBatchView: View {
     private var headerDetail: String {
         switch store.batchPhase {
         case .preflighting:
-            "Overujem dostupnosť súborov a spoločné nastavenia."
+            "Overujem súbory, nastavenia a vstupné elektronické podpisy."
         case .ready:
             hasBlockingItems
                 ? "Niektoré dokumenty obsahujú blokujúce problémy."

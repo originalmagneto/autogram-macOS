@@ -246,6 +246,52 @@ final class SigningBatchTests: XCTestCase {
         XCTAssertEqual(store.batchSettingsSnapshot?.outputFormat, .embeddedPAdES)
         XCTAssertFalse(store.batchSettingsSnapshot?.includeQualifiedTimestamp ?? true)
     }
+    func testPrepareBatchUsesOneBulkSignatureInspectionAndAllowsUnknownResults() async {
+        let unknown = InputSignatureInspectionResult.completed(signatures: [
+            DocumentSignatureInfo(
+                id: "unknown",
+                signerDisplayName: "Unknown",
+                state: .indeterminate)
+        ])
+        let provider = RecordingSigningProvider(inputInspectionByName: [
+            "first.pdf": unknown,
+            "second.pdf": unknown
+        ])
+        let store = makeStore(provider: provider)
+        let first = makePDF(named: "first.pdf")
+        let second = makePDF(named: "second.pdf")
+        await store.addDocuments(at: [first, second], selectLast: false)
+        store.identities = await provider.availableIdentities()
+        store.selectedIdentityID = "identity"
+        store.includeQualifiedTimestamp = false
+        store.outputFormat = .embeddedPAdES
+
+        await store.prepareBatch(ids: store.queue.map(\.id))
+
+        let bulkInspectionCount = await provider.bulkInspectionCount()
+        XCTAssertEqual(bulkInspectionCount, 1)
+        XCTAssertEqual(store.batchItems.map(\.inputSignatureState), [.unknown, .unknown])
+        XCTAssertEqual(store.batchPhase, .ready)
+    }
+
+    func testPrepareBatchAllowsUnavailableValidationService() async {
+        let provider = RecordingSigningProvider(inputInspectionByName: [
+            "offline.pdf": .unavailable(detail: "Trust list nie je dostupný.")
+        ])
+        let store = makeStore(provider: provider)
+        let url = makePDF(named: "offline.pdf")
+        await store.addDocuments(at: [url], selectLast: false)
+        store.identities = await provider.availableIdentities()
+        store.selectedIdentityID = "identity"
+        store.includeQualifiedTimestamp = false
+        store.outputFormat = .embeddedPAdES
+
+        await store.prepareBatch(ids: store.queue.map(\.id))
+
+        XCTAssertEqual(store.batchItems.first?.inputSignatureState, .unavailable)
+        XCTAssertEqual(store.batchPhase, .ready)
+    }
+
 
     func testUnreadablePDFBlocksBatchBeforeProviderSign() async {
         let provider = RecordingSigningProvider()
@@ -605,6 +651,7 @@ private actor RecordingSigningProvider: QualifiedSigningProviding {
     private let identityAvailable: Bool
     private var attempts: [String: Int] = [:]
     private var resolveCalls = 0
+    private var bulkInspectionCalls = 0
     private var didStartAvailable = false
 
     init(
@@ -647,6 +694,18 @@ private actor RecordingSigningProvider: QualifiedSigningProviding {
     func inspectInputSignatures(in fileURL: URL) async -> InputSignatureInspectionResult {
         inputInspectionByName[fileURL.lastPathComponent]
             ?? .completed(signatures: [])
+    }
+    func inspectInputSignatures(in fileURLs: [URL]) async -> [URL: InputSignatureInspectionResult] {
+        bulkInspectionCalls += 1
+        return Dictionary(uniqueKeysWithValues: fileURLs.map { fileURL in
+            (EnginePaths.canonical(fileURL),
+             inputInspectionByName[fileURL.lastPathComponent]
+                 ?? .completed(signatures: []))
+        })
+    }
+
+    func bulkInspectionCount() -> Int {
+        bulkInspectionCalls
     }
 
 

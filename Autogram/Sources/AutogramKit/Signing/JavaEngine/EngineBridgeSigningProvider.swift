@@ -101,44 +101,70 @@ public final class EngineBridgeSigningProvider: QualifiedSigningProviding, @unch
 
     public func inspectInputSignatures(in fileURL: URL) async -> InputSignatureInspectionResult {
         let canonical = EnginePaths.canonical(fileURL)
-        guard FileManager.default.fileExists(atPath: canonical.path) else {
-            return .unavailable(detail: "Vstupný dokument nie je dostupný.")
+        return await inspectInputSignatures(in: [canonical])[canonical]
+            ?? .unavailable(detail: "Kontrola vstupného dokumentu nevrátila výsledok.")
+    }
+
+    public func inspectInputSignatures(in fileURLs: [URL]) async -> [URL: InputSignatureInspectionResult] {
+        var canonicalURLs: [URL] = []
+        var seenURLs = Set<URL>()
+        for fileURL in fileURLs {
+            let canonical = EnginePaths.canonical(fileURL)
+            if seenURLs.insert(canonical).inserted {
+                canonicalURLs.append(canonical)
+            }
+        }
+        let validURLs = canonicalURLs.filter {
+            FileManager.default.fileExists(atPath: $0.path)
+        }
+        var results = Dictionary(uniqueKeysWithValues: canonicalURLs.map { url in
+            (url, InputSignatureInspectionResult.unavailable(
+                detail: "Vstupný dokument nie je dostupný."))
+        })
+        guard !validURLs.isEmpty else { return results }
+
+        let descriptors = validURLs.enumerated().map { index, url in
+            PDFItemDescriptor(id: "inspect-\(index)", sourceURL: url)
         }
         do {
-            return .completed(signatures: try await inspectEngineSignatures(at: canonical))
+            let inspections = try await engine.validate(files: descriptors)
+            let inspectedByID = Dictionary(
+                uniqueKeysWithValues: inspections.flatMap(\.files).map { ($0.id, $0) })
+            for (index, url) in validURLs.enumerated() {
+                guard let inspected = inspectedByID["inspect-\(index)"] else {
+                    results[url] = .unavailable(
+                        detail: "Kontrola vstupného dokumentu nevrátila výsledok.")
+                    continue
+                }
+                results[url] = Self.inputSignatureInspection(from: inspected)
+            }
         } catch {
-            logger.info("Input signature inspection failed: \(error.localizedDescription, privacy: .public)")
-            return .unavailable(detail: error.localizedDescription)
+            logger.info("Input signature validation failed: \(error.localizedDescription, privacy: .public)")
+            for url in validURLs {
+                results[url] = .unavailable(detail: error.localizedDescription)
+            }
         }
+        return results
     }
 
     public func inspectSignatures(in fileURL: URL) async -> [DocumentSignatureInfo] {
         let canonical = EnginePaths.canonical(fileURL)
-        guard FileManager.default.fileExists(atPath: canonical.path) else { return [] }
-        do {
-            return try await inspectEngineSignatures(at: canonical)
-        } catch {
-            logger.info("Inspection failed: \(error.localizedDescription, privacy: .public)")
-            return []
-        }
+        return (await inspectInputSignatures(in: [canonical])[canonical])?.signatures ?? []
     }
 
     static func requireInspectableFile(in inspections: [PDFInspection]) throws -> InspectedPDF {
         guard let inspected = inspections
             .flatMap(\.files)
-            .first(where: { $0.id == "inspect" }),
+            .first(where: { $0.id.hasPrefix("inspect") }),
               inspected.isSignable else {
             throw SigningFailure.engine("Engine nevrátil dokončenú kontrolu vstupného dokumentu.")
         }
         return inspected
     }
 
-    private func inspectEngineSignatures(at sourceURL: URL) async throws -> [DocumentSignatureInfo] {
-        let inspections = try await engine.validate(files: [
-            PDFItemDescriptor(id: "inspect", sourceURL: sourceURL)
-        ])
-        let inspected = try Self.requireInspectableFile(in: inspections)
-        return inspected.signatures.map { signature in
+    private static func inputSignatureInspection(
+        from inspected: InspectedPDF) -> InputSignatureInspectionResult {
+        .completed(signatures: inspected.signatures.map { signature in
             let state: DocumentSignatureInfo.State
             switch signature.validationState {
             case .valid: state = .valid
@@ -153,7 +179,7 @@ public final class EngineBridgeSigningProvider: QualifiedSigningProviding, @unch
                 hasQualifiedTimestamp: signature.hasQualifiedTimestamp,
                 state: state,
                 detail: signature.validationReason ?? signature.subIndication)
-        }
+        })
     }
 
     /// Odtlaček pripojených driverov + ich ľudské názvy (pre synthetic identitu).

@@ -282,6 +282,7 @@ public protocol QualifiedSigningProviding: Sendable {
     func sign(_ request: SigningRequest) async throws -> SignedConversionResult
     func inspectSignatures(in fileURL: URL) async -> [DocumentSignatureInfo]
     func inspectInputSignatures(in fileURL: URL) async -> InputSignatureInspectionResult
+    func inspectInputSignatures(in fileURLs: [URL]) async -> [URL: InputSignatureInspectionResult]
 }
 
 extension QualifiedSigningProviding {
@@ -298,6 +299,14 @@ extension QualifiedSigningProviding {
                      includeTimestamp: Bool) async throws -> SignedConversionResult {
         try await sign(SigningRequest(pdfData: pdf, identityID: identityID,
                                       includeTimestamp: includeTimestamp))
+    }
+    public func inspectInputSignatures(in fileURLs: [URL]) async -> [URL: InputSignatureInspectionResult] {
+        var results: [URL: InputSignatureInspectionResult] = [:]
+        for fileURL in fileURLs {
+            let canonical = EnginePaths.canonical(fileURL)
+            results[canonical] = await inspectInputSignatures(in: canonical)
+        }
+        return results
     }
 
     public func sign(pdf: Data, identityID: String, includeTimestamp: Bool,

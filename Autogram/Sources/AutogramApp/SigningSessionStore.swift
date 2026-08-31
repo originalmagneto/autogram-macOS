@@ -673,22 +673,21 @@ final class SigningSessionStore {
             return
         }
 
-        for item in selectedItems {
-            guard documents[item.id] != nil else { continue }
-            let secured = item.url.startAccessingSecurityScopedResource()
-            defer { if secured { item.url.stopAccessingSecurityScopedResource() } }
-            let inspection = await signingProvider.inspectInputSignatures(in: item.url)
-            guard batchGeneration == generation else { return }
+        let inspectableItems = selectedItems.filter { documents[$0.id] != nil }
+        let inspections = await signingProvider.inspectInputSignatures(
+            in: inspectableItems.map(\.url))
+        guard batchGeneration == generation else { return }
+        for item in inspectableItems {
             guard let batchIndex = batchItems.firstIndex(where: { $0.id == item.id }) else {
                 continue
             }
+            let inspection = inspections[EnginePaths.canonical(item.url)]
+                ?? .unavailable(detail: "Kontrola vstupného dokumentu nevrátila výsledok.")
             batchItems[batchIndex].inputSignatureState = inspection.state
             batchItems[batchIndex].inputSignatureDetail = inspection.detail
-            guard inspection.state != .invalid, inspection.state != .unavailable else {
-                batchItems[batchIndex].state = .failed
-                batchItems[batchIndex].errorMessage = inspection.detail
-                continue
-            }
+            guard inspection.state == .invalid else { continue }
+            batchItems[batchIndex].state = .failed
+            batchItems[batchIndex].errorMessage = inspection.detail
         }
 
         let pin = signingPIN
