@@ -148,9 +148,9 @@ public struct VisibleSignatureRenderer {
         var y: CGFloat = 88
         for (line, attributes) in details.prefix(4) {
             (line as NSString).draw(
-                in: NSRect(x: 28, y: y, width: size.width - 56, height: 13),
+                in: NSRect(x: 28, y: y, width: size.width - 56, height: 17),
                 withAttributes: attributes)
-            y -= 14
+            y -= 16
         }
         drawSymbol("clock.fill", in: NSRect(x: 28, y: 34, width: 13, height: 13), color: .systemGreen)
         let timestampAttributes: [NSAttributedString.Key: Any] = [
