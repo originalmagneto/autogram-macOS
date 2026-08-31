@@ -131,7 +131,8 @@ public final class EngineBridgeSigningProvider: QualifiedSigningProviding, @unch
         do {
             let inspections = try await engine.validate(files: descriptors)
             let inspectedByID = Dictionary(
-                uniqueKeysWithValues: inspections.flatMap(\.files).map { ($0.id, $0) })
+                inspections.flatMap(\.files).map { ($0.id, $0) },
+                uniquingKeysWith: { first, _ in first })
             for (index, url) in validURLs.enumerated() {
                 guard let inspected = inspectedByID["inspect-\(index)"] else {
                     results[url] = .unavailable(
