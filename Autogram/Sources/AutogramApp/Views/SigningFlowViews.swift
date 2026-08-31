@@ -455,11 +455,15 @@ struct SigningPrepareView: View {
                 ForEach(store.existingSignatures) { signature in
                     SignatureInfoRow(info: signature)
                 }
-                Text("Podpísaním sa pridá ďalší podpis (prírastkový podpis PAdES).")
+                Text("Pridá sa ďalší podpis k existujúcim podpisom v dokumente.")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
         }
+    }
+
+    private var signatureSectionTitle: String {
+        "Podpisy v dokumente" + (store.existingSignatures.isEmpty ? "" : " · \(store.existingSignatures.count)")
     }
 
     private var selectedOutputFormatPresentation: SigningOutputFormatPresentation {
@@ -665,7 +669,7 @@ struct SigningPrepareView: View {
 
             // Section 4: Existujúce podpisy
             VStack(alignment: .leading, spacing: 8) {
-                Label("Podpisy v dokumente", systemImage: "signature")
+                Label(signatureSectionTitle, systemImage: "signature")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.secondary)
 
@@ -695,7 +699,7 @@ struct SigningPrepareView: View {
                 } else {
                     Image(systemName: "signature.badge.checkmark")
                 }
-                Text(store.isSigning ? (store.statusText.isEmpty ? "Podpisujem…" : store.statusText) : "Podpísať KEP")
+                Text(store.isSigning ? (store.statusText.isEmpty ? "Podpisujem…" : store.statusText) : (store.existingSignatures.isEmpty ? "Podpísať KEP" : "Pridať podpis"))
                     .font(.body.weight(.semibold))
             }
             .padding(.horizontal, 10)
@@ -707,7 +711,6 @@ struct SigningPrepareView: View {
     }
 }
 
-// MARK: - Signature Info Row
 struct SignatureInfoRow: View {
     let info: DocumentSignatureInfo
 
@@ -716,7 +719,7 @@ struct SignatureInfoRow: View {
             Image(systemName: icon)
                 .foregroundStyle(tint)
                 .frame(width: 16)
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(info.signerDisplayName)
                     .font(.caption.weight(.semibold))
                     .lineLimit(2)
@@ -728,6 +731,20 @@ struct SignatureInfoRow: View {
                         Text("QTS").font(.caption2.weight(.semibold)).foregroundStyle(.green)
                     }
                     Text(stateLabel).font(.caption2).foregroundStyle(tint)
+                }
+                if let signingTime = info.signingTime {
+                    Text(signingTime.formatted(date: .abbreviated, time: .shortened))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                if let detail = info.detail, !detail.isEmpty {
+                    DisclosureGroup("Detail validácie") {
+                        Text(detail)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .font(.caption2)
                 }
             }
             Spacer(minLength: 0)
