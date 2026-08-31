@@ -185,7 +185,7 @@ cat > "$CONTENTS/PkgInfo" <<'PKG'
 APPL????
 PKG
 
-codesign --force --deep --sign - "$APP_DIR" >/dev/null 2>&1 || true
+codesign --force --sign - "$APP_DIR" >/dev/null 2>&1 || true
 
 echo "✔ Hotovo: $APP_DIR"
 echo "  Spustenie: open \"$APP_DIR\""
