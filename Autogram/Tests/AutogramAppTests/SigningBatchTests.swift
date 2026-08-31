@@ -57,6 +57,29 @@ final class SigningBatchTests: XCTestCase {
         await store.startBatch()
         XCTAssertEqual(store.batchItems.first?.state, .signed)
     }
+    func testPDFAGraphicSignatureIsEmbeddedBeforeEngineSigning() async {
+        let provider = RecordingSigningProvider(identityRequiresPIN: false)
+        let store = makeStore(provider: provider)
+        let source = makePDF(named: "pdfa-visual.pdf")
+        await store.addDocuments(at: [source], selectLast: false)
+        store.identities = await provider.availableIdentities()
+        store.selectedIdentityID = "identity"
+        store.outputFormat = .embeddedPAdES
+        store.includeQualifiedTimestamp = false
+        store.includeVisibleSignature = true
+        store.convertToPDFA = true
+        store.visualPlacement = VisibleSignaturePlacement(
+            pageIndex: 0,
+            pageRect: CGRect(x: 350, y: 100, width: 180, height: 70),
+            rotationDegrees: 0)
+
+        await store.prepareBatch(ids: store.queue.map(\.id))
+        await store.startBatch()
+
+        XCTAssertEqual(store.batchItems.first?.state, .signed)
+        let visualStamps = await provider.requestVisualStamps()
+        XCTAssertTrue(visualStamps.allSatisfy { $0 == nil })
+    }
 
 
  

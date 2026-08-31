@@ -382,6 +382,25 @@ final class SigningSessionStore {
             let originalPdfData = pdfData
             pdfaPrepared = false
             pdfaAfterSign = false
+            var visualStampWasPreapplied = false
+            if convertToPDFA, includeVisibleSignature, outputFormat == .embeddedPAdES {
+                let imageData = visualArtworkOverride
+                    ?? VisualSignatureStore.imageData(for: selectedVisualAppearanceID)
+                let stamp = VisibleSignatureStamper.StampData(
+                    fullName: displayName(),
+                    timestamp: Date(),
+                    pageIndex: min(signaturePage, analysis.totalPages - 1),
+                    normalizedRect: signatureRect,
+                    imagePNG: imageData)
+                let stampedData = await Self.stampPDFData(
+                    pdfData,
+                    stamp: stamp,
+                    includeTimestamp: includeQualifiedTimestamp,
+                    stamper: stamper)
+                visualStampWasPreapplied = stampedData != pdfData
+                pdfData = stampedData
+            }
+
 
             if convertToPDFA, !pdfData.isEmpty {
                 statusText = "Konvertujem do PDF/A…"
@@ -390,10 +409,14 @@ final class SigningSessionStore {
                 let mode: PDFAConversionMode = outputFormat == .embeddedPAdES
                     ? .rasterGuaranteed
                     : pdfaMode
-                pdfData = try PDFAConverter().convert(document: document, mode: mode, title: title)
+                let pdfaDocument = PDFDocument(data: pdfData) ?? document
+                pdfData = try PDFAConverter().convert(document: pdfaDocument, mode: mode, title: title)
                 var pdfaCheck = PDFAValidator().validate(pdfData)
                 if !pdfaCheck.isValid {
-                    pdfData = try PDFAConverter().convert(document: document, mode: .rasterGuaranteed, title: title)
+                    pdfData = try PDFAConverter().convert(
+                        document: PDFDocument(data: pdfData) ?? pdfaDocument,
+                        mode: .rasterGuaranteed,
+                        title: title)
                     pdfaCheck = PDFAValidator().validate(pdfData)
                 }
                 guard pdfaCheck.isValid else {
@@ -435,7 +458,7 @@ final class SigningSessionStore {
             let pdfName = sourceURL?.lastPathComponent ?? "dokument.pdf"
             let artworkPNG = visualArtworkOverride ?? VisualSignatureStore.imageData(for: selectedVisualAppearanceID)
             let visualStamp: VisualStampSpec?
-            if includeVisibleSignature, outputFormat == .embeddedPAdES {
+            if includeVisibleSignature, outputFormat == .embeddedPAdES, !visualStampWasPreapplied {
                 visualStamp = VisualStampSpec(
                     fullName: displayName(),
                     timestamp: Date(),
@@ -927,6 +950,7 @@ final class SigningSessionStore {
         _ item: BatchItem,
         snapshot: BatchSettingsSnapshot,
         pin: String?,
+
         generation: UUID
     ) async throws -> BatchSigningOutput {
         try checkBatchGeneration(generation)
@@ -950,17 +974,39 @@ final class SigningSessionStore {
         let originalPDFData = pdfData
         var didPreparePDFA = false
         var didFallbackToOriginal = false
+        var visualStampWasPreapplied = false
+        if snapshot.convertToPDFA,
+           snapshot.includeVisibleSignature,
+           snapshot.outputFormat == .embeddedPAdES {
+            let stamp = VisibleSignatureStamper.StampData(
+                fullName: snapshot.identityLabel,
+                timestamp: Date(),
+                pageIndex: snapshot.visualPlacement?.pageIndex ?? snapshot.signaturePage,
+                normalizedRect: snapshot.signatureRect,
+                imagePNG: snapshot.visualArtworkOverride
+                    ?? VisualSignatureStore.imageData(for: snapshot.selectedVisualAppearanceID))
+            try checkBatchGeneration(generation)
+            let stampedData = await Self.stampPDFData(
+                pdfData,
+                stamp: stamp,
+                includeTimestamp: snapshot.includeQualifiedTimestamp,
+                stamper: stamper)
+            visualStampWasPreapplied = stampedData != pdfData
+            pdfData = stampedData
+        }
 
         if snapshot.convertToPDFA {
             let mode: PDFAConversionMode = snapshot.outputFormat == .embeddedPAdES
                 ? .rasterGuaranteed : snapshot.pdfaMode
+            let pdfaDocument = PDFDocument(data: pdfData) ?? document
             pdfData = try PDFAConverter().convert(
-                document: document, mode: mode,
+                document: pdfaDocument, mode: mode,
                 title: item.url.deletingPathExtension().lastPathComponent)
             var check = PDFAValidator().validate(pdfData)
             if !check.isValid {
                 pdfData = try PDFAConverter().convert(
-                    document: document, mode: .rasterGuaranteed,
+                    document: PDFDocument(data: pdfData) ?? pdfaDocument,
+                    mode: .rasterGuaranteed,
                     title: item.url.deletingPathExtension().lastPathComponent)
                 check = PDFAValidator().validate(pdfData)
             }
@@ -990,7 +1036,9 @@ final class SigningSessionStore {
 
         try checkBatchGeneration(generation)
         let visualStamp: VisualStampSpec?
-        if snapshot.includeVisibleSignature, snapshot.outputFormat == .embeddedPAdES {
+        if snapshot.includeVisibleSignature,
+           snapshot.outputFormat == .embeddedPAdES,
+           !visualStampWasPreapplied {
             visualStamp = VisualStampSpec(
                 fullName: snapshot.identityLabel,
                 timestamp: Date(),

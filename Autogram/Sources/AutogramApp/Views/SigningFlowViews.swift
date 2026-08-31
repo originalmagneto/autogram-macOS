@@ -236,6 +236,7 @@ struct SigningPrepareView: View {
     @Bindable var store: SigningSessionStore
     @State private var customTSADraft = ""
     @State private var visualState: SignaturePlacementState?
+    @FocusState private var signingPINFocused: Bool
     @State private var bridgePlacement: VisibleSignaturePlacement?
 
     var body: some View {
@@ -279,7 +280,7 @@ struct SigningPrepareView: View {
                   !store.signingPIN.isEmpty else { return }
             try? await Task.sleep(for: .milliseconds(350))
             guard !Task.isCancelled else { return }
-            await store.resolveCertificateForPreview()
+            await resolveCertificateForPreview(relinquishApplicationFocus: false)
         }
         .onChange(of: bridgePlacement) { _, newValue in
             syncPlacementToStore(newValue)
@@ -466,6 +467,21 @@ struct SigningPrepareView: View {
             .attachedASIC
         }
     }
+    @MainActor
+    private func resolveCertificateForPreview(
+        force: Bool = false,
+        relinquishApplicationFocus: Bool = true
+    ) async {
+        if relinquishApplicationFocus {
+            signingPINFocused = false
+            NSApp.deactivate()
+        }
+        await store.resolveCertificateForPreview(force: force)
+        if relinquishApplicationFocus {
+            NSApp.activate(ignoringOtherApps: true)
+        }
+    }
+
 
     private var settingsContent: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -501,15 +517,20 @@ struct SigningPrepareView: View {
                             HStack(spacing: 8) {
                                 SecureField("Zadajte PIN karty", text: $store.signingPIN)
                                     .textFieldStyle(.roundedBorder)
+                                    .focused($signingPINFocused)
                                     .onSubmit {
                                         Task {
-                                            await store.resolveCertificateForPreview(force: true)
+                                            await resolveCertificateForPreview(
+                                                force: true,
+                                                relinquishApplicationFocus: true)
                                         }
                                     }
 
                                 Button {
                                     Task {
-                                        await store.resolveCertificateForPreview(force: true)
+                                        await resolveCertificateForPreview(
+                                            force: true,
+                                            relinquishApplicationFocus: true)
                                     }
                                 } label: {
                                     Label("Načítať certifikáty", systemImage: "arrow.clockwise")
