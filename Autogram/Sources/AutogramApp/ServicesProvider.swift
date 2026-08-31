@@ -1,44 +1,58 @@
-import AppKit
+import Foundation
 
-/// Routes files received from the Finder Quick Action (NSServices) into the signing flow.
-@MainActor
-final class FinderSigningRouter: @unchecked Sendable {
-    static let shared = FinderSigningRouter()
+enum FinderQuickActionService {
+    static let menuTitle = "Podpísať s QES + QTS (Autogram)"
+    static let workflowResourceName = "Autogram Finder Quick Action"
+    static let workflowInstallName = "Autogram Finder Quick Action.workflow"
 
-    private var handler: (([URL]) -> Void)?
-    private var pending: [[URL]] = []
+    @discardableResult
+    static func installQuickAction() -> Bool {
+        guard let source = Bundle.main.url(
+            forResource: workflowResourceName,
+            withExtension: "workflow"
+        ) else {
+            return false
+        }
 
-    func enqueue(_ urls: [URL]) {
-        if let handler {
-            handler(urls)
-        } else {
-            pending.append(urls)
+        let servicesDirectory = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Services", isDirectory: true)
+        let destination = servicesDirectory.appendingPathComponent(workflowInstallName)
+        do {
+            try FileManager.default.createDirectory(
+                at: servicesDirectory,
+                withIntermediateDirectories: true
+            )
+            if FileManager.default.fileExists(atPath: destination.path) {
+                try FileManager.default.removeItem(at: destination)
+            }
+            try FileManager.default.copyItem(at: source, to: destination)
+            enableInstalledWorkflow()
+            return refreshServicesCache()
+        } catch {
+            return false
         }
     }
 
-    /// Installs the real handler once RootView is ready; flushes queued requests.
-    func install(_ handler: @escaping ([URL]) -> Void) {
-        self.handler = handler
-        let queued = pending
-        pending.removeAll()
-        queued.forEach(handler)
+    private static func enableInstalledWorkflow() {
+        guard let defaults = UserDefaults(suiteName: "pbs") else { return }
+        var statuses = defaults.dictionary(forKey: "NSServicesStatus") ?? [:]
+        statuses["(null) - \(menuTitle) - runWorkflowAsService"] = [
+            "enabled_context_menu": NSNumber(value: 1),
+            "enabled_services_menu": NSNumber(value: 1)
+        ]
+        defaults.set(statuses, forKey: "NSServicesStatus")
     }
-}
 
-/// NSServices provider: receives PDF file URLs selected in Finder.
-@objc final class ServicesProvider: NSObject {
-    @objc func signFiles(_ pasteboard: NSPasteboard,
-                         userData: String?,
-                         error: AutoreleasingUnsafeMutablePointer<NSString>) {
-        let urls = (pasteboard.readObjects(forClasses: [NSURL.self],
-                                           options: [.urlReadingFileURLsOnly: true]) as? [URL]) ?? []
-        let pdfs = urls.filter { $0.pathExtension.lowercased() == "pdf" }
-        guard !pdfs.isEmpty else {
-            error.pointee = "Nie sú vybrané žiadne PDF súbory." as NSString
-            return
-        }
-        DispatchQueue.main.async {
-            FinderSigningRouter.shared.enqueue(pdfs)
+    @discardableResult
+    static func refreshServicesCache() -> Bool {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/System/Library/CoreServices/pbs")
+        process.arguments = ["-update"]
+        do {
+            try process.run()
+            return true
+        } catch {
+            return false
         }
     }
 }

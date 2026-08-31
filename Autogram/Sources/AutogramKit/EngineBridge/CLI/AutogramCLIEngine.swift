@@ -655,10 +655,9 @@ private extension ProcessConfiguration {
             candidates.append(override)
         }
         candidates.append(Bundle.main.bundleURL.appending(path: "Contents/Helpers/AutogramCLI-arm64").path)
-        candidates.append("/Applications/Autogram macOS 2.app/Contents/Helpers/AutogramCLI-arm64")
         let executableURL = candidates.first { FileManager.default.isExecutableFile(atPath: $0) }
             .map { URL(fileURLWithPath: $0) }
-            ?? URL(fileURLWithPath: "/Applications/Autogram macOS 2.app/Contents/Helpers/AutogramCLI-arm64")
+            ?? URL(fileURLWithPath: candidates[0])
         return ProcessConfiguration(
             executableURL: executableURL,
             timeout: .seconds(90),

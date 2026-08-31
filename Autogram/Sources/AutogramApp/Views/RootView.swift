@@ -189,12 +189,6 @@ struct RootView: View {
                 .navigationTitle(selection.rawValue)
                 .navigationSubtitle(subtitle)
         }
-        .task {
-            FinderSigningRouter.shared.install { urls in
-                selection = .signing
-                Task { await signingStore.signFromFinder(urls) }
-            }
-        }
         .focusedValue(\.autogramCommandActions, AutogramCommandActions(
             openDocument: openDocument,
             addFiles: openMoreFiles,

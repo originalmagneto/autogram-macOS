@@ -46,7 +46,7 @@ Autogram je natívna macOS aplikácia v SwiftUI pre elektronické podpisovanie d
 | PDF/A | Vektorový a rasterizovaný režim, PDF/A-2b pilotný profil |
 | Register | `register.json` v Application Support, CSV export |
 | EZZK | Demo mock, OAuth2/PKCE klient, native callback a guarded transport |
-| Verifikácia | 236 testov, 3 voliteľné live engine testy skipped, 0 failures |
+| Verifikácia | 235 testov, 3 voliteľné live engine testy skipped, 0 failures |
 
 <table>
   <thead>
@@ -73,7 +73,7 @@ Diagramová galéria: [`docs/gallery.html`](docs/gallery.html)
 - Xcode 26.5 a Swift 6 pre zostavenie zo zdrojov
 - pre reálny podpis: kompatibilná eID karta, advokátsky preukaz alebo iný PKCS#11, CryptoTokenKit alebo Keychain token
 - pre produkčné CEZZK odoslanie: EZZK účet, registrácia callbacku `autogram://ezzk/callback` u prevádzkovateľa, sandboxové overenie a sieťové pripojenie k príslušnej službe
-- pre PDFBox normalizáciu: nainštalovaný Autogram macOS 2 engine s Java runtime; bez neho sa použije lokálny fallback iba vtedy, ak výsledok prejde lokálnou kontrolou
+- pre PDFBox normalizáciu: Java engine a PDFBox dependency JAR súbory pribalené v app bundle; bez nich sa použije lokálny fallback iba vtedy, ak výsledok prejde lokálnou kontrolou
 
 Aplikácia je cielene zostavená pre macOS 27. `Package.swift` preto deklaruje platformu `.macOS("27.0")` a build script zapisuje `LSMinimumSystemVersion=27.0`.
 
@@ -194,16 +194,16 @@ Nedávno otvorené dokumenty sa ukladajú iba ako bezpečné security-scoped boo
 
 <img src="docs/diagrams/finder-quick-action.svg" alt="Finder Quick Action na podpis PDF súborov" width="100%">
 
-Vo Finderi označte PDF súbory, prípadne priečinok s PDF súbormi, a zvoľte **Rýchle akcie -> Podpísať s QES + QTS (Autogram)**.
+Vo Finderi označte PDF súbory a zvoľte **Rýchle akcie -> Podpísať s QES + QTS (Autogram)**. Pri prvom spustení aplikácia nainštaluje workflow do `~/Library/Services`.
 
-- Služba je registrovaná cez natívne `NSServices` v hlavnom bundle.
-- `NSRequiredContext` obmedzuje službu na Finder.
-- `FinderSigningRouter` odovzdá výber do `SigningSessionStore.signFromFinder(_:)`.
-- Dávka prejde preflight kontrolou, použije dostupnú kvalifikovanú identitu a aktívnu TSA.
-- Výstupy používajú collision-safe naming a zachovajú pôvodný priečinok, ak to security scope dovolí.
-- Alternatívou je drag and drop viacerých súborov do hlavného okna.
+- Workflow je skutočná Automator Quick Action s `NSRequiredContext` obmedzeným na Finder.
+- `Run Shell Script` spustí existujúci Autogram CLI helper v pozadí. Hlavné okno aplikácie sa pri podpise neotvorí.
+- App bundle obsahuje `AutogramCLI-arm64`, `AutogramQuickActionRunner-arm64`, Java runtime, JAR a dependency JAR súbory. Workflow preto nie je závislé od premenovanej starej inštalácie.
+- CLI flow zobrazí výber ovládača, podpisového certifikátu a PIN/BOK dialóg. Výstupom je PAdES Baseline T s kvalifikovanou TSA.
+- Quick Action prijíma iba PDF súbory. ASiC-E kontajnery spracujte v hlavnom workflow aplikácie.
+- Výstupy používajú collision-safe naming a zachovajú pôvodný priečinok.
 
-Ak sa akcia nezobrazuje, otvorte vo Finderi **Rýchle akcie -> Prispôsobiť...** a službu zapnite.
+Ak sa akcia nezobrazuje, v Nastaveniach Autogramu kliknite na **Nainštalovať Quick Action**, potom vo Finderi otvorte **Rýchle akcie -> Prispôsobiť...** a zaškrtnite **Podpísať s QES + QTS (Autogram)**. Nakoniec reštartujte Finder.
 
 <a id="architecture"></a>
 ## Architektúra
@@ -347,7 +347,7 @@ ditto --rsrc --extattr --acl \
 open "/Applications/Autogram macOS.app"
 ```
 
-Overený výsledok na aktuálnom zdrojovom strome: 236 testov, 3 voliteľné live engine testy skipped a 0 failures. Debug bundle má verziu `0.2.2`. `./build_app.sh install` vykoná čistú náhradu bundle v `/Applications/Autogram macOS.app`, aby v inštalácii nezostali staré súbory. Build vytvorí `.build/arm64-apple-macosx/debug/Autogram.app` a pri dostupnom Autogram macOS 2 engine vloží PDFBox dependency classpath do `Contents/app/dependency-jars`.
+Overený výsledok na aktuálnom zdrojovom strome: 235 testov, 3 voliteľné live engine testy skipped a 0 failures. Debug bundle má verziu `0.2.2`. `./build_app.sh install` vykoná čistú náhradu bundle v `/Applications/Autogram macOS.app`, aby v inštalácii nezostali staré súbory. Build vytvorí `.build/arm64-apple-macosx/debug/Autogram.app` a pri dostupnom zdrojovom app bundle vloží CLI helper, JAR dependency classpath a Java runtime do nového bundle; zdroj možno explicitne nastaviť cez `AUTOGRAM_LEGACY_APP_ROOT`.
 
 ## Diagramy
 

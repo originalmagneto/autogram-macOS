@@ -30,7 +30,7 @@ public enum PDFAError: LocalizedError, Equatable, Sendable {
         case .catalogNotFound(let num): return "Katalógová objekt #\(num) sa nepodarilo načítať."
         case .serializationFailed: return "Serializácia PDF zlyhala."
         case .normalizerUnavailable:
-            return "PDF/A normalizácia nie je dostupná. Nainštalujte Autogram macOS 2 engine a skúste znova."
+            return "PDF/A normalizácia nie je dostupná. Skontrolujte inštaláciu Autogram engine a skúste znova."
         case .normalizedOutputInvalid(let issues):
             return "Výsledný dokument neprešiel kontrolou PDF/A: \(issues.joined(separator: "; "))"
         }

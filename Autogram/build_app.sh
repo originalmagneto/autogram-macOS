@@ -40,7 +40,36 @@ if [[ -x "$BIN_DIR/pkcs11-helper" ]]; then
     cp "$BIN_DIR/pkcs11-helper" "$CONTENTS/MacOS/pkcs11-helper"
 fi
 cp "Assets/Autogram.icns" "$CONTENTS/Resources/Autogram.icns"
+ditto "Assets/Autogram Finder Quick Action.workflow" "$CONTENTS/Resources/Autogram Finder Quick Action.workflow"
 
+LEGACY_CONTENTS="${AUTOGRAM_LEGACY_APP_ROOT:-}"
+if [[ -z "$LEGACY_CONTENTS" ]]; then
+    for candidate in /Applications/*.app/Contents "$HOME"/Applications/*.app/Contents; do
+        if [[ -x "$candidate/Helpers/AutogramCLI-arm64" \
+              && -x "$candidate/Helpers/AutogramQuickActionRunner-arm64" \
+              && -f "$candidate/app/autogram.jar" \
+              && -d "$candidate/app/dependency-jars" \
+              && -d "$candidate/runtime" ]]; then
+            LEGACY_CONTENTS="$candidate"
+            break
+        fi
+    done
+fi
+
+if [[ -n "$LEGACY_CONTENTS" \
+      && -x "$LEGACY_CONTENTS/Helpers/AutogramCLI-arm64" \
+      && -x "$LEGACY_CONTENTS/Helpers/AutogramQuickActionRunner-arm64" \
+      && -f "$LEGACY_CONTENTS/app/autogram.jar" \
+      && -d "$LEGACY_CONTENTS/app/dependency-jars" \
+      && -d "$LEGACY_CONTENTS/runtime" ]]; then
+    mkdir -p "$CONTENTS/Helpers" "$CONTENTS/app"
+    ditto "$LEGACY_CONTENTS/Helpers" "$CONTENTS/Helpers"
+    cp "$LEGACY_CONTENTS/app/autogram.jar" "$CONTENTS/app/autogram.jar"
+    ditto "$LEGACY_CONTENTS/app/dependency-jars" "$CONTENTS/app/dependency-jars"
+    ditto "$LEGACY_CONTENTS/runtime" "$CONTENTS/runtime"
+else
+    echo "Warning: Legacy Autogram CLI payload not found. CLI Quick Action will require an external legacy installation." >&2
+fi
 cat > "$CONTENTS/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -96,7 +125,7 @@ cat > "$CONTENTS/Info.plist" <<'PLIST'
             <key>NSMenuItem</key>
             <dict>
                 <key>default</key>
-                <string>Podpísať s QES + QTS (Autogram)</string>
+                <string>Autogram Signing Bridge</string>
             </dict>
             <key>NSMessage</key>
             <string>signFiles</string>

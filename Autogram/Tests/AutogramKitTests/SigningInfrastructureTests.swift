@@ -46,8 +46,8 @@ final class SigningInfrastructureTests: XCTestCase {
 
     func testProviderSelectionPrefersEngineWhenInstalled() {
         let provider = SigningProviderFactory.makeDefault()
-        if JavaEngineLocator().locate()?.helperURL.path.contains("Helpers") == true,
-           FileManager.default.isExecutableFile(atPath: "/Applications/Autogram macOS 2.app/Contents/Helpers/AutogramCLI-arm64") {
+        if let installation = JavaEngineLocator().locate(),
+           FileManager.default.isExecutableFile(atPath: installation.helperURL.path) {
             XCTAssertTrue(provider is EngineBridgeSigningProvider,
                           "Pri nainštalovanom engine musí factory preferovať EngineBridgeSigningProvider.")
             return

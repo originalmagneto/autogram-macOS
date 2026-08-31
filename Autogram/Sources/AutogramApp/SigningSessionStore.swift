@@ -1180,56 +1180,6 @@ final class SigningSessionStore {
         settingsStore.settings = next
     }
 
-    /// Entry point for the Finder Quick Action (NSServices).
-    /// A single PDF keeps the established direct signing flow. Multiple PDFs
-    /// are prepared and shown for review before any signing starts.
-    func signFromFinder(_ urls: [URL]) async {
-        guard !urls.isEmpty else { return }
-        guard batchPhase != .preflighting, batchPhase != .signing else { return }
-        await refreshIdentities()
-        if selectedIdentityID == nil {
-            selectedIdentityID = identities.first(where: \.isQualified)?.id ?? identities.first?.id
-        }
-        guard selectedIdentityID != nil else {
-            lastError = "Nie je pripojený podpisový certifikát. Pripojte eID kartu alebo advokátsky preukaz a opakujte Quick Action."
-            return
-        }
-
-        if urls.count == 1 {
-            let standardizedURL = urls[0].standardizedFileURL
-            await addDocuments(at: urls, selectLast: false)
-            guard let accepted = queue.first(where: {
-                $0.url.standardizedFileURL == standardizedURL
-            }) else {
-                lastError = "Dokument sa nepodarilo pridať do fronty podpisovania."
-                return
-            }
-
-            if accepted.status == .signed {
-                await selectQueueItem(accepted.id)
-                lastError = "Dokument \(accepted.displayName) už je podpísaný. Existujúci výstup zostal nezmenený."
-                return
-            }
-            guard accepted.status == .ready || accepted.status == .failed else {
-                lastError = "Dokument \(accepted.displayName) nie je pripravený na podpis."
-                return
-            }
-
-            await selectQueueItem(accepted.id)
-            await sign()
-            return
-        }
-        await addDocuments(at: urls, selectLast: false)
-        let standardizedURLs = Set(urls.map(\.standardizedFileURL))
-        let ids = queue
-            .filter {
-                standardizedURLs.contains($0.url.standardizedFileURL)
-                    && ($0.status == .ready || $0.status == .failed)
-            }
-            .map(\.id)
-        await prepareBatch(ids: ids)
-    }
-
     func reset(keepingIdentity: Bool = true) {
         let identity = keepingIdentity ? selectedIdentityID : nil
         selectedQueueID = nil

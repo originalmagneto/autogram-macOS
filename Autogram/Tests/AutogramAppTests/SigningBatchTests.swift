@@ -60,27 +60,6 @@ final class SigningBatchTests: XCTestCase {
 
 
  
-    func testFinderSignedDuplicateDoesNotResign() async {
-        let provider = RecordingSigningProvider()
-        let store = makeStore(provider: provider)
-        let source = makePDF(named: "finder-signed.pdf")
-        await store.addDocuments(at: [source], selectLast: false)
-        store.identities = await provider.availableIdentities()
-        store.selectedIdentityID = "identity"
-        store.includeQualifiedTimestamp = false
-
-        await store.prepareBatch(ids: store.queue.map(\.id))
-        await store.startBatch()
-        let signCountBeforeFinder = await provider.signCount()
-        XCTAssertEqual(signCountBeforeFinder, 1)
-
-        await store.signFromFinder([source])
-
-        let signCountAfterFinder = await provider.signCount()
-        XCTAssertEqual(signCountAfterFinder, 1)
-        XCTAssertTrue(store.lastError?.contains("už je podpísaný") == true)
-        XCTAssertEqual(store.batchPhase, .completed)
-    }
     func testBatchOutputCollisionUsesDeterministicSiblingWithoutReplacingExisting() async {
         let provider = RecordingSigningProvider()
         let store = makeStore(provider: provider)
@@ -662,6 +641,12 @@ private actor RecordingSigningProvider: QualifiedSigningProviding {
             signedAt: Date(),
             signatureLabel: "Test signature",
             isLegallyBinding: false)
+    }
+    func requestOutputFormats() -> [SigningOutputFormat] {
+        requests.map(\.outputFormat)
+    }
+    func requestTimestamps() -> [Bool] {
+        requests.map(\.includeTimestamp)
     }
 
     func setFailingNames(_ names: Set<String>) {

@@ -42,6 +42,7 @@ struct SettingsView: View {
     @State private var ezzkEvidenceCount = "1"
     @State private var ezzkEvidenceValidation: String?
     @State private var pendingEZZKEvidenceCount = 0
+    @State private var finderQuickActionStatus: String?
 
     @State private var selectedPromptPreset: AIPromptPreset = .legalDocuments
 
@@ -56,6 +57,9 @@ struct SettingsView: View {
 
             settingsTabContent(ezzkTab)
             .tabItem { Label("EZZK", systemImage: "number.square") }
+
+            settingsTabContent(finderQuickActionTab)
+            .tabItem { Label("Finder Quick Action", systemImage: "finder") }
 
             settingsTabContent(profilesTab)
             .tabItem { Label("Profily advokáta", systemImage: "person.crop.circle.badge.checkmark") }
@@ -902,8 +906,85 @@ struct SettingsView: View {
             ("Chyba relácie", "exclamationmark.triangle.fill", .red)
         }
     }
+    // MARK: - Tab 4: Finder Quick Action
+    private var finderQuickActionTab: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 12) {
+                Label("Podpisovanie z Findera", systemImage: "finder")
+                    .font(.headline)
 
-    // MARK: - Tab 4: Profily advokáta
+                Text(
+                    "Quick Action je samostatné Automator workflow. Spúšťa starý Autogram CLI helper v pozadí, takže hlavné okno aplikácie sa pri podpise neotvorí."
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+                Text(
+                    "Výstupom je podpísané PDF vo formáte PAdES Baseline T s kvalifikovanou časovou pečiatkou. Workflow zobrazí iba výber ovládača, certifikátu a PIN/BOK dialóg."
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+                Divider()
+
+                HStack(spacing: 10) {
+                    Button("Nainštalovať Quick Action") {
+                        finderQuickActionStatus = FinderQuickActionService.installQuickAction()
+                            ? "Quick Action bola nainštalovaná do služieb Findera."
+                            : "Quick Action sa nepodarilo nainštalovať."
+                    }
+                    .controlSize(.small)
+
+                    Button("Obnoviť služby") {
+                        finderQuickActionStatus = FinderQuickActionService.refreshServicesCache()
+                            ? "Registrácia služieb bola odoslaná systému macOS."
+                            : "Registráciu služieb sa nepodarilo obnoviť."
+                    }
+                    .controlSize(.small)
+
+                    if let finderQuickActionStatus {
+                        Text(finderQuickActionStatus)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .glassCard(cornerRadius: 14, padding: 16)
+
+            VStack(alignment: .leading, spacing: 10) {
+                Label("Aktivácia vo Findere", systemImage: "questionmark.circle")
+                    .font(.headline)
+
+                Text(
+                    """
+                    1. Nainštalujte Autogram do priečinka /Applications.
+                    2. Kliknite na Nainštalovať Quick Action vyššie. Autogram ju uloží do ~/Library/Services.
+                    3. Vo Findere otvorte Quick Actions → Customize... a zaškrtnite \(FinderQuickActionService.menuTitle).
+                    4. Vo Findere označte jeden alebo viac PDF súborov.
+                    5. Kliknite pravým tlačidlom myši a zvoľte Quick Actions → \(FinderQuickActionService.menuTitle).
+                    6. Autogram vyberie dostupný podpisový certifikát, pričom mandátny certifikát uprednostní. PIN alebo BOK zadáte iba počas podpisu.
+                    """
+                )
+                .font(.caption)
+                .fixedSize(horizontal: false, vertical: true)
+
+                Text(
+                    "Ak položka nie je ani v Customize..., ukončite a znova spustite Autogram, kliknite na Obnoviť služby a reštartujte Finder. Workflow prijíma iba PDF súbory, nie ASiC-E kontajnery. PIN sa nikdy neukladá do nastavení."
+                )
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .glassCard(cornerRadius: 14, padding: 16)
+        }
+    }
+
+    // MARK: - Tab 5: Profily advokáta
     private var profilesTab: some View {
         VStack(alignment: .leading, spacing: 18) {
             HStack {

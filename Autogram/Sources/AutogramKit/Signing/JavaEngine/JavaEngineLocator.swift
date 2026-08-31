@@ -24,7 +24,6 @@ public struct JavaEngineInstallation: Sendable, Equatable {
 public struct JavaEngineLocator: Sendable {
     public static let environmentKey = "AUTOGRAM_JAVA_ENGINE_ROOT"
     public static let defaultRoots = [
-        "/Applications/Autogram macOS 2.app/Contents",
         "/Applications/Autogram macOS.app/Contents"
     ]
 
@@ -40,10 +39,13 @@ public struct JavaEngineLocator: Sendable {
            !override.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             roots.append(override)
         }
-        roots.append(contentsOf: Self.defaultRoots)
+        let bundledRoot = Bundle.main.bundleURL.appending(path: "Contents").path
+        for root in [bundledRoot] + Self.defaultRoots where !roots.contains(root) {
+            roots.append(root)
+        }
         self.candidateRoots = roots
-    }
 
+    }
     public func locate(fileManager: FileManager = .default) -> JavaEngineInstallation? {
         for root in candidateRoots {
             if let installation = Self.installation(root: root, fileManager: fileManager) {

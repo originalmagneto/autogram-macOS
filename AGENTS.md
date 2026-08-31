@@ -25,7 +25,7 @@ Autogram is a 100% native macOS SwiftUI application for Qualified Electronic Sig
   - `AuthorizeView`: Mandate certificate verification, PIN handling, and sticky authorization action bar.
   - `DoneView`: Direct access to converted PDF/A and clause files.
 - **Evidence Dashboard (EvidenceDashboardView.swift)**: Search filter, segmented status picker, SQLite table with right-click context menu, and confirmation dialog for deletions.
-- **Finder Quick Action (ServicesProvider.swift)**: NSServices provider (`signFiles`) registered in Info.plist; `FinderSigningRouter` (MainActor singleton) routes selected PDFs into `SigningSessionStore.signFromFinder(_:)` for headless batch QES + QTS signing; Quick Action label "Podpísať s QES + QTS (Autogram)", restricted to Finder via `NSRequiredContext`
+- **Finder Quick Action (`Assets/Autogram Finder Quick Action.workflow`, `build_app.sh`)**: Automator workflow restricted to Finder via `NSRequiredContext`; runs `autogram-quick-action.sh` and the bundled legacy CLI helper in the background, with `AutogramCLI-arm64`, `AutogramQuickActionRunner-arm64`, JAR dependencies, and Java runtime bundled in the app. The flow shows driver, certificate, and PIN/BOK dialogs without opening the main app and accepts PDF files only.
 
 ## Build & Test Instructions
 - Run build script: `DEVELOPER_DIR="/Applications/Xcode-26.5.app/Contents/Developer" ./build_app.sh`
