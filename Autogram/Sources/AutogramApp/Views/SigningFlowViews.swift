@@ -27,7 +27,7 @@ struct SigningFlowView: View {
         .overlay {
             if isTargeted { targetedOverlay }
         }
-        .onDrop(of: [UTType.pdf, UTType(filenameExtension: "asice") ?? .data, .jpeg, .png, .tiff], isTargeted: $isTargeted) { providers in
+        .onDrop(of: [UTType.pdf, UTType(importedAs: "org.autogram.asice", conformingTo: .data), .jpeg, .png, .tiff], isTargeted: $isTargeted) { providers in
             handleDrop(providers)
         }
         .task { await store.refreshIdentities() }
@@ -65,7 +65,7 @@ struct SigningFlowView: View {
 
     private func handleDrop(_ providers: [NSItemProvider]) -> Bool {
         let pdfProvider = providers.first { $0.hasItemConformingToTypeIdentifier(UTType.pdf.identifier) }
-        let asiceType = UTType(filenameExtension: "asice") ?? .data
+        let asiceType = UTType(importedAs: "org.autogram.asice", conformingTo: .data)
         let asiceProvider = providers.first { $0.hasItemConformingToTypeIdentifier(asiceType.identifier) }
         let imageTypes = [UTType.jpeg, .png, .tiff, .heic]
         let imageProvider = imageTypes.compactMap { type in
@@ -172,7 +172,7 @@ struct SigningIntakeView: View {
 
     private func openPanel() {
         let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.pdf, UTType(filenameExtension: "asice") ?? .data]
+        panel.allowedContentTypes = [.pdf, UTType(importedAs: "org.autogram.asice", conformingTo: .data)]
         panel.allowsMultipleSelection = true
         panel.message = "Vyberte PDF dokumenty na podpísanie."
         panel.begin { response in

@@ -299,7 +299,7 @@ struct RootView: View {
 
     private func openDocument() {
         let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.pdf, UTType(filenameExtension: "asice") ?? .data]
+        panel.allowedContentTypes = [.pdf, UTType(importedAs: "org.autogram.asice", conformingTo: .data)]
         panel.allowsMultipleSelection = false
         panel.begin { response in
             guard response == .OK, let url = panel.url else { return }
@@ -313,7 +313,8 @@ struct RootView: View {
     private func openMoreFiles() {
         guard !batchIsActive else { return }
         let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.pdf, UTType(filenameExtension: "asice") ?? .data]
+        panel.allowedContentTypes = [.pdf, UTType(importedAs: "org.autogram.asice", conformingTo: .data)]
+        panel.allowsMultipleSelection = true
         panel.begin { response in
             guard response == .OK else { return }
             Task { @MainActor in
