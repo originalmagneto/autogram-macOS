@@ -87,6 +87,7 @@ final class EvidenceAndPackagingTests: XCTestCase {
         XCTAssertEqual(entries.first?.data, payload)
     }
 
+
     private func deflate(_ data: Data) throws -> Data {
         let dstCapacity = data.count + 256
         var dst = Data(count: dstCapacity)

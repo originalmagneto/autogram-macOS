@@ -915,14 +915,16 @@ struct SigningDoneView: View {
         }
     }
     private func detailRow(_ label: String, _ value: String) -> some View {
-        VStack(alignment: .leading, spacing: 1) {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text(label)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
+                .frame(width: 68, alignment: .leading)
             Text(value)
                 .font(.caption)
                 .textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
         }
     }
 

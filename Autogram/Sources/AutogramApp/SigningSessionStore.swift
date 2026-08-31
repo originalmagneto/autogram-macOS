@@ -533,7 +533,8 @@ final class SigningSessionStore {
                 queue[index].errorMessage = nil
             }
             if let signedURL = signedOutputURL {
-                signedPreviewDocument = previewDocument(for: signedURL)
+                signedPreviewDocument = PDFDocument(data: signed.pdfData)
+                    ?? previewDocument(for: signedURL)
                 resultSignatures = await signingProvider.inspectSignatures(in: signedURL)
                 pdfaAfterSign = PDFAValidator().validate(signed.pdfData).isValid
                     || (signed.asicData != nil && pdfaPrepared)
