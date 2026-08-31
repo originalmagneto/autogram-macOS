@@ -773,9 +773,9 @@ final class SigningSessionStore {
                     batchItems[batchIndex].errorMessage = placementError
                 }
             }
-        }
-        if !signingProviderIsDemo && snapshot.selectedIdentityID.isEmpty {
-            blockingErrors.append("Certifikát pre vizuálny podpis nie je dostupný.")
+            if !signingProviderIsDemo && snapshot.selectedIdentityID.isEmpty {
+                blockingErrors.append("Certifikát pre vizuálny podpis nie je dostupný.")
+            }
         }
 
         var plannedURLs = Set<URL>()
