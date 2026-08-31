@@ -240,7 +240,7 @@ final class SigningSessionStore {
         selectedQueueID = id
         lastError = item.errorMessage
         signedOutputURL = item.signedOutputURL
-        signedPreviewDocument = item.signedOutputURL.flatMap { PDFDocument(url: $0) }
+        signedPreviewDocument = item.signedOutputURL.flatMap { previewDocument(for: $0) }
         resultSignatures = []
         let secured = item.url.startAccessingSecurityScopedResource()
         defer { if secured { item.url.stopAccessingSecurityScopedResource() } }
