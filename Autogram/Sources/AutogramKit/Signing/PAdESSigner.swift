@@ -150,6 +150,8 @@ public struct PAdESSigner: Sendable {
                 "BT /Helv 8.5 Tf 0.1 0.1 0.12 rg \(Self.pdfNumber(stampRect.height * 0.9 + 8)) \(Self.pdfNumber(stampRect.height - 23)) Td (\(esc)) Tj ET\n" +
                 (certificateText.isEmpty ? "" :
                     "BT /Helv 5.5 Tf 0.35 0.4 0.45 rg \(Self.pdfNumber(stampRect.height * 0.9 + 8)) \(Self.pdfNumber(stampRect.height - 34)) Td (Certifikat: \(escapedCertificate)) Tj ET\n") +
+                (stampDate.isEmpty ? "" :
+                    "BT /Helv 5.5 Tf 0.35 0.4 0.45 rg \(Self.pdfNumber(stampRect.height * 0.9 + 8)) 18 Td (Cas: \(stampDate)) Tj ET\n") +
                 (qtsText.isEmpty ? "" :
                     "BT /Helv 5.5 Tf 0.35 0.4 0.45 rg \(Self.pdfNumber(stampRect.height * 0.9 + 8)) 5 Td (QTS: \(escapedQTS)) Tj ET\n")
         } else {
