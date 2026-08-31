@@ -83,11 +83,21 @@ public struct VisibleSignatureStamper: Sendable {
         stamp: StampData,
         includeTimestamp: Bool
     ) -> Data? {
-        guard let sourcePage = document.page(at: stamp.pageIndex),
-              let imagePNG = stamp.imagePNG,
-              let image = NSImage(data: imagePNG),
+        guard let sourcePage = document.page(at: stamp.pageIndex) else { return nil }
+        guard let imagePNG = stamp.imagePNG else {
+            return self.stamp(document: document, stamp: stamp, includeTimestamp: includeTimestamp)
+        }
+        let enrichedPNG = try? VisibleSignatureRenderer().renderPNG(
+            artworkPNG: imagePNG,
+            content: VisibleSignatureCardContent(
+                signerName: stamp.fullName,
+                certificateName: stamp.certificateName,
+                certificateQualification: stamp.certificateQualification,
+                timestampAuthorityName: includeTimestamp ? stamp.timestampAuthorityName : nil),
+            signingTime: stamp.timestamp)
+        guard let image = NSImage(data: enrichedPNG ?? imagePNG),
               let imageRef = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
-            return nil
+            return self.stamp(document: document, stamp: stamp, includeTimestamp: includeTimestamp)
         }
         let pageBounds = sourcePage.bounds(for: .mediaBox)
         let pdfData = NSMutableData()
