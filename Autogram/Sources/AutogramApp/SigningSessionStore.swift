@@ -244,7 +244,7 @@ final class SigningSessionStore {
         resultSignatures = []
         let secured = item.url.startAccessingSecurityScopedResource()
         defer { if secured { item.url.stopAccessingSecurityScopedResource() } }
-        guard let document = PDFDocument(url: item.url) else {
+        guard let document = previewDocument(for: item.url) else {
             lastError = "Súbor sa nepodarilo otvoriť ako PDF."
             return
         }

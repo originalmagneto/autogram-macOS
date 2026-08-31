@@ -27,7 +27,7 @@ struct SigningFlowView: View {
         .overlay {
             if isTargeted { targetedOverlay }
         }
-        .onDrop(of: [UTType.pdf, .jpeg, .png, .tiff], isTargeted: $isTargeted) { providers in
+        .onDrop(of: [UTType.pdf, UTType(filenameExtension: "asice") ?? .data, .jpeg, .png, .tiff], isTargeted: $isTargeted) { providers in
             handleDrop(providers)
         }
         .task { await store.refreshIdentities() }
@@ -65,16 +65,17 @@ struct SigningFlowView: View {
 
     private func handleDrop(_ providers: [NSItemProvider]) -> Bool {
         let pdfProvider = providers.first { $0.hasItemConformingToTypeIdentifier(UTType.pdf.identifier) }
+        let asiceType = UTType(filenameExtension: "asice") ?? .data
+        let asiceProvider = providers.first { $0.hasItemConformingToTypeIdentifier(asiceType.identifier) }
         let imageTypes = [UTType.jpeg, .png, .tiff, .heic]
         let imageProvider = imageTypes.compactMap { type in
             providers.first { $0.hasItemConformingToTypeIdentifier(type.identifier) } != nil ? type : nil
         }.first
-
-        guard pdfProvider != nil || imageProvider != nil else { return false }
-
-        let isPDF = pdfProvider != nil
-        let typeIdentifier = isPDF ? UTType.pdf.identifier : (imageProvider?.identifier ?? UTType.png.identifier)
-        let provider = (pdfProvider ?? providers.first)!
+        let isPDF = pdfProvider != nil || asiceProvider != nil
+        let typeIdentifier = pdfProvider != nil
+            ? UTType.pdf.identifier
+            : (asiceProvider != nil ? asiceType.identifier : (imageProvider?.identifier ?? UTType.png.identifier))
+        let provider = (pdfProvider ?? asiceProvider ?? providers.first)!
 
         provider.loadDataRepresentation(forTypeIdentifier: typeIdentifier) { data, _ in
             guard let data else { return }
@@ -171,7 +172,7 @@ struct SigningIntakeView: View {
 
     private func openPanel() {
         let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.pdf]
+        panel.allowedContentTypes = [.pdf, UTType(filenameExtension: "asice") ?? .data]
         panel.allowsMultipleSelection = true
         panel.message = "Vyberte PDF dokumenty na podpísanie."
         panel.begin { response in
