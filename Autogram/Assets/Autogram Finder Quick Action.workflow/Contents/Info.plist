@@ -23,7 +23,7 @@
             </dict>
             <key>NSSendFileTypes</key>
             <array>
-                <string>com.adobe.pdf</string>
+        <string>public.item</string>
             </array>
         </dict>
     </array>
