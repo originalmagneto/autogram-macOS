@@ -117,10 +117,12 @@ public final class EngineBridgeSigningProvider: QualifiedSigningProviding, @unch
         let validURLs = canonicalURLs.filter {
             FileManager.default.fileExists(atPath: $0.path)
         }
-        var results = Dictionary(uniqueKeysWithValues: canonicalURLs.map { url in
-            (url, InputSignatureInspectionResult.unavailable(
-                detail: "Vstupný dokument nie je dostupný."))
-        })
+        var results = Dictionary(
+            canonicalURLs.map { url in
+                (url, InputSignatureInspectionResult.unavailable(
+                    detail: "Vstupný dokument nie je dostupný."))
+            },
+            uniquingKeysWith: { first, _ in first })
         guard !validURLs.isEmpty else { return results }
 
         let descriptors = validURLs.enumerated().map { index, url in

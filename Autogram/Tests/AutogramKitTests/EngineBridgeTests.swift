@@ -310,6 +310,17 @@ final class EngineInspectionContractTests: XCTestCase {
             try EngineBridgeSigningProvider.requireInspectableFile(
                 in: [inspection]))
     }
+    func testBulkInputInspectionDeduplicatesDuplicateURLs() async {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("duplicate-input-\(UUID().uuidString).pdf")
+
+        let results = await EngineBridgeSigningProvider()
+            .inspectInputSignatures(in: [url, url])
+
+        XCTAssertEqual(results.count, 1)
+        XCTAssertEqual(results[EnginePaths.canonical(url)]?.state, .unavailable)
+    }
+
 }
 
 final class JavaEngineLiveProcessTests: XCTestCase {
