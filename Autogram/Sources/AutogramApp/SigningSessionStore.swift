@@ -1081,7 +1081,10 @@ final class SigningSessionStore {
             batchCurrentIndex = nil
             batchPhase = .completed
             batchPIN = nil
+        } catch is BatchCancellationError {
+            return
         } catch {
+            guard batchGeneration == generation, batchPhase == .signing else { return }
             let message = error.localizedDescription
             for index in batchItems.indices where batchItems[index].state == .pending {
                 batchItems[index].state = .failed

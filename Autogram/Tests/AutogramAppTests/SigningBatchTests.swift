@@ -149,6 +149,7 @@ final class SigningBatchTests: XCTestCase {
         store.selectedIdentityID = "identity"
         store.includeQualifiedTimestamp = false
 
+        store.outputFormat = .embeddedPAdES
         await store.prepareBatch(ids: store.queue.map(\.id))
         let task = Task { await store.startBatch() }
         while await provider.signCount() < 2 { await Task.yield() }
@@ -340,6 +341,7 @@ final class SigningBatchTests: XCTestCase {
         store.identities = await provider.availableIdentities()
         store.selectedIdentityID = "identity"
         store.includeQualifiedTimestamp = false
+        store.outputFormat = .embeddedPAdES
 
         await store.prepareBatch(ids: store.queue.map(\.id))
         let task = Task { await store.startBatch() }
@@ -361,6 +363,7 @@ final class SigningBatchTests: XCTestCase {
         store.identities = await provider.availableIdentities()
         store.selectedIdentityID = "identity"
         store.includeQualifiedTimestamp = false
+        store.outputFormat = .embeddedPAdES
 
         await store.prepareBatch(ids: store.queue.map(\.id))
         let task = Task { await store.startBatch() }
@@ -381,6 +384,7 @@ final class SigningBatchTests: XCTestCase {
         store.identities = await provider.availableIdentities()
         store.selectedIdentityID = "identity"
         store.includeQualifiedTimestamp = false
+        store.outputFormat = .embeddedPAdES
 
         await store.prepareBatch(ids: store.queue.map(\.id))
         let task = Task { await store.startBatch() }
@@ -403,6 +407,7 @@ final class SigningBatchTests: XCTestCase {
         store.identities = await provider.availableIdentities()
         store.selectedIdentityID = "identity"
         store.includeQualifiedTimestamp = false
+        store.outputFormat = .embeddedPAdES
 
         await store.prepareBatch(ids: store.queue.map(\.id))
         let task = Task { await store.startBatch() }
@@ -425,6 +430,7 @@ final class SigningBatchTests: XCTestCase {
         store.identities = await provider.availableIdentities()
         store.selectedIdentityID = "identity"
         store.includeQualifiedTimestamp = false
+        store.outputFormat = .embeddedPAdES
         store.signingPIN = "1234"
         await store.prepareBatch(ids: store.queue.map(\.id))
         XCTAssertEqual(store.batchPhase, .ready, store.lastError ?? "batch did not become ready")
