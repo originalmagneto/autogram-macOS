@@ -99,22 +99,31 @@ public struct VisibleSignatureStamper: Sendable {
               let imageRef = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
             return self.stamp(document: document, stamp: stamp, includeTimestamp: includeTimestamp)
         }
-        let pageBounds = sourcePage.bounds(for: .mediaBox)
+        let sourceBounds = sourcePage.bounds(for: .mediaBox)
+        let sourceRotation = ((sourcePage.pageRef?.rotationAngle ?? 0) % 360 + 360) % 360
+        let outputSize = sourceRotation % 180 == 0
+            ? sourceBounds.size
+            : CGSize(width: sourceBounds.height, height: sourceBounds.width)
+        let outputBounds = CGRect(origin: .zero, size: outputSize)
+        let stampRect = CGRect(
+            x: stamp.normalizedRect.x * outputBounds.width,
+            y: (1 - stamp.normalizedRect.y - stamp.normalizedRect.height) * outputBounds.height,
+            width: max(stamp.normalizedRect.width * outputBounds.width, 120),
+            height: max(stamp.normalizedRect.height * outputBounds.height, 40))
         let pdfData = NSMutableData()
         guard let consumer = CGDataConsumer(data: pdfData as CFMutableData) else { return nil }
-        var mediaBox = pageBounds
-        guard let context = CGContext(consumer: consumer, mediaBox: &mediaBox, nil) else { return nil }
+        var initialBox = outputBounds
+        guard let context = CGContext(consumer: consumer, mediaBox: &initialBox, nil) else { return nil }
         defer { context.closePDF() }
-
-        let stampRect = CGRect(
-            x: stamp.normalizedRect.x * pageBounds.width,
-            y: (1 - stamp.normalizedRect.y - stamp.normalizedRect.height) * pageBounds.height,
-            width: max(stamp.normalizedRect.width * pageBounds.width, 120),
-            height: max(stamp.normalizedRect.height * pageBounds.height, 40))
         for index in 0..<document.pageCount {
             guard let page = document.page(at: index), let pageRef = page.pageRef else { continue }
             let box = page.bounds(for: .mediaBox)
-            let boxData = withUnsafeBytes(of: box) { bytes in
+            let rotation = ((pageRef.rotationAngle % 360) + 360) % 360
+            let effectiveSize = rotation % 180 == 0
+                ? box.size
+                : CGSize(width: box.height, height: box.width)
+            let effectiveBox = CGRect(origin: .zero, size: effectiveSize)
+            let boxData = withUnsafeBytes(of: effectiveBox) { bytes in
                 CFDataCreate(nil, bytes.bindMemory(to: UInt8.self).baseAddress, bytes.count)
             }
             let options: CFDictionary? = boxData.map {
@@ -124,14 +133,14 @@ public struct VisibleSignatureStamper: Sendable {
             context.saveGState()
             context.concatenate(pageRef.getDrawingTransform(
                 .mediaBox,
-                rect: box,
-                rotate: pageRef.rotationAngle,
+                rect: effectiveBox,
+                rotate: 0,
                 preserveAspectRatio: true))
             context.drawPDFPage(pageRef)
+            context.restoreGState()
             if index == stamp.pageIndex {
                 context.draw(imageRef, in: stampRect)
             }
-            context.restoreGState()
             context.endPDFPage()
         }
         return pdfData as Data
