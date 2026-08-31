@@ -773,16 +773,36 @@ final class SigningSessionStore {
                     batchItems[batchIndex].errorMessage = placementError
                 }
             }
-            if !signingProviderIsDemo && snapshot.selectedIdentityID.isEmpty {
-                blockingErrors.append("Certifikát pre vizuálny podpis nie je dostupný.")
-            }
+        }
+        if !signingProviderIsDemo && snapshot.selectedIdentityID.isEmpty {
+            blockingErrors.append("Certifikát pre vizuálny podpis nie je dostupný.")
         }
 
         var plannedURLs = Set<URL>()
+        var sharedPlannedURL: URL?
+        if snapshot.outputFormat == .attachedASIC, let firstItem = selectedItems.first {
+            let location = outputLocation(for: firstItem.url)
+            do {
+                let planned = try outputService.previewUniqueSibling(
+                    for: firstItem.url,
+                    in: location.directory,
+                    stemSuffix: "_podpisane",
+                    outputExtension: "asice",
+                    occupiedURLs: plannedURLs)
+                sharedPlannedURL = planned
+                plannedURLs.insert(planned.standardizedFileURL)
+            } catch {
+                blockingErrors.append("Cieľový spoločný ASiC-E výstup sa nepodarilo pripraviť.")
+            }
+        }
         let outputExtension = snapshot.outputFormat == .embeddedPAdES ? "pdf" : "asice"
         for item in selectedItems {
             guard documents[item.id] != nil else { continue }
             guard let batchIndex = batchItems.firstIndex(where: { $0.id == item.id }) else {
+                continue
+            }
+            if let sharedPlannedURL {
+                batchItems[batchIndex].plannedOutputURL = sharedPlannedURL
                 continue
             }
             let location = outputLocation(for: item.url)
@@ -838,6 +858,11 @@ final class SigningSessionStore {
         batchPhase = .signing
         lastError = nil
         let pin = batchPIN
+        if snapshot.outputFormat == .attachedASIC {
+            await signCombinedASiCBatch(snapshot: snapshot, pin: pin, generation: generation)
+            return
+        }
+
 
         for index in batchItems.indices {
             guard batchGeneration == generation else { return }
@@ -949,6 +974,152 @@ final class SigningSessionStore {
         batchGeneration = UUID()
         batchDecisionContinuation?.resume(returning: .stopBatch)
         batchDecisionContinuation = nil
+    }
+
+    private func signCombinedASiCBatch(
+        snapshot: BatchSettingsSnapshot,
+        pin: String?,
+        generation: UUID
+    ) async {
+        do {
+            try checkBatchGeneration(generation)
+            let selectedItems = batchItems.filter { $0.state == .pending }
+            guard let firstItem = selectedItems.first else {
+                throw SigningError.signingFailed("Na podpisovanie nebol vybraný žiadny dokument.")
+            }
+
+            var entries: [ASiCEPackager.Entry] = []
+            var usedNames = Set<String>()
+            for item in selectedItems {
+                try checkBatchGeneration(generation)
+                let document = try loadBatchPDF(item.url)
+                var pdfData = try batchPDFData(for: item.url, document: document)
+                if snapshot.includeVisibleSignature {
+                    let stamp = VisibleSignatureStamper.StampData(
+                        fullName: snapshot.identityLabel,
+                        timestamp: Date(),
+                        pageIndex: snapshot.visualPlacement?.pageIndex ?? snapshot.signaturePage,
+                        normalizedRect: snapshot.signatureRect,
+                        imagePNG: snapshot.visualArtworkOverride
+                            ?? VisualSignatureStore.imageData(for: snapshot.selectedVisualAppearanceID),
+                        certificateName: snapshot.identityLabel,
+                        certificateQualification: snapshot.identityIsQualified
+                            ? "Kvalifikovaný elektronický podpis" : nil,
+                        timestampAuthorityName: snapshot.includeQualifiedTimestamp
+                            ? (settings.availableTSAServers.first { $0.url == snapshot.tsaURL }?.name ?? snapshot.tsaURL)
+                            : nil)
+                    pdfData = await Self.stampPDFData(
+                        pdfData,
+                        stamp: stamp,
+                        includeTimestamp: snapshot.includeQualifiedTimestamp,
+                        stamper: stamper,
+                        flattenAnnotations: true)
+                }
+                if snapshot.convertToPDFA {
+                    let pdfaDocument = PDFDocument(data: pdfData) ?? document
+                    pdfData = try PDFAConverter().convert(
+                        document: pdfaDocument,
+                        mode: .rasterGuaranteed,
+                        title: item.url.deletingPathExtension().lastPathComponent)
+                    guard PDFAValidator().validate(pdfData).isValid else {
+                        throw SigningError.signingFailed("Konverzia do PDF/A zlyhala pri súbore \(item.displayName).")
+                    }
+                }
+                let baseName = item.url.deletingPathExtension().lastPathComponent
+                var entryName = "\(baseName).pdf"
+                var suffix = 2
+                while !usedNames.insert(entryName).inserted {
+                    entryName = "\(baseName) (\(suffix)).pdf"
+                    suffix += 1
+                }
+                entries.append(.init(path: entryName, data: pdfData))
+            }
+
+            guard let firstData = entries.first?.data else {
+                throw SigningError.signingFailed("Dávka neobsahuje žiadne PDF dáta.")
+            }
+            let signed = try await signingProvider.sign(SigningRequest(
+                pdfData: firstData,
+                identityID: snapshot.selectedIdentityID,
+                includeTimestamp: snapshot.includeQualifiedTimestamp,
+                tsaURL: snapshot.tsaURL,
+                outputFormat: .attachedASIC,
+                pin: pin,
+                extraFiles: entries))
+            guard let asicData = signed.asicData else {
+                throw SigningError.signingFailed("Podpisový provider nevytvoril ASiC-E kontajner.")
+            }
+            let directory = outputLocation(for: firstItem.url).directory
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            let reservation = try outputService.reserveUniqueSibling(
+                for: firstItem.url,
+                in: directory,
+                stemSuffix: "_podpisane",
+                outputExtension: "asice")
+            do {
+                try checkBatchGeneration(generation)
+                try asicData.write(to: reservation.temporaryURL, options: [.atomic])
+                try outputService.finalize(reservation)
+            } catch {
+                try? FileManager.default.removeItem(at: reservation.temporaryURL)
+                throw error
+            }
+
+            for index in batchItems.indices where batchItems[index].state == .pending {
+                batchItems[index].state = .signed
+                batchItems[index].outputURL = reservation.finalURL
+                batchItems[index].plannedOutputURL = reservation.finalURL
+                batchItems[index].errorMessage = nil
+                if let queueIndex = queue.firstIndex(where: { $0.id == batchItems[index].id }) {
+                    queue[queueIndex].status = .signed
+                    queue[queueIndex].signedOutputURL = reservation.finalURL
+                    queue[queueIndex].errorMessage = nil
+                }
+            }
+            batchCompletedCount = batchItems.filter { $0.state == .signed }.count
+            batchFailedCount = batchItems.filter { $0.state == .failed }.count
+            batchCurrentIndex = nil
+            batchPhase = .completed
+            batchPIN = nil
+        } catch {
+            let message = error.localizedDescription
+            for index in batchItems.indices where batchItems[index].state == .pending {
+                batchItems[index].state = .failed
+                batchItems[index].errorMessage = message
+                if let queueIndex = queue.firstIndex(where: { $0.id == batchItems[index].id }) {
+                    queue[queueIndex].status = .failed
+                    queue[queueIndex].errorMessage = message
+                }
+            }
+            batchFailedCount = batchItems.filter { $0.state == .failed }.count
+            batchPhase = .completed
+            batchPIN = nil
+        }
+    }
+
+    private func loadBatchPDF(_ url: URL) throws -> PDFDocument {
+        if url.pathExtension.lowercased() == "asice",
+           let data = try? Data(contentsOf: url),
+           let pdfData = ASiCEContainerVerifier.extractPDFData(data),
+           let document = PDFDocument(data: pdfData) {
+            return document
+        }
+        guard let document = PDFDocument(url: url) else {
+            throw SigningError.signingFailed("Súbor \(url.lastPathComponent) sa nepodarilo otvoriť ako PDF.")
+        }
+        return document
+    }
+
+    private func batchPDFData(for url: URL, document: PDFDocument) throws -> Data {
+        if url.pathExtension.lowercased() != "asice",
+           let data = try? Data(contentsOf: url),
+           !data.isEmpty {
+            return data
+        }
+        guard let data = document.dataRepresentation(), !data.isEmpty else {
+            throw SigningError.signingFailed("PDF dokument \(url.lastPathComponent) neobsahuje žiadne dáta.")
+        }
+        return data
     }
 
     private struct BatchCancellationError: Error {}
