@@ -100,10 +100,18 @@ public final class SignaturePlacementState {
         update(placement: current)
     }
 
-    /// Nastaví obsah karty (meno podpisujúceho + kvalifikácia certifikátu).
-    public func setContent(signerName: String, qualification: String?) {
-        cardContent = VisibleSignatureCardContent(signerName: signerName,
-                                                  certificateQualification: qualification)
+    /// Sets the signer, certificate, and timestamp content shown in the card.
+    public func setContent(
+        signerName: String,
+        certificateName: String? = nil,
+        qualification: String? = nil,
+        timestampAuthorityName: String? = nil
+    ) {
+        cardContent = VisibleSignatureCardContent(
+            signerName: signerName,
+            certificateName: certificateName,
+            certificateQualification: qualification,
+            timestampAuthorityName: timestampAuthorityName)
         refreshPreview()
     }
 
@@ -141,8 +149,8 @@ public final class SignaturePlacementState {
             return false
         }
         if cardContent == nil {
-            cardContent = VisibleSignatureCardContent(signerName: "Certificate details pending",
-                                                      certificateQualification: nil)
+            cardContent = VisibleSignatureCardContent(
+                signerName: "Certificate details pending")
         }
         guard let content = cardContent,
               let previewURL = try? VisibleSignatureRenderer(assetStore: assetStore).render(

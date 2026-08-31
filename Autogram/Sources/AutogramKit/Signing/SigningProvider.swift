@@ -192,13 +192,21 @@ public struct VisualStampSpec: Sendable {
     public var pdfPageRect: CGRect?
     public var rotationDegrees: Double
     public var qualification: String?
+    public var certificateName: String?
+    public var timestampAuthorityName: String?
 
-    public init(fullName: String, timestamp: Date,
-                pageIndex: Int, normalizedRect: NormalizedRect,
-                imagePNG: Data? = nil,
-                pdfPageRect: CGRect? = nil,
-                rotationDegrees: Double = 0,
-                qualification: String? = nil) {
+    public init(
+        fullName: String,
+        timestamp: Date,
+        pageIndex: Int,
+        normalizedRect: NormalizedRect,
+        imagePNG: Data? = nil,
+        pdfPageRect: CGRect? = nil,
+        rotationDegrees: Double = 0,
+        qualification: String? = nil,
+        certificateName: String? = nil,
+        timestampAuthorityName: String? = nil
+    ) {
         self.fullName = fullName
         self.timestamp = timestamp
         self.pageIndex = pageIndex
@@ -207,6 +215,8 @@ public struct VisualStampSpec: Sendable {
         self.pdfPageRect = pdfPageRect
         self.rotationDegrees = rotationDegrees
         self.qualification = qualification
+        self.certificateName = certificateName
+        self.timestampAuthorityName = timestampAuthorityName
     }
 }
 

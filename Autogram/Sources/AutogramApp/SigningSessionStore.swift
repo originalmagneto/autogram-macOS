@@ -391,7 +391,11 @@ final class SigningSessionStore {
                     timestamp: Date(),
                     pageIndex: min(signaturePage, analysis.totalPages - 1),
                     normalizedRect: signatureRect,
-                    imagePNG: imageData)
+                    imagePNG: imageData,
+                    certificateName: identities.first(where: { $0.id == selectedIdentityID })?.label,
+                    certificateQualification: identities.first(where: { $0.id == selectedIdentityID })?.isQualified == true
+                        ? "Kvalifikovaný elektronický podpis" : nil,
+                    timestampAuthorityName: includeQualifiedTimestamp ? settings.activeTSA.name : nil)
                 let stampedData = await Self.stampPDFData(
                     pdfData,
                     stamp: stamp,
@@ -436,7 +440,11 @@ final class SigningSessionStore {
                     timestamp: Date(),
                     pageIndex: min(signaturePage, analysis.totalPages - 1),
                     normalizedRect: signatureRect,
-                    imagePNG: imageData)
+                    imagePNG: imageData,
+                    certificateName: identities.first(where: { $0.id == selectedIdentityID })?.label,
+                    certificateQualification: identities.first(where: { $0.id == selectedIdentityID })?.isQualified == true
+                        ? "Kvalifikovaný elektronický podpis" : nil,
+                    timestampAuthorityName: includeQualifiedTimestamp ? settings.activeTSA.name : nil)
                 let includeStamp = includeQualifiedTimestamp
                 if let stampedSource = PDFDocument(data: pdfData) {
                     let stampedDoc = UncheckedSendable(stampedSource)
@@ -469,7 +477,9 @@ final class SigningSessionStore {
                     pdfPageRect: convertToPDFA ? nil : visualPlacement?.pageRect,
                     rotationDegrees: visualPlacement?.rotationDegrees ?? 0,
                     qualification: identities.first(where: { $0.id == identityID })?.isQualified == true
-                        ? "Kvalifikovaný elektronický podpis" : nil)
+                        ? "Kvalifikovaný elektronický podpis" : nil,
+                    certificateName: identities.first(where: { $0.id == identityID })?.label,
+                    timestampAuthorityName: includeQualifiedTimestamp ? settings.activeTSA.name : nil)
             } else {
                 visualStamp = nil
             }
@@ -523,7 +533,7 @@ final class SigningSessionStore {
                 queue[index].errorMessage = nil
             }
             if let signedURL = signedOutputURL {
-                signedPreviewDocument = PDFDocument(url: signedURL)
+                signedPreviewDocument = previewDocument(for: signedURL)
                 resultSignatures = await signingProvider.inspectSignatures(in: signedURL)
                 pdfaAfterSign = PDFAValidator().validate(signed.pdfData).isValid
                     || (signed.asicData != nil && pdfaPrepared)
@@ -984,7 +994,13 @@ final class SigningSessionStore {
                 pageIndex: snapshot.visualPlacement?.pageIndex ?? snapshot.signaturePage,
                 normalizedRect: snapshot.signatureRect,
                 imagePNG: snapshot.visualArtworkOverride
-                    ?? VisualSignatureStore.imageData(for: snapshot.selectedVisualAppearanceID))
+                    ?? VisualSignatureStore.imageData(for: snapshot.selectedVisualAppearanceID),
+                certificateName: snapshot.identityLabel,
+                certificateQualification: snapshot.identityIsQualified
+                    ? "Kvalifikovaný elektronický podpis" : nil,
+                timestampAuthorityName: snapshot.includeQualifiedTimestamp
+                    ? (settings.availableTSAServers.first { $0.url == snapshot.tsaURL }?.name ?? snapshot.tsaURL)
+                    : nil)
             try checkBatchGeneration(generation)
             let stampedData = await Self.stampPDFData(
                 pdfData,
@@ -1026,7 +1042,13 @@ final class SigningSessionStore {
                 timestamp: Date(),
                 pageIndex: snapshot.signaturePage,
                 normalizedRect: snapshot.signatureRect,
-                imagePNG: imageData)
+                imagePNG: imageData,
+                certificateName: snapshot.identityLabel,
+                certificateQualification: snapshot.identityIsQualified
+                    ? "Kvalifikovaný elektronický podpis" : nil,
+                timestampAuthorityName: snapshot.includeQualifiedTimestamp
+                    ? (settings.availableTSAServers.first { $0.url == snapshot.tsaURL }?.name ?? snapshot.tsaURL)
+                    : nil)
             attachedStamp = stamp
             try checkBatchGeneration(generation)
             pdfData = await Self.stampPDFData(
@@ -1050,7 +1072,11 @@ final class SigningSessionStore {
                 pdfPageRect: nil,
                 rotationDegrees: snapshot.visualPlacement?.rotationDegrees ?? 0,
                 qualification: snapshot.identityIsQualified
-                    ? "Kvalifikovaný elektronický podpis" : nil)
+                    ? "Kvalifikovaný elektronický podpis" : nil,
+                certificateName: snapshot.identityLabel,
+                timestampAuthorityName: snapshot.includeQualifiedTimestamp
+                    ? (settings.availableTSAServers.first { $0.url == snapshot.tsaURL }?.name ?? snapshot.tsaURL)
+                    : nil)
         } else {
             visualStamp = nil
         }
@@ -1171,10 +1197,24 @@ final class SigningSessionStore {
                   pageBounds.height.isFinite,
                   pageBounds.width > 0,
                   pageBounds.height > 0 else {
+
                 return "Cieľová strana PDF nemá platné rozmery."
             }
         }
         return nil
+    }
+    private func previewDocument(for url: URL) -> PDFDocument? {
+        guard let data = try? Data(contentsOf: url) else { return nil }
+        if url.pathExtension.lowercased() != "asice" {
+            return PDFDocument(data: data)
+        }
+        guard let entries = ASiCEContainerVerifier.readEntries(data),
+              let pdfEntry = entries.first(where: {
+                  $0.name.lowercased().hasSuffix(".pdf")
+              }) else {
+            return nil
+        }
+        return PDFDocument(data: pdfEntry.data)
     }
 
     private func checkBatchGeneration(_ generation: UUID) throws {

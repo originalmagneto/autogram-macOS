@@ -26,5 +26,19 @@ public struct VisibleSignaturePlacement: Sendable, Equatable {
 
 public struct VisibleSignatureCardContent: Sendable, Equatable {
     public var signerName: String
+    public var certificateName: String?
     public var certificateQualification: String?
+    public var timestampAuthorityName: String?
+
+    public init(
+        signerName: String,
+        certificateName: String? = nil,
+        certificateQualification: String? = nil,
+        timestampAuthorityName: String? = nil
+    ) {
+        self.signerName = signerName
+        self.certificateName = certificateName
+        self.certificateQualification = certificateQualification
+        self.timestampAuthorityName = timestampAuthorityName
+    }
 }

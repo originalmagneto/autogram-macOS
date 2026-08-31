@@ -127,6 +127,14 @@ public struct PAdESSigner: Sendable {
         } ?? ""
         let esc = name.replacingOccurrences(of: "(", with: "\\(")
             .replacingOccurrences(of: ")", with: "\\)")
+        let certificateText = stamp?.certificateName.map { Self.asciiFold($0) } ?? ""
+        let qtsText = stamp?.timestampAuthorityName.map { Self.asciiFold($0) } ?? ""
+        let escapedCertificate = certificateText
+            .replacingOccurrences(of: "(", with: "\\(")
+            .replacingOccurrences(of: ")", with: "\\)")
+        let escapedQTS = qtsText
+            .replacingOccurrences(of: "(", with: "\\(")
+            .replacingOccurrences(of: ")", with: "\\)")
         let appearanceStream: String
         if stamp?.imagePNG != nil {
             let imageW = Self.pdfNumber(stampRect.height * 0.9)
@@ -140,8 +148,10 @@ public struct PAdESSigner: Sendable {
                 "q 0.15 0.28 0.48 RG 0.8 w \(textX) 1.5 \(textW) \(Self.pdfNumber(stampRect.height - 3)) re S Q\n" +
                 "BT /Helv 6.5 Tf 0.35 0.45 0.6 rg \(Self.pdfNumber(stampRect.height * 0.9 + 8)) \(Self.pdfNumber(stampRect.height - 11)) Td (Elektronicky podpisane) Tj ET\n" +
                 "BT /Helv 8.5 Tf 0.1 0.1 0.12 rg \(Self.pdfNumber(stampRect.height * 0.9 + 8)) \(Self.pdfNumber(stampRect.height - 23)) Td (\(esc)) Tj ET\n" +
-                (stampDate.isEmpty ? "" :
-                    "BT /Helv 7 Tf 0.35 0.4 0.45 rg \(Self.pdfNumber(stampRect.height * 0.9 + 8)) 6 Td (\(stampDate)) Tj ET\n")
+                (certificateText.isEmpty ? "" :
+                    "BT /Helv 5.5 Tf 0.35 0.4 0.45 rg \(Self.pdfNumber(stampRect.height * 0.9 + 8)) \(Self.pdfNumber(stampRect.height - 34)) Td (Certifikat: \(escapedCertificate)) Tj ET\n") +
+                (qtsText.isEmpty ? "" :
+                    "BT /Helv 5.5 Tf 0.35 0.4 0.45 rg \(Self.pdfNumber(stampRect.height * 0.9 + 8)) 5 Td (QTS: \(escapedQTS)) Tj ET\n")
         } else {
             appearanceStream =
                 "q 0.96 0.97 0.985 rg 0 0 \(w) \(h) re f Q\n" +

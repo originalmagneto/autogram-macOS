@@ -64,6 +64,27 @@ public struct VisibleSignatureRenderer {
         try png.write(to: output, options: .withoutOverwriting)
         return output
     }
+    public func renderPNG(
+        artworkPNG: Data,
+        content: VisibleSignatureCardContent,
+        signingTime: Date
+    ) throws -> Data {
+        guard let artwork = NSImage(data: artworkPNG) else {
+            throw VisibleSignatureRendererError.unreadableArtwork
+        }
+        let card = try renderedCard(
+            artwork: artwork,
+            content: content,
+            signingTime: signingTime,
+            isPreview: false)
+        guard let tiff = card.tiffRepresentation,
+              let bitmap = NSBitmapImageRep(data: tiff),
+              let png = bitmap.representation(using: .png, properties: [:]) else {
+            throw VisibleSignatureRendererError.unableToEncode
+        }
+        return png
+    }
+
 
     private func renderedCard(
         artwork: NSImage,
@@ -90,12 +111,12 @@ public struct VisibleSignatureRenderer {
         let paragraph = NSMutableParagraphStyle()
         paragraph.alignment = .left
         let textAttributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.systemFont(ofSize: 11),
+            .font: NSFont.systemFont(ofSize: 9),
             .foregroundColor: NSColor.labelColor,
             .paragraphStyle: paragraph
         ]
         let headingAttributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.boldSystemFont(ofSize: 14),
+            .font: NSFont.boldSystemFont(ofSize: 13),
             .foregroundColor: NSColor.labelColor,
             .paragraphStyle: paragraph
         ]
@@ -104,21 +125,32 @@ public struct VisibleSignatureRenderer {
             withAttributes: headingAttributes
         )
         let artworkRect = Self.aspectFitRect(imageSize: artwork.size, inside: Self.artworkSlot)
-        artwork.draw(in: artworkRect, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: false, hints: [.interpolation: NSImageInterpolation.high])
+        artwork.draw(in: artworkRect, from: .zero, operation: .sourceOver, fraction: 1,
+                     respectFlipped: false, hints: [.interpolation: NSImageInterpolation.high])
         NSColor.labelColor.withAlphaComponent(0.18).setStroke()
         let divider = NSBezierPath()
         divider.move(to: CGPoint(x: 28, y: 106))
         divider.line(to: CGPoint(x: size.width - 28, y: 106))
         divider.stroke()
-        let details = [
-            (content.signerName, headingAttributes),
-            (content.certificateQualification ?? "Certificate qualification unavailable", textAttributes),
-            ("PAdES Baseline T · Qualified TSA", textAttributes)
+        var details: [(String, [NSAttributedString.Key: Any])] = [
+            (content.signerName, headingAttributes)
         ]
-        var y: CGFloat = 86
-        for (line, attributes) in details {
-            (line as NSString).draw(in: NSRect(x: 28, y: y, width: size.width - 56, height: 14), withAttributes: attributes)
-            y -= 16
+        if let certificateName = content.certificateName, !certificateName.isEmpty {
+            details.append(("Certifikát: \(certificateName)", textAttributes))
+        }
+        if let qualification = content.certificateQualification, !qualification.isEmpty {
+            details.append((qualification, textAttributes))
+        }
+        if let timestampAuthorityName = content.timestampAuthorityName,
+           !timestampAuthorityName.isEmpty {
+            details.append(("QTS: \(timestampAuthorityName)", textAttributes))
+        }
+        var y: CGFloat = 88
+        for (line, attributes) in details.prefix(4) {
+            (line as NSString).draw(
+                in: NSRect(x: 28, y: y, width: size.width - 56, height: 13),
+                withAttributes: attributes)
+            y -= 14
         }
         drawSymbol("clock.fill", in: NSRect(x: 28, y: 34, width: 13, height: 13), color: .systemGreen)
         let timestampAttributes: [NSAttributedString.Key: Any] = [

@@ -10,15 +10,28 @@ public struct VisibleSignatureStamper: Sendable {
         public var pageIndex: Int
         public var normalizedRect: NormalizedRect
         public var imagePNG: Data?
+        public var certificateName: String?
+        public var certificateQualification: String?
+        public var timestampAuthorityName: String?
 
-        public init(fullName: String, timestamp: Date,
-                    pageIndex: Int, normalizedRect: NormalizedRect,
-                    imagePNG: Data? = nil) {
+        public init(
+            fullName: String,
+            timestamp: Date,
+            pageIndex: Int,
+            normalizedRect: NormalizedRect,
+            imagePNG: Data? = nil,
+            certificateName: String? = nil,
+            certificateQualification: String? = nil,
+            timestampAuthorityName: String? = nil
+        ) {
             self.fullName = fullName
             self.timestamp = timestamp
             self.pageIndex = pageIndex
             self.normalizedRect = normalizedRect
             self.imagePNG = imagePNG
+            self.certificateName = certificateName
+            self.certificateQualification = certificateQualification
+            self.timestampAuthorityName = timestampAuthorityName
         }
     }
 
@@ -34,9 +47,19 @@ public struct VisibleSignatureStamper: Sendable {
         let formatter = DateFormatter()
         formatter.dateFormat = "d. M. yyyy HH:mm"
 
-        if let imagePNG = stamp.imagePNG, let image = NSImage(data: imagePNG) {
-            let annotation = ImageStampAnnotation(bounds: rect, image: image)
-            page.addAnnotation(annotation)
+        if let imagePNG = stamp.imagePNG {
+            let enrichedPNG = try? VisibleSignatureRenderer().renderPNG(
+                artworkPNG: imagePNG,
+                content: VisibleSignatureCardContent(
+                    signerName: stamp.fullName,
+                    certificateName: stamp.certificateName,
+                    certificateQualification: stamp.certificateQualification,
+                    timestampAuthorityName: includeTimestamp ? stamp.timestampAuthorityName : nil),
+                signingTime: stamp.timestamp)
+            if let image = NSImage(data: enrichedPNG ?? imagePNG) {
+                let annotation = ImageStampAnnotation(bounds: rect, image: image)
+                page.addAnnotation(annotation)
+            }
         } else {
             let annotation = PDFAnnotation(bounds: rect, forType: .freeText, withProperties: nil)
             annotation.contents = includeTimestamp

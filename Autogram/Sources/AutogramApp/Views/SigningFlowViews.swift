@@ -331,9 +331,11 @@ struct SigningPrepareView: View {
         }
         visualState.setContent(
             signerName: identity.label,
+            certificateName: identity.label,
             qualification: identity.isQualified
                 ? "Kvalifikovaný elektronický podpis"
-                : "Nekvalifikovaný certifikát"
+                : "Nekvalifikovaný certifikát",
+            timestampAuthorityName: store.includeQualifiedTimestamp ? store.settings.activeTSA.name : nil
         )
     }
 
@@ -880,8 +882,50 @@ struct SigningDoneView: View {
                 }
                 .padding(4)
             }
+            if let identity = store.identities.first(where: { $0.id == store.selectedIdentityID }) {
+                GroupBox("Použitý certifikát") {
+                    VStack(alignment: .leading, spacing: 5) {
+                        detailRow("Názov", identity.label)
+                        detailRow("Vydal", identity.issuerSummary)
+                        detailRow("Kvalifikácia", identity.isQualified ? "Kvalifikovaný" : "Nekvalifikovaný")
+                        if let validUntil = identity.validUntil {
+                            detailRow("Platný do", validUntil.formatted(date: .abbreviated, time: .omitted))
+                        }
+                    }
+                    .padding(4)
+                }
+            }
+
+            if store.includeQualifiedTimestamp {
+                GroupBox("Kvalifikovaná časová pečiatka") {
+                    VStack(alignment: .leading, spacing: 5) {
+                        detailRow("Autorita", store.settings.activeTSA.name)
+                        detailRow("Adresa", store.settings.activeTSA.url)
+                        if let signature = store.resultSignatures.first,
+                           let signingTime = signature.signingTime {
+                            detailRow("Čas podpisu", signingTime.formatted(date: .abbreviated, time: .standard))
+                        }
+                        if let detail = store.resultSignatures.first?.detail {
+                            detailRow("Validácia", detail)
+                        }
+                    }
+                    .padding(4)
+                }
+            }
         }
     }
+    private func detailRow(_ label: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(label)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.caption)
+                .textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
 }
 
 // MARK: - Batch Review, Progress & Summary
