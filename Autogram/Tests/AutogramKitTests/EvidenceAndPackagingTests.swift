@@ -240,4 +240,26 @@ final class EvidenceAndPackagingTests: XCTestCase {
         XCTAssertGreaterThan(asic.count, pdf.count / 2)
         XCTAssertTrue(result.signatureLabel.contains("SHA-256"))
     }
+    func testDemoSigningCreatesOneMultiPDFASICContainer() async throws {
+        let provider = DemoSigningProvider()
+        let identities = await provider.availableIdentities()
+        let identity = try XCTUnwrap(identities.first)
+        let firstPDF = TestPDFBuilder.typicalContractPDF()
+        let secondPDF = TestPDFBuilder.typicalContractPDF()
+        let result = try await provider.sign(SigningRequest(
+            pdfData: firstPDF,
+            identityID: identity.id,
+            includeTimestamp: false,
+            outputFormat: .attachedASIC,
+            extraFiles: [
+                .init(path: "prvy.pdf", data: firstPDF),
+                .init(path: "druhy.pdf", data: secondPDF)
+            ]))
+
+        let asic = try XCTUnwrap(result.asicData)
+        let verification = ASiCEContainerVerifier().verify(asic)
+        XCTAssertTrue(verification.containsDemoSignature)
+        XCTAssertTrue(verification.entryNames.contains("prvy.pdf"))
+        XCTAssertTrue(verification.entryNames.contains("druhy.pdf"))
+    }
 }
