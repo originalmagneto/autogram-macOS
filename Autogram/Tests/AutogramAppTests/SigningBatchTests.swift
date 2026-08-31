@@ -78,7 +78,7 @@ final class SigningBatchTests: XCTestCase {
 
         XCTAssertEqual(store.batchItems.first?.state, .signed)
         let visualStamps = await provider.requestVisualStamps()
-        XCTAssertTrue(visualStamps.allSatisfy { $0 == nil })
+        XCTAssertTrue(visualStamps.allSatisfy { $0 != nil })
         let outputURL = try! XCTUnwrap(store.batchItems.first?.outputURL)
         let output = try! XCTUnwrap(PDFDocument(url: outputURL))
         let page = try! XCTUnwrap(output.page(at: 0))

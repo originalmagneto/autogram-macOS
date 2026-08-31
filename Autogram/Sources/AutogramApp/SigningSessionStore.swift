@@ -462,7 +462,7 @@ final class SigningSessionStore {
             let pdfName = sourceURL?.lastPathComponent ?? "dokument.pdf"
             let artworkPNG = visualArtworkOverride ?? VisualSignatureStore.imageData(for: selectedVisualAppearanceID)
             let visualStamp: VisualStampSpec?
-            if includeVisibleSignature, outputFormat == .embeddedPAdES, !visualStampWasPreapplied {
+            if includeVisibleSignature, outputFormat == .embeddedPAdES {
                 visualStamp = VisualStampSpec(
                     fullName: displayName(),
                     timestamp: Date(),
@@ -1064,11 +1064,9 @@ final class SigningSessionStore {
                 flattenAnnotations: true)
         }
 
-
         let visualStamp: VisualStampSpec?
         if snapshot.includeVisibleSignature,
-           snapshot.outputFormat == .embeddedPAdES,
-           !visualStampWasPreapplied {
+           snapshot.outputFormat == .embeddedPAdES {
             visualStamp = VisualStampSpec(
                 fullName: snapshot.identityLabel,
                 timestamp: Date(),
