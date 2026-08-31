@@ -268,9 +268,7 @@ public struct PDFAConverter: Sendable {
         ctx.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: 1))
         ctx.fill(CGRect(x: 0, y: 0, width: width, height: height))
         ctx.scaleBy(x: scale, y: scale)
-        if let ref = page.pageRef {
-            ctx.drawPDFPage(ref)
-        }
+        page.draw(with: .mediaBox, to: ctx)
         return ctx.makeImage()
     }
 
