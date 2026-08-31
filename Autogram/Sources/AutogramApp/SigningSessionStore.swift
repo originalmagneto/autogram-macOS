@@ -446,17 +446,12 @@ final class SigningSessionStore {
                         ? "Kvalifikovaný elektronický podpis" : nil,
                     timestampAuthorityName: includeQualifiedTimestamp ? settings.activeTSA.name : nil)
                 let includeStamp = includeQualifiedTimestamp
-                if let stampedSource = PDFDocument(data: pdfData) {
-                    let stampedDoc = UncheckedSendable(stampedSource)
-                    let stampedData = await Task.detached(priority: .userInitiated) { [stamper, stampedDoc] in
-                        stamper.stamp(document: stampedDoc.value,
-                                      stamp: stamp,
-                                      includeTimestamp: includeStamp)
-                    }.value
-                    if let finalData = stampedData {
-                        pdfData = finalData
-                    }
-                }
+                pdfData = await Self.stampPDFData(
+                    pdfData,
+                    stamp: stamp,
+                    includeTimestamp: includeStamp,
+                    stamper: stamper,
+                    flattenAnnotations: convertToPDFA)
             }
 
             statusText = "Podpisujem kvalifikovaným podpisom…"
@@ -1053,11 +1048,13 @@ final class SigningSessionStore {
             attachedStamp = stamp
             try checkBatchGeneration(generation)
             pdfData = await Self.stampPDFData(
-                pdfData, stamp: stamp, includeTimestamp: snapshot.includeQualifiedTimestamp,
-                stamper: stamper)
+                pdfData,
+                stamp: stamp,
+                includeTimestamp: snapshot.includeQualifiedTimestamp,
+                stamper: stamper,
+                flattenAnnotations: snapshot.convertToPDFA)
         }
 
-        try checkBatchGeneration(generation)
         let visualStamp: VisualStampSpec?
         if snapshot.includeVisibleSignature,
            snapshot.outputFormat == .embeddedPAdES,
@@ -1226,16 +1223,23 @@ final class SigningSessionStore {
         _ data: Data,
         stamp: VisibleSignatureStamper.StampData,
         includeTimestamp: Bool,
-        stamper: VisibleSignatureStamper
+        stamper: VisibleSignatureStamper,
+        flattenAnnotations: Bool = false
     ) async -> Data {
         guard let source = PDFDocument(data: data) else { return data }
         let sendableSource = UncheckedSendable(source)
-        return await Task.detached(priority: .userInitiated) {
+        let stamped = await Task.detached(priority: .userInitiated) {
             stamper.stamp(
                 document: sendableSource.value,
                 stamp: stamp,
                 includeTimestamp: includeTimestamp)
         }.value ?? data
+        guard flattenAnnotations,
+              let stampedDocument = PDFDocument(data: stamped),
+              let flattened = try? PDFAConverter.rasterizedPDFData(document: stampedDocument) else {
+            return stamped
+        }
+        return flattened
     }
 
     private func outputLocation(for url: URL) -> (directory: URL, stem: String) {
