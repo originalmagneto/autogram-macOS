@@ -1214,14 +1214,10 @@ final class SigningSessionStore {
         if url.pathExtension.lowercased() != "asice" {
             return PDFDocument(data: data)
         }
-        guard let entries = ASiCEContainerVerifier.readEntries(data),
-              let pdfEntry = entries.first(where: {
-                  $0.name.lowercased().hasSuffix(".pdf")
-                      || $0.data.starts(with: Data("%PDF-".utf8))
-              }) else {
+        guard let pdfData = ASiCEContainerVerifier.extractPDFData(data) else {
             return nil
         }
-        return PDFDocument(data: pdfEntry.data)
+        return PDFDocument(data: pdfData)
     }
 
     private func checkBatchGeneration(_ generation: UUID) throws {
