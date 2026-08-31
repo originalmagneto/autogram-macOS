@@ -107,11 +107,22 @@ public struct ASiCEContainerVerifier: Sendable {
         return result.isEmpty ? nil : result
     }
     public static func extractPDFData(_ asic: Data) -> Data? {
-        guard let entries = readEntries(asic) else { return nil }
-        return entries.first(where: {
-            $0.name.lowercased().hasSuffix(".pdf")
-                || $0.data.starts(with: Data("%PDF-".utf8))
-        })?.data
+        extractPDFData(asic, depth: 0)
+    }
+
+    private static func extractPDFData(_ asic: Data, depth: Int) -> Data? {
+        guard depth < 4, let entries = readEntries(asic) else { return nil }
+        for entry in entries {
+            if entry.name.lowercased().hasSuffix(".pdf")
+                || entry.data.starts(with: Data("%PDF-".utf8)) {
+                return entry.data
+            }
+            if entry.data.starts(with: Data([0x50, 0x4B, 0x03, 0x04])),
+               let pdfData = extractPDFData(entry.data, depth: depth + 1) {
+                return pdfData
+            }
+        }
+        return nil
     }
 
     public func verify(_ asic: Data) -> Verification {
