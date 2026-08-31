@@ -126,6 +126,23 @@ final class PDFAConverterTests: XCTestCase {
         XCTAssertGreaterThan(topDark, bottomDark,
                              "Rasterizovaná strana je prevrátená — text musí ostať hore (top=\(topDark), bottom=\(bottomDark)).")
     }
+    func testRasterModeHandlesRotatedPageWithoutCropping() throws {
+        let source = try XCTUnwrap(PDFDocument(data: TestPDFBuilder.typicalContractPDF()))
+        try XCTUnwrap(source.page(at: 0)).rotation = 270
+        let sourceBounds = try XCTUnwrap(source.page(at: 0)).bounds(for: .mediaBox)
+        let output = try XCTUnwrap(PDFDocument(data: PDFAConverter().convert(
+            document: source,
+            mode: .rasterGuaranteed)))
+        let outputPage = try XCTUnwrap(output.page(at: 0))
+        let outputBounds = outputPage.bounds(for: .mediaBox)
+        XCTAssertEqual(round(outputBounds.width), round(sourceBounds.height))
+        XCTAssertEqual(round(outputBounds.height), round(sourceBounds.width))
+        let image = try XCTUnwrap(renderToImage(page: outputPage))
+        XCTAssertGreaterThan(image.width, 0)
+        XCTAssertGreaterThan(image.height, 0)
+        XCTAssertGreaterThan(Self.darkPixels(in: image, x: 0, y: 0, width: image.width / 2, height: image.height / 2), 10)
+    }
+
 
     private func renderToImage(page: PDFPage) -> CGImage? {
         let bounds = page.bounds(for: .mediaBox)
@@ -142,6 +159,15 @@ final class PDFAConverterTests: XCTestCase {
             ctx.drawPDFPage(ref)
         }
         return ctx.makeImage()
+    }
+    private static func darkPixels(in image: CGImage, x: Int, y: Int, width: Int, height: Int) -> Int {
+        var count = 0
+        for row in stride(from: y, to: min(y + height, image.height), by: 4) {
+            for column in stride(from: x, to: min(x + width, image.width), by: 4) {
+                if isDark(image, x: column, y: row) { count += 1 }
+            }
+        }
+        return count
     }
 
     private static func isDark(_ image: CGImage, x: Int, y: Int) -> Bool {
