@@ -134,7 +134,7 @@ public final class EngineBridgeSigningProvider: QualifiedSigningProviding, @unch
     }
 
     private func inspectEngineSignatures(at sourceURL: URL) async throws -> [DocumentSignatureInfo] {
-        let inspections = try await engine.inspect(files: [
+        let inspections = try await engine.validate(files: [
             PDFItemDescriptor(id: "inspect", sourceURL: sourceURL)
         ])
         let inspected = try Self.requireInspectableFile(in: inspections)
