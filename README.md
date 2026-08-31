@@ -74,6 +74,10 @@ Interaktívne HTML grafiky sú samostatné, bez JavaScriptu a pripravené na otv
 - pre reálny podpis kompatibilná eID karta, advokátsky preukaz alebo PKCS#11, CryptoTokenKit či Keychain token
 - pre EZZK produkčný režim účet, callback `autogram://ezzk/callback`, sandboxové overenie a sieťové pripojenie
 
+
+## Stiahnutie
+
+Aktuálny macOS build bude dostupný v [GitHub Releases](https://github.com/originalmagneto/autogram-macOS/releases/latest) ako DMG. Aplikácia vyžaduje macOS 27 alebo novší.
 ### Build a inštalácia
 
 ```bash
