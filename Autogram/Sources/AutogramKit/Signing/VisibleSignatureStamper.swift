@@ -1,5 +1,6 @@
 import Foundation
 import PDFKit
+import AppKit
 
 public struct VisibleSignatureStamper: Sendable {
     public init() {}
@@ -77,9 +78,42 @@ public struct VisibleSignatureStamper: Sendable {
 
         return document.dataRepresentation()
     }
-}
+    public func flattenedStamp(
+        document: PDFDocument,
+        stamp: StampData,
+        includeTimestamp: Bool
+    ) -> Data? {
+        guard let sourcePage = document.page(at: stamp.pageIndex),
+              let imagePNG = stamp.imagePNG,
+              let image = NSImage(data: imagePNG),
+              let imageRef = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+            return nil
+        }
+        let pageBounds = sourcePage.bounds(for: .mediaBox)
+        let pdfData = NSMutableData()
+        guard let consumer = CGDataConsumer(data: pdfData as CFMutableData) else { return nil }
+        var mediaBox = pageBounds
+        guard let context = CGContext(consumer: consumer, mediaBox: &mediaBox, nil) else { return nil }
+        defer { context.closePDF() }
 
-import AppKit
+        let stampRect = CGRect(
+            x: stamp.normalizedRect.x * pageBounds.width,
+            y: (1 - stamp.normalizedRect.y - stamp.normalizedRect.height) * pageBounds.height,
+            width: max(stamp.normalizedRect.width * pageBounds.width, 120),
+            height: max(stamp.normalizedRect.height * pageBounds.height, 40))
+        for index in 0..<document.pageCount {
+            guard let page = document.page(at: index), let pageRef = page.pageRef else { continue }
+            let box = page.bounds(for: .mediaBox)
+            context.beginPDFPage([kCGPDFContextMediaBox as String: NSValue(rect: box)] as CFDictionary)
+            context.drawPDFPage(pageRef)
+            if index == stamp.pageIndex {
+                context.draw(imageRef, in: stampRect)
+            }
+            context.endPDFPage()
+        }
+        return pdfData as Data
+    }
+}
 
 final class ImageStampAnnotation: PDFAnnotation {
     private let image: NSImage

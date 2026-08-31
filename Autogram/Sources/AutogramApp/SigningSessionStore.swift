@@ -1236,18 +1236,18 @@ final class SigningSessionStore {
     ) async -> Data {
         guard let source = PDFDocument(data: data) else { return data }
         let sendableSource = UncheckedSendable(source)
-        let stamped = await Task.detached(priority: .userInitiated) {
-            stamper.stamp(
+        return await Task.detached(priority: .userInitiated) {
+            if flattenAnnotations {
+                return stamper.flattenedStamp(
+                    document: sendableSource.value,
+                    stamp: stamp,
+                    includeTimestamp: includeTimestamp)
+            }
+            return stamper.stamp(
                 document: sendableSource.value,
                 stamp: stamp,
                 includeTimestamp: includeTimestamp)
         }.value ?? data
-        guard flattenAnnotations,
-              let stampedDocument = PDFDocument(data: stamped),
-              let flattened = try? PDFAConverter.rasterizedPDFData(document: stampedDocument) else {
-            return stamped
-        }
-        return flattened
     }
 
     private func outputLocation(for url: URL) -> (directory: URL, stem: String) {
