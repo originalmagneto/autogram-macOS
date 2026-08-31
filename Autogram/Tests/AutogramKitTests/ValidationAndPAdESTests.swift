@@ -1,5 +1,6 @@
 import XCTest
 import PDFKit
+import AppKit
 import Security
 import CryptoKit
 @testable import AutogramKit
@@ -38,6 +39,54 @@ final class ValidationAndPAdESTests: XCTestCase {
         let result = PDFAValidator().validate(converted)
         XCTAssertTrue(result.isValid, "Problémy: \(result.issues)")
         XCTAssertTrue(result.issues.isEmpty)
+    }
+    func testPDFARasterizationPreservesGraphicStampPixels() throws {
+        func blankDocument() -> PDFDocument {
+            let document = PDFDocument()
+            let page = PDFPage()
+            let bounds = CGRect(x: 0, y: 0, width: 612, height: 792)
+            page.setBounds(bounds, for: .mediaBox)
+            page.setBounds(bounds, for: .cropBox)
+            document.insert(page, at: 0)
+            return document
+        }
+
+        let plain = blankDocument()
+        let stamped = blankDocument()
+        let artwork = NSImage(size: NSSize(width: 80, height: 40))
+        artwork.lockFocus()
+        NSColor.systemRed.setFill()
+        NSRect(origin: .zero, size: artwork.size).fill()
+        artwork.unlockFocus()
+        let png = try XCTUnwrap(
+            artwork.tiffRepresentation.flatMap { NSBitmapImageRep(data: $0) }?
+                .representation(using: .png, properties: [:]))
+        let stamp = VisibleSignatureStamper.StampData(
+            fullName: "Test signer",
+            timestamp: Date(timeIntervalSince1970: 1_700_000_000),
+            pageIndex: 0,
+            normalizedRect: NormalizedRect(x: 0.1, y: 0.1, width: 0.3, height: 0.15),
+            imagePNG: png)
+        let stampedData = try XCTUnwrap(
+            VisibleSignatureStamper().stamp(document: stamped, stamp: stamp, includeTimestamp: false))
+
+        let plainRaster = try PDFAConverter.rasterize(document: plain)
+        let stampedRaster = try PDFAConverter.rasterize(
+            document: try XCTUnwrap(PDFDocument(data: stampedData)))
+        let plainRasterDocument = try XCTUnwrap(PDFDocument(data: plainRaster))
+        let stampedRasterDocument = try XCTUnwrap(PDFDocument(data: stampedRaster))
+        let plainImage = try XCTUnwrap(
+            PDFAConverter.renderPageImage(
+                page: try XCTUnwrap(plainRasterDocument.page(at: 0)),
+                scale: 1))
+        let stampedImage = try XCTUnwrap(
+            PDFAConverter.renderPageImage(
+                page: try XCTUnwrap(stampedRasterDocument.page(at: 0)),
+                scale: 1))
+        XCTAssertNotEqual(
+            plainImage.dataProvider?.data as Data?,
+            stampedImage.dataProvider?.data as Data?,
+            "PDF/A rasterizácia nesmie zahodiť grafickú pečiatku")
     }
 
     func testPDFAValidatorRejectsPlainPDF() throws {
