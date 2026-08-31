@@ -86,6 +86,24 @@ final class EvidenceAndPackagingTests: XCTestCase {
         XCTAssertEqual(entries.first?.name, name)
         XCTAssertEqual(entries.first?.data, payload)
     }
+    func testASiCEVerifierExtractsPDFFromNestedContainer() throws {
+        let packager = ASiCEPackager()
+        let inner = try packager.package(files: [
+            .init(path: "mimetype",
+                  data: Data("application/vnd.etsi.asic-e+zip".utf8),
+                  storeUncompressed: true),
+            .init(path: "document.pdf", data: TestPDFBuilder.typicalContractPDF())
+        ])
+        let outer = try packager.package(files: [
+            .init(path: "mimetype",
+                  data: Data("application/vnd.etsi.asic-e+zip".utf8),
+                  storeUncompressed: true),
+            .init(path: "kontajner.asice", data: inner)
+        ])
+
+        let extracted = try XCTUnwrap(ASiCEContainerVerifier.extractPDFData(outer))
+        XCTAssertTrue(extracted.starts(with: Data("%PDF-".utf8)))
+    }
 
 
     private func deflate(_ data: Data) throws -> Data {
