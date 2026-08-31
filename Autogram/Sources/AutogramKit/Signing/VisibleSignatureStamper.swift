@@ -114,11 +114,24 @@ public struct VisibleSignatureStamper: Sendable {
         for index in 0..<document.pageCount {
             guard let page = document.page(at: index), let pageRef = page.pageRef else { continue }
             let box = page.bounds(for: .mediaBox)
-            context.beginPDFPage([kCGPDFContextMediaBox as String: NSValue(rect: box)] as CFDictionary)
+            let boxData = withUnsafeBytes(of: box) { bytes in
+                CFDataCreate(nil, bytes.bindMemory(to: UInt8.self).baseAddress, bytes.count)
+            }
+            let options: CFDictionary? = boxData.map {
+                [kCGPDFContextMediaBox as String: $0] as CFDictionary
+            }
+            context.beginPDFPage(options)
+            context.saveGState()
+            context.concatenate(pageRef.getDrawingTransform(
+                .mediaBox,
+                rect: box,
+                rotate: pageRef.rotationAngle,
+                preserveAspectRatio: true))
             context.drawPDFPage(pageRef)
             if index == stamp.pageIndex {
                 context.draw(imageRef, in: stampRect)
             }
+            context.restoreGState()
             context.endPDFPage()
         }
         return pdfData as Data
