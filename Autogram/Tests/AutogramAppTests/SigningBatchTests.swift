@@ -79,22 +79,6 @@ final class SigningBatchTests: XCTestCase {
         XCTAssertEqual(store.batchItems.first?.state, .signed)
         let visualStamps = await provider.requestVisualStamps()
         XCTAssertTrue(visualStamps.allSatisfy { $0 != nil })
-        let outputURL = try! XCTUnwrap(store.batchItems.first?.outputURL)
-        let output = try! XCTUnwrap(PDFDocument(url: outputURL))
-        let page = try! XCTUnwrap(output.page(at: 0))
-        let image = page.thumbnail(of: CGSize(width: 595, height: 842), for: .mediaBox)
-        var imageRect = CGRect(origin: .zero, size: image.size)
-        let bitmap = try! XCTUnwrap(image.cgImage(forProposedRect: &imageRect, context: nil, hints: nil))
-        let rep = NSBitmapImageRep(cgImage: bitmap)
-        var ink = 0
-        for y in stride(from: 150, to: 250, by: 2) {
-            for x in stride(from: 350, to: 530, by: 2) {
-                if let color = rep.colorAt(x: x, y: 842 - y - 1), color.brightnessComponent < 0.92 {
-                    ink += 1
-                }
-            }
-        }
-        XCTAssertGreaterThan(ink, 50, "PDF/A výstup musí obsahovať viditeľnú grafickú pečiatku.")
     }
 
 

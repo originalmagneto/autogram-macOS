@@ -383,7 +383,7 @@ final class SigningSessionStore {
             pdfaPrepared = false
             pdfaAfterSign = false
             var visualStampWasPreapplied = false
-            if convertToPDFA, includeVisibleSignature {
+            if convertToPDFA, includeVisibleSignature, outputFormat == .attachedASIC {
                 let imageData = visualArtworkOverride
                     ?? VisualSignatureStore.imageData(for: selectedVisualAppearanceID)
                 let stamp = VisibleSignatureStamper.StampData(
@@ -985,7 +985,7 @@ final class SigningSessionStore {
         var attachedStamp: VisibleSignatureStamper.StampData?
         if snapshot.convertToPDFA,
            snapshot.includeVisibleSignature,
-           (snapshot.outputFormat == .embeddedPAdES || snapshot.outputFormat == .attachedASIC) {
+           snapshot.outputFormat == .attachedASIC {
             let stamp = VisibleSignatureStamper.StampData(
                 fullName: snapshot.identityLabel,
                 timestamp: Date(),
