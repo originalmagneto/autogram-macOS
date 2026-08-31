@@ -383,7 +383,7 @@ final class SigningSessionStore {
             pdfaPrepared = false
             pdfaAfterSign = false
             var visualStampWasPreapplied = false
-            if convertToPDFA, includeVisibleSignature, outputFormat == .embeddedPAdES {
+            if convertToPDFA, includeVisibleSignature {
                 let imageData = visualArtworkOverride
                     ?? VisualSignatureStore.imageData(for: selectedVisualAppearanceID)
                 let stamp = VisibleSignatureStamper.StampData(
@@ -431,28 +431,7 @@ final class SigningSessionStore {
                 statusText = "PDF/A je pripravené, podpisujem…"
             }
 
-            if includeVisibleSignature, !pdfData.isEmpty, outputFormat == .attachedASIC {
-                statusText = "Vkladám vizuálny podpis…"
-                let imageData = visualArtworkOverride
-                    ?? VisualSignatureStore.imageData(for: selectedVisualAppearanceID)
-                let stamp = VisibleSignatureStamper.StampData(
-                    fullName: displayName(),
-                    timestamp: Date(),
-                    pageIndex: min(signaturePage, analysis.totalPages - 1),
-                    normalizedRect: signatureRect,
-                    imagePNG: imageData,
-                    certificateName: identities.first(where: { $0.id == selectedIdentityID })?.label,
-                    certificateQualification: identities.first(where: { $0.id == selectedIdentityID })?.isQualified == true
-                        ? "Kvalifikovaný elektronický podpis" : nil,
-                    timestampAuthorityName: includeQualifiedTimestamp ? settings.activeTSA.name : nil)
-                let includeStamp = includeQualifiedTimestamp
-                pdfData = await Self.stampPDFData(
-                    pdfData,
-                    stamp: stamp,
-                    includeTimestamp: includeStamp,
-                    stamper: stamper,
-                    flattenAnnotations: convertToPDFA)
-            }
+            
 
             statusText = "Podpisujem kvalifikovaným podpisom…"
             guard let identityID = selectedIdentityID else {
@@ -981,9 +960,10 @@ final class SigningSessionStore {
         var didPreparePDFA = false
         var didFallbackToOriginal = false
         var visualStampWasPreapplied = false
+        var attachedStamp: VisibleSignatureStamper.StampData?
         if snapshot.convertToPDFA,
            snapshot.includeVisibleSignature,
-           snapshot.outputFormat == .embeddedPAdES {
+           (snapshot.outputFormat == .embeddedPAdES || snapshot.outputFormat == .attachedASIC) {
             let stamp = VisibleSignatureStamper.StampData(
                 fullName: snapshot.identityLabel,
                 timestamp: Date(),
@@ -1004,8 +984,12 @@ final class SigningSessionStore {
                 includeTimestamp: snapshot.includeQualifiedTimestamp,
                 stamper: stamper)
             visualStampWasPreapplied = stampedData != pdfData
+            if snapshot.outputFormat == .attachedASIC {
+                attachedStamp = stamp
+            }
             pdfData = stampedData
         }
+        
 
         if snapshot.convertToPDFA {
             let mode: PDFAConversionMode = snapshot.outputFormat == .embeddedPAdES
@@ -1029,31 +1013,6 @@ final class SigningSessionStore {
             didPreparePDFA = true
         }
 
-        var attachedStamp: VisibleSignatureStamper.StampData?
-        if snapshot.includeVisibleSignature, snapshot.outputFormat == .attachedASIC {
-            let imageData = snapshot.visualArtworkOverride
-                ?? VisualSignatureStore.imageData(for: snapshot.selectedVisualAppearanceID)
-            let stamp = VisibleSignatureStamper.StampData(
-                fullName: snapshot.identityLabel,
-                timestamp: Date(),
-                pageIndex: snapshot.signaturePage,
-                normalizedRect: snapshot.signatureRect,
-                imagePNG: imageData,
-                certificateName: snapshot.identityLabel,
-                certificateQualification: snapshot.identityIsQualified
-                    ? "Kvalifikovaný elektronický podpis" : nil,
-                timestampAuthorityName: snapshot.includeQualifiedTimestamp
-                    ? (settings.availableTSAServers.first { $0.url == snapshot.tsaURL }?.name ?? snapshot.tsaURL)
-                    : nil)
-            attachedStamp = stamp
-            try checkBatchGeneration(generation)
-            pdfData = await Self.stampPDFData(
-                pdfData,
-                stamp: stamp,
-                includeTimestamp: snapshot.includeQualifiedTimestamp,
-                stamper: stamper,
-                flattenAnnotations: snapshot.convertToPDFA)
-        }
 
         let visualStamp: VisualStampSpec?
         if snapshot.includeVisibleSignature,
@@ -1223,23 +1182,16 @@ final class SigningSessionStore {
         _ data: Data,
         stamp: VisibleSignatureStamper.StampData,
         includeTimestamp: Bool,
-        stamper: VisibleSignatureStamper,
-        flattenAnnotations: Bool = false
+        stamper: VisibleSignatureStamper
     ) async -> Data {
         guard let source = PDFDocument(data: data) else { return data }
         let sendableSource = UncheckedSendable(source)
-        let stamped = await Task.detached(priority: .userInitiated) {
+        return await Task.detached(priority: .userInitiated) {
             stamper.stamp(
                 document: sendableSource.value,
                 stamp: stamp,
                 includeTimestamp: includeTimestamp)
         }.value ?? data
-        guard flattenAnnotations,
-              let stampedDocument = PDFDocument(data: stamped),
-              let flattened = try? PDFAConverter.rasterizedPDFData(document: stampedDocument) else {
-            return stamped
-        }
-        return flattened
     }
 
     private func outputLocation(for url: URL) -> (directory: URL, stem: String) {
