@@ -84,19 +84,38 @@ public struct VisibleSignatureStamper: Sendable {
         includeTimestamp: Bool
     ) -> Data? {
         guard let sourcePage = document.page(at: stamp.pageIndex) else { return nil }
-        guard let imagePNG = stamp.imagePNG else {
-            return self.stamp(document: document, stamp: stamp, includeTimestamp: includeTimestamp)
+        let image: NSImage
+        if let imagePNG = stamp.imagePNG {
+            let enrichedPNG = try? VisibleSignatureRenderer().renderPNG(
+                artworkPNG: imagePNG,
+                content: VisibleSignatureCardContent(
+                    signerName: stamp.fullName,
+                    certificateName: stamp.certificateName,
+                    certificateQualification: stamp.certificateQualification,
+                    timestampAuthorityName: includeTimestamp ? stamp.timestampAuthorityName : nil),
+                signingTime: stamp.timestamp)
+            guard let renderedImage = NSImage(data: enrichedPNG ?? imagePNG) else {
+                return self.stamp(document: document, stamp: stamp, includeTimestamp: includeTimestamp)
+            }
+            image = renderedImage
+        } else {
+            let fallback = NSImage(size: NSSize(width: 720, height: 220))
+            fallback.lockFocus()
+            NSColor.white.setFill()
+            NSBezierPath(rect: NSRect(origin: .zero, size: fallback.size)).fill()
+            let text = includeTimestamp
+                ? "Elektronicky podpísané\n\(stamp.fullName)\n\(stamp.timestamp.formatted(date: .numeric, time: .shortened))"
+                : "Elektronicky podpísané\n\(stamp.fullName)"
+            (text as NSString).draw(
+                in: NSRect(x: 24, y: 24, width: 672, height: 172),
+                withAttributes: [
+                    .font: NSFont.systemFont(ofSize: 30),
+                    .foregroundColor: NSColor.black
+                ])
+            fallback.unlockFocus()
+            image = fallback
         }
-        let enrichedPNG = try? VisibleSignatureRenderer().renderPNG(
-            artworkPNG: imagePNG,
-            content: VisibleSignatureCardContent(
-                signerName: stamp.fullName,
-                certificateName: stamp.certificateName,
-                certificateQualification: stamp.certificateQualification,
-                timestampAuthorityName: includeTimestamp ? stamp.timestampAuthorityName : nil),
-            signingTime: stamp.timestamp)
-        guard let image = NSImage(data: enrichedPNG ?? imagePNG),
-              let imageRef = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+        guard let imageRef = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
             return self.stamp(document: document, stamp: stamp, includeTimestamp: includeTimestamp)
         }
         let sourceBounds = sourcePage.bounds(for: .mediaBox)
@@ -123,26 +142,14 @@ public struct VisibleSignatureStamper: Sendable {
                 ? box.size
                 : CGSize(width: box.height, height: box.width)
             let effectiveBox = CGRect(origin: .zero, size: effectiveSize)
-            let boxData = withUnsafeBytes(of: effectiveBox) { bytes in
-                CFDataCreate(nil, bytes.bindMemory(to: UInt8.self).baseAddress, bytes.count)
-            }
-            let options: CFDictionary? = boxData.map {
-                [kCGPDFContextMediaBox as String: $0] as CFDictionary
-            }
-            context.beginPDFPage(options)
-            context.saveGState()
-            context.concatenate(pageRef.getDrawingTransform(
-                .mediaBox,
-                rect: effectiveBox,
-                rotate: 0,
-                preserveAspectRatio: true))
+            context.beginPDFPage(nil)
             context.drawPDFPage(pageRef)
-            context.restoreGState()
             if index == stamp.pageIndex {
                 context.draw(imageRef, in: stampRect)
             }
             context.endPDFPage()
         }
+        context.closePDF()
         return pdfData as Data
     }
 }

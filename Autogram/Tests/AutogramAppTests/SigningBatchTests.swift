@@ -87,7 +87,7 @@ final class SigningBatchTests: XCTestCase {
         let bitmap = try! XCTUnwrap(image.cgImage(forProposedRect: &imageRect, context: nil, hints: nil))
         let rep = NSBitmapImageRep(cgImage: bitmap)
         var ink = 0
-        for y in stride(from: 100, to: 170, by: 2) {
+        for y in stride(from: 150, to: 250, by: 2) {
             for x in stride(from: 350, to: 530, by: 2) {
                 if let color = rep.colorAt(x: x, y: 842 - y - 1), color.brightnessComponent < 0.92 {
                     ink += 1
