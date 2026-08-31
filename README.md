@@ -40,6 +40,30 @@ Interaktívne HTML grafiky sú samostatné, bez JavaScriptu a pripravené na otv
 - [Finder Quick Action](docs/diagrams/finder-quick-action.svg)
 - [Stavový automat evidencie](docs/diagrams/state-machine.svg)
 
+<p align="center">
+  <img src="docs/diagrams/architecture.svg" alt="Vrstvená architektúra Autogram macOS" width="100%">
+</p>
+
+<p align="center">
+  <img src="docs/diagrams/process-zako.svg" alt="Proces zaručenej konverzie" width="100%">
+</p>
+
+<p align="center">
+  <img src="docs/diagrams/ai-vision.svg" alt="AI Vision pipeline" width="100%">
+</p>
+
+<p align="center">
+  <img src="docs/diagrams/pdfa-pipeline.svg" alt="PDF/A pipeline" width="100%">
+</p>
+
+<p align="center">
+  <img src="docs/diagrams/finder-quick-action.svg" alt="Finder Quick Action" width="100%">
+</p>
+
+<p align="center">
+  <img src="docs/diagrams/state-machine.svg" alt="Stavový automat evidencie" width="100%">
+</p>
+
 ## Rýchly štart
 
 ### Požiadavky
@@ -102,6 +126,10 @@ ZaKo používa tento sled:
 5. **Autorizácia:** evidenčné číslo, serverový čas, PDF/A, podpis, lokálna evidencia a voliteľné odoslanie do CEZZK.
 
 Produkčné CEZZK odoslanie je fail-closed, kým nie je vytvorený a validovaný samostatný podpísaný record ASiC a potvrdený receipt kontrakt.
+
+## Stav integrácie EZZK
+
+EZZK integrácia je pripravená na úrovni OAuth2/PKCE, OIDC discovery, natívneho callbacku a bezpečného uloženia session v Keychain. Na produkčné zapojenie čakáme na potvrdenie a integračné podklady od **MIRRI SR**. Dovtedy zostáva produkčné odoslanie do CEZZK oddelené a fail-closed.
 
 ## Výstupy a hranice
 
