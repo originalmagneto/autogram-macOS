@@ -371,8 +371,10 @@ public final class EngineBridgeSigningProvider: QualifiedSigningProviding, @unch
 
         let content = VisibleSignatureCardContent(
             signerName: certificateDisplayName ?? stamp.fullName,
-            certificateQualification: qualification ?? stamp.qualification ?? "Kvalifikovaný elektronický podpis")
-        let signingTime = Date()
+            certificateName: stamp.certificateName ?? certificateDisplayName,
+            certificateQualification: qualification ?? stamp.qualification ?? "Kvalifikovaný elektronický podpis",
+            timestampAuthorityName: stamp.timestampAuthorityName)
+        let signingTime = stamp.timestamp
         let renderedURL: URL
         do {
             renderedURL = try VisibleSignatureRenderer(assetStore: store).render(asset: asset,
