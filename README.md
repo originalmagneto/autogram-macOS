@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="Autogram/docs/diagrams/hero.svg" alt="Autogram macOS: podpisovanie a zaručená konverzia" width="100%">
+  <img src="docs/diagrams/hero.svg" alt="Autogram macOS: podpisovanie a zaručená konverzia" width="100%">
 </p>
 
 # Autogram macOS
@@ -31,14 +31,14 @@ Natívna macOS aplikácia v SwiftUI pre kvalifikované elektronické podpisovani
 
 Interaktívne HTML grafiky sú samostatné, bez JavaScriptu a pripravené na otvorenie v prehliadači:
 
-- [Architektúra a batch preflight](Autogram/docs/diagrams/autogram-visual-guide.html)
-- [Diagramová galéria](Autogram/docs/gallery.html)
-- [Architektúra aplikácie](Autogram/docs/diagrams/architecture.svg)
-- [Proces zaručenej konverzie](Autogram/docs/diagrams/process-zako.svg)
-- [AI Vision pipeline](Autogram/docs/diagrams/ai-vision.svg)
-- [PDF/A pipeline](Autogram/docs/diagrams/pdfa-pipeline.svg)
-- [Finder Quick Action](Autogram/docs/diagrams/finder-quick-action.svg)
-- [Stavový automat evidencie](Autogram/docs/diagrams/state-machine.svg)
+- [Architektúra a batch preflight](docs/diagrams/autogram-visual-guide.html)
+- [Diagramová galéria](docs/gallery.html)
+- [Architektúra aplikácie](docs/diagrams/architecture.svg)
+- [Proces zaručenej konverzie](docs/diagrams/process-zako.svg)
+- [AI Vision pipeline](docs/diagrams/ai-vision.svg)
+- [PDF/A pipeline](docs/diagrams/pdfa-pipeline.svg)
+- [Finder Quick Action](docs/diagrams/finder-quick-action.svg)
+- [Stavový automat evidencie](docs/diagrams/state-machine.svg)
 
 ## Rýchly štart
 
@@ -128,7 +128,7 @@ Lokálny register je JSON-based:
 ~/Library/Application Support/Autogram/Evidence/register.json
 ```
 
-Kompletná implementačná dokumentácia je v [`Autogram/docs/PHASES.md`](Autogram/docs/PHASES.md).
+Kompletná implementačná dokumentácia je v [`docs/PHASES.md`](docs/PHASES.md).
 
 ## Právne a bezpečnostné upozornenie
 
