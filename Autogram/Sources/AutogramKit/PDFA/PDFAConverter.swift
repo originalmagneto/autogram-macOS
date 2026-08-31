@@ -167,6 +167,9 @@ public struct PDFAConverter: Sendable {
 
         return Self.buildJPEGPDF(pages: pageImages, quality: 0.82)
     }
+    public static func rasterizedPDFData(document: PDFDocument) throws -> Data {
+        try rasterize(document: document)
+    }
 
 
     /// PDF s JPEG (DCTDecode) stránkami — raster PDF/A má tak desiatky KB, nie desiatky MB.

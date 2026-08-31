@@ -410,7 +410,8 @@ final class SigningSessionStore {
                 statusText = "Konvertujem do PDF/A…"
                 let title = sourceURL?.deletingPathExtension().lastPathComponent ?? ""
                 // PAdES DSS rozbije vektorový incremental PDF/A: raster je jediný spoľahlivý vstup.
-                let mode: PDFAConversionMode = outputFormat == .embeddedPAdES
+                let mode: PDFAConversionMode =
+                    outputFormat == .embeddedPAdES || visualStampWasPreapplied
                     ? .rasterGuaranteed
                     : pdfaMode
                 let pdfaDocument = PDFDocument(data: pdfData) ?? document
@@ -429,6 +430,26 @@ final class SigningSessionStore {
                 }
                 pdfaPrepared = true
                 statusText = "PDF/A je pripravené, podpisujem…"
+            }
+            if !convertToPDFA, includeVisibleSignature, outputFormat == .attachedASIC {
+                let imageData = visualArtworkOverride
+                    ?? VisualSignatureStore.imageData(for: selectedVisualAppearanceID)
+                let stamp = VisibleSignatureStamper.StampData(
+                    fullName: displayName(),
+                    timestamp: Date(),
+                    pageIndex: min(signaturePage, analysis.totalPages - 1),
+                    normalizedRect: signatureRect,
+                    imagePNG: imageData,
+                    certificateName: identities.first(where: { $0.id == selectedIdentityID })?.label,
+                    certificateQualification: identities.first(where: { $0.id == selectedIdentityID })?.isQualified == true
+                        ? "Kvalifikovaný elektronický podpis" : nil,
+                    timestampAuthorityName: includeQualifiedTimestamp ? settings.activeTSA.name : nil)
+                pdfData = await Self.stampPDFData(
+                    pdfData,
+                    stamp: stamp,
+                    includeTimestamp: includeQualifiedTimestamp,
+                    stamper: stamper,
+                    flattenAnnotations: true)
             }
 
             
@@ -992,8 +1013,10 @@ final class SigningSessionStore {
         
 
         if snapshot.convertToPDFA {
-            let mode: PDFAConversionMode = snapshot.outputFormat == .embeddedPAdES
-                ? .rasterGuaranteed : snapshot.pdfaMode
+            let mode: PDFAConversionMode =
+                snapshot.outputFormat == .embeddedPAdES || visualStampWasPreapplied
+                ? .rasterGuaranteed
+                : snapshot.pdfaMode
             let pdfaDocument = PDFDocument(data: pdfData) ?? document
             pdfData = try PDFAConverter().convert(
                 document: pdfaDocument, mode: mode,
@@ -1011,6 +1034,32 @@ final class SigningSessionStore {
                     "Konverzia do PDF/A zlyhala: \(check.issues.joined(separator: "; ")).")
             }
             didPreparePDFA = true
+        }
+        if !snapshot.convertToPDFA,
+           snapshot.includeVisibleSignature,
+           snapshot.outputFormat == .attachedASIC {
+            let imageData = snapshot.visualArtworkOverride
+                ?? VisualSignatureStore.imageData(for: snapshot.selectedVisualAppearanceID)
+            let stamp = VisibleSignatureStamper.StampData(
+                fullName: snapshot.identityLabel,
+                timestamp: Date(),
+                pageIndex: snapshot.signaturePage,
+                normalizedRect: snapshot.signatureRect,
+                imagePNG: imageData,
+                certificateName: snapshot.identityLabel,
+                certificateQualification: snapshot.identityIsQualified
+                    ? "Kvalifikovaný elektronický podpis" : nil,
+                timestampAuthorityName: snapshot.includeQualifiedTimestamp
+                    ? (settings.availableTSAServers.first { $0.url == snapshot.tsaURL }?.name ?? snapshot.tsaURL)
+                    : nil)
+            attachedStamp = stamp
+            try checkBatchGeneration(generation)
+            pdfData = await Self.stampPDFData(
+                pdfData,
+                stamp: stamp,
+                includeTimestamp: snapshot.includeQualifiedTimestamp,
+                stamper: stamper,
+                flattenAnnotations: true)
         }
 
 
@@ -1182,16 +1231,23 @@ final class SigningSessionStore {
         _ data: Data,
         stamp: VisibleSignatureStamper.StampData,
         includeTimestamp: Bool,
-        stamper: VisibleSignatureStamper
+        stamper: VisibleSignatureStamper,
+        flattenAnnotations: Bool = false
     ) async -> Data {
         guard let source = PDFDocument(data: data) else { return data }
         let sendableSource = UncheckedSendable(source)
-        return await Task.detached(priority: .userInitiated) {
+        let stamped = await Task.detached(priority: .userInitiated) {
             stamper.stamp(
                 document: sendableSource.value,
                 stamp: stamp,
                 includeTimestamp: includeTimestamp)
         }.value ?? data
+        guard flattenAnnotations,
+              let stampedDocument = PDFDocument(data: stamped),
+              let flattened = try? PDFAConverter.rasterizedPDFData(document: stampedDocument) else {
+            return stamped
+        }
+        return flattened
     }
 
     private func outputLocation(for url: URL) -> (directory: URL, stem: String) {
