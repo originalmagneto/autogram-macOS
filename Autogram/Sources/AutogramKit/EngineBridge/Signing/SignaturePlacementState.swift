@@ -62,8 +62,8 @@ public final class SignaturePlacementState {
         guard assets.contains(where: { $0.id == asset.id }) else { return }
         selectedAsset = asset
         isEnabled = true
-        placement = defaultPlacement()
         refreshPreview()
+        placement = defaultPlacement()
         persistPreferences()
     }
 
@@ -128,9 +128,9 @@ public final class SignaturePlacementState {
         guard pageCount > 0, let page = document?.page(at: pageCount - 1) else { return nil }
         let cropBox = page.bounds(for: .cropBox)
         guard cropBox.width > 0, cropBox.height > 0 else { return nil }
-        let aspectRatio = selectedAsset.flatMap {
+        let aspectRatio = (cardPreview?.size ?? selectedAsset.flatMap {
             NSImage(contentsOf: assetStore.fileURL(for: $0))?.size
-        }.map { max($0.width / max($0.height, 1), 1) } ?? (420.0 / 260.0)
+        }).map { max($0.width / max($0.height, 1), 1) } ?? (420.0 / 260.0)
         let maxWidth = min(cropBox.width, 420)
         let maxHeight = min(cropBox.height, 180)
         let width = min(maxWidth, maxHeight * aspectRatio)
