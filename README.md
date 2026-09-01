@@ -84,55 +84,50 @@ Interaktívne HTML grafiky sú samostatné, bez JavaScriptu a pripravené na otv
 - [Finder Quick Action](docs/diagrams/finder-quick-action.svg)
 - [Stavový automat evidencie](docs/diagrams/state-machine.svg)
 
-### Tok aplikácie
 
-```mermaid
-flowchart LR
-    A[PDF alebo ASiC-E] --> B[SwiftUI workflow]
-    B --> C{Preflight}
-    C -->|platný alebo informatívny stav| D[EngineBridge]
-    C -->|neplatný vstup| E[Blokovanie dokumentu]
-    D --> F[Java DSS a PKCS#11]
-    D --> G[PDFKit a PDF/A]
-    F --> H[Podpísaný artefakt]
-    G --> H
-    B --> I[Lokálna evidencia]
-    B --> J[ZaKo a EZZK]
-```
+### Architektúra aplikácie
 
-### Čo jednotlivé diagramy vysvetľujú
-
-| Diagram | Textový výklad |
-| --- | --- |
-| **Architektúra aplikácie** | Zobrazuje vrstvy natívneho macOS klienta: SwiftUI rozhranie, aplikačné workflow, `AutogramKit`, lokálne registre a integračné mosty k Java DSS, PKCS#11, PDFKit a EZZK. |
-| **Proces zaručenej konverzie** | Zachytáva cestu od vstupného dokumentu cez analýzu strán, kontrolu bezpečnostných prvkov, doplnenie doložky a autorizáciu až po export PDF/A a registračných výstupov. |
-| **AI Vision pipeline** | Vysvetľuje lokálnu analýzu dokumentu: rasterizáciu strán, detekciu pečatí a podpisov, manuálne potvrdenie nálezov a odovzdanie výsledku do validačného workflow. |
-| **PDF/A pipeline** | Ukazuje normalizáciu dokumentu do PDF/A vrátane metadát, vložených príloh, XMP profilu, fingerprintu a finálnej kontroly artefaktu. |
-| **Finder Quick Action** | Znázorňuje spracovanie PDF priamo z Findera bez otvorenia hlavnej aplikácie: výber ovládača, certifikátu a PIN/BOK, následné podpísanie a uloženie výsledku. |
-| **Stavový automat evidencie** | Opisuje životný cyklus záznamu v lokálnej evidencii od vytvorenia a preflight kontroly cez podpis alebo konverziu až po odoslanie, odmietnutie či archiváciu. |
-
-Diagramy sú zámerne oddelené od samotnej implementácie. Čítajte ich zľava doprava ako tok dokumentu a zhora nadol ako prechod medzi vrstvami, kontrolami a výslednými artefaktmi.
+Táto mapa vysvetľuje, ako sa natívny SwiftUI shell opiera o session stores a `AutogramKit`. Dokumentové služby zostávajú lokálne; externé hranice sú jasne oddelené cez Java DSS helper, PKCS#11, PDFKit a EZZK.
 
 <p align="center">
   <img src="docs/diagrams/architecture.svg" alt="Vrstvená architektúra Autogram macOS" width="100%">
-
 </p>
+
+### Proces zaručenej konverzie
+
+Procesný diagram sleduje dokument od skenu originálu cez analýzu, AI Vision a evidenčné číslo až po PDF/A výstup, doložku a zápis do CEZZK. Oranžový krok označuje autorizáciu KEP mandátom a QTS.
 
 <p align="center">
   <img src="docs/diagrams/process-zako.svg" alt="Proces zaručenej konverzie" width="100%">
 </p>
 
+### AI Vision pipeline
+
+Pipeline ukazuje oddelenie medzi lokálnou detekciou bezpečnostných prvkov a voliteľným LLM opisom. Nálezy nie sú automaticky považované za potvrdené: advokát ich skontroluje a až potom pokračuje validačný workflow.
+
 <p align="center">
   <img src="docs/diagrams/ai-vision.svg" alt="AI Vision pipeline" width="100%">
 </p>
+
+### PDF/A pipeline
+
+Diagram opisuje technickú normalizáciu výsledného dokumentu: vloženie metadát a príloh, vytvorenie XMP profilu, výpočet fingerprintu a kontrolu, že exportovaný artefakt spĺňa požadovaný formát.
 
 <p align="center">
   <img src="docs/diagrams/pdfa-pipeline.svg" alt="PDF/A pipeline" width="100%">
 </p>
 
+### Finder Quick Action
+
+Quick Action skracuje cestu pre jednoduché podpísanie PDF priamo vo Finderi. Samostatný runner zobrazí výber ovládača, certifikátu a PIN/BOK, podpíše súbor na pozadí a uloží výsledok bez otvorenia hlavného workflow.
+
 <p align="center">
   <img src="docs/diagrams/finder-quick-action.svg" alt="Finder Quick Action" width="100%">
 </p>
+
+### Stavový automat evidencie
+
+Stavový automat ukazuje, kedy je dokument iba pripravený, kedy prešiel kontrolou a kedy už vznikol podpísaný alebo konvertovaný artefakt. Oddelené koncové stavy pomáhajú rozlíšiť úspešné odoslanie, odmietnutie a archiváciu.
 
 <p align="center">
   <img src="docs/diagrams/state-machine.svg" alt="Stavový automat evidencie" width="100%">
