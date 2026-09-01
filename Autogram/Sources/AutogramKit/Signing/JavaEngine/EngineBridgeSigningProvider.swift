@@ -129,7 +129,7 @@ public final class EngineBridgeSigningProvider: QualifiedSigningProviding, @unch
             PDFItemDescriptor(id: "inspect-\(index)", sourceURL: url)
         }
         do {
-            let inspections = try await engine.validate(files: descriptors)
+            let inspections = try await engine.inspect(files: descriptors)
             let inspectedByID = Dictionary(
                 inspections.flatMap(\.files).map { ($0.id, $0) },
                 uniquingKeysWith: { first, _ in first })
