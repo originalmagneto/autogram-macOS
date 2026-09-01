@@ -4,6 +4,17 @@
 
 # Autogram macOS
 
+<p align="center">
+  <a href="https://github.com/originalmagneto/autogram-macOS/releases/latest"><img src="https://img.shields.io/github/v/release/originalmagneto/autogram-macOS?display_name=tag&style=flat-square&color=eb6c36" alt="Aktuálne vydanie"></a>
+  <img src="https://img.shields.io/badge/macOS-27%2B-2d3142?style=flat-square" alt="macOS 27 alebo novší">
+  <img src="https://img.shields.io/badge/Swift-6-f05138?style=flat-square" alt="Swift 6">
+</p>
+
+<p align="center">
+  <strong>Natívny pracovný stôl pre dôveryhodné právne dokumenty.</strong><br>
+  Podpis. Konverzia. Evidencia. V jednom lokálnom workflow.
+</p>
+
 Natívna macOS aplikácia v SwiftUI pre kvalifikované elektronické podpisovanie, zaručenú konverziu a lokálnu evidenciu právnych dokumentov.
 
 `macOS 27` · `Swift 6` · `SwiftUI` · `PDFKit` · `0 Swift package dependencies`
@@ -27,6 +38,39 @@ Natívna macOS aplikácia v SwiftUI pre kvalifikované elektronické podpisovani
 - **Finder Quick Action:** podpis PDF súborov bez otvárania hlavného okna aplikácie.
 - **Bezpečné dáta:** security-scoped bookmarks, Keychain pre tajomstvá a lokálna evidencia bez ukladania obsahu dokumentov.
 
+<details>
+<summary><strong>Čo získate v každom module</strong></summary>
+
+<table>
+<tr>
+<td width="50%" valign="top">
+<h3>Podpisovanie</h3>
+<ul>
+<li>Výber eID, I.CA SecureStore, PKCS#11 a Keychain tokenov.</li>
+<li>Detekcia certifikátov na karte vrátane čítačiek s viacerými slotmi.</li>
+<li>PAdES a ASiC-E výstupy s kvalifikovanou časovou pečiatkou.</li>
+<li>Vizuálny podpis, dávkové spracovanie a bezpečné zrušenie operácie.</li>
+</ul>
+</td>
+<td width="50%" valign="top">
+<h3>Zaručená konverzia</h3>
+<ul>
+<li>Kontrolovaný import a potvrdenie pôvodu dokumentu.</li>
+<li>AI Vision s manuálnou kontrolou podpisov, pečatí a paraf.</li>
+<li>PDF/A-2b, osvedčovacia doložka, XML a lokálna evidencia.</li>
+<li>Mandátny certifikát a fail-closed produkčné odoslanie do CEZZK.</li>
+</ul>
+</td>
+</tr>
+</table>
+</details>
+
+<details>
+<summary><strong>Stavy podpisu a dôveryhodnosti</strong></summary>
+
+`INSPECT` rýchlo číta existujúce podpisy vrátane podpisov v ASiC-E. `VALIDATE` vykonáva úplnú dôveryhodnostnú kontrolu s trust listami. Ak trust service nie je dostupná, výsledok môže byť `indeterminate`; to nie je to isté ako platný alebo neplatný podpis.
+</details>
+
 ## Vizuálny guide
 
 Interaktívne HTML grafiky sú samostatné, bez JavaScriptu a pripravené na otvorenie v prehliadači:
@@ -40,8 +84,38 @@ Interaktívne HTML grafiky sú samostatné, bez JavaScriptu a pripravené na otv
 - [Finder Quick Action](docs/diagrams/finder-quick-action.svg)
 - [Stavový automat evidencie](docs/diagrams/state-machine.svg)
 
+### Tok aplikácie
+
+```mermaid
+flowchart LR
+    A[PDF alebo ASiC-E] --> B[SwiftUI workflow]
+    B --> C{Preflight}
+    C -->|platný alebo informatívny stav| D[EngineBridge]
+    C -->|neplatný vstup| E[Blokovanie dokumentu]
+    D --> F[Java DSS a PKCS#11]
+    D --> G[PDFKit a PDF/A]
+    F --> H[Podpísaný artefakt]
+    G --> H
+    B --> I[Lokálna evidencia]
+    B --> J[ZaKo a EZZK]
+```
+
+### Čo jednotlivé diagramy vysvetľujú
+
+| Diagram | Textový výklad |
+| --- | --- |
+| **Architektúra aplikácie** | Zobrazuje vrstvy natívneho macOS klienta: SwiftUI rozhranie, aplikačné workflow, `AutogramKit`, lokálne registre a integračné mosty k Java DSS, PKCS#11, PDFKit a EZZK. |
+| **Proces zaručenej konverzie** | Zachytáva cestu od vstupného dokumentu cez analýzu strán, kontrolu bezpečnostných prvkov, doplnenie doložky a autorizáciu až po export PDF/A a registračných výstupov. |
+| **AI Vision pipeline** | Vysvetľuje lokálnu analýzu dokumentu: rasterizáciu strán, detekciu pečatí a podpisov, manuálne potvrdenie nálezov a odovzdanie výsledku do validačného workflow. |
+| **PDF/A pipeline** | Ukazuje normalizáciu dokumentu do PDF/A vrátane metadát, vložených príloh, XMP profilu, fingerprintu a finálnej kontroly artefaktu. |
+| **Finder Quick Action** | Znázorňuje spracovanie PDF priamo z Findera bez otvorenia hlavnej aplikácie: výber ovládača, certifikátu a PIN/BOK, následné podpísanie a uloženie výsledku. |
+| **Stavový automat evidencie** | Opisuje životný cyklus záznamu v lokálnej evidencii od vytvorenia a preflight kontroly cez podpis alebo konverziu až po odoslanie, odmietnutie či archiváciu. |
+
+Diagramy sú zámerne oddelené od samotnej implementácie. Čítajte ich zľava doprava ako tok dokumentu a zhora nadol ako prechod medzi vrstvami, kontrolami a výslednými artefaktmi.
+
 <p align="center">
   <img src="docs/diagrams/architecture.svg" alt="Vrstvená architektúra Autogram macOS" width="100%">
+
 </p>
 
 <p align="center">
@@ -78,6 +152,17 @@ Interaktívne HTML grafiky sú samostatné, bez JavaScriptu a pripravené na otv
 ## Stiahnutie
 
 Aktuálny macOS build bude dostupný v [GitHub Releases](https://github.com/originalmagneto/autogram-macOS/releases/latest) ako DMG. Aplikácia vyžaduje macOS 27 alebo novší.
+
+<details open>
+<summary><strong>v0.2.3 · aktuálne vydanie</strong></summary>
+
+<ul>
+<li>I.CA SecureStore správne vyberá slot s kartou aj pri prázdnej čítačke na prvej pozícii.</li>
+<li>Existujúce XAdES podpisy v ASiC-E sa načítajú cez ľahkú inšpekciu bez blokovania na nedostupnom trust liste.</li>
+<li>Batch preflight, PDF/A výstupy, ZaKo workflow a lokálna evidencia zostávajú súčasťou jedného natívneho buildu.</li>
+</ul>
+</details>
+
 ### Build a inštalácia
 
 ```bash
