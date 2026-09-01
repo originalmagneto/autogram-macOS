@@ -26,8 +26,9 @@ public struct EmbeddedFileService: Sendable {
         let fileNumber = maxNumber + 1
         let specNumber = maxNumber + 2
         let newCatalogNumber = maxNumber + 3
+        let escapedMimeType = attachment.mimeType.replacingOccurrences(of: "/", with: "#2F")
 
-        var fileObj = Data("\n\(fileNumber) 0 obj\n<< /Type /EmbeddedFile /Subtype /\(attachment.mimeType) /Length \(attachment.data.count) >>\nstream\n".utf8)
+        var fileObj = Data("\n\(fileNumber) 0 obj\n<< /Type /EmbeddedFile /Subtype /\(escapedMimeType) /Length \(attachment.data.count) >>\nstream\n".utf8)
         fileObj.append(attachment.data)
         fileObj.append(Data("\nendstream\nendobj\n".utf8))
 
@@ -35,7 +36,6 @@ public struct EmbeddedFileService: Sendable {
             .replacingOccurrences(of: ")", with: "").replacingOccurrences(of: "\\", with: "")
         let ufHex = attachment.fileName.utf16.map { String(format: "%04X", $0) }.joined()
         let escapedDesc = attachment.mimeType.replacingOccurrences(of: "(", with: "")
-
         let specBody = "<< /Type /Filespec /F (\(nameASCII)) /UF <FEFF\(ufHex)>" +
             " /AFRelationship /Data /Desc (\(escapedDesc))" +
             " /EF << /F \(fileNumber) 0 R /UF \(fileNumber) 0 R >> >>"

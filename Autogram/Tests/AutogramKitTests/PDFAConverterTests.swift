@@ -83,7 +83,9 @@ final class PDFAConverterTests: XCTestCase {
         let delivered = try PDFAConverter().normalizeForDelivery(attached, title: "Test")
 
         XCTAssertEqual(PDFAValidator().validate(delivered).isValid, true)
-        XCTAssertTrue(String(decoding: attached, as: UTF8.self).contains("/Subtype /application/xml"))
+        let attachedText = String(decoding: attached, as: UTF8.self)
+        XCTAssertTrue(attachedText.contains("/Subtype /application#2Fxml"))
+        XCTAssertTrue(attachedText.contains("/Desc (application/xml)"))
         XCTAssertEqual(PDFDocument(data: delivered)?.pageCount, source.pageCount)
     }
 
