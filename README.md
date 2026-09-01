@@ -99,6 +99,20 @@ flowchart LR
     B --> I[Lokálna evidencia]
     B --> J[ZaKo a EZZK]
 ```
+
+### Čo jednotlivé diagramy vysvetľujú
+
+| Diagram | Textový výklad |
+| --- | --- |
+| **Architektúra aplikácie** | Zobrazuje vrstvy natívneho macOS klienta: SwiftUI rozhranie, aplikačné workflow, `AutogramKit`, lokálne registre a integračné mosty k Java DSS, PKCS#11, PDFKit a EZZK. |
+| **Proces zaručenej konverzie** | Zachytáva cestu od vstupného dokumentu cez analýzu strán, kontrolu bezpečnostných prvkov, doplnenie doložky a autorizáciu až po export PDF/A a registračných výstupov. |
+| **AI Vision pipeline** | Vysvetľuje lokálnu analýzu dokumentu: rasterizáciu strán, detekciu pečatí a podpisov, manuálne potvrdenie nálezov a odovzdanie výsledku do validačného workflow. |
+| **PDF/A pipeline** | Ukazuje normalizáciu dokumentu do PDF/A vrátane metadát, vložených príloh, XMP profilu, fingerprintu a finálnej kontroly artefaktu. |
+| **Finder Quick Action** | Znázorňuje spracovanie PDF priamo z Findera bez otvorenia hlavnej aplikácie: výber ovládača, certifikátu a PIN/BOK, následné podpísanie a uloženie výsledku. |
+| **Stavový automat evidencie** | Opisuje životný cyklus záznamu v lokálnej evidencii od vytvorenia a preflight kontroly cez podpis alebo konverziu až po odoslanie, odmietnutie či archiváciu. |
+
+Diagramy sú zámerne oddelené od samotnej implementácie. Čítajte ich zľava doprava ako tok dokumentu a zhora nadol ako prechod medzi vrstvami, kontrolami a výslednými artefaktmi.
+
 <p align="center">
   <img src="docs/diagrams/architecture.svg" alt="Vrstvená architektúra Autogram macOS" width="100%">
 
