@@ -71,6 +71,16 @@ Natívna macOS aplikácia v SwiftUI pre kvalifikované elektronické podpisovani
 `INSPECT` rýchlo číta existujúce podpisy vrátane podpisov v ASiC-E. `VALIDATE` vykonáva úplnú dôveryhodnostnú kontrolu s trust listami. Ak trust service nie je dostupná, výsledok môže byť `indeterminate`; to nie je to isté ako platný alebo neplatný podpis.
 </details>
 
+<details open>
+<summary><strong>Stav zaručenej konverzie a AI Vision</strong></summary>
+
+<p><strong>Produkčné EZZK backlinkovanie ešte čaká na schválenie MIRRI.</strong> Aplikácia preto zatiaľ pripraví konverzný artefakt, osvedčovaciu doložku a lokálnu evidenciu v pilotnom režime. Produkčné pridelenie evidenčného čísla a odoslanie záznamu do CEZZK sú dostupné až po zapojení schválenej EZZK integrácie.</p>
+
+<p>AI Vision je dnes pomocná vrstva s lokálnym Vision baseline a voliteľným LLM. Bezpečnostné prvky je možné označiť ručne, upraviť ich rámec a potvrdiť alebo odmietnuť každý nález. Budúca verzia má doplniť vlastné ML vision modely, ktoré budú prvky automaticky identifikovať a označovať; manuálna kontrola však zostane dôležitou poistkou.</p>
+
+<p>Aktuálny pilotný postup je: importovať dokument, skontrolovať každú neprázdnu stranu, ručne označiť bezpečnostné prvky, potvrdiť ich, prihlásiť sa do EZZK sandboxu a vyžiadať evidenčné číslo. Bez čísla z EZZK aplikácia zámerne nepovolí autorizáciu.</p>
+</details>
+
 ## Vizuálny guide
 
 Interaktívne HTML grafiky sú samostatné, bez JavaScriptu a pripravené na otvorenie v prehliadači:
