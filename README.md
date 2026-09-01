@@ -6,7 +6,6 @@
 
 <p align="center">
   <a href="https://github.com/originalmagneto/autogram-macOS/releases/latest"><img src="https://img.shields.io/github/v/release/originalmagneto/autogram-macOS?display_name=tag&style=flat-square&color=eb6c36" alt="Aktuálne vydanie"></a>
-  <a href="https://github.com/originalmagneto/autogram-macOS/actions"><img src="https://img.shields.io/github/actions/workflow/status/originalmagneto/autogram-macOS/test.yml?style=flat-square&label=build" alt="Build"></a>
   <img src="https://img.shields.io/badge/macOS-27%2B-2d3142?style=flat-square" alt="macOS 27 alebo novší">
   <img src="https://img.shields.io/badge/Swift-6-f05138?style=flat-square" alt="Swift 6">
 </p>
