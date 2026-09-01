@@ -78,11 +78,12 @@ final class PDFAConverterTests: XCTestCase {
         let source = try XCTUnwrap(PDFDocument(data: TestPDFBuilder.typicalContractPDF()))
         let converted = try PDFAConverter().convert(document: source)
         let attached = try EmbeddedFileService().embed(
-            .init(fileName: "osvedcovacia-dolozka.xml", mimeType: "application#2Fxml", data: Data("<x/>".utf8)),
+            .init(fileName: "osvedcovacia-dolozka.xml", mimeType: "application/xml", data: Data("<x/>".utf8)),
             into: converted)
         let delivered = try PDFAConverter().normalizeForDelivery(attached, title: "Test")
 
         XCTAssertEqual(PDFAValidator().validate(delivered).isValid, true)
+        XCTAssertTrue(String(decoding: attached, as: UTF8.self).contains("/Subtype /application/xml"))
         XCTAssertEqual(PDFDocument(data: delivered)?.pageCount, source.pageCount)
     }
 
@@ -90,7 +91,7 @@ final class PDFAConverterTests: XCTestCase {
         let source = try XCTUnwrap(PDFDocument(data: TestPDFBuilder.typicalContractPDF()))
         let converted = try PDFAConverter().convert(document: source)
         let attached = try EmbeddedFileService().embed(
-            .init(fileName: "osvedcovacia-dolozka.xml", mimeType: "application#2Fxml", data: Data("<x/>".utf8)),
+            .init(fileName: "osvedcovacia-dolozka.xml", mimeType: "application/xml", data: Data("<x/>".utf8)),
             into: converted)
         let delivered = try PDFAConverter().normalizeForDelivery(attached, title: "Test")
         XCTAssertEqual(PDFDocument(data: delivered)?.pageCount, source.pageCount)

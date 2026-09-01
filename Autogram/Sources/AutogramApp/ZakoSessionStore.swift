@@ -817,7 +817,7 @@ final class ZakoSessionStore {
             analysisProgressText = "Vkladám XML doložku do dokumentu…"
             var finalPDF = try embeddedFileService.embed(
                 .init(fileName: "osvedcovacia-dolozka.xml",
-                      mimeType: "application#2Fxml",
+                      mimeType: "application/xml",
                       data: Data(xml.utf8)),
                 into: pdfaData)
 
