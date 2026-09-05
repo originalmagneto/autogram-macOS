@@ -7,10 +7,10 @@ public protocol SecurityElementsProviding: Sendable {
 }
 
 public struct DetectionPipeline: SecurityElementsProviding {
-    public let builtin: BuiltInVisionProvider
+    public let builtin: any SecurityElementsProviding
     public let llmProvider: (any SecurityElementsProviding)?
 
-    public init(builtin: BuiltInVisionProvider = BuiltInVisionProvider(),
+    public init(builtin: any SecurityElementsProviding = BuiltInVisionProvider(),
                 llmProvider: (any SecurityElementsProviding)? = nil) {
         self.builtin = builtin
         self.llmProvider = llmProvider
