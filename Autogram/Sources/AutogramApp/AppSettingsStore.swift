@@ -18,6 +18,7 @@ final class AppSettingsStore {
     }
     private(set) var signingProvider: any QualifiedSigningProviding
     private(set) var evidenceStore: LocalEvidenceStore
+    let exampleBank = ExampleBank(directory: ExampleBank.defaultDirectory)
 
     init() {
         let loaded = AppSettings.load()

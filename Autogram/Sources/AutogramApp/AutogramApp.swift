@@ -20,7 +20,7 @@ final class AutogramAppModel {
             signingProvider: settings.signingProvider,
             settingsStore: settings,
             recentDocumentStore: recentDocuments)
-        zakoStore = ZakoSessionStore(settingsStore: settings)
+        zakoStore = ZakoSessionStore(settingsStore: settings, exampleBank: settings.exampleBank)
     }
 }
 

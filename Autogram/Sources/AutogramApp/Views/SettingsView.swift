@@ -1,6 +1,7 @@
 import SwiftUI
 import AutogramKit
 import AppKit
+import FoundationModels
 
 enum AIPromptPreset: String, CaseIterable, Identifiable {
     case legalDocuments = "Právne dokumenty"
@@ -358,6 +359,8 @@ struct SettingsView: View {
                     $0.promptText == current
                 } ?? (current == nil ? .legalDocuments : .customPrompt)
             }
+
+            LearningDatasetCard(settingsStore: settingsStore, bank: settingsStore.exampleBank)
         }
     }
 
@@ -1115,5 +1118,83 @@ struct SettingsView: View {
 extension AdvocateProfile {
     var displayName: String {
         fullName.isEmpty ? officeName : fullName
+    }
+}
+
+enum LearningCardText {
+    static func summary(counts: [BankLabel: Int]) -> String {
+        func n(_ label: BankLabel) -> Int { counts[label] ?? 0 }
+        return "Pečiatky: \(n(.kind(.officialStamp))) · Podpisy: \(n(.kind(.handwrittenSignature))) · " +
+               "Slepotlač: \(n(.kind(.embossedSeal))) · Parafy: \(n(.kind(.initial))) · " +
+               "Iné: \(n(.kind(.other))) · Zamietnuté: \(n(.negative))"
+    }
+}
+
+struct LearningDatasetCard: View {
+    @Bindable var settingsStore: AppSettingsStore
+    let bank: ExampleBank
+    @State private var counts: [BankLabel: Int] = [:]
+    @State private var exportMessage: String?
+    @State private var showDeleteConfirmation = false
+    private let modelAvailable = SystemLanguageModel.default.isAvailable
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Učenie a lokálny dataset").font(.headline)
+
+            Toggle("Klasifikovať neisté nálezy on-device modelom (Apple Intelligence)",
+                   isOn: $settingsStore.settings.useFoundationModelClassifier)
+                .disabled(!modelAvailable)
+            Text(modelAvailable
+                 ? "Model beží výhradne na tomto Macu. Bez neho rozhoduje iba porovnanie s potvrdenými príkladmi."
+                 : "On-device model nie je na tomto Macu dostupný. Zapnite Apple Intelligence v Systémových nastaveniach.")
+                .font(.caption2).foregroundStyle(.secondary)
+
+            Toggle("Učiť sa z potvrdených a odmietnutých prvkov", isOn: $settingsStore.settings.learnFromReviews)
+            Text(LearningCardText.summary(counts: counts))
+                .font(.caption.monospacedDigit())
+            Text("Dataset zostáva na tomto Macu. Obsahuje náhľady strán dokumentov, ktorých prvky ste potvrdili alebo odmietli. Nikdy sa neodosiela.")
+                .font(.caption2).foregroundStyle(.secondary)
+
+            HStack {
+                Button("Exportovať dataset pre Create ML…") { exportDataset() }
+                Button("Vymazať lokálny dataset…", role: .destructive) { showDeleteConfirmation = true }
+                Spacer()
+            }
+            .controlSize(.small)
+            if let exportMessage {
+                Text(exportMessage).font(.caption2).foregroundStyle(.secondary)
+            }
+        }
+        .glassCard(cornerRadius: 14, padding: 16)
+        .task { await refreshCounts() }
+        .confirmationDialog("Vymazať všetky uložené príklady?", isPresented: $showDeleteConfirmation) {
+            Button("Vymazať", role: .destructive) {
+                Task { try? await bank.removeAll(); await refreshCounts() }
+            }
+            Button("Zrušiť", role: .cancel) {}
+        }
+    }
+
+    private func refreshCounts() async {
+        let entries = await bank.entries()
+        counts = Dictionary(grouping: entries, by: \.label).mapValues(\.count)
+    }
+
+    private func exportDataset() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.canCreateDirectories = true
+        panel.prompt = "Exportovať"
+        guard panel.runModal() == .OK, let folder = panel.url else { return }
+        Task {
+            do {
+                let url = try await CreateMLExporter.export(bank: bank, to: folder)
+                exportMessage = "Export hotový: \(url.path)"
+            } catch {
+                exportMessage = "Export zlyhal: \(error.localizedDescription)"
+            }
+        }
     }
 }
