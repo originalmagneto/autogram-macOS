@@ -3,10 +3,10 @@ import AppKit
 import PDFKit
 import AutogramKit
 
-// Usage: vision-eval <dataset-folder> [--builtin-only] [--no-fm] [--iou 0.4] [--json]
+// Usage: vision-eval <dataset-folder> [--builtin-only] [--no-fm] [--bank <dir>] [--iou 0.4] [--json]
 var args = Array(CommandLine.arguments.dropFirst())
 guard let folderPath = args.first else {
-    FileHandle.standardError.write("usage: vision-eval <dataset-folder> [--builtin-only] [--no-fm] [--iou 0.4] [--json]\n".data(using: .utf8)!)
+    FileHandle.standardError.write("usage: vision-eval <dataset-folder> [--builtin-only] [--no-fm] [--bank <dir>] [--iou 0.4] [--json]\n".data(using: .utf8)!)
     exit(2)
 }
 args.removeFirst()
@@ -15,6 +15,14 @@ let useFM = !args.contains("--no-fm")
 let json = args.contains("--json")
 var iou = 0.4
 if let i = args.firstIndex(of: "--iou"), i + 1 < args.count, let v = Double(args[i + 1]) { iou = v }
+
+// The example bank steers kNN, so an eval run must never silently inherit the
+// user's live bank. Default to a fresh empty directory unless --bank says otherwise.
+var bankDirectory = FileManager.default.temporaryDirectory
+    .appendingPathComponent("vision-eval-bank-\(UUID().uuidString)", isDirectory: true)
+if let i = args.firstIndex(of: "--bank"), i + 1 < args.count {
+    bankDirectory = URL(fileURLWithPath: args[i + 1], isDirectory: true)
+}
 
 let folder = URL(fileURLWithPath: folderPath)
 let annotationsURL = folder.appendingPathComponent("annotations.json")
@@ -38,7 +46,14 @@ struct UncheckedSendableBox<T>: @unchecked Sendable {
     let value: T
 }
 
-let bank = ExampleBank(directory: ExampleBank.defaultDirectory)
+let bank = ExampleBank(directory: bankDirectory)
+let bankLine = "bank: \(bankDirectory.path)"
+if json {
+    FileHandle.standardError.write("\(bankLine)\n".data(using: .utf8)!)
+} else {
+    print(bankLine)
+}
+
 let provider: any SecurityElementsProviding = builtinOnly
     ? BuiltInVisionProvider()
     : LayeredDetectionProvider.makeDefault(bank: bank, useFoundationModel: useFM)
@@ -46,18 +61,30 @@ let analyses = PDFAnalysisEngine().analyze(document: document).pageAnalyses
 
 let documentBox = UncheckedSendableBox(value: document)
 let start = Date()
-let predicted = await provider.detect(in: documentBox.value, pageAnalyses: analyses)
+var foundationModelCalls = 0
+let predicted: [SecurityElement]
+if let layered = provider as? LayeredDetectionProvider {
+    let run = await layered.detectWithStats(in: documentBox.value, pageAnalyses: analyses)
+    predicted = run.elements
+    foundationModelCalls = run.stats.foundationModelCalls
+} else {
+    predicted = await provider.detect(in: documentBox.value, pageAnalyses: analyses)
+}
 let elapsed = Date().timeIntervalSince(start) * 1000
 
 let perLabel = DetectionEvaluator.score(predicted: predicted, truth: truth, imageSizes: sizes, pageOrder: pageOrder, iouThreshold: iou)
-let metrics = EvaluationMetrics(perLabel: perLabel, meanMillisecondsPerPage: elapsed / Double(max(pageOrder.count, 1)), pages: pageOrder.count)
+let metrics = EvaluationMetrics(perLabel: perLabel,
+                                meanMillisecondsPerPage: elapsed / Double(max(pageOrder.count, 1)),
+                                pages: pageOrder.count,
+                                foundationModelCalls: foundationModelCalls)
 
 if json {
     let encoder = JSONEncoder(); encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
     print(String(decoding: try encoder.encode(metrics), as: UTF8.self))
 } else {
     print("provider: \(provider.providerName)")
-    print(String(format: "pages: %d   mean ms/page: %.0f", metrics.pages, metrics.meanMillisecondsPerPage))
+    print(String(format: "pages: %d   mean ms/page: %.0f   fm calls: %d",
+                 metrics.pages, metrics.meanMillisecondsPerPage, metrics.foundationModelCalls))
     func pad(_ s: String, _ width: Int) -> String { s.padding(toLength: max(s.count, width), withPad: " ", startingAt: 0) }
     print("\(pad("label", 22)) \(pad("TP", 5)) \(pad("FP", 5)) \(pad("FN", 5)) \(pad("P", 7)) \(pad("R", 7)) \(pad("F1", 7))")
     for (label, m) in perLabel.sorted(by: { $0.key < $1.key }) {

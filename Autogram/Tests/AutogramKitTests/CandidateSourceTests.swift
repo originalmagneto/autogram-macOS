@@ -9,16 +9,30 @@ final class CandidateSourceTests: XCTestCase {
         return try XCTUnwrap(BuiltInVisionProvider.render(page: page, targetWidth: 760)?.cgImage)
     }
 
-    func testBuiltInSourceConvertsElementsToHintedCandidatesAndPassesBarcodesThrough() throws {
+    /// Renders page 0 once and computes its exclusions, mirroring the shared
+    /// render pass LayeredDetectionProvider performs.
+    private func preparedContractPage() throws -> PreparedPage {
         let document = try XCTUnwrap(PDFDocument(data: TestPDFBuilder.typicalContractPDF()))
-        let analysis = PDFAnalysisEngine().analyze(document: document)
-        let doc = TestUncheckedSendable(document)
-        let result = awaitAsync {
-            await BuiltInCandidateSource().candidates(in: doc.value, pageAnalyses: analysis.pageAnalyses)
-        }
+        let page = try XCTUnwrap(document.page(at: 0))
+        let rendered = try XCTUnwrap(BuiltInVisionProvider.render(page: page, targetWidth: 760))
+        let box = TestUncheckedSendable(rendered)
+        return awaitAsync { () -> TestUncheckedSendable<PreparedPage> in
+            let exclusions = await BuiltInVisionProvider.visionExclusionBoxes(cgImage: box.value.cgImage)
+            return TestUncheckedSendable(PreparedPage(pageIndex: 0, pixels: box.value.pixels,
+                                                      image: box.value.cgImage, exclusions: exclusions))
+        }.value
+    }
+
+    func testBuiltInSourceConvertsElementsToHintedCandidatesAndPassesBarcodesThrough() throws {
+        let prepared = try preparedContractPage()
+        let result = BuiltInCandidateSource().candidates(on: prepared)
         XCTAssertFalse(result.candidates.isEmpty, "Vstavaný detektor má vrátiť aspoň jedného kandidáta")
         XCTAssertTrue(result.candidates.allSatisfy { $0.sources == [.builtIn] && $0.kindHint != nil })
         XCTAssertTrue(result.passthrough.allSatisfy { $0.kind == .other })
+        // One passthrough element per barcode, exactly as the frozen provider emits.
+        let barcodes = result.passthrough.filter { $0.verbalDescription == "Čiarový kód / QR (notárska pripojka)" }
+        XCTAssertEqual(barcodes.count, prepared.exclusions.barcodeBoxes.count)
+        XCTAssertTrue(barcodes.allSatisfy { !$0.detectedByAI && $0.confidence == 0.9 && $0.reviewState == .pending })
     }
 
     func testContourSourceFindsDrawnStampRegion() throws {

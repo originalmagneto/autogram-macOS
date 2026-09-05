@@ -78,7 +78,7 @@ struct DetectionCandidate: Sendable, Hashable {
 ### 5.2 Candidate sources
 
 - `BuiltInCandidateSource`: calls `BuiltInVisionProvider.detect` once per document and converts each element into a candidate with `kindHint` and `hintConfidence`. Barcode elements pass through unchanged as `.other` (they are already reliable).
-- `ContourCandidateSource`: `DetectContoursRequest` with `contrastAdjustment` 2.0, `detectsDarkOnLight` true, `maximumImageDimension` 760. Top-level contours whose bounding box passes the size gates become candidates. Nested contours are folded into their parent.
+- `ContourCandidateSource`: `DetectContoursRequest` with `contrastAdjustment` 1.5, `detectsDarkOnLight` true, `maximumImageDimension` 760. The value is 1.5 because the drawn-ring fixture's contour is only found at 1.5; at 2.0 the ring is lost. Top-level contours whose bounding box passes the size gates become candidates. Nested contours are folded into their parent.
 - `SaliencyCandidateSource`: `GenerateObjectnessBasedSaliencyImageRequest`; each `salientObjects` rect passing size gates becomes a candidate.
 
 All three run inside a `TaskGroup` per page; pages are processed with at most `ProcessInfo.activeProcessorCount / 2` in flight.
@@ -97,6 +97,8 @@ protocol ElementClassifying: Sendable {
     func classify(crop: CGImage, hint: SecurityElement.Kind?) async throws -> ElementJudgement
 }
 ```
+
+Each page has a Foundation Model budget of 12 candidates, ordered by hint first, then by how many sources agreed, then by area; candidates beyond the budget are decided by kNN with the built-in hint as fallback.
 
 Crops are taken from the page render with a 12 % margin around the candidate box, clamped to the page.
 
@@ -169,7 +171,7 @@ func snap(pageImage: CGImage, seed: NormalizedPoint) async throws -> NormalizedR
 func refine(pageImage: CGImage, box: NormalizedRect) async throws -> NormalizedRect
 ```
 
-`snap` builds `GenerateIterativeSegmentationRequest(seed:)`, performs it, takes the mask's bounding rect, converts to bottom-origin normalized coordinates, and pads by 4 %. `refine` seeds from the box centre and adds the four inset corners as included points. If `assetStatus` is not ready, the snapper calls `downloadAssets(progress:)` once, reporting progress through a published property; while downloading or if the download fails, snapping is disabled and drag remains.
+`snap` builds `GenerateIterativeSegmentationRequest(seed:)`, performs it, takes the mask's bounding rect, converts to bottom-origin normalized coordinates, and pads by 4 %. `refine` seeds `GenerateIterativeSegmentationRequest(seedBox:)` with the current box. If `assetStatus` is not ready, the snapper calls `downloadAssets(progress:)` once, reporting progress through a published property; while downloading or if the download fails, snapping is disabled and drag remains.
 
 Canvas changes (`AnalysisCanvasView`):
 - In an element mode (Pečiatka, Podpis, Pečať, Parafa), a click without drag snaps and creates the element; drag still draws manually.
@@ -184,7 +186,7 @@ New executable target `vision-eval` (depends on `AutogramKit`), not bundled in t
 swift run vision-eval <dataset-folder> [--builtin-only] [--no-fm] [--iou 0.4] [--json]
 ```
 
-Input is the same folder format as the dataset export (page images plus `annotations.json`). It runs `LayeredDetectionProvider` over each page image and prints per-kind precision, recall, F1 at the given IoU, plus mean ms per page and count of FM calls. `--builtin-only` runs the wrapped provider alone so the delta of the new layers is visible. `--json` emits machine-readable output for tracking across commits.
+Input is the same folder format as the dataset export (page images plus `annotations.json`). It runs `LayeredDetectionProvider` over each page image and prints per-kind precision, recall, F1 at the given IoU, plus mean ms per page and count of FM calls. `--bank <dir>` selects the example bank that feeds kNN; without it the harness creates a fresh empty temporary bank so a run never inherits the user's local examples. `--builtin-only` runs the wrapped provider alone so the delta of the new layers is visible. `--json` emits machine-readable output for tracking across commits.
 
 Real scans stay outside the repository. The repository keeps only synthetic fixtures from `TestPDFBuilder`.
 

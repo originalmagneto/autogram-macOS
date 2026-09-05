@@ -1,6 +1,7 @@
 import XCTest
 import PDFKit
 import CoreGraphics
+import os
 @testable import AutogramKit
 
 final class LayeredDetectionProviderTests: XCTestCase {
@@ -16,6 +17,42 @@ final class LayeredDetectionProviderTests: XCTestCase {
     private struct FixedClassifier: ElementClassifying {
         let judgement: ElementJudgement
         func classify(crop: CGImage, hint: SecurityElement.Kind?) async throws -> ElementJudgement { judgement }
+    }
+    /// Stands in for the Foundation Model so budget enforcement is observable.
+    private final class CountingClassifier: ElementClassifying, @unchecked Sendable {
+        private let calls = OSAllocatedUnfairLock(initialState: 0)
+        var count: Int { calls.withLock { $0 } }
+        func classify(crop: CGImage, hint: SecurityElement.Kind?) async throws -> ElementJudgement {
+            calls.withLock { $0 += 1 }
+            return .unsure
+        }
+    }
+
+    /// 20 non-overlapping boxes, far more than the per-page budget of 12.
+    /// They claim `.builtIn` so the merger's text gate cannot drop them and the
+    /// count stays deterministic.
+    private static func gridBoxes() -> [NormalizedRect] {
+        var boxes: [NormalizedRect] = []
+        for row in 0..<4 {
+            for column in 0..<5 {
+                boxes.append(.init(x: 0.05 + Double(column) * 0.09, y: 0.05 + Double(row) * 0.09,
+                                   width: 0.04, height: 0.04))
+            }
+        }
+        return boxes
+    }
+
+    private func runWithBudget(_ budget: Int) throws -> (calls: Int, stats: DetectionRunStats) {
+        let (document, analyses) = try contract()
+        let counter = CountingClassifier()
+        var provider = LayeredDetectionProvider(
+            extraSources: [FixedSource(source: .builtIn, boxes: Self.gridBoxes(), fails: false)],
+            classifier: TwoStageClassifier(primary: FixedClassifier(judgement: .unsure), secondary: counter))
+        provider.foundationModelBudgetPerPage = budget
+        let configured = provider
+        let doc = TestUncheckedSendable(document)
+        let stats = awaitAsync { await configured.detectWithStats(in: doc.value, pageAnalyses: analyses).stats }
+        return (counter.count, stats)
     }
 
     private func contract() throws -> (PDFDocument, [PageAnalysis]) {
@@ -77,6 +114,45 @@ final class LayeredDetectionProviderTests: XCTestCase {
         XCTAssertEqual(provider.identifier, "LayeredDetectionProvider/1 builtIn+contour+saliency kNN fm")
         let noFM = LayeredDetectionProvider(extraSources: [], classifier: TwoStageClassifier(primary: FixedClassifier(judgement: .unsure), secondary: nil))
         XCTAssertEqual(noFM.identifier, "LayeredDetectionProvider/1 builtIn kNN")
+    }
+
+    func testFoundationModelBudgetCapsCallsPerPageAndIsReportedInStats() throws {
+        let unlimited = try runWithBudget(1000)
+        XCTAssertGreaterThan(unlimited.calls, 12, "Fixture musí ponúknuť viac kandidátov než je rozpočet")
+        XCTAssertEqual(unlimited.stats.foundationModelCalls, unlimited.calls)
+
+        let budgeted = try runWithBudget(12)
+        XCTAssertGreaterThan(budgeted.stats.pagesProcessed, 0)
+        XCTAssertLessThanOrEqual(budgeted.calls, 12 * budgeted.stats.pagesProcessed)
+        XCTAssertLessThan(budgeted.calls, unlimited.calls)
+        XCTAssertEqual(budgeted.stats.foundationModelCalls, budgeted.calls)
+    }
+
+    func testPrioritizedPutsHintedThenMultiSourceThenLargerCandidatesFirst() {
+        func candidate(x: Double, width: Double, sources: Set<CandidateSource>,
+                       hint: SecurityElement.Kind? = nil) -> DetectionCandidate {
+            DetectionCandidate(pageIndex: 0, box: .init(x: x, y: 0, width: width, height: width),
+                               sources: sources, kindHint: hint, hintConfidence: hint == nil ? nil : 0.7)
+        }
+        let hinted = candidate(x: 0.0, width: 0.05, sources: [.builtIn], hint: .officialStamp)
+        let twoSources = candidate(x: 0.1, width: 0.05, sources: [.contour, .saliency])
+        let large = candidate(x: 0.3, width: 0.2, sources: [.contour])
+        let small = candidate(x: 0.6, width: 0.05, sources: [.contour])
+        let ordered = LayeredDetectionProvider.prioritized([small, large, twoSources, hinted])
+        XCTAssertEqual(ordered.map(\.box.x), [hinted.box.x, twoSources.box.x, large.box.x, small.box.x])
+    }
+
+    func testFailingSourceIsReportedInRunStats() throws {
+        let (document, analyses) = try contract()
+        let provider = LayeredDetectionProvider(
+            extraSources: [FixedSource(source: .saliency, boxes: [], fails: true)],
+            classifier: TwoStageClassifier(primary: FixedClassifier(judgement: .unsure), secondary: nil))
+        let doc = TestUncheckedSendable(document)
+        let stats = awaitAsync { await provider.detectWithStats(in: doc.value, pageAnalyses: analyses).stats }
+        XCTAssertFalse(stats.sourceFailures.isEmpty, "Zlyhanie zdroja sa musí objaviť v štatistike behu")
+        XCTAssertTrue(stats.sourceFailures.allSatisfy { $0.hasPrefix("saliency: ") }, "\(stats.sourceFailures)")
+        XCTAssertEqual(DetectionPipeline.sourceFailureMessage(stats.sourceFailures),
+                       "Niektoré zdroje kandidátov zlyhali (saliency). ")
     }
 
     func testDetectionPipelineAcceptsLayeredProvider() throws {

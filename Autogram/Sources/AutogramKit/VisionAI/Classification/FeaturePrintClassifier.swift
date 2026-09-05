@@ -2,22 +2,50 @@ import Foundation
 import CoreGraphics
 
 public struct FeaturePrintClassifier: ElementClassifying {
-    public let bank: ExampleBank
+    /// Live bank, read on every classification. Nil for a snapshotted classifier.
+    public let bank: ExampleBank?
+    /// Fixed examples captured by `snapshot()`. Nil for a bank-backed classifier.
+    public let examples: [(FeatureVector, BankLabel)]?
     public let featurePrints: any FeaturePrintProviding
     public let k: Int
 
     public init(bank: ExampleBank, featurePrints: any FeaturePrintProviding = VisionFeaturePrintProvider(), k: Int = 5) {
         self.bank = bank
+        self.examples = nil
         self.featurePrints = featurePrints
         self.k = k
     }
 
+    /// Classifier over a fixed example set, so one detection run votes against
+    /// a stable bank even when reviews are recorded while it runs.
+    public init(examples: [(FeatureVector, BankLabel)],
+                featurePrints: any FeaturePrintProviding = VisionFeaturePrintProvider(), k: Int = 5) {
+        self.bank = nil
+        self.examples = examples
+        self.featurePrints = featurePrints
+        self.k = k
+    }
+
+    /// Reads the bank once and returns an examples-backed copy.
+    public func snapshot() async -> FeaturePrintClassifier {
+        guard let bank else { return self }
+        let entries = await bank.entries().map { ($0.featureVector, $0.label) }
+        return FeaturePrintClassifier(examples: entries, featurePrints: featurePrints, k: k)
+    }
+
     public func classify(crop: CGImage, hint: SecurityElement.Kind?) async throws -> ElementJudgement {
         let query = try await featurePrints.featureVector(for: crop)
-        let examples = await bank.entries()
-            .filter { $0.featureVector.values.count == query.values.count }
-            .map { ($0.featureVector, $0.label) }
-        return Self.vote(query: query, examples: examples, k: k)
+        let pool: [(FeatureVector, BankLabel)]
+        if let examples {
+            pool = examples
+        } else if let bank {
+            pool = await bank.entries().map { ($0.featureVector, $0.label) }
+        } else {
+            pool = []
+        }
+        return Self.vote(query: query,
+                         examples: pool.filter { $0.0.values.count == query.values.count },
+                         k: k)
     }
 
     /// Distance-weighted vote over the k nearest examples.

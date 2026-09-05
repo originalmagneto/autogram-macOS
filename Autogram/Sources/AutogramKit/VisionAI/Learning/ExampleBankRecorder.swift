@@ -45,12 +45,34 @@ public struct ExampleBankRecorder: Sendable {
         try await bank.remove(id: elementID)
     }
 
+    /// Writes to a sibling temporary file and swaps it in, so a concurrent writer
+    /// of the same page image can never leave a truncated PNG behind.
     static func writePNG(_ image: CGImage, to url: URL) throws {
-        guard let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil) else {
+        let temporary = url.deletingLastPathComponent()
+            .appendingPathComponent("\(UUID().uuidString).png-partial")
+        guard let destination = CGImageDestinationCreateWithURL(temporary as CFURL, UTType.png.identifier as CFString, 1, nil) else {
             throw RecorderError.writeFailed
         }
         CGImageDestinationAddImage(destination, image, nil)
-        guard CGImageDestinationFinalize(destination) else { throw RecorderError.writeFailed }
+        guard CGImageDestinationFinalize(destination) else {
+            try? FileManager.default.removeItem(at: temporary)
+            throw RecorderError.writeFailed
+        }
+        do {
+            if FileManager.default.fileExists(atPath: url.path) {
+                _ = try FileManager.default.replaceItemAt(url, withItemAt: temporary)
+            } else {
+                do {
+                    try FileManager.default.moveItem(at: temporary, to: url)
+                } catch {
+                    // Another writer won the race between the check and the move.
+                    _ = try FileManager.default.replaceItemAt(url, withItemAt: temporary)
+                }
+            }
+        } catch {
+            try? FileManager.default.removeItem(at: temporary)
+            throw RecorderError.writeFailed
+        }
     }
 
     public enum RecorderError: Error { case renderFailed, cropFailed, writeFailed }

@@ -13,9 +13,11 @@ public struct BuiltInCandidateSource: Sendable {
     public let provider: BuiltInVisionProvider
     public init(provider: BuiltInVisionProvider = BuiltInVisionProvider()) { self.provider = provider }
 
-    public func candidates(in document: PDFDocument,
-                           pageAnalyses: [PageAnalysis]) async -> (candidates: [DetectionCandidate], passthrough: [SecurityElement]) {
-        let elements = await provider.detect(in: document, pageAnalyses: pageAnalyses)
+    /// Reproduces `BuiltInVisionProvider.detect` for one page, but on an already
+    /// rendered page so the document is never rasterized or OCRed twice.
+    func candidates(on page: PreparedPage) -> (candidates: [DetectionCandidate], passthrough: [SecurityElement]) {
+        let elements = provider.detectOnPage(pixels: page.pixels, pageIndex: page.pageIndex,
+                                             exclusions: page.exclusions)
         var candidates: [DetectionCandidate] = []
         var passthrough: [SecurityElement] = []
         for element in elements {
@@ -26,6 +28,17 @@ public struct BuiltInCandidateSource: Sendable {
                                                      sources: [.builtIn], kindHint: element.kind,
                                                      hintConfidence: element.confidence))
             }
+        }
+        // Same barcode passthrough the frozen provider appends after detectOnPage.
+        for barcode in page.exclusions.barcodeBoxes {
+            passthrough.append(SecurityElement(
+                kind: .other,
+                pageIndex: page.pageIndex,
+                boundingBox: barcode,
+                confidence: 0.9,
+                verbalDescription: "Čiarový kód / QR (notárska pripojka)",
+                detectedByAI: false,
+                reviewState: .pending))
         }
         return (candidates, passthrough)
     }

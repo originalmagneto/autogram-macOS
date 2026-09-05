@@ -76,7 +76,7 @@ Natívna macOS aplikácia v SwiftUI pre kvalifikované elektronické podpisovani
 
 <p><strong>Produkčné EZZK backlinkovanie ešte čaká na schválenie MIRRI.</strong> Aplikácia preto zatiaľ pripraví konverzný artefakt, osvedčovaciu doložku a lokálnu evidenciu v pilotnom režime. Produkčné pridelenie evidenčného čísla a odoslanie záznamu do CEZZK sú dostupné až po zapojení schválenej EZZK integrácie.</p>
 
-<p>AI Vision je vrstvená: kandidáti z vstavaných heuristík, Apple Vision kontúr a saliency sa zlúčia a každý výrez klasifikuje porovnanie s lokálne uloženými potvrdenými príkladmi (feature print kNN); neisté prípady posúdi on-device Apple model. Každé potvrdenie alebo odmietnutie v kontrole ukladá výrez do lokálneho datasetu, ktorý sa dá exportovať pre Create ML. Bezpečnostné prvky je možné označiť ručne alebo kliknutím (Vision segmentácia), upraviť ich rámec a potvrdiť alebo odmietnuť každý nález. Manuálna kontrola zostáva povinnou poistkou.</p>
+<p>AI Vision je vrstvená: kandidáti z vstavaných heuristík, Apple Vision kontúr a saliency sa zlúčia a každý výrez sa klasifikuje porovnaním s lokálne uloženými potvrdenými príkladmi (feature print kNN); neisté prípady posúdi on-device Apple model. Každé potvrdenie alebo odmietnutie v kontrole ukladá výrez do lokálneho datasetu, ktorý sa dá exportovať pre Create ML. Bezpečnostné prvky je možné označiť ručne alebo kliknutím (Vision segmentácia), upraviť ich rámec a potvrdiť alebo odmietnuť každý nález. Manuálna kontrola zostáva povinnou poistkou.</p>
 
 <p>Aktuálny pilotný postup je: importovať dokument, skontrolovať každú neprázdnu stranu, ručne označiť bezpečnostné prvky, potvrdiť ich, prihlásiť sa do EZZK sandboxu a vyžiadať evidenčné číslo. Bez čísla z EZZK aplikácia zámerne nepovolí autorizáciu.</p>
 </details>
@@ -196,7 +196,7 @@ DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
 swift test --filter JavaEngineLiveProcessTests
 ```
 
-- `swift run vision-eval <dataset>` vyhodnotí presnosť a rýchlosť detekcie na exportovanom datasete (mimo repozitára).
+- `swift run vision-eval <dataset> [--builtin-only] [--no-fm] [--bank <dir>] [--iou 0.4] [--json]` vyhodnotí presnosť a rýchlosť detekcie na exportovanom datasete (mimo repozitára). Bez `--bank` sa použije prázdny dočasný priečinok, nie banka používateľa.
 
 ## Podpisovanie
 

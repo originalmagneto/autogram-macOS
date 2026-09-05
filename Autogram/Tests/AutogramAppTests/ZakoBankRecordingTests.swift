@@ -13,6 +13,12 @@ final class ZakoBankRecordingTests: XCTestCase {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("zako-bank-\(UUID().uuidString)", isDirectory: true)
         let bank = ExampleBank(directory: dir)
         let settingsStore = AppSettingsStore()
+        // AppSettingsStore.settings.didSet persists to disk, so the user's real
+        // settings must be put back when the test finishes.
+        let originalSettings = settingsStore.settings
+        addTeardownBlock {
+            await MainActor.run { settingsStore.settings = originalSettings }
+        }
         settingsStore.settings.learnFromReviews = learn
         let store = ZakoSessionStore(settingsStore: settingsStore, exampleBank: bank)
         store.bankRecorderFactory = { bank, version in

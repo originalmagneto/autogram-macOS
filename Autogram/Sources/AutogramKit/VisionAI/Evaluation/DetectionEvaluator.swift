@@ -17,8 +17,12 @@ public struct EvaluationMetrics: Codable, Equatable, Sendable {
     public var perLabel: [String: LabelMetrics]
     public var meanMillisecondsPerPage: Double
     public var pages: Int
-    public init(perLabel: [String: LabelMetrics], meanMillisecondsPerPage: Double, pages: Int) {
+    /// Foundation Model invocations during the run. Zero for providers that do not report stats.
+    public var foundationModelCalls: Int = 0
+    public init(perLabel: [String: LabelMetrics], meanMillisecondsPerPage: Double, pages: Int,
+                foundationModelCalls: Int = 0) {
         self.perLabel = perLabel; self.meanMillisecondsPerPage = meanMillisecondsPerPage; self.pages = pages
+        self.foundationModelCalls = foundationModelCalls
     }
 }
 

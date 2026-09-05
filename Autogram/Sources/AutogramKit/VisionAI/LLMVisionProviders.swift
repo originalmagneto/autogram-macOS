@@ -340,9 +340,19 @@ public extension DetectionPipeline {
     /// Built-in findings remain available even when the augmentation is unavailable.
     func detectWithStatus(in document: PDFDocument,
                           pageAnalyses: [PageAnalysis]) async -> LLMVisionDetectionOutcome {
-        let builtinElements = await builtin.detect(in: document, pageAnalyses: pageAnalyses)
+        let builtinElements: [SecurityElement]
+        var sourceFailureMessage: String?
+        if let layered = builtin as? LayeredDetectionProvider {
+            let run = await layered.detectWithStats(in: document, pageAnalyses: pageAnalyses)
+            builtinElements = run.elements
+            sourceFailureMessage = Self.sourceFailureMessage(run.stats.sourceFailures)
+        } else {
+            builtinElements = await builtin.detect(in: document, pageAnalyses: pageAnalyses)
+        }
+
         guard let llmProvider else {
-            return LLMVisionDetectionOutcome(elements: builtinElements)
+            return LLMVisionDetectionOutcome(elements: builtinElements,
+                                             failureMessage: Self.combine(sourceFailureMessage, nil))
         }
 
         let llmOutcome: LLMVisionDetectionOutcome
@@ -361,6 +371,23 @@ public extension DetectionPipeline {
             elements: merged.sorted {
                 ($0.pageIndex, $0.boundingBox.y) < ($1.pageIndex, $1.boundingBox.y)
             },
-            failureMessage: llmOutcome.failureMessage)
+            failureMessage: Self.combine(sourceFailureMessage, llmOutcome.failureMessage))
+    }
+
+    /// Names the candidate sources that threw, so the user knows detection ran degraded.
+    static func sourceFailureMessage(_ failures: [String]) -> String? {
+        var names: [String] = []
+        for failure in failures {
+            let name = String(failure.prefix { $0 != ":" })
+            if !name.isEmpty && !names.contains(name) { names.append(name) }
+        }
+        guard !names.isEmpty else { return nil }
+        return "Niektoré zdroje kandidátov zlyhali (\(names.joined(separator: ", "))). "
+    }
+
+    static func combine(_ sourceFailure: String?, _ llmFailure: String?) -> String? {
+        let combined = [sourceFailure, llmFailure].compactMap { $0 }.joined()
+        let trimmed = combined.trimmingCharacters(in: .whitespaces)
+        return trimmed.isEmpty ? nil : trimmed
     }
 }
