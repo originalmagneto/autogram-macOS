@@ -489,8 +489,11 @@ final class ZakoSessionStore {
         guard settings.learnFromReviews, let document, let documentData else { return }
         let recorder = bankRecorderFactory(exampleBank, detectorIdentifier)
         let doc = UncheckedSendable(document)
-        bankWriteTasks[element.id]?.cancel()
-        bankWriteTasks[element.id] = Task.detached(priority: .utility) { [weak self, recorder, doc, documentData, element] in
+        // Writes for one element run strictly in decision order: each task waits for the
+        // previous one, so a fast confirm followed by return-to-review cannot interleave.
+        let previous = bankWriteTasks[element.id]
+        let task = Task.detached(priority: .utility) { [weak self, recorder, doc, documentData, element] in
+            _ = await previous?.value
             do {
                 switch state {
                 case .confirmed:
@@ -506,6 +509,12 @@ final class ZakoSessionStore {
                 await MainActor.run { self?.showBankWarningOnce(error) }
             }
         }
+        bankWriteTasks[element.id] = task
+        Task { @MainActor [weak self] in
+            _ = await task.value
+            // Prune only if no newer write replaced this one.
+            if let self, self.bankWriteTasks[element.id] == task { self.bankWriteTasks[element.id] = nil }
+        }
     }
 
     private func showBankWarningOnce(_ error: Error) {
@@ -516,7 +525,8 @@ final class ZakoSessionStore {
 
     /// Test hook: wait for outstanding bank writes.
     func waitForBankWrites() async {
-        for task in bankWriteTasks.values { await task.value }
+        let tasks = Array(bankWriteTasks.values)
+        for task in tasks { await task.value }
         bankWriteTasks = [:]
     }
 

@@ -59,6 +59,25 @@ final class ZakoBankRecordingTests: XCTestCase {
         XCTAssertTrue(entries.isEmpty)
     }
 
+    func testRapidDecisionsOnOneElementApplyInOrder() async throws {
+        let (store, bank) = try makeStore(learn: true)
+        let stamp = SecurityElement(kind: .officialStamp, pageIndex: 0,
+                                    boundingBox: .init(x: 0.6, y: 0.1, width: 0.2, height: 0.2), confidence: 0.8)
+        store.securityElements = [stamp]
+
+        store.confirmSecurityElement(id: stamp.id)
+        store.returnSecurityElementToReview(id: stamp.id)
+        await store.waitForBankWrites()
+        let entriesAfterReturn = await bank.entries()
+        XCTAssertTrue(entriesAfterReturn.isEmpty, "Návrat na kontrolu po potvrdení musí záznam odstrániť")
+
+        store.rejectSecurityElement(id: stamp.id)
+        store.confirmSecurityElement(id: stamp.id)
+        await store.waitForBankWrites()
+        let entriesAfterConfirm = await bank.entries()
+        XCTAssertEqual(entriesAfterConfirm.first?.label, .kind(.officialStamp))
+    }
+
     func testReviewStampCarriesDetectorIdentifier() throws {
         let (store, _) = try makeStore(learn: true)
         XCTAssertTrue(store.securityReviewStamp.detectorIdentifier.hasPrefix("LayeredDetectionProvider/"))
