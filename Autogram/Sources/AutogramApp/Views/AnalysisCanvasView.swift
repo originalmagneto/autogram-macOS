@@ -907,17 +907,12 @@ struct ElementRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
+            // Row 1: kind (as the menu label itself) and confidence.
             HStack(spacing: 8) {
                 Button(action: onSelect) {
-                    HStack(spacing: 8) {
-                        Image(systemName: element.kind.sfSymbol)
-                            .foregroundStyle(ElementKindColor.color(for: element.kind))
-                            .frame(width: 16)
-                        Text(element.kind.rawValue)
-                            .font(.callout.weight(.medium))
-                            .lineLimit(1)
-                        Spacer(minLength: 0)
-                    }
+                    Image(systemName: element.kind.sfSymbol)
+                        .foregroundStyle(ElementKindColor.color(for: element.kind))
+                        .frame(width: 16)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("\(element.kind.rawValue), stav: \(element.reviewState.label), \(UXLabels.provenanceLabel(detectedByAI: element.detectedByAI))")
@@ -933,21 +928,32 @@ struct ElementRow: View {
                         }
                     }
                 } label: {
-                    Label("Typ prvku", systemImage: "arrow.left.arrow.right")
-                        .lineLimit(1)
-                        .truncationMode(.tail)
+                    HStack(spacing: 3) {
+                        Text(element.kind.rawValue)
+                            .font(.callout.weight(.medium))
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                    .lineLimit(1)
                 }
-                .menuStyle(.borderedButton)
-                .layoutPriority(1)
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .fixedSize()
                 .accessibilityLabel("Typ prvku")
                 .accessibilityValue(element.kind.rawValue)
+
+                Spacer(minLength: 6)
 
                 ConfidenceBar(confidence: element.confidence)
                 Text(UXLabels.confidenceLabel(for: element.confidence))
                     .font(.caption2.monospacedDigit())
                     .foregroundStyle(.secondary)
+                    .fixedSize()
             }
+            .lineLimit(1)
 
+            // Row 2: description.
             TextField("Popis prvku", text: Binding(
                 get: { element.verbalDescription },
                 set: { onDescriptionChange($0) }
@@ -956,35 +962,47 @@ struct ElementRow: View {
             .textFieldStyle(.roundedBorder)
             .accessibilityLabel("Popis prvku")
 
+            // Row 3: review state and actions. Every label is fixed-size so nothing
+            // wraps mid-word in a narrow sidebar.
             HStack(alignment: .center, spacing: 6) {
                 Label(element.reviewState.label, systemImage: reviewIcon)
                     .font(.caption2)
+                    .labelStyle(.titleAndIcon)
+                    .fixedSize()
                     .foregroundStyle(reviewColor)
-                Spacer()
+
+                Spacer(minLength: 6)
+
                 if element.reviewState == .pending {
                     Button("Potvrdiť") {
                         onReviewStateChange(.confirmed)
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.borderedProminent)
                     .controlSize(.small)
+                    .fixedSize()
                     Button("Odmietnuť") {
                         onReviewStateChange(.rejected)
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
+                    .fixedSize()
                 } else if element.reviewState == .rejected {
                     Button("Vrátiť na kontrolu") {
                         onReviewStateChange(.pending)
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
+                    .fixedSize()
                 }
+
                 Button {
                     onDuplicate()
                 } label: {
                     Label("Duplikovať prvok", systemImage: "plus.square.on.square")
                 }
-                .buttonStyle(.plain)
+                .labelStyle(.iconOnly)
+                .buttonStyle(.borderless)
+                .help("Duplikovať prvok")
                 .foregroundStyle(.secondary)
 
                 Button {
@@ -992,8 +1010,9 @@ struct ElementRow: View {
                 } label: {
                     Label("Spresniť rámec", systemImage: "wand.and.stars")
                 }
-                .help("Prispôsobí rámec skutočnému obrysu prvku (Apple Vision).")
-                .buttonStyle(.plain)
+                .labelStyle(.iconOnly)
+                .buttonStyle(.borderless)
+                .help("Spresniť rámec podľa obrysu (Apple Vision)")
                 .foregroundStyle(.secondary)
 
                 Button(role: .destructive) {
@@ -1001,9 +1020,19 @@ struct ElementRow: View {
                 } label: {
                     Label("Odstrániť prvok", systemImage: "trash")
                 }
-                .buttonStyle(.plain)
+                .labelStyle(.iconOnly)
+                .buttonStyle(.borderless)
+                .help("Odstrániť prvok")
                 .foregroundStyle(.red)
             }
+            .lineLimit(1)
+
+            // Row 4: how this element was found.
+            Text(sourceCaption)
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+                .lineLimit(1)
+                .truncationMode(.tail)
         }
         .padding(10)
         .background(isSelected ? Color.accentColor.opacity(0.1) : Color.primary.opacity(0.03),
@@ -1020,6 +1049,10 @@ struct ElementRow: View {
         } message: {
             Text("Prvok bude odstránený z doložky. Túto zmenu môžete vrátiť tlačidlom Späť.")
         }
+    }
+
+    private var sourceCaption: String {
+        DetectionSourceLabel.slovak(element.detectionSource)
     }
 
     private var reviewIcon: String {
