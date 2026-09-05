@@ -79,6 +79,13 @@ public actor SystemFoundationJudge: FoundationJudging {
     }
 }
 
+/// Holds the outcome of a judge task so a cancellable polling task can observe it without
+/// awaiting the (possibly non-cancellable) judge task directly.
+private actor JudgementCell {
+    private(set) var result: Result<ElementJudgement, Error>?
+    func set(_ r: Result<ElementJudgement, Error>) { result = r }
+}
+
 public struct FoundationModelClassifier: ElementClassifying {
     public let judge: any FoundationJudging
     public let timeoutSeconds: Double
@@ -97,16 +104,45 @@ public struct FoundationModelClassifier: ElementClassifying {
         let judge = self.judge
         let timeout = timeoutSeconds
         let crop = crop
-        return try await withThrowingTaskGroup(of: ElementJudgement?.self) { group in
-            group.addTask { Self.map(try await judge.judge(crop: crop, hint: hint)) }
+        // The judge runs in its own detached task, outside the task group, because
+        // `withThrowingTaskGroup` only returns once every child task has finished.
+        // `LanguageModelSession.respond` is not guaranteed to observe cancellation, so if the
+        // judge itself were a group child, a slow/non-cancellable model call would block
+        // `classify` for the full inference time and the timeout would never be honoured.
+        // Instead the judge writes its outcome into an actor-isolated cell, and a cancellable
+        // polling child inside the group reads that cell. This lets the group (and therefore
+        // `classify`) return as soon as the timeout fires, without ever awaiting the judge task.
+        let cell = JudgementCell()
+        let judgeTask = Task {
+            do {
+                let result = Self.map(try await judge.judge(crop: crop, hint: hint))
+                await cell.set(.success(result))
+            } catch {
+                await cell.set(.failure(error))
+            }
+        }
+        let result: ElementJudgement? = try await withThrowingTaskGroup(of: ElementJudgement?.self) { group in
+            group.addTask {
+                while !Task.isCancelled {
+                    if let outcome = await cell.result {
+                        return try outcome.get()
+                    }
+                    try await Task.sleep(for: .milliseconds(50))
+                }
+                return nil
+            }
             group.addTask {
                 try await Task.sleep(for: .seconds(timeout))
                 return nil
             }
             let first = try await group.next() ?? nil
             group.cancelAll()
-            return first ?? ElementJudgement(kind: nil, confidence: 0, decidedBy: .foundationModel)
+            return first
         }
+        if result == nil {
+            judgeTask.cancel()
+        }
+        return result ?? ElementJudgement(kind: nil, confidence: 0, decidedBy: .foundationModel)
     }
 
     public static func map(_ judgement: FoundationJudgement) -> ElementJudgement {

@@ -46,6 +46,27 @@ final class FoundationModelClassifierTests: XCTestCase {
         XCTAssertEqual(judgement.decidedBy, .foundationModel)
     }
 
+    private struct StubbornJudge: FoundationJudging {
+        func judge(crop: CGImage, hint: SecurityElement.Kind?) async throws -> FoundationJudgement {
+            // Spins the current thread without ever checking cancellation, simulating a model
+            // call that does not honour Task cancellation. `Thread.sleep` is unavailable from
+            // async contexts, so a busy loop is used instead to block the thread the same way.
+            let start = Date()
+            while Date().timeIntervalSince(start) < 3 { /* spin */ }
+            return FoundationJudgement(isSecurityElement: true, kind: .stamp, descriptionSK: "", confidence: 1)
+        }
+    }
+
+    func testTimeoutIsHonouredEvenWhenJudgeIgnoresCancellation() throws {
+        let classifier = FoundationModelClassifier(judge: StubbornJudge(), timeoutSeconds: 0.2)
+        let image = try blankImage()
+        let start = Date()
+        let judgement = try awaitAsyncThrowing { try await classifier.classify(crop: image, hint: nil) }
+        XCTAssertLessThan(Date().timeIntervalSince(start), 1.5, "classify musí skončiť v limite aj pri nezrušiteľnom modeli")
+        XCTAssertNil(judgement.kind)
+        XCTAssertEqual(judgement.decidedBy, .foundationModel)
+    }
+
     func testLiveModelSeparatesRingFromPlainTextIfAvailable() throws {
         guard let classifier = FoundationModelClassifier.makeIfAvailable() else {
             throw XCTSkip("On-device Foundation Model nie je dostupný")
