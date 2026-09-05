@@ -17,10 +17,6 @@ public struct FeatureVector: Codable, Sendable, Equatable {
     }
 }
 
-public enum FeatureVectorError: Error {
-    case unsupportedElementType
-}
-
 public protocol FeaturePrintProviding: Sendable {
     func featureVector(for image: CGImage) async throws -> FeatureVector
 }

@@ -51,6 +51,7 @@ public actor ExampleBank {
     public let directory: URL
     private var cache: [BankEntry] = []
     private var loaded = false
+    public private(set) var loadError: Error?
 
     public init(directory: URL) { self.directory = directory }
 
@@ -69,7 +70,13 @@ public actor ExampleBank {
         if let data = try? Data(contentsOf: indexURL) {
             let decoder = JSONDecoder()
             decoder.dateDecodingStrategy = .iso8601
-            cache = try decoder.decode([BankEntry].self, from: data)
+            do {
+                cache = try decoder.decode([BankEntry].self, from: data)
+                loadError = nil
+            } catch {
+                cache = []
+                loadError = error
+            }
         } else {
             cache = []
         }

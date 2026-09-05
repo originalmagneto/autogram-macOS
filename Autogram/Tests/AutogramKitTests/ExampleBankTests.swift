@@ -47,4 +47,14 @@ final class ExampleBankTests: XCTestCase {
         XCTAssertEqual(BankLabel.kind(.handwrittenSignature).exportLabel, "handwrittenSignature")
         XCTAssertEqual(BankLabel.negative.exportLabel, "negative")
     }
+
+    func testCorruptIndexYieldsEmptyEntriesAndLoadError() throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("bank-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try "not json".data(using: .utf8)!.write(to: dir.appendingPathComponent("bank.json"))
+        let bank = ExampleBank(directory: dir)
+        XCTAssertTrue(awaitAsync { await bank.entries() }.isEmpty)
+        XCTAssertNotNil(awaitAsync { await bank.loadError })
+    }
 }

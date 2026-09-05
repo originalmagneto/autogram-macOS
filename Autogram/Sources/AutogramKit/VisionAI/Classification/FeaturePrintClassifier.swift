@@ -35,7 +35,7 @@ public struct FeaturePrintClassifier: ElementClassifying {
             counts[item.label, default: 0] += 1
         }
         let total = weights.values.reduce(0, +)
-        let ranked = weights.sorted { $0.value > $1.value }
+        let ranked = weights.sorted { $0.value > $1.value || ($0.value == $1.value && $0.key.exportLabel < $1.key.exportLabel) }
         let winner = ranked[0]
         let runnerUp = ranked.count > 1 ? ranked[1].value : 0
         let confidence = winner.value / total
