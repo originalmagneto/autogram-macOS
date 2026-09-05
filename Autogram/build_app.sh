@@ -22,7 +22,7 @@ for argument in "$@"; do
     esac
 done
 
-export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode-26.5.app/Contents/Developer}"
+export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode-beta.app/Contents/Developer}"
 export MACOSX_DEPLOYMENT_TARGET="27.0"
 
 echo "▸ swift build -c $MODE"

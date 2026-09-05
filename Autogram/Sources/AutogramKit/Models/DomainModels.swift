@@ -148,16 +148,20 @@ public struct SecurityElement: Codable, Hashable, Identifiable, Sendable {
     public var verbalDescription: String
     public var detectedByAI: Bool
     public var reviewState: SecurityElementReviewState
+    /// Audit string naming the candidate sources and the deciding classifier,
+    /// for example "builtIn+contour; kNN(n=12)". Nil for manual or legacy elements.
+    public var detectionSource: String?
 
     private enum CodingKeys: String, CodingKey {
         case id, kind, pageIndex, boundingBox, confidence, verbalDescription,
-             detectedByAI, reviewState
+             detectedByAI, reviewState, detectionSource
     }
 
     public init(id: UUID = UUID(), kind: Kind, pageIndex: Int,
                 boundingBox: NormalizedRect, confidence: Double,
                  verbalDescription: String = "", detectedByAI: Bool = true,
-                 reviewState: SecurityElementReviewState? = nil) {
+                 reviewState: SecurityElementReviewState? = nil,
+                 detectionSource: String? = nil) {
         self.id = id
         self.kind = kind
         self.pageIndex = pageIndex
@@ -166,6 +170,7 @@ public struct SecurityElement: Codable, Hashable, Identifiable, Sendable {
         self.verbalDescription = verbalDescription
         self.detectedByAI = detectedByAI
         self.reviewState = reviewState ?? (detectedByAI ? .pending : .confirmed)
+        self.detectionSource = detectionSource
     }
 
     public init(from decoder: Decoder) throws {
@@ -181,6 +186,7 @@ public struct SecurityElement: Codable, Hashable, Identifiable, Sendable {
         // pending regardless of provenance so it cannot bypass the new gate.
         self.reviewState = try container.decodeIfPresent(SecurityElementReviewState.self,
                                                          forKey: .reviewState) ?? .pending
+        self.detectionSource = try container.decodeIfPresent(String.self, forKey: .detectionSource)
     }
 
     public func locationDescription(pageSizePt: CGSize) -> String {

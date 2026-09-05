@@ -4,7 +4,7 @@
 Autogram is a 100% native macOS SwiftUI application for Qualified Electronic Signatures (KEP / eIDAS) and Guaranteed Conversion of legal documents (Zarucena konverzia according to Slovak Law No. 305/2013 Z. z. and Decree No. 70/2021 Z. z.).
 
 ## Architecture & Tech Stack
-- Swift 6.0+ / Xcode 26.5 toolchain (`/Applications/Xcode-26.5.app`)
+- Swift 6.0+ / Xcode 27.0 toolchain (`/Applications/Xcode-beta.app`)
 - Native macOS SwiftUI (`NavigationSplitView`, `.regularMaterial`, `.ultraThinMaterial`, Liquid Glass design)
 - Core Data / SQLite for Evidence and Conversion registers (CEZZK integration)
 - PKCS#11 bridge for Slovak eID cards, SAK advocate cards, and Disig smartcards
@@ -28,8 +28,8 @@ Autogram is a 100% native macOS SwiftUI application for Qualified Electronic Sig
 - **Finder Quick Action (`Assets/Autogram Finder Quick Action.workflow`, `build_app.sh`)**: Automator workflow restricted to Finder via `NSRequiredContext`; runs `autogram-quick-action.sh` and the bundled legacy CLI helper in the background, with `AutogramCLI-arm64`, `AutogramQuickActionRunner-arm64`, JAR dependencies, and Java runtime bundled in the app. The flow shows driver, certificate, and PIN/BOK dialogs without opening the main app and accepts PDF files only.
 
 ## Build & Test Instructions
-- Run build script: `DEVELOPER_DIR="/Applications/Xcode-26.5.app/Contents/Developer" ./build_app.sh`
-- Run test suite: `DEVELOPER_DIR="/Applications/Xcode-26.5.app/Contents/Developer" swift test`
+- Run build script: `DEVELOPER_DIR="/Applications/Xcode-beta.app/Contents/Developer" ./build_app.sh`
+- Run test suite: `DEVELOPER_DIR="/Applications/Xcode-beta.app/Contents/Developer" swift test`
 - Binary output: `.build/arm64-apple-macosx/debug/Autogram.app`
 
 ## Code Conventions
