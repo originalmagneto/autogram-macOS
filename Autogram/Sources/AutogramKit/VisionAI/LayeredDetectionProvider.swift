@@ -71,7 +71,8 @@ public struct LayeredDetectionProvider: SecurityElementsProviding {
         self.extraSources = extraSources
         self.classifier = classifier
         self.renderTargetWidth = renderTargetWidth
-        self.maxConcurrentPages = maxConcurrentPages
+        // Chunked page processing strides by this value; zero would trap.
+        self.maxConcurrentPages = max(1, maxConcurrentPages)
     }
 
     public static func makeDefault(bank: ExampleBank, useFoundationModel: Bool) -> LayeredDetectionProvider {
