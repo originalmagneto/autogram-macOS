@@ -1136,7 +1136,7 @@ struct LearningDatasetCard: View {
     @State private var counts: [BankLabel: Int] = [:]
     @State private var exportMessage: String?
     @State private var showDeleteConfirmation = false
-    private let modelAvailable = SystemLanguageModel.default.isAvailable
+    @State private var modelAvailable = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -1170,13 +1170,22 @@ struct LearningDatasetCard: View {
         .task { await refreshCounts() }
         .confirmationDialog("Vymazať všetky uložené príklady?", isPresented: $showDeleteConfirmation) {
             Button("Vymazať", role: .destructive) {
-                Task { try? await bank.removeAll(); await refreshCounts() }
+                Task {
+                    do {
+                        try await bank.removeAll()
+                        exportMessage = "Lokálny dataset bol vymazaný."
+                    } catch {
+                        exportMessage = "Vymazanie zlyhalo: \(error.localizedDescription)"
+                    }
+                    await refreshCounts()
+                }
             }
             Button("Zrušiť", role: .cancel) {}
         }
     }
 
     private func refreshCounts() async {
+        modelAvailable = SystemLanguageModel.default.isAvailable
         let entries = await bank.entries()
         counts = Dictionary(grouping: entries, by: \.label).mapValues(\.count)
     }
