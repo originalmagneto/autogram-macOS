@@ -99,18 +99,8 @@ public struct LayeredDetectionProvider: SecurityElementsProviding {
                                 pageAnalyses: [PageAnalysis]) async -> (elements: [SecurityElement], stats: DetectionRunStats) {
         guard document.pageCount > 0 else { return ([], DetectionRunStats()) }
 
-        // One sequential render pass. PDFKit is not thread safe, so every page is
-        // rasterized and OCRed on this task before any concurrent work starts, and
-        // the result is shared by the built-in heuristics and the extra sources.
-        var prepared: [PreparedPage] = []
-        for pageIndex in 0..<document.pageCount {
-            guard let analysis = pageAnalyses.first(where: { $0.pageIndex == pageIndex }),
-                  !analysis.isEmpty,
-                  let page = document.page(at: pageIndex),
-                  let rendered = BuiltInVisionProvider.render(page: page, targetWidth: renderTargetWidth) else { continue }
-            let exclusions = await BuiltInVisionProvider.visionExclusionBoxes(cgImage: rendered.cgImage)
-            prepared.append(PreparedPage(pageIndex: pageIndex, pixels: rendered.pixels,
-                                         image: rendered.cgImage, exclusions: exclusions))
+        let nonEmptyPageIndices = (0..<document.pageCount).filter { pageIndex in
+            pageAnalyses.first(where: { $0.pageIndex == pageIndex })?.isEmpty == false
         }
 
         // Snapshot the example bank once per run so every page votes against the
@@ -123,29 +113,39 @@ public struct LayeredDetectionProvider: SecurityElementsProviding {
 
         var elements: [SecurityElement] = []
         var sourceFailures: [String] = []
-        var next = 0
-        await withTaskGroup(of: PageResult.self) { group in
-            // Enqueue keeps the sliding window full: it advances until a task was
-            // actually added or the array ran out, so no page can consume a slot
-            // without producing a result.
-            func enqueue() {
-                while next < prepared.count {
-                    let page = prepared[next]
-                    next += 1
-                    group.addTask { await self.detectOnPage(page, classifier: runClassifier) }
-                    return
-                }
+        var pagesProcessed = 0
+
+        // Pages are processed in chunks of `maxConcurrentPages`. Each chunk is
+        // rendered and OCRed sequentially (PDFKit is not thread safe), then
+        // classified concurrently within one `TaskGroup`. Only one chunk's
+        // bitmaps are resident at a time, so peak memory is bounded by the
+        // window rather than growing with the page count.
+        for chunkStart in stride(from: 0, to: nonEmptyPageIndices.count, by: maxConcurrentPages) {
+            let chunkIndices = nonEmptyPageIndices[chunkStart..<min(chunkStart + maxConcurrentPages, nonEmptyPageIndices.count)]
+
+            var chunk: [PreparedPage] = []
+            for pageIndex in chunkIndices {
+                guard let page = document.page(at: pageIndex),
+                      let rendered = BuiltInVisionProvider.render(page: page, targetWidth: renderTargetWidth) else { continue }
+                let exclusions = await BuiltInVisionProvider.visionExclusionBoxes(cgImage: rendered.cgImage)
+                chunk.append(PreparedPage(pageIndex: pageIndex, pixels: rendered.pixels,
+                                          image: rendered.cgImage, exclusions: exclusions))
             }
-            for _ in 0..<maxConcurrentPages { enqueue() }
-            for await pageResult in group {
-                elements.append(contentsOf: pageResult.elements)
-                sourceFailures.append(contentsOf: pageResult.sourceFailures)
-                enqueue()
+            pagesProcessed += chunk.count
+
+            await withTaskGroup(of: PageResult.self) { group in
+                for page in chunk {
+                    group.addTask { await self.detectOnPage(page, classifier: runClassifier) }
+                }
+                for await pageResult in group {
+                    elements.append(contentsOf: pageResult.elements)
+                    sourceFailures.append(contentsOf: pageResult.sourceFailures)
+                }
             }
         }
 
         let stats = DetectionRunStats(foundationModelCalls: counting?.count ?? 0,
-                                      pagesProcessed: prepared.count,
+                                      pagesProcessed: pagesProcessed,
                                       sourceFailures: sourceFailures)
         return (elements, stats)
     }
@@ -193,14 +193,20 @@ public struct LayeredDetectionProvider: SecurityElementsProviding {
     }
 
     /// Foundation Model budget order: hinted candidates first, then the ones more
-    /// sources agreed on, then the larger regions.
+    /// sources agreed on, then the larger regions. Candidates that tie on all
+    /// three are ordered by box origin (y then x) so the result is deterministic
+    /// regardless of input order.
     static func prioritized(_ candidates: [DetectionCandidate]) -> [DetectionCandidate] {
         candidates.sorted { lhs, rhs in
             let lhsHinted = lhs.kindHint != nil
             let rhsHinted = rhs.kindHint != nil
             if lhsHinted != rhsHinted { return lhsHinted }
             if lhs.sources.count != rhs.sources.count { return lhs.sources.count > rhs.sources.count }
-            return lhs.box.width * lhs.box.height > rhs.box.width * rhs.box.height
+            let lhsArea = lhs.box.width * lhs.box.height
+            let rhsArea = rhs.box.width * rhs.box.height
+            if lhsArea != rhsArea { return lhsArea > rhsArea }
+            if lhs.box.y != rhs.box.y { return lhs.box.y < rhs.box.y }
+            return lhs.box.x < rhs.box.x
         }
     }
 

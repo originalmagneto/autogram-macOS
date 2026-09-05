@@ -77,11 +77,11 @@ struct DetectionCandidate: Sendable, Hashable {
 
 ### 5.2 Candidate sources
 
-- `BuiltInCandidateSource`: calls `BuiltInVisionProvider.detect` once per document and converts each element into a candidate with `kindHint` and `hintConfidence`. Barcode elements pass through unchanged as `.other` (they are already reliable).
+- `BuiltInCandidateSource`: runs the frozen provider's `detectOnPage` on the shared page render and exclusions, converting each element into a candidate with `kindHint` and `hintConfidence`. Barcode exclusions become `.other` passthrough elements exactly as `BuiltInVisionProvider.detect` emits them.
 - `ContourCandidateSource`: `DetectContoursRequest` with `contrastAdjustment` 1.5, `detectsDarkOnLight` true, `maximumImageDimension` 760. The value is 1.5 because the drawn-ring fixture's contour is only found at 1.5; at 2.0 the ring is lost. Top-level contours whose bounding box passes the size gates become candidates. Nested contours are folded into their parent.
 - `SaliencyCandidateSource`: `GenerateObjectnessBasedSaliencyImageRequest`; each `salientObjects` rect passing size gates becomes a candidate.
 
-All three run inside a `TaskGroup` per page; pages are processed with at most `ProcessInfo.activeProcessorCount / 2` in flight.
+Pages are rendered and OCRed sequentially in chunks of `ProcessInfo.activeProcessorCount / 2`; each chunk is classified in a `TaskGroup`, and its bitmaps are released before the next chunk is rendered, so peak memory is bounded by the window rather than by page count. Within a page the built-in, contour and saliency sources run one after another.
 
 ### 5.3 Classification
 

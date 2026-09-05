@@ -35,6 +35,27 @@ final class CandidateSourceTests: XCTestCase {
         XCTAssertTrue(barcodes.allSatisfy { !$0.detectedByAI && $0.confidence == 0.9 && $0.reviewState == .pending })
     }
 
+    func testBarcodeExclusionsPassThroughExactlyLikeFrozenProvider() throws {
+        let base = try preparedContractPage()
+        let barcodeBox = NormalizedRect(x: 0.1, y: 0.8, width: 0.2, height: 0.1)
+        var exclusions = base.exclusions
+        exclusions.barcodeBoxes = [barcodeBox]
+        let prepared = PreparedPage(pageIndex: base.pageIndex, pixels: base.pixels,
+                                    image: base.image, exclusions: exclusions)
+
+        let result = BuiltInCandidateSource().candidates(on: prepared)
+        let barcodePassthroughs = result.passthrough.filter { $0.boundingBox == barcodeBox }
+        XCTAssertEqual(barcodePassthroughs.count, 1)
+        let element = try XCTUnwrap(barcodePassthroughs.first)
+        XCTAssertEqual(element.kind, .other)
+        XCTAssertEqual(element.boundingBox, barcodeBox)
+        XCTAssertEqual(element.confidence, 0.9)
+        XCTAssertEqual(element.verbalDescription, "Čiarový kód / QR (notárska pripojka)")
+        XCTAssertFalse(element.detectedByAI)
+        XCTAssertEqual(element.reviewState, .pending)
+        XCTAssertEqual(element.pageIndex, prepared.pageIndex)
+    }
+
     func testContourSourceFindsDrawnStampRegion() throws {
         let image = try renderedContractPage()
         let candidates = try awaitAsyncThrowing {

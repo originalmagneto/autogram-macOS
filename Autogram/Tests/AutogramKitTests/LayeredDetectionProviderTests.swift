@@ -142,6 +142,23 @@ final class LayeredDetectionProviderTests: XCTestCase {
         XCTAssertEqual(ordered.map(\.box.x), [hinted.box.x, twoSources.box.x, large.box.x, small.box.x])
     }
 
+    func testPrioritizedTieBreaksByOriginWhenOtherwiseEqual() {
+        func candidate(x: Double, y: Double) -> DetectionCandidate {
+            DetectionCandidate(pageIndex: 0, box: .init(x: x, y: y, width: 0.05, height: 0.05),
+                               sources: [.contour])
+        }
+        let topLeft = candidate(x: 0.1, y: 0.1)
+        let topRight = candidate(x: 0.5, y: 0.1)
+        let bottom = candidate(x: 0.3, y: 0.6)
+        let expected: [[Double]] = [[topLeft.box.y, topLeft.box.x], [topRight.box.y, topRight.box.x], [bottom.box.y, bottom.box.x]]
+
+        let orderedA = LayeredDetectionProvider.prioritized([bottom, topRight, topLeft])
+        XCTAssertEqual(orderedA.map { [$0.box.y, $0.box.x] }, expected)
+
+        let orderedB = LayeredDetectionProvider.prioritized([topRight, bottom, topLeft])
+        XCTAssertEqual(orderedB.map { [$0.box.y, $0.box.x] }, expected)
+    }
+
     func testFailingSourceIsReportedInRunStats() throws {
         let (document, analyses) = try contract()
         let provider = LayeredDetectionProvider(
