@@ -8,9 +8,12 @@ Autogram is a 100% native macOS SwiftUI application for Qualified Electronic Sig
 - Native macOS SwiftUI (`NavigationSplitView`, `.regularMaterial`, `.ultraThinMaterial`, Liquid Glass design)
 - Core Data / SQLite for Evidence and Conversion registers (CEZZK integration)
 - PKCS#11 bridge for Slovak eID cards, SAK advocate cards, and Disig smartcards
-- PDFKit, CoreGraphics, and on-device Vision AI for document analysis and security element detection
+- PDFKit, CoreGraphics, Apple Vision and FoundationModels for document analysis and security element detection
+  - `LayeredDetectionProvider` (VisionAI/): candidates from `BuiltInVisionProvider` (frozen), `DetectContoursRequest`, objectness saliency; merged by `CandidateMerger`; classified by `TwoStageClassifier` (`FeaturePrintClassifier` kNN over `ExampleBank`, then on-device `FoundationModelClassifier`)
+  - `ExampleBank` at `~/Library/Application Support/Autogram/VisionBank` records confirm/reject decisions; `CreateMLExporter` writes Create ML object-detector datasets; `vision-eval` target scores precision/recall
+  - `SegmentationSnapper` wraps `GenerateIterativeSegmentationRequest` for click-to-snap boxes in `AnalysisCanvasView`
   - Local LLM vision providers: oMLX (Apple Silicon MLX, `localhost:8000/v1`) and Ollama (`localhost:11434`), plus OpenAI-compatible cloud APIs with keys in Keychain
-  - AI provider selection in Settings uses provider cards (`SettingsView.aiProviderRow`); config panel renders under the chosen mode
+  - AI provider selection in Settings uses provider cards (`SettingsView.aiProviderRow`); config panel renders under the chosen mode; `LearningDatasetCard` holds the learning toggles and dataset export
 
 ## Design System & UI/UX Structure
 - **DesignSystem.swift**: Contains `.liquidGlass()` modifiers, `StickyActionBar` containers, `SmartcardHUDStatus` reader badges, `EIDASBadge` verification pills, and `FlowStepBar` subheader stepper navigation.
@@ -30,6 +33,7 @@ Autogram is a 100% native macOS SwiftUI application for Qualified Electronic Sig
 ## Build & Test Instructions
 - Run build script: `DEVELOPER_DIR="/Applications/Xcode-beta.app/Contents/Developer" ./build_app.sh`
 - Run test suite: `DEVELOPER_DIR="/Applications/Xcode-beta.app/Contents/Developer" swift test`
+- Run detection eval harness: `swift run vision-eval <dataset>` (dataset export kept outside the repo)
 - Binary output: `.build/arm64-apple-macosx/debug/Autogram.app`
 
 ## Code Conventions

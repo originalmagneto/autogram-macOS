@@ -29,7 +29,7 @@
 - No credentials, private keys, PINs, timestamp tokens, signed payloads, or API secrets may be committed or written to ordinary application logs.
 - Comments, identifiers, and internal documentation MUST be in English. End-user strings MUST be in Slovak.
 - Do not use em dashes in source, documentation, UI copy, or reports.
-- Preserve the current `BuiltInVisionProvider.swift` work unless a narrowly scoped regression fix is required.
+- Preserve the current `BuiltInVisionProvider.swift` work unless a narrowly scoped regression fix is required. This freeze remains in effect: `LayeredDetectionProvider` wraps `BuiltInVisionProvider` unchanged as one candidate source and is the extension point for new detectors (contours, saliency, and future Create ML sources).
 - Every implementation task MUST add or update a focused behavioral test before changing production code.
 - Every phase ends with its stated exit gate. A green local test suite alone MUST NOT be treated as production, legal, interoperability, sandbox, or external conformance evidence.
 

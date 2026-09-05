@@ -183,13 +183,13 @@ Legenda: 🟢 MVP (Fáza 1) · 🔵 V2 · 🟣 V3 · ⭐ = seamless/automatika
 ### 5.2 AI Vision — Bezpečnostné prvky (seamless jadro produktu)
 
 - 🟢⭐ Detekcia **vlastnoručných podpisov** (bounding boxy, strana + kvadrant/pozícia).
-- 🟢⭐ Detekcia **okrúhlych úradných pečiatok** (Hough circle transform + Vision/CoreML klasifikátor).
+- 🟢⭐ Detekcia **okrúhlych úradných pečiatok**: Implementované: vrstvená detekcia (heuristiky + Vision kontúry + saliency), kNN nad lokálnym datasetom, on-device Foundation Model klasifikácia neistých výrezov. Fáza C (plán): Create ML `MLObjectDetector` natrénovaný z exportovaného datasetu, pripojený ako ďalší zdroj kandidátov cez `CoreMLRequest`.
 - 🟢⭐ Detekcia **reliéfnych slepotlačí** (shadow/gradient heuristika).
 - 🟢⭐ **Slovný opis prvkov generovaný automaticky** do doložky: *„Na liste 2, strane 1, v pravej dolnej časti sa nachádza vlastnoručný podpis…"* — advokát len schváli/upraví.
 - 🟢 Manuálny režim: advokát klikne na stranu → pridá prvok z palety (podpis/pečiatka/slepotlač/parafa/iné) → ťahaním umiestni.
 - 🔵 OCR (Vision framework) — prečítanie hlavičky dokumentu na auto-názov doložky.
 - 🔵 Confidence score + „potrebný ľudský dohľad" indikátor pri nízkjej istote.
-- 🟣 On-device model finetuning; znalecké osvedčenie automatizácie podľa § 39 ods. 4 (marketingová výhoda).
+- 🟣 Fáza C: doladenie Create ML `MLObjectDetector` nad rastúcim datasetom (pozri 5.2 vyššie); znalecké osvedčenie automatizácie podľa § 39 ods. 4 (marketingová výhoda).
 
 ### 5.3 Certifikáty a podpisovanie
 
@@ -265,7 +265,7 @@ Naväzuje na `design_assets/zako_advocate_studio.jpg` a hybridný model (kompakt
 AutogramApp (SwiftUI)
  ├─ ZaKoFeature
  │   ├─ Intake          (drag&drop, scanner bridge)
- │   ├─ AnalysisEngine  (PDFKit + Vision + CoreML → SecurityElementsModel)
+ │   ├─ AnalysisEngine  (PDFKit + Vision + FoundationModels (+ CoreML vo fáze C) → SecurityElementsModel)
  │   ├─ AttestationKit  (XMLCoder generátor + XSD validator + HTML/PDF renderer)
  │   ├─ SigningEngine   (PKCS#11/CryptoTokenKit + PAdES/ASiC-E + TSA klient)
  │   ├─ EzzkClient      (URLSession, Keychain creds, evidence-number API, submission queue)
@@ -277,7 +277,7 @@ AutogramApp (SwiftUI)
 Kľúčové technické rozhodnutia:
 
 1. **Podpisový engine:** PAdES/ASiC-E + QTS je najrizikovejší diel. Možnosti: (a) zabaliť EU **DSS knižnicu** (rovnakú ako používa Autogram/Podpisuj) do helper procesu, (b) natívna Swift implementácia nad Apple Crypto. Odporúčanie: **(a)** pre MVP-paritu s ekosystémom, s natívnym Swift facade.
-2. **Vision pipeline:** Vision `VNRecognizeTextRequest` (OCR) + `VNDetectContoursRequest`/custom CoreML pre pečiatky; heuristiky pre slepotlače; všetko on-device (GDPR), voliteľne LLM vision backendy podľa existujúcej 4-režimovej AI špecifikácie.
+2. **Vision + FoundationModels pipeline (+ CoreML vo fáze C):** `LayeredDetectionProvider` zlučuje kandidátov z `BuiltInVisionProvider` (frozen baseline), `VNDetectContoursRequest` a objectness saliency cez `CandidateMerger`; `TwoStageClassifier` klasifikuje najprv `FeaturePrintClassifier` (kNN nad `ExampleBank`) a neisté prípady posunie on-device `FoundationModelClassifier`; `SegmentationSnapper` (`GenerateIterativeSegmentationRequest`) dorába klik-na-prvok rámce. Fáza C dopĺňa Create ML `MLObjectDetector` ako ďalší zdroj kandidátov cez `CoreMLRequest`. Všetko on-device (GDPR), voliteľne LLM vision backendy podľa existujúcej 4-režimovej AI špecifikácie.
 3. **XML:** `XMLCoder` + runtime XSD validácia; artefakty formulárov cacheované a verziované (`FormularyRepository`).
 4. **EmbeddedFile do PDF:** PDFKit/CoreGraphics (`PDFDocument` + attachment) — kontrola, že viewer zachová prílohu; alternatívne ASiC-E kontajner.
 5. **Bezpečnosť:** EZZK heslá len v Keychain; PIN/BOK overlay bez logovania; audit log úkonov.
@@ -318,7 +318,7 @@ Kľúčové technické rozhodnutia:
 |---|---|---|
 | **F1 — MVP P→E** (≈ 6–8 týždňov) | Intake, analýza (strany/listy/veľkosť), AI Vision prvky v1, XML doložka v1.0, EZZK číslo+odoslanie, KEP+QTS podpis, lokálna evidencia | End-to-end konverzia reálneho dokumentu; XSD-validný XML; zápis v CEZZK |
 | **F2** | E→P, E→E, batch, PDF/A štandardizácia + veraPDF, overovací klient CEZZK, fakturačný export | Dva nové smery konverzie; hromadná dávka 20 dokumentov bez zásahu |
-| **F3** | Formuláre 1.2 (2027-ready), LTA archivácia, on-device ML tuning, znalecké osvedčenie automatizácie, scanner bridge, CLI/REST (autogram protocol) | Auto-update formulárov; certifikovaná automatizácia prvkov |
+| **F3** | Formuláre 1.2 (2027-ready), LTA archivácia, Create ML `MLObjectDetector` (fáza C, pozri 5.2 a 7 vyššie), znalecké osvedčenie automatizácie, scanner bridge, CLI/REST (autogram protocol) | Auto-update formulárov; certifikovaná automatizácia prvkov |
 
 ## 11. Otvorené Otázky / Riziká
 

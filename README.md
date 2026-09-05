@@ -33,7 +33,7 @@ Natívna macOS aplikácia v SwiftUI pre kvalifikované elektronické podpisovani
 - **Dávkové podpisovanie:** jedna plná DSS validácia pre celú dávku, výsledky podľa dokumentu, bezpečné cancellation guards a collision-safe výstupy.
 - **Dôveryhodnosť vstupu:** neplatný podpis blokuje konkrétny dokument; indeterminate stav alebo nedostupná trust služba zostáva informatívna.
 - **ZaKo workflow:** päť krokov od importu po dokončenie, vrátane potvrdenia pôvodu, bezpečnostných prvkov, osvedčovacej doložky a mandátneho certifikátu.
-- **AI Vision:** lokálny Apple Vision baseline, oMLX, Ollama a voliteľné OpenAI-compatible endpointy.
+- **AI Vision:** vrstvená on-device detekcia (vstavané heuristiky + Apple Vision kontúry a saliency), klasifikácia porovnaním s potvrdenými príkladmi a on-device Apple modelom, klik-na-prvok cez Vision segmentáciu; voliteľne oMLX, Ollama a OpenAI-compatible endpointy.
 - **PDF/A:** vektorový a rasterizovaný režim, lokálna kontrola štruktúry, XMP, OutputIntent, EmbeddedFile a asociácie `/AF`.
 - **Finder Quick Action:** podpis PDF súborov bez otvárania hlavného okna aplikácie.
 - **Bezpečné dáta:** security-scoped bookmarks, Keychain pre tajomstvá a lokálna evidencia bez ukladania obsahu dokumentov.
@@ -76,7 +76,7 @@ Natívna macOS aplikácia v SwiftUI pre kvalifikované elektronické podpisovani
 
 <p><strong>Produkčné EZZK backlinkovanie ešte čaká na schválenie MIRRI.</strong> Aplikácia preto zatiaľ pripraví konverzný artefakt, osvedčovaciu doložku a lokálnu evidenciu v pilotnom režime. Produkčné pridelenie evidenčného čísla a odoslanie záznamu do CEZZK sú dostupné až po zapojení schválenej EZZK integrácie.</p>
 
-<p>AI Vision je dnes pomocná vrstva s lokálnym Vision baseline a voliteľným LLM. Bezpečnostné prvky je možné označiť ručne, upraviť ich rámec a potvrdiť alebo odmietnuť každý nález. Budúca verzia má doplniť vlastné ML vision modely, ktoré budú prvky automaticky identifikovať a označovať; manuálna kontrola však zostane dôležitou poistkou.</p>
+<p>AI Vision je vrstvená: kandidáti z vstavaných heuristík, Apple Vision kontúr a saliency sa zlúčia a každý výrez klasifikuje porovnanie s lokálne uloženými potvrdenými príkladmi (feature print kNN); neisté prípady posúdi on-device Apple model. Každé potvrdenie alebo odmietnutie v kontrole ukladá výrez do lokálneho datasetu, ktorý sa dá exportovať pre Create ML. Bezpečnostné prvky je možné označiť ručne alebo kliknutím (Vision segmentácia), upraviť ich rámec a potvrdiť alebo odmietnuť každý nález. Manuálna kontrola zostáva povinnou poistkou.</p>
 
 <p>Aktuálny pilotný postup je: importovať dokument, skontrolovať každú neprázdnu stranu, ručne označiť bezpečnostné prvky, potvrdiť ich, prihlásiť sa do EZZK sandboxu a vyžiadať evidenčné číslo. Bez čísla z EZZK aplikácia zámerne nepovolí autorizáciu.</p>
 </details>
@@ -113,7 +113,7 @@ Procesný diagram sleduje dokument od skenu originálu cez analýzu, AI Vision a
 
 ### AI Vision pipeline
 
-Pipeline ukazuje oddelenie medzi lokálnou detekciou bezpečnostných prvkov a voliteľným LLM opisom. Nálezy nie sú automaticky považované za potvrdené: advokát ich skontroluje a až potom pokračuje validačný workflow.
+Pipeline ukazuje oddelenie medzi lokálnou detekciou bezpečnostných prvkov a voliteľným LLM opisom. Kandidáti z troch zdrojov sa zlučujú a klasifikujú dvojstupňovo (kNN nad lokálnym datasetom, potom on-device model). Nálezy nie sú automaticky považované za potvrdené: advokát ich skontroluje a až potom pokračuje validačný workflow.
 
 <p align="center">
   <img src="docs/diagrams/ai-vision.svg" alt="AI Vision pipeline" width="100%">
@@ -148,7 +148,7 @@ Stavový automat ukazuje, kedy je dokument iba pripravený, kedy prešiel kontro
 ### Požiadavky
 
 - macOS 27 alebo novší
-- Xcode 26.5 a Swift 6 pre build zo zdrojov
+- Xcode 27.0 a Swift 6 pre build zo zdrojov
 - Apple Silicon alebo Intel podľa použitého toolchainu
 - pre reálny podpis kompatibilná eID karta, advokátsky preukaz alebo PKCS#11, CryptoTokenKit či Keychain token
 - pre EZZK produkčný režim účet, callback `autogram://ezzk/callback`, sandboxové overenie a sieťové pripojenie
@@ -172,7 +172,7 @@ Aktuálny macOS build bude dostupný v [GitHub Releases](https://github.com/orig
 
 ```bash
 cd Autogram
-DEVELOPER_DIR=/Applications/Xcode-26.5.app/Contents/Developer ./build_app.sh install
+DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer ./build_app.sh install
 ```
 
 Aplikácia sa nainštaluje do:
@@ -185,16 +185,18 @@ Aplikácia sa nainštaluje do:
 
 ```bash
 cd Autogram
-DEVELOPER_DIR=/Applications/Xcode-26.5.app/Contents/Developer swift test
+DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift test
 ```
 
 Voliteľné live engine testy:
 
 ```bash
 AUTOGRAM_ENGINE_LIVE_TEST=1 \
-DEVELOPER_DIR=/Applications/Xcode-26.5.app/Contents/Developer \
+DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
 swift test --filter JavaEngineLiveProcessTests
 ```
+
+- `swift run vision-eval <dataset>` vyhodnotí presnosť a rýchlosť detekcie na exportovanom datasete (mimo repozitára).
 
 ## Podpisovanie
 
