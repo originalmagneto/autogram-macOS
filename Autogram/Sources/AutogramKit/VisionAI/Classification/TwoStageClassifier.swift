@@ -35,6 +35,10 @@ public struct TwoStageClassifier: Sendable {
     public static func decide(primary: ElementJudgement, secondary: ElementJudgement?,
                               hint: SecurityElement.Kind?, hintConfidence: Double?,
                               minimumSupport: Int, minimumMargin: Double) -> ElementJudgement? {
+        // An unsure secondary (for example a model timeout) carries no information;
+        // treat it like an absent secondary so hinted candidates are not discarded.
+        let secondary = secondary.flatMap { $0.kind == nil && $0.confidence == 0 ? nil : $0 }
+
         if isConfident(primary, minimumSupport: minimumSupport, minimumMargin: minimumMargin) {
             return primary.kind == nil ? nil : primary
         }

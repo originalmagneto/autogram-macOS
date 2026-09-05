@@ -1,4 +1,5 @@
 import XCTest
+import CoreGraphics
 @testable import AutogramKit
 
 final class TwoStageClassifierTests: XCTestCase {
@@ -63,5 +64,55 @@ final class TwoStageClassifierTests: XCTestCase {
                                                secondary: nil, hint: .officialStamp, hintConfidence: 0.9,
                                                minimumSupport: 3, minimumMargin: 0.25)
         XCTAssertNil(result)
+    }
+
+    func testUnsureSecondaryFallsThroughToHint() {
+        let result = TwoStageClassifier.decide(primary: knn(nil, conf: 0, margin: 0, support: 0),
+                                               secondary: fm(nil, conf: 0),
+                                               hint: .officialStamp, hintConfidence: 0.7,
+                                               minimumSupport: 3, minimumMargin: 0.25)
+        XCTAssertEqual(result?.kind, .officialStamp)
+        XCTAssertEqual(result?.decidedBy, .builtInHint)
+    }
+
+    func testUnsureSecondaryWithoutHintDiscards() {
+        let result = TwoStageClassifier.decide(primary: knn(nil, conf: 0, margin: 0, support: 0),
+                                               secondary: fm(nil, conf: 0),
+                                               hint: nil, hintConfidence: nil,
+                                               minimumSupport: 3, minimumMargin: 0.25)
+        XCTAssertNil(result)
+    }
+
+    private final class CountingClassifier: ElementClassifying, @unchecked Sendable {
+        let judgement: ElementJudgement
+        var calls = 0
+        init(_ judgement: ElementJudgement) { self.judgement = judgement }
+        func classify(crop: CGImage, hint: SecurityElement.Kind?) async throws -> ElementJudgement {
+            calls += 1
+            return judgement
+        }
+    }
+
+    private func blankImage() throws -> CGImage {
+        let ctx = try XCTUnwrap(CGContext(data: nil, width: 8, height: 8, bitsPerComponent: 8, bytesPerRow: 0,
+                                          space: CGColorSpaceCreateDeviceRGB(),
+                                          bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+        return try XCTUnwrap(ctx.makeImage())
+    }
+
+    func testSecondaryIsConsultedOnlyWhenPrimaryIsUnsure() throws {
+        let image = try blankImage()
+        let confident = CountingClassifier(knn(.officialStamp, conf: 0.9, margin: 0.9, support: 9))
+        let weak = CountingClassifier(knn(.officialStamp, conf: 0.4, margin: 0.05, support: 9))
+        let secondary = CountingClassifier(fm(.officialStamp, conf: 0.8))
+
+        let a = TwoStageClassifier(primary: confident, secondary: secondary)
+        _ = awaitAsync { await a.classify(crop: image, hint: nil, hintConfidence: nil) }
+        XCTAssertEqual(secondary.calls, 0)
+
+        let b = TwoStageClassifier(primary: weak, secondary: secondary)
+        let result = awaitAsync { await b.classify(crop: image, hint: nil, hintConfidence: nil) }
+        XCTAssertEqual(secondary.calls, 1)
+        XCTAssertEqual(result?.decidedBy, .foundationModel)
     }
 }
