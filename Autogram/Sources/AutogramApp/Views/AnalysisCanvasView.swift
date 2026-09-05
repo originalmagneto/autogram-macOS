@@ -409,10 +409,44 @@ struct AnalysisCanvasView: View {
                         Spacer()
                     }
                 }
+                if store.isAnalyzing {
+                    analysisOverlay
+                }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         }
+    }
+
+    /// Covers the canvas while detection runs: the dimming layer also swallows
+    /// clicks, so nobody edits boxes that the finishing run is about to replace.
+    private var analysisOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.25)
+                .contentShape(Rectangle())
+
+            VStack(spacing: 10) {
+                ProgressView()
+                    .controlSize(.large)
+                Text("Analyzujem dokument")
+                    .font(.headline)
+                if !store.analysisProgressText.isEmpty {
+                    Text(store.analysisProgressText)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
+                Text("Nálezy sa zobrazia po dokončení. Kontrola každej strany zostáva na vás.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 320)
+            }
+            .padding(20)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        }
+        .transition(.opacity)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Prebieha analýza dokumentu")
     }
 
     private var countersRow: some View {

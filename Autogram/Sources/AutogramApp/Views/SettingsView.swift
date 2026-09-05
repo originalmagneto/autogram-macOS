@@ -115,13 +115,17 @@ struct SettingsView: View {
         }
     }
 
+    /// The scroll container is what keeps a tab taller than the window reachable;
+    /// without it the content was simply clipped at the bottom edge.
     private func settingsTabContent<Content: View>(_ content: Content) -> some View {
-        content
-            .frame(maxWidth: 960, alignment: .topLeading)
-            .padding(.vertical, 18)
-            .padding(.horizontal, 28)
-            .fixedSize(horizontal: false, vertical: true)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        ScrollView {
+            content
+                .frame(maxWidth: 960, alignment: .topLeading)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.vertical, 18)
+                .padding(.horizontal, 28)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
 
