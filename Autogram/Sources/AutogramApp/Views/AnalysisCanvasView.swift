@@ -373,6 +373,19 @@ struct AnalysisCanvasView: View {
                         markupToolbar
                     }
                     .padding(14)
+
+                    if let progress = store.snapAssetProgress {
+                        HStack(spacing: 6) {
+                            ProgressView(value: progress)
+                                .frame(width: 80)
+                            Text("Sťahujem model výberu…").font(.caption2)
+                        }
+                        .padding(6)
+                        .background(.regularMaterial, in: Capsule())
+                    } else if let reason = store.snapUnavailableReason {
+                        Text(reason).font(.caption2).foregroundStyle(.secondary)
+                    }
+
                     Spacer()
                 }
 
@@ -479,6 +492,7 @@ struct AnalysisCanvasView: View {
                                        store.removeSecurityElement(id: element.id)
                                    },
                                    onDuplicate: { _ = store.duplicateElement(id: element.id) },
+                                   onRefine: { Task { await store.refineElement(id: element.id) } },
                                    onReviewStateChange: { state in
                                        switch state {
                                        case .confirmed: store.confirmSecurityElement(id: element.id)
@@ -791,8 +805,20 @@ struct ElementOverlay: View {
             .onChanged { value in
                 handleDragChanged(value)
             }
-            .onEnded { _ in
-                interaction = nil
+            .onEnded { value in
+                defer { interaction = nil }
+                guard let current = interaction, !current.moved,
+                      case .resizing(let id, _) = current.kind,
+                      let tool = store.activeTool,
+                      store.securityElements.first(where: { $0.id == id })?.detectedByAI == false else { return }
+                // A click without movement in an element mode: replace the placeholder with a snapped element.
+                let point = mapper.normalizedPoint(from: value.location)
+                store.removeSecurityElement(id: id)
+                Task { @MainActor in
+                    if await store.snapElement(kind: tool, at: point) == nil {
+                        store.undoDelete()
+                    }
+                }
             }
     }
 
@@ -840,6 +866,7 @@ struct ElementRow: View {
     let onSelect: () -> Void
     let onDelete: () -> Void
     let onDuplicate: () -> Void
+    let onRefine: () -> Void
     let onReviewStateChange: (SecurityElementReviewState) -> Void
     let onKindChange: (SecurityElement.Kind) -> Void
     let onDescriptionChange: (String) -> Void
@@ -924,6 +951,15 @@ struct ElementRow: View {
                 } label: {
                     Label("Duplikovať prvok", systemImage: "plus.square.on.square")
                 }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+
+                Button {
+                    onRefine()
+                } label: {
+                    Label("Spresniť rámec", systemImage: "wand.and.stars")
+                }
+                .help("Prispôsobí rámec skutočnému obrysu prvku (Apple Vision).")
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
 

@@ -74,6 +74,11 @@ final class ZakoSessionStore {
     var lastDeletedElement: (SecurityElement, Int)?
     var selectedElementID: UUID?
 
+    var snapper: any SegmentationSnapping = SegmentationSnapper()
+    var snapAssetProgress: Double?
+    var snapUnavailableReason: String?
+    private var snapAssetsReady = false
+
     var validationErrors: [AttestationValidationError] = []
     var preflightErrors: [AttestationValidationError] = []
     var result: SignedConversionResult?
@@ -578,6 +583,46 @@ final class ZakoSessionStore {
         }
         lastDeletedElement = nil
         recomputePreflight()
+    }
+
+    private func ensureSnapAssets() async -> Bool {
+        if snapAssetsReady { return true }
+        snapAssetProgress = 0
+        defer { snapAssetProgress = nil }
+        do {
+            try await snapper.ensureAssets { fraction in
+                Task { @MainActor in self.snapAssetProgress = fraction }
+            }
+            snapAssetsReady = true
+            snapUnavailableReason = nil
+            return true
+        } catch {
+            snapUnavailableReason = "Presný výber prvku nie je dostupný (model sa nepodarilo stiahnuť). Rámec nakreslite ručne."
+            return false
+        }
+    }
+
+    private func renderedPage(_ pageIndex: Int) -> CGImage? {
+        guard let document, let page = document.page(at: pageIndex) else { return nil }
+        return BuiltInVisionProvider.render(page: page, targetWidth: 1200)?.cgImage
+    }
+
+    /// Click without drag in an element mode: segment at the point and create the element.
+    func snapElement(kind: SecurityElement.Kind, at point: NormalizedPoint) async -> UUID? {
+        let pageIndex = previewPageIndex
+        guard await ensureSnapAssets(), let image = renderedPage(pageIndex) else { return nil }
+        let box = UncheckedSendableImage(image)
+        guard let rect = try? await snapper.snap(pageImage: box.image, seed: point) else { return nil }
+        addSecurityElement(kind: kind, pageIndex: pageIndex, rect: rect)
+        return selectedElementID
+    }
+
+    func refineElement(id: UUID) async {
+        guard let element = securityElements.first(where: { $0.id == id }),
+              await ensureSnapAssets(), let image = renderedPage(element.pageIndex) else { return }
+        let box = UncheckedSendableImage(image)
+        guard let rect = try? await snapper.refine(pageImage: box.image, box: element.boundingBox) else { return }
+        updateElementBoundingBox(id: id, boundingBox: rect)
     }
 
     func placeElement(kind: SecurityElement.Kind, at center: NormalizedPoint, pageIndex: Int? = nil) -> UUID {
