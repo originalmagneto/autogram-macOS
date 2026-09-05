@@ -28,7 +28,9 @@ export MACOSX_DEPLOYMENT_TARGET="27.0"
 echo "▸ swift build -c $MODE"
 swift build -c "$MODE"
 
-BIN_DIR=".build/arm64-apple-macosx/$MODE"
+# Ask SwiftPM where it put the products: Xcode 27 toolchains use .build/out/Products/<Mode>,
+# older ones .build/arm64-apple-macosx/<mode>.
+BIN_DIR="$(swift build -c "$MODE" --show-bin-path)"
 APP_DIR="$BIN_DIR/Autogram.app"
 CONTENTS="$APP_DIR/Contents"
 

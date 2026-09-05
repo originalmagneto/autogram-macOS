@@ -34,7 +34,7 @@ Autogram is a 100% native macOS SwiftUI application for Qualified Electronic Sig
 - Run build script: `DEVELOPER_DIR="/Applications/Xcode-beta.app/Contents/Developer" ./build_app.sh`
 - Run test suite: `DEVELOPER_DIR="/Applications/Xcode-beta.app/Contents/Developer" swift test`
 - Run detection eval harness: `swift run vision-eval <dataset> [--builtin-only] [--no-fm] [--bank <dir>] [--iou 0.4] [--json]` (dataset export kept outside the repo; `--bank <dir>` picks the example bank, default is a fresh empty temporary directory)
-- Binary output: `.build/arm64-apple-macosx/debug/Autogram.app`
+- Binary output: `$(swift build --show-bin-path)/Autogram.app` (Xcode 27: `.build/out/Products/Debug/Autogram.app`)
 
 ## Code Conventions
 - Strict typing and modular design
