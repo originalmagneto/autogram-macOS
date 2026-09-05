@@ -13,8 +13,9 @@ public struct SaliencyCandidateSource: CandidateSourcing {
         let request = GenerateObjectnessBasedSaliencyImageRequest()
         let observation = try await request.perform(on: pageImage)
         let size = CGSize(width: pageImage.width, height: pageImage.height)
-        return observation.salientObjects.map { object in
+        return observation.salientObjects.compactMap { object in
             let pixel = object.boundingBox.toImageCoordinates(size, origin: .upperLeft)
+            guard pixel.width > 0, pixel.height > 0 else { return nil }
             let box = PageCrop.normalizedRect(fromPixelRect: pixel,
                                               imageWidth: pageImage.width, imageHeight: pageImage.height)
             return DetectionCandidate(pageIndex: pageIndex, box: box, sources: [.saliency])

@@ -42,6 +42,8 @@ final class CandidateSourceTests: XCTestCase {
             XCTAssertTrue((0...1).contains(c.box.x) && (0...1).contains(c.box.y))
             XCTAssertLessThanOrEqual(c.box.x + c.box.width, 1.0001)
             XCTAssertLessThanOrEqual(c.box.y + c.box.height, 1.0001)
+            XCTAssertGreaterThan(c.box.width, 0)
+            XCTAssertGreaterThan(c.box.height, 0)
             XCTAssertEqual(c.sources, [.saliency])
         }
     }
