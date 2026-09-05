@@ -32,7 +32,9 @@ public struct FoundationJudgement: Sendable, Equatable {
 }
 
 public protocol FoundationJudging: Sendable {
-    func judge(crop: CGImage, hint: SecurityElement.Kind?) async throws -> FoundationJudgement
+    /// `context` carries extra evidence about the crop (for example OCR text
+    /// coverage). Empty when nothing is known.
+    func judge(crop: CGImage, hint: SecurityElement.Kind?, context: String) async throws -> FoundationJudgement
 }
 
 /// Structured output type for the on-device model.
@@ -59,16 +61,20 @@ public actor SystemFoundationJudge: FoundationJudging {
         or surrounding text. A stamp is an inked impression (often round, blue or red, with text or \
         a coat of arms). A signature is handwritten cursive ink. An embossed seal is a colourless \
         relief impression. An initial is a short handwritten mark. Printed text, logos, lines, tables \
-        and photographs are not security elements. Answer in the requested structure. \
-        descriptionSK must be Slovak.
+        and photographs are not security elements. Printed or typed text, names, addresses, \
+        numbers, table cells, form fields, ruled boxes and underlines are NOT security elements \
+        even when bold. A handwritten signature shows irregular pen strokes that do not look like \
+        a font. Answer in the requested structure. descriptionSK must be Slovak.
         """)
+        // Warming the session moves model load off the first real classification.
+        session.prewarm()
     }
 
-    public func judge(crop: CGImage, hint: SecurityElement.Kind?) async throws -> FoundationJudgement {
+    public func judge(crop: CGImage, hint: SecurityElement.Kind?, context: String) async throws -> FoundationJudgement {
         let hintText = hint.map { "A heuristic detector suggested this may be: \($0.rawValue). Verify visually." } ?? ""
         let response = try await session.respond(generating: GeneratedJudgement.self,
                                                  options: GenerationOptions(temperature: 0)) {
-            "Is a physical security element visible in this crop? \(hintText)"
+            "Is a physical security element visible in this crop? \(hintText) \(context)"
             Attachment(crop)
         }
         let content = response.content
@@ -101,9 +107,17 @@ public struct FoundationModelClassifier: ElementClassifying {
     }
 
     public func classify(crop: CGImage, hint: SecurityElement.Kind?) async throws -> ElementJudgement {
+        try await classify(crop: crop, hint: hint, textCoverage: nil)
+    }
+
+    /// `textCoverage` is the fraction of the crop covered by OCR text boxes, passed
+    /// to the model as extra evidence so printed regions are rejected more reliably.
+    public func classify(crop: CGImage, hint: SecurityElement.Kind?,
+                         textCoverage: Double?) async throws -> ElementJudgement {
         let judge = self.judge
         let timeout = timeoutSeconds
         let crop = crop
+        let context = Self.contextText(textCoverage: textCoverage)
         // The judge runs in its own detached task, outside the task group, because
         // `withThrowingTaskGroup` only returns once every child task has finished.
         // `LanguageModelSession.respond` is not guaranteed to observe cancellation, so if the
@@ -115,7 +129,7 @@ public struct FoundationModelClassifier: ElementClassifying {
         let cell = JudgementCell()
         let judgeTask = Task {
             do {
-                let result = Self.map(try await judge.judge(crop: crop, hint: hint))
+                let result = Self.map(try await judge.judge(crop: crop, hint: hint, context: context))
                 await cell.set(.success(result))
             } catch {
                 await cell.set(.failure(error))
@@ -142,7 +156,14 @@ public struct FoundationModelClassifier: ElementClassifying {
         if result == nil {
             judgeTask.cancel()
         }
-        return result ?? ElementJudgement(kind: nil, confidence: 0, decidedBy: .foundationModel)
+        return result ?? ElementJudgement(kind: nil, confidence: 0, decidedBy: .foundationModel,
+                                          isUnsure: true)
+    }
+
+    static func contextText(textCoverage: Double?) -> String {
+        guard let textCoverage else { return "" }
+        let percent = Int((textCoverage * 100).rounded())
+        return "OCR found printed text covering \(percent) % of this region."
     }
 
     public static func map(_ judgement: FoundationJudgement) -> ElementJudgement {

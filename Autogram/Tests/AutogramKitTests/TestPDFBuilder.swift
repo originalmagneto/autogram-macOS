@@ -114,6 +114,41 @@ enum TestPDFBuilder {
         ])
     }
 
+    /// A ruled form: six stroked table cells, each holding one line of printed
+    /// text, and a title. No ring and no handwriting, so every signature-like
+    /// finding on this page is a false positive from the cell borders.
+    static func ruledFormPDF() -> Data {
+        let a4 = CGSize(width: 595, height: 842)
+        let cellWidth: CGFloat = 200
+        let cellHeight: CGFloat = 80
+        let labels = [
+            "Meno a priezvisko",
+            "Dátum narodenia",
+            "Adresa pobytu",
+            "IČO organizácie",
+            "Rozsah plnej moci",
+            "Miesto a dátum"
+        ]
+
+        return build(pages: [
+            (a4, { ctx, size in
+                text("PLNOMOCENSTVO", at: CGPoint(x: 60, y: size.height - 90), size: 18)(ctx, size)
+                for (index, label) in labels.enumerated() {
+                    let column = index % 2
+                    let row = index / 2
+                    let originX = CGFloat(60 + column * 280)
+                    let originY = CGFloat(600 - row * 130)
+                    ctx.saveGState()
+                    ctx.setStrokeColor(CGColor(gray: 0.1, alpha: 1))
+                    ctx.setLineWidth(1.5)
+                    ctx.stroke(CGRect(x: originX, y: originY, width: cellWidth, height: cellHeight))
+                    ctx.restoreGState()
+                    text(label, at: CGPoint(x: originX + 28, y: originY + 34), size: 13)(ctx, size)
+                }
+            })
+        ])
+    }
+
     static func singlePageWhitePDF() -> Data {
         build(pages: [(CGSize(width: 595, height: 842), { _, _ in })])
     }

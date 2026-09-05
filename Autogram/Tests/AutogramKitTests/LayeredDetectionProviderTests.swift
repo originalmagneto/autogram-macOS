@@ -172,6 +172,22 @@ final class LayeredDetectionProviderTests: XCTestCase {
                        "Niektoré zdroje kandidátov zlyhali (saliency). ")
     }
 
+    /// A ruled form is the shape that produced the field's false positives: the
+    /// heuristic reads every stroked table cell as a signature. Only hints and the
+    /// quality filter act here, so the assertion is about the filter alone.
+    func testRuledFormWithPrintedTextYieldsNoSignatures() throws {
+        let document = try XCTUnwrap(PDFDocument(data: TestPDFBuilder.ruledFormPDF()))
+        let analyses = PDFAnalysisEngine().analyze(document: document).pageAnalyses
+        let provider = LayeredDetectionProvider(
+            extraSources: [],
+            classifier: TwoStageClassifier(primary: FixedClassifier(judgement: .unsure), secondary: nil))
+        let doc = TestUncheckedSendable(document)
+        let elements = awaitAsync { await provider.detect(in: doc.value, pageAnalyses: analyses) }
+        let signatures = elements.filter { $0.kind == .handwrittenSignature || $0.kind == .initial }
+        XCTAssertTrue(signatures.isEmpty,
+                      "Linkovaný formulár nesmie dať podpisy: \(signatures.map(\.boundingBox))")
+    }
+
     func testDetectionPipelineAcceptsLayeredProvider() throws {
         let (document, analyses) = try contract()
         let provider = LayeredDetectionProvider(extraSources: [], classifier: TwoStageClassifier(primary: FixedClassifier(judgement: .unsure), secondary: nil))

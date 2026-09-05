@@ -345,7 +345,8 @@ public extension DetectionPipeline {
         if let layered = builtin as? LayeredDetectionProvider {
             let run = await layered.detectWithStats(in: document, pageAnalyses: pageAnalyses)
             builtinElements = run.elements
-            sourceFailureMessage = Self.sourceFailureMessage(run.stats.sourceFailures)
+            sourceFailureMessage = Self.combine(Self.unsureModelMessage(run.stats.foundationModelUnsure),
+                                                Self.sourceFailureMessage(run.stats.sourceFailures))
         } else {
             builtinElements = await builtin.detect(in: document, pageAnalyses: pageAnalyses)
         }
@@ -383,6 +384,13 @@ public extension DetectionPipeline {
         }
         guard !names.isEmpty else { return nil }
         return "Niektoré zdroje kandidátov zlyhali (\(names.joined(separator: ", "))). "
+    }
+
+    /// Tells the user that the on-device model did not answer for some crops, so
+    /// those findings rest on the heuristics alone.
+    static func unsureModelMessage(_ count: Int) -> String? {
+        guard count > 0 else { return nil }
+        return "On-device model neodpovedal pre \(count) výrezov; použil sa odhad heuristík. "
     }
 
     static func combine(_ sourceFailure: String?, _ llmFailure: String?) -> String? {

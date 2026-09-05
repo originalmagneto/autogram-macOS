@@ -21,27 +21,57 @@ public struct DetectionRunStats: Sendable, Equatable {
     public var foundationModelCalls: Int
     public var pagesProcessed: Int
     public var sourceFailures: [String]
+    /// Calls where the on-device model timed out or threw, so its answer carried
+    /// no information and the built-in hint decided instead.
+    public var foundationModelUnsure: Int
+    /// Candidates dropped by `CandidateQualityFilter` before classification.
+    public var filteredCandidates: Int
 
-    public init(foundationModelCalls: Int = 0, pagesProcessed: Int = 0, sourceFailures: [String] = []) {
+    public init(foundationModelCalls: Int = 0, pagesProcessed: Int = 0, sourceFailures: [String] = [],
+                foundationModelUnsure: Int = 0, filteredCandidates: Int = 0) {
         self.foundationModelCalls = foundationModelCalls
         self.pagesProcessed = pagesProcessed
         self.sourceFailures = sourceFailures
+        self.foundationModelUnsure = foundationModelUnsure
+        self.filteredCandidates = filteredCandidates
     }
 }
 
 /// Counts how often the secondary (Foundation Model) classifier was invoked
 /// during one detection run. Created per run, so the count never leaks between runs.
 final class CallCountingClassifier: ElementClassifying, @unchecked Sendable {
-    private let wrapped: any ElementClassifying
+    let wrapped: any ElementClassifying
     private let calls = OSAllocatedUnfairLock(initialState: 0)
+    private let unsureCalls = OSAllocatedUnfairLock(initialState: 0)
 
     init(wrapping wrapped: any ElementClassifying) { self.wrapped = wrapped }
 
     var count: Int { calls.withLock { $0 } }
+    /// Calls that produced no usable answer (unsure result or a thrown error).
+    var unsure: Int { unsureCalls.withLock { $0 } }
 
     func classify(crop: CGImage, hint: SecurityElement.Kind?) async throws -> ElementJudgement {
+        try await classify(crop: crop, hint: hint, textCoverage: nil)
+    }
+
+    func classify(crop: CGImage, hint: SecurityElement.Kind?,
+                  textCoverage: Double?) async throws -> ElementJudgement {
         calls.withLock { $0 += 1 }
-        return try await wrapped.classify(crop: crop, hint: hint)
+        do {
+            let result: ElementJudgement
+            if let foundationModel = wrapped as? FoundationModelClassifier {
+                result = try await foundationModel.classify(crop: crop, hint: hint, textCoverage: textCoverage)
+            } else {
+                result = try await wrapped.classify(crop: crop, hint: hint)
+            }
+            if result.isUnsure { unsureCalls.withLock { $0 += 1 } }
+            return result
+        } catch {
+            // A throwing secondary is as uninformative as a timeout; count it,
+            // then let the caller's `try?` turn it into an absent judgement.
+            unsureCalls.withLock { $0 += 1 }
+            throw error
+        }
     }
 }
 
@@ -61,6 +91,10 @@ public struct LayeredDetectionProvider: SecurityElementsProviding {
     /// Upper bound on candidates per page that may reach the Foundation Model.
     /// Candidates beyond it are decided by kNN with the built-in hint as fallback.
     public var foundationModelBudgetPerPage: Int = 12
+
+    /// Called on the detection loop after each page result, with the number of
+    /// pages finished and the total number of non-empty pages.
+    public var progress: (@Sendable (_ processed: Int, _ total: Int) -> Void)?
 
     public init(builtIn: BuiltInCandidateSource = BuiltInCandidateSource(),
                 extraSources: [any CandidateSourcing] = [ContourCandidateSource(), SaliencyCandidateSource()],
@@ -115,6 +149,9 @@ public struct LayeredDetectionProvider: SecurityElementsProviding {
         var elements: [SecurityElement] = []
         var sourceFailures: [String] = []
         var pagesProcessed = 0
+        var filteredCandidates = 0
+        var pagesFinished = 0
+        let totalPages = nonEmptyPageIndices.count
 
         // Pages are processed in chunks of `maxConcurrentPages`. Each chunk is
         // rendered and OCRed sequentially (PDFKit is not thread safe), then
@@ -141,19 +178,25 @@ public struct LayeredDetectionProvider: SecurityElementsProviding {
                 for await pageResult in group {
                     elements.append(contentsOf: pageResult.elements)
                     sourceFailures.append(contentsOf: pageResult.sourceFailures)
+                    filteredCandidates += pageResult.filteredCandidates
+                    pagesFinished += 1
+                    progress?(pagesFinished, totalPages)
                 }
             }
         }
 
         let stats = DetectionRunStats(foundationModelCalls: counting?.count ?? 0,
                                       pagesProcessed: pagesProcessed,
-                                      sourceFailures: sourceFailures)
+                                      sourceFailures: sourceFailures,
+                                      foundationModelUnsure: counting?.unsure ?? 0,
+                                      filteredCandidates: filteredCandidates)
         return (elements, stats)
     }
 
     private struct PageResult: Sendable {
         var elements: [SecurityElement]
         var sourceFailures: [String]
+        var filteredCandidates: Int = 0
     }
 
     private func detectOnPage(_ page: PreparedPage, classifier runClassifier: TwoStageClassifier) async -> PageResult {
@@ -167,7 +210,10 @@ public struct LayeredDetectionProvider: SecurityElementsProviding {
                 sourceFailures.append("\(source.source.rawValue): \(error.localizedDescription)")
             }
         }
-        let merged = Self.prioritized(CandidateMerger.merge(candidates, exclusions: page.exclusions))
+        let allMerged = CandidateMerger.merge(candidates, exclusions: page.exclusions)
+        let kept = allMerged.compactMap { CandidateQualityFilter.filter($0, page: page) }
+        let filteredCandidates = allMerged.count - kept.count
+        let merged = Self.prioritized(kept)
 
         // Candidates without a secondary classifier cannot reach the Foundation Model.
         let withoutFoundationModel = TwoStageClassifier(primary: runClassifier.primary, secondary: nil,
@@ -178,8 +224,11 @@ public struct LayeredDetectionProvider: SecurityElementsProviding {
         for (rank, candidate) in merged.enumerated() {
             guard let crop = PageCrop.crop(page.image, to: candidate.box) else { continue }
             let effective = rank < foundationModelBudgetPerPage ? runClassifier : withoutFoundationModel
+            let coverage = CandidateQualityFilter.textCoverage(of: candidate.box,
+                                                               textBoxes: page.exclusions.textBoxes)
             guard let judgement = await effective.classify(crop: crop, hint: candidate.kindHint,
-                                                           hintConfidence: candidate.hintConfidence),
+                                                           hintConfidence: candidate.hintConfidence,
+                                                           textCoverage: coverage),
                   let kind = judgement.kind else { continue }
             // For a hint-only decision `descriptionSK` is empty on purpose: no
             // judgement produced a verbal description, and inventing one would
@@ -190,7 +239,8 @@ public struct LayeredDetectionProvider: SecurityElementsProviding {
                 detectedByAI: true, reviewState: .pending,
                 detectionSource: Self.sourceString(candidate: candidate, judgement: judgement)))
         }
-        return PageResult(elements: result, sourceFailures: sourceFailures)
+        return PageResult(elements: result, sourceFailures: sourceFailures,
+                          filteredCandidates: filteredCandidates)
     }
 
     /// Foundation Model budget order: hinted candidates first, then the ones more

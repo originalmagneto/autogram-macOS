@@ -8,7 +8,7 @@ final class FoundationModelClassifierTests: XCTestCase {
     private struct FakeJudge: FoundationJudging {
         let result: FoundationJudgement
         let delay: Double
-        func judge(crop: CGImage, hint: SecurityElement.Kind?) async throws -> FoundationJudgement {
+        func judge(crop: CGImage, hint: SecurityElement.Kind?, context: String) async throws -> FoundationJudgement {
             if delay > 0 { try await Task.sleep(for: .seconds(delay)) }
             return result
         }
@@ -25,6 +25,7 @@ final class FoundationModelClassifierTests: XCTestCase {
         let judgement = FoundationModelClassifier.map(
             FoundationJudgement(isSecurityElement: true, kind: .stamp, descriptionSK: "Okrúhla modrá pečiatka.", confidence: 0.8))
         XCTAssertEqual(judgement.kind, .officialStamp)
+        XCTAssertFalse(judgement.isUnsure)
         XCTAssertEqual(judgement.confidence, 0.8, accuracy: 1e-9)
         XCTAssertEqual(judgement.descriptionSK, "Okrúhla modrá pečiatka.")
         XCTAssertEqual(judgement.decidedBy, .foundationModel)
@@ -34,6 +35,13 @@ final class FoundationModelClassifierTests: XCTestCase {
         let judgement = FoundationModelClassifier.map(
             FoundationJudgement(isSecurityElement: false, kind: .stamp, descriptionSK: "", confidence: 0.9))
         XCTAssertNil(judgement.kind)
+        XCTAssertFalse(judgement.isUnsure, "Model odpovedal, teda ide o rozhodnutie, nie o neistotu")
+    }
+
+    func testContextTextReportsCoverageAsPercent() {
+        XCTAssertEqual(FoundationModelClassifier.contextText(textCoverage: nil), "")
+        XCTAssertEqual(FoundationModelClassifier.contextText(textCoverage: 0.37),
+                       "OCR found printed text covering 37 % of this region.")
     }
 
     func testTimeoutYieldsUnsureJudgement() throws {
@@ -45,10 +53,11 @@ final class FoundationModelClassifierTests: XCTestCase {
         XCTAssertNil(judgement.kind)
         XCTAssertEqual(judgement.confidence, 0)
         XCTAssertEqual(judgement.decidedBy, .foundationModel)
+        XCTAssertTrue(judgement.isUnsure, "Timeout nenesie informáciu, musí byť označený ako unsure")
     }
 
     private struct StubbornJudge: FoundationJudging {
-        func judge(crop: CGImage, hint: SecurityElement.Kind?) async throws -> FoundationJudgement {
+        func judge(crop: CGImage, hint: SecurityElement.Kind?, context: String) async throws -> FoundationJudgement {
             // Spins the current thread without ever checking cancellation, simulating a model
             // call that does not honour Task cancellation. `Thread.sleep` is unavailable from
             // async contexts, so a busy loop is used instead to block the thread the same way.

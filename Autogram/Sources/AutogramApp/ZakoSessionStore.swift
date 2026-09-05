@@ -338,9 +338,19 @@ final class ZakoSessionStore {
             }
             return nil
         }()
-        let pipeline = Self.buildPipeline(settings: selectedSettings, bank: exampleBank)
+        var pipeline = Self.buildPipeline(settings: selectedSettings, bank: exampleBank)
         if let layered = pipeline.builtin as? LayeredDetectionProvider {
             detectorIdentifier = layered.identifier
+            // `buildPipeline` is static and cannot capture the store, so the
+            // per-page progress hook is attached here on a copy.
+            var reporting = layered
+            reporting.progress = { [weak self] processed, total in
+                Task { @MainActor in
+                    self?.analysisProgressText =
+                        "Detegujem bezpečnostné prvky… strana \(processed) z \(total)"
+                }
+            }
+            pipeline = DetectionPipeline(builtin: reporting, llmProvider: pipeline.llmProvider)
         }
         let detectionOutcome = await Task.detached(priority: .userInitiated) { [doc, pipeline] in
             await pipeline.detectWithStatus(in: doc.value, pageAnalyses: baseAnalysis.pageAnalyses)

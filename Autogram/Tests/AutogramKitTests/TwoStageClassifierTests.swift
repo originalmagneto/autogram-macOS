@@ -6,8 +6,10 @@ final class TwoStageClassifierTests: XCTestCase {
     private func knn(_ kind: SecurityElement.Kind?, conf: Double, margin: Double, support: Int) -> ElementJudgement {
         ElementJudgement(kind: kind, confidence: conf, margin: margin, decidedBy: .featurePrintKNN, supportCount: support)
     }
-    private func fm(_ kind: SecurityElement.Kind?, conf: Double, desc: String = "") -> ElementJudgement {
-        ElementJudgement(kind: kind, confidence: conf, descriptionSK: desc, decidedBy: .foundationModel)
+    private func fm(_ kind: SecurityElement.Kind?, conf: Double, desc: String = "",
+                    isUnsure: Bool = false) -> ElementJudgement {
+        ElementJudgement(kind: kind, confidence: conf, descriptionSK: desc, decidedBy: .foundationModel,
+                         isUnsure: isUnsure)
     }
 
     func testConfidentKNNWins() {
@@ -68,7 +70,7 @@ final class TwoStageClassifierTests: XCTestCase {
 
     func testUnsureSecondaryFallsThroughToHint() {
         let result = TwoStageClassifier.decide(primary: knn(nil, conf: 0, margin: 0, support: 0),
-                                               secondary: fm(nil, conf: 0),
+                                               secondary: fm(nil, conf: 0, isUnsure: true),
                                                hint: .officialStamp, hintConfidence: 0.7,
                                                minimumSupport: 3, minimumMargin: 0.25)
         XCTAssertEqual(result?.kind, .officialStamp)
@@ -77,8 +79,18 @@ final class TwoStageClassifierTests: XCTestCase {
 
     func testUnsureSecondaryWithoutHintDiscards() {
         let result = TwoStageClassifier.decide(primary: knn(nil, conf: 0, margin: 0, support: 0),
-                                               secondary: fm(nil, conf: 0),
+                                               secondary: fm(nil, conf: 0, isUnsure: true),
                                                hint: nil, hintConfidence: nil,
+                                               minimumSupport: 3, minimumMargin: 0.25)
+        XCTAssertNil(result)
+    }
+
+    /// A model answer of "not a security element" is decisive even at confidence 0,
+    /// so it must beat the built-in hint instead of falling through to it.
+    func testDecisiveNegativeSecondaryDiscardsHintedCandidateEvenAtZeroConfidence() {
+        let result = TwoStageClassifier.decide(primary: knn(nil, conf: 0, margin: 0, support: 0),
+                                               secondary: fm(nil, conf: 0, isUnsure: false),
+                                               hint: .handwrittenSignature, hintConfidence: 0.75,
                                                minimumSupport: 3, minimumMargin: 0.25)
         XCTAssertNil(result)
     }
