@@ -81,6 +81,10 @@ public struct AppSettings: Codable, Sendable {
     public var ezzkNotificationEmail: String
     public var ezzkEdeskAddress: String
     public var retainRecentDocuments: Bool
+    /// Use the on-device Foundation Model to classify uncertain candidates.
+    public var useFoundationModelClassifier: Bool
+    /// Record confirmed and rejected elements into the local example bank.
+    public var learnFromReviews: Bool
 
     private enum CodingKeys: String, CodingKey {
         case aiMode, aiPrompt
@@ -91,6 +95,7 @@ public struct AppSettings: Codable, Sendable {
         case pdfaMode, profiles, activeProfileID
         case ezzkICO, ezzkUsername, ezzkNotificationEmail, ezzkEdeskAddress
         case retainRecentDocuments
+        case useFoundationModelClassifier, learnFromReviews
     }
 
     public init(aiMode: AIMode = .builtInOnDevice,
@@ -110,7 +115,9 @@ public struct AppSettings: Codable, Sendable {
                 ezzkUsername: String = "",
                 ezzkNotificationEmail: String = "",
                 ezzkEdeskAddress: String = "",
-                retainRecentDocuments: Bool = false) {
+                retainRecentDocuments: Bool = false,
+                useFoundationModelClassifier: Bool = true,
+                learnFromReviews: Bool = true) {
         self.aiMode = aiMode
         self.aiPrompt = aiPrompt
         self.omlxURL = omlxURL
@@ -129,6 +136,8 @@ public struct AppSettings: Codable, Sendable {
         self.ezzkNotificationEmail = ezzkNotificationEmail
         self.ezzkEdeskAddress = ezzkEdeskAddress
         self.retainRecentDocuments = retainRecentDocuments
+        self.useFoundationModelClassifier = useFoundationModelClassifier
+        self.learnFromReviews = learnFromReviews
     }
 
     public init(from decoder: Decoder) throws {
@@ -170,6 +179,8 @@ public struct AppSettings: Codable, Sendable {
         self.ezzkNotificationEmail = try container.decodeIfPresent(String.self, forKey: .ezzkNotificationEmail) ?? ""
         self.ezzkEdeskAddress = try container.decodeIfPresent(String.self, forKey: .ezzkEdeskAddress) ?? ""
         self.retainRecentDocuments = try container.decodeIfPresent(Bool.self, forKey: .retainRecentDocuments) ?? false
+        self.useFoundationModelClassifier = try container.decodeIfPresent(Bool.self, forKey: .useFoundationModelClassifier) ?? true
+        self.learnFromReviews = try container.decodeIfPresent(Bool.self, forKey: .learnFromReviews) ?? true
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -192,6 +203,8 @@ public struct AppSettings: Codable, Sendable {
         try container.encode(ezzkNotificationEmail, forKey: .ezzkNotificationEmail)
         try container.encode(ezzkEdeskAddress, forKey: .ezzkEdeskAddress)
         try container.encode(retainRecentDocuments, forKey: .retainRecentDocuments)
+        try container.encode(useFoundationModelClassifier, forKey: .useFoundationModelClassifier)
+        try container.encode(learnFromReviews, forKey: .learnFromReviews)
     }
 
     public var availableTSAServers: [TimestampAuthority] {

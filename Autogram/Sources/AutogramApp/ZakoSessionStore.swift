@@ -11,6 +11,15 @@ final class ZakoSessionStore {
     var step: Step = .intake
     var sourceURL: URL?
     var document: PDFDocument?
+    var documentData: Data?
+    let exampleBank: ExampleBank
+    var bankRecorderFactory: (ExampleBank, String) -> ExampleBankRecorder = { bank, version in
+        ExampleBankRecorder(bank: bank, detectorVersion: version)
+    }
+    private(set) var detectorIdentifier: String = LayeredDetectionProvider(
+        classifier: TwoStageClassifier(primary: NoOpClassifier(), secondary: nil)).identifier
+    private var bankWriteTasks: [UUID: Task<Void, Never>] = [:]
+    private var bankWarningShown = false
     var analysis: DocumentAnalysis = .empty()
     var securityElements: [SecurityElement] = []
     var reviewedNonEmptyPages: Set<Int> = []
@@ -116,6 +125,7 @@ final class ZakoSessionStore {
                                       kind: $0.kind, pageIndex: $0.pageIndex,
                                       boundingBox: $0.boundingBox)
             },
+            detectorIdentifier: detectorIdentifier,
             reviewedAt: reviewUpdatedAt ?? Date())
     }
 
@@ -144,12 +154,14 @@ final class ZakoSessionStore {
     private(set) var currentRecordID = UUID()
 
     init(settingsStore: AppSettingsStore,
-         formPackRepository: FormPackRepository = FormPackRepository()) {
+         formPackRepository: FormPackRepository = FormPackRepository(),
+         exampleBank: ExampleBank = ExampleBank(directory: ExampleBank.defaultDirectory)) {
         self.settingsStore = settingsStore
         self.pdfaConverter = PDFAConverter()
         self.clauseGenerator = AttestationClauseGenerator()
         self.embeddedFileService = EmbeddedFileService()
         self.formPackRepository = formPackRepository
+        self.exampleBank = exampleBank
         self.selectedFormPack = formPackRepository.packs.first {
             $0.direction == .paperToElectronic && $0.isActive(at: Date())
         } ?? FormPackRepository.currentLegacyUnverified
@@ -212,7 +224,7 @@ final class ZakoSessionStore {
         }
     }
 
-    static func buildPipeline(settings: AppSettings) -> DetectionPipeline {
+    static func buildPipeline(settings: AppSettings, bank: ExampleBank) -> DetectionPipeline {
         let llmProvider: (any SecurityElementsProviding)?
         switch settings.aiMode {
         case .omlxLocal:
@@ -251,7 +263,8 @@ final class ZakoSessionStore {
         case .builtInOnDevice, .disabled:
             llmProvider = nil
         }
-        return DetectionPipeline(builtin: BuiltInVisionProvider(), llmProvider: llmProvider)
+        let layered = LayeredDetectionProvider.makeDefault(bank: bank, useFoundationModel: settings.useFoundationModelClassifier)
+        return DetectionPipeline(builtin: layered, llmProvider: llmProvider)
     }
 
     var effectiveSheetCount: Int {
@@ -291,6 +304,9 @@ final class ZakoSessionStore {
             return
         }
         self.document = document
+        self.documentData = (try? Data(contentsOf: url)).flatMap {
+            url.pathExtension.lowercased() == "asice" ? ASiCEContainerVerifier.extractPDFData($0) : $0
+        }
         self.sourceURL = url
         step = .analysis
         await runAnalysis()
@@ -317,13 +333,19 @@ final class ZakoSessionStore {
             }
             return nil
         }()
-        let pipeline = Self.buildPipeline(settings: selectedSettings)
+        let pipeline = Self.buildPipeline(settings: selectedSettings, bank: exampleBank)
+        if let layered = pipeline.builtin as? LayeredDetectionProvider {
+            detectorIdentifier = layered.identifier
+        }
         let detectionOutcome = await Task.detached(priority: .userInitiated) { [doc, pipeline] in
             await pipeline.detectWithStatus(in: doc.value, pageAnalyses: baseAnalysis.pageAnalyses)
         }.value
         guard analysisRecordID == currentRecordID, !Task.isCancelled else { return }
         if let failureMessage = detectionOutcome.failureMessage {
             analysisWarning = "\(failureMessage) Vstavaná detekcia zostáva aktívna."
+        }
+        if let bankLoadError = await exampleBank.loadError, !bankWarningShown {
+            showBankWarningOnce(bankLoadError)
         }
         let detected = detectionOutcome.elements
 
@@ -460,6 +482,42 @@ final class ZakoSessionStore {
         securityElements[index].reviewState = state
         touchReview()
         recomputePreflight()
+        recordReviewDecision(securityElements[index], state: state)
+    }
+
+    private func recordReviewDecision(_ element: SecurityElement, state: SecurityElementReviewState) {
+        guard settings.learnFromReviews, let document, let documentData else { return }
+        let recorder = bankRecorderFactory(exampleBank, detectorIdentifier)
+        let doc = UncheckedSendable(document)
+        bankWriteTasks[element.id]?.cancel()
+        bankWriteTasks[element.id] = Task.detached(priority: .utility) { [weak self, recorder, doc, documentData, element] in
+            do {
+                switch state {
+                case .confirmed:
+                    try await recorder.record(document: doc.value, documentData: documentData,
+                                              element: element, label: .kind(element.kind))
+                case .rejected:
+                    try await recorder.record(document: doc.value, documentData: documentData,
+                                              element: element, label: .negative)
+                case .pending:
+                    try await recorder.forget(elementID: element.id)
+                }
+            } catch {
+                await MainActor.run { self?.showBankWarningOnce(error) }
+            }
+        }
+    }
+
+    private func showBankWarningOnce(_ error: Error) {
+        guard !bankWarningShown else { return }
+        bankWarningShown = true
+        analysisWarning = "Lokálny dataset sa nepodarilo aktualizovať (\(error.localizedDescription)). Kontrola pokračuje."
+    }
+
+    /// Test hook: wait for outstanding bank writes.
+    func waitForBankWrites() async {
+        for task in bankWriteTasks.values { await task.value }
+        bankWriteTasks = [:]
     }
 
     private func invalidateReview(for index: Int) {
@@ -1058,6 +1116,7 @@ func resetSession(keepingProfile: Bool) {
         step = .intake
         sourceURL = nil
         document = nil
+        documentData = nil
         analysis = .empty()
         securityElements = []
         reviewedNonEmptyPages = []
@@ -1123,4 +1182,9 @@ func resetSession(keepingProfile: Bool) {
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return url
     }
+}
+
+/// Placeholder used only to compute the default identifier before the first analysis.
+private struct NoOpClassifier: ElementClassifying {
+    func classify(crop: CGImage, hint: SecurityElement.Kind?) async throws -> ElementJudgement { .unsure }
 }
