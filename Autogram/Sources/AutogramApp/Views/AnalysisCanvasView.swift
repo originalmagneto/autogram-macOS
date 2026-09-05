@@ -16,6 +16,9 @@ struct AnalysisCanvasView: View {
         var kind: Kind
         var startPoint: NormalizedPoint
         var moved: Bool = false
+        /// True only when this interaction placed a brand-new placeholder element
+        /// (via store.placeElement), so a click-without-drag on it should snap.
+        var created: Bool = false
     }
 
     /// Maps between view coordinates (y=0 top) and the domain convention
@@ -807,17 +810,13 @@ struct ElementOverlay: View {
             }
             .onEnded { value in
                 defer { interaction = nil }
-                guard let current = interaction, !current.moved,
+                guard let current = interaction, !current.moved, current.created,
                       case .resizing(let id, _) = current.kind,
-                      let tool = store.activeTool,
-                      store.securityElements.first(where: { $0.id == id })?.detectedByAI == false else { return }
-                // A click without movement in an element mode: replace the placeholder with a snapped element.
+                      store.activeTool != nil else { return }
+                // A click without movement right after placing a new element: snap its box in place.
                 let point = mapper.normalizedPoint(from: value.location)
-                store.removeSecurityElement(id: id)
                 Task { @MainActor in
-                    if await store.snapElement(kind: tool, at: point) == nil {
-                        store.undoDelete()
-                    }
+                    await store.snapPlacedElement(id: id, at: point)
                 }
             }
     }
@@ -840,7 +839,7 @@ struct ElementOverlay: View {
 
             if let tool = store.activeTool {
                 let newID = store.placeElement(kind: tool, at: normPoint)
-                interaction = .init(kind: .resizing(newID, normPoint), startPoint: normPoint)
+                interaction = .init(kind: .resizing(newID, normPoint), startPoint: normPoint, created: true)
                 return
             }
 

@@ -607,14 +607,17 @@ final class ZakoSessionStore {
         return BuiltInVisionProvider.render(page: page, targetWidth: 1200)?.cgImage
     }
 
-    /// Click without drag in an element mode: segment at the point and create the element.
-    func snapElement(kind: SecurityElement.Kind, at point: NormalizedPoint) async -> UUID? {
-        let pageIndex = previewPageIndex
-        guard await ensureSnapAssets(), let image = renderedPage(pageIndex) else { return nil }
+    /// Click without drag on a freshly placed element: segment at the point and
+    /// tighten that element's box in place. On failure the placeholder stays so
+    /// the advocate can adjust it by hand.
+    @discardableResult
+    func snapPlacedElement(id: UUID, at point: NormalizedPoint) async -> Bool {
+        guard let element = securityElements.first(where: { $0.id == id }),
+              await ensureSnapAssets(), let image = renderedPage(element.pageIndex) else { return false }
         let box = UncheckedSendableImage(image)
-        guard let rect = try? await snapper.snap(pageImage: box.image, seed: point) else { return nil }
-        addSecurityElement(kind: kind, pageIndex: pageIndex, rect: rect)
-        return selectedElementID
+        guard let rect = try? await snapper.snap(pageImage: box.image, seed: point) else { return false }
+        updateElementBoundingBox(id: id, boundingBox: rect)
+        return true
     }
 
     func refineElement(id: UUID) async {

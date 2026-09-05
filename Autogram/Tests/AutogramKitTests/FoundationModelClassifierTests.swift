@@ -1,6 +1,7 @@
 import XCTest
 import CoreGraphics
 import PDFKit
+import FoundationModels
 @testable import AutogramKit
 
 final class FoundationModelClassifierTests: XCTestCase {
@@ -68,9 +69,10 @@ final class FoundationModelClassifierTests: XCTestCase {
     }
 
     func testLiveModelSeparatesRingFromPlainTextIfAvailable() throws {
-        guard let classifier = FoundationModelClassifier.makeIfAvailable() else {
+        guard SystemLanguageModel.default.isAvailable else {
             throw XCTSkip("On-device Foundation Model nie je dostupný")
         }
+        let classifier = FoundationModelClassifier(judge: SystemFoundationJudge(), timeoutSeconds: 120)
         let document = try XCTUnwrap(PDFKit.PDFDocument(data: TestPDFBuilder.typicalContractPDF()))
         let page = try XCTUnwrap(document.page(at: 0))
         let rendered = try XCTUnwrap(BuiltInVisionProvider.render(page: page, targetWidth: 760))
