@@ -21,6 +21,10 @@ let package = Package(
             name: "pkcs11-helper",
             dependencies: ["AutogramKit"]
         ),
+        .executableTarget(
+            name: "vision-eval",
+            dependencies: ["AutogramKit"]
+        ),
         .testTarget(
             name: "AutogramKitTests",
             dependencies: ["AutogramKit"]
