@@ -314,7 +314,7 @@ Aktuálny macOS build je v [GitHub Releases](https://github.com/originalmagneto/
 xattr -d com.apple.quarantine "/Applications/Autogram macOS.app"
 ```
 
-<p>Overenie stiahnutého DMG: v poznámkach k vydaniu je SHA-256 odtlačok; porovnajte ho s výstupom <code>shasum -a 256 Autogram-macOS-v0.3.0.dmg</code>.</p>
+<p>Overenie stiahnutého DMG: v poznámkach k vydaniu je SHA-256 odtlačok; porovnajte ho s výstupom <code>shasum -a 256 Autogram-macOS-v0.3.1.dmg</code>.</p>
 </details>
 
 <details>
@@ -327,7 +327,16 @@ xattr -d com.apple.quarantine "/Applications/Autogram macOS.app"
 </details>
 
 <details open>
-<summary><strong>v0.3.0 · aktuálne vydanie: vrstvená AI Vision a nová kontrola originálu</strong></summary>
+<summary><strong>v0.3.1 · aktuálne vydanie: podpisový engine a Finder Quick Action v DMG</strong></summary>
+<ul>
+<li>DMG obsahuje Java podpisový engine (DSS, PKCS#11, machine protokol v1/v2) s vlastným jlink runtime; kvalifikovaný podpis eID a advokátskym preukazom funguje bez inštalácie Javy a sidebar už nepadá do režimu DEMO.</li>
+<li>Finder Quick Action podpisuje cez zabalené helpery <code>AutogramCLI-arm64</code> a <code>AutogramQuickActionRunner-arm64</code>.</li>
+<li>Zdroje enginu sú v repozitári (<code>engine/</code>, EUPL 1.2) a zostavujú sa skriptom <code>Autogram/scripts/build-engine.sh</code>.</li>
+</ul>
+</details>
+
+<details>
+<summary><strong>v0.3.0 · vrstvená AI Vision a nová kontrola originálu</strong></summary>
 <ul>
 <li>Kandidáti z troch zdrojov (heuristiky, Vision kontúry, saliency) plus presné OCR, ktoré odfiltruje tlačený text a linkované bunky formulárov; na reálnom skene plnomocenstva klesol počet volaní modelu z 24 na 3 a strana bez podpisu ostala čistá.</li>
 <li>Klasifikácia porovnaním s vašimi potvrdenými príkladmi a on-device Apple modelom, bez externých služieb.</li>
@@ -340,10 +349,15 @@ xattr -d com.apple.quarantine "/Applications/Autogram macOS.app"
 
 ### Build a inštalácia
 
+Podpisový engine (Java fork Autogramu s DSS, machine protokol v1/v2, Finder Quick Action) je v priečinku `engine/` a zostavuje sa raz, pred buildom aplikácie. Potrebuje arm64 JDK 25 s JavaFX jmods ([Azul Zulu FX 25](https://www.azul.com/downloads/?version=java-25-lts&os=macos&architecture=arm-64-bit&package=jdk-fx)) rozbalený pod `~/Library/Java`, prípadne cestu v `AUTOGRAM_JAVA_HOME`.
+
 ```bash
 cd Autogram
-DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer ./build_app.sh install
+scripts/build-engine.sh
+DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer ./build_app.sh --release install
 ```
+
+`build-engine.sh` zostaví `autogram.jar` a závislosti cez Maven, vytvorí jlink runtime, skompiluje launcher `AutogramCLI-arm64` a runner `AutogramQuickActionRunner-arm64` a overí engine cez `CAPABILITIES`. `build_app.sh` potom všetko zabalí do `Contents/{Helpers,app,runtime}`; bez enginu aplikácia beží, ale podpis padá na Keychain alebo DEMO a Finder Quick Action nepodpisuje.
 
 Aplikácia sa nainštaluje do `/Applications/Autogram macOS.app`.
 

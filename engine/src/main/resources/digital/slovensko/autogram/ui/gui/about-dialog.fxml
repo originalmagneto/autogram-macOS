@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.text.*?>
+<?import javafx.scene.control.Hyperlink?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.image.ImageView?>
+<?import javafx.scene.image.Image?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.geometry.Insets?>
+<BorderPane xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml" styleClass="autogram-dialog">
+    <center>
+        <VBox fx:id="mainBox" styleClass="autogram-dialog-content,autogram-dialog-content--wide">
+            <VBox>
+                <TextFlow styleClass="autogram-heading-m">
+                    <Text styleClass="autogram-heading-m" text="O projekte "/>
+                    <Label styleClass="autogram-claim,autogram-heading-m">Autogram</Label>
+                </TextFlow>
+
+                <VBox styleClass="autogram-prose">
+                    <TextFlow styleClass="autogram-body">
+                        <Text styleClass="autogram-body"
+                              text="Autogram je jednoduchý nástroj na podpisovanie a&#160;overovanie dokumentov podľa európskeho nariadenia eIDAS, slovenských zákonov a&#160;štandardov. Môžete ho používať komerčne aj nekomerčne a&#160;úplne zadarmo."/>
+                    </TextFlow>
+
+                    <TextFlow styleClass="autogram-heading-s">
+                        <Text styleClass="autogram-heading-s" text="Autori a sponzori"/>
+                    </TextFlow>
+
+                    <TextFlow styleClass="autogram-body-s">
+                        <Text styleClass="autogram-body-s"
+                              text="Autormi tohto projektu sú Jakub Ďuraš, Slovensko.Digital, CRYSTAL&#160;CONSULTING,&#160;s.r.o, Solver&#160;IT&#160;s.r.o. a ďalší spoluautori. "/>
+                        <Text styleClass="autogram-body-s"
+                              text="Tento projekt je spolufinancovaný z&#160;prostriedkov Európskeho fondu regionálneho rozvoja v&#160;rámci Operačného programu Integrovaná infraštruktúra."/>
+                    </TextFlow>
+
+                    <TextFlow styleClass="autogram-heading-s">
+                        <Text styleClass="autogram-heading-s" text="Licencia a zdrojové kódy"/>
+                    </TextFlow>
+                    <TextFlow styleClass="autogram-body-s">
+                        <Text styleClass="autogram-body-s"
+                              text="Tento softvér pôvodne vychádza projektu z Octosign White Label od Jakuba Ďuraša, ktorý je licencovaný pod MIT licenciou. So súhlasom autora je táto verzia distribuovaná pod licenciou EUPL v1.2."/>
+                    </TextFlow>
+
+                    <TextFlow>
+                        <Text styleClass="autogram-body-s" text="Zdrojové kódy sú dostupné na "/>
+                        <Hyperlink styleClass="autogram-body-s,autogram-link" text="GitHub-e" onAction="#githubLinkAction"/>
+                        <Text styleClass="autogram-body-s" text="."/>
+                    </TextFlow>
+
+                    <StackPane>
+                        <padding>
+                            <Insets top="32" bottom="16" />
+                        </padding>
+                        <children>
+                            <ImageView>
+                                <fitWidth>520</fitWidth>
+                                <preserveRatio>true</preserveRatio>
+                                <image>
+                                    <Image url="@logo_OPII_ESIF.png" />
+                                </image>
+                            </ImageView>
+                        </children>
+                    </StackPane>
+                </VBox>
+            </VBox>
+        </VBox>
+    </center>
+    <bottom>
+        <HBox styleClass="autogram-footer" spacing="16" alignment="CENTER_LEFT">
+            <TextFlow HBox.hgrow="ALWAYS">
+                <Text styleClass="autogram-body-s" text="Verzia: "/>
+                <Text styleClass="autogram-body-s" text="dev" fx:id="versionText"/>
+            </TextFlow>
+            <Button fx:id="closeButton" styleClass="autogram-button,autogram-button--secondary" text="Zatvoriť" onAction="#onCloseButtonAction"/>
+        </HBox>
+    </bottom>
+</BorderPane>

@@ -30,10 +30,12 @@ Autogram is a 100% native macOS SwiftUI application for Qualified Electronic Sig
   - `AuthorizeView`: Mandate certificate verification, PIN handling, and sticky authorization action bar.
   - `DoneView`: Direct access to converted PDF/A and clause files.
 - **Evidence Dashboard (EvidenceDashboardView.swift)**: Search filter, segmented status picker, SQLite table with right-click context menu, and confirmation dialog for deletions.
+- **Signing engine (`engine/`, `Autogram/scripts/build-engine.sh`)**: EUPL fork of slovensko-digital/autogram (DSS, PKCS#11, machine protocol v1/v2) plus the C launcher and Swift Quick Action runner; built into a jlink arm64 runtime and bundled by `build_app.sh`. Machine mode SIGKILLs itself after the terminal event, so exit 137 after `session.completed` is expected.
 - **Finder Quick Action (`Assets/Autogram Finder Quick Action.workflow`, `build_app.sh`)**: Automator workflow restricted to Finder via `NSRequiredContext`; runs `autogram-quick-action.sh` and the bundled legacy CLI helper in the background, with `AutogramCLI-arm64`, `AutogramQuickActionRunner-arm64`, JAR dependencies, and Java runtime bundled in the app. The flow shows driver, certificate, and PIN/BOK dialogs without opening the main app and accepts PDF files only.
 
 ## Build & Test Instructions
-- Run build script: `DEVELOPER_DIR="/Applications/Xcode-beta.app/Contents/Developer" ./build_app.sh`
+- Build the signing engine first (once, or after changes in `engine/`): `scripts/build-engine.sh` (needs an arm64 JDK 25 with JavaFX jmods, Azul Zulu FX 25, under `~/Library/Java` or `AUTOGRAM_JAVA_HOME`; output `.build/engine/Contents`)
+- Run build script: `DEVELOPER_DIR="/Applications/Xcode-beta.app/Contents/Developer" ./build_app.sh [--release] [install]` (bundles `.build/engine/Contents` into `Contents/{Helpers,app,runtime}`; without it signing falls back to Keychain/DEMO and the Quick Action cannot sign)
 - Run test suite: `DEVELOPER_DIR="/Applications/Xcode-beta.app/Contents/Developer" swift test`
 - Run detection eval harness: `swift run vision-eval <dataset> [--builtin-only] [--no-fm] [--bank <dir>] [--iou 0.4] [--json]` (dataset export kept outside the repo; `--bank <dir>` picks the example bank, default is a fresh empty temporary directory)
 - Binary output: `$(swift build --show-bin-path)/Autogram.app` (Xcode 27: `.build/out/Products/Debug/Autogram.app`)

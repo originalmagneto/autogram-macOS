@@ -44,7 +44,13 @@ fi
 cp "Assets/Autogram.icns" "$CONTENTS/Resources/Autogram.icns"
 ditto "Assets/Autogram Finder Quick Action.workflow" "$CONTENTS/Resources/Autogram Finder Quick Action.workflow"
 
+# Preferred source of the signing engine: the in-repo Java fork built by
+# scripts/build-engine.sh. A legacy app bundle is only a fallback.
 LEGACY_CONTENTS="${AUTOGRAM_LEGACY_APP_ROOT:-}"
+ENGINE_BUILD=".build/engine/Contents"
+if [[ -z "$LEGACY_CONTENTS" && -x "$ENGINE_BUILD/Helpers/AutogramCLI-arm64" && -f "$ENGINE_BUILD/app/autogram.jar" ]]; then
+    LEGACY_CONTENTS="$ENGINE_BUILD"
+fi
 if [[ -z "$LEGACY_CONTENTS" ]]; then
     for candidate in /Applications/*.app/Contents "$HOME"/Applications/*.app/Contents; do
         if [[ -x "$candidate/Helpers/AutogramCLI-arm64" \
@@ -78,7 +84,7 @@ if [[ -n "$LEGACY_CONTENTS" \
     fi
     jar uf "$CONTENTS/app/autogram.jar" -C "$MACHINE_SETTINGS_PATCH_ROOT" "$MACHINE_SETTINGS_PATCH"
 else
-    echo "Warning: Legacy Autogram CLI payload not found. CLI Quick Action will require an external legacy installation." >&2
+    echo "Warning: signing engine not found. Run scripts/build-engine.sh first; without it KEP signing falls back to Keychain/DEMO and the Finder Quick Action cannot sign." >&2
 fi
 cat > "$CONTENTS/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -127,9 +133,9 @@ cat > "$CONTENTS/Info.plist" <<'PLIST'
         </dict>
     </array>
     <key>CFBundleVersion</key>
-    <string>0.3.0</string>
+    <string>0.3.1</string>
     <key>CFBundleShortVersionString</key>
-    <string>0.3.0</string>
+    <string>0.3.1</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleExecutable</key>

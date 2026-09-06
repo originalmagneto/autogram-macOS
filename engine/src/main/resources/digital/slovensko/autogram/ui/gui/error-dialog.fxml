@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<?import javafx.scene.text.Text?>
+<?import javafx.scene.text.TextFlow?>
+
+<VBox xmlns="http://javafx.com/javafx"
+    xmlns:fx="http://javafx.com/fxml"
+    styleClass="autogram-dialog-content,autogram-dialog-content--default"
+    fx:id="mainBox">
+
+    <fx:include fx:id="errorSummaryComponent" source="error-summary-component.fxml" VBox.vgrow="ALWAYS" />
+
+    <HBox alignment="CENTER_RIGHT" spacing="12" styleClass="autogram-actions">
+        <Button fx:id="mainButton" styleClass="autogram-button,autogram-button--secondary"
+            text="Pokračovať" onAction="#onMainButtonAction" />
+    </HBox>
+
+    <TextArea fx:id="errorDetails" styleClass="autogram-details__text" editable="false"
+        visible="false" managed="false">Error details</TextArea>
+</VBox>

@@ -1,0 +1,5 @@
+# Created dynamically during build from *.template.*
+main.wxs
+autogram.desktop
+Info.plist
+DTempFiles

@@ -1,0 +1,65 @@
+package digital.slovensko.autogram.ui.gui;
+
+import digital.slovensko.autogram.ui.BatchUiResult;
+import javafx.application.HostServices;
+import javafx.event.ActionEvent;
+import javafx.fxml.FXML;
+import javafx.scene.Node;
+import javafx.scene.control.Hyperlink;
+import javafx.scene.text.Text;
+
+public class BatchSigningSuccessDialogController extends BaseController implements SuppressedFocusController {
+    private final HostServices hostServices;
+    private final BatchUiResult result;
+    private Runnable onClose;
+
+    @FXML
+    Hyperlink folderPathText;
+    @FXML
+    Node mainBox;
+
+    @FXML
+    Text successCount;
+
+    public BatchSigningSuccessDialogController(BatchUiResult result, HostServices hostServices) {
+
+        this.result = result;
+        this.hostServices = hostServices;
+    }
+
+    @Override
+    public void initialize() {
+        folderPathText.setText(result.getTargetDirectory().toString());
+        var signedFileNamesList = result.getTargetFilesSortedList().stream().filter(e -> e != null)
+                .map(file -> file.getName())
+                .toList();
+        successCount.setText(String.valueOf(signedFileNamesList.size()));
+    }
+
+    public void onOpenFolderAction(ActionEvent ignored) {
+        hostServices.showDocument(result.getTargetDirectory().toUri().toString());
+    }
+
+    public void onCloseAction(ActionEvent ignored) {
+        if (onClose != null) {
+            onClose.run();
+        } else {
+            GUIUtils.closeWindow(mainBox);
+        }
+    }
+
+    public void setOnClose(Runnable onClose) {
+        this.onClose = onClose;
+    }
+
+    public void onShowFiles(ActionEvent ignored) {
+        if (mainBox.getParent() != null) {
+            mainBox.getParent().requestLayout();
+        }
+    }
+
+    @Override
+    public Node getNodeForLoosingFocus() {
+        return mainBox;
+    }
+}

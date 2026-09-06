@@ -22,3 +22,7 @@ xcuserdata/
 
 # Referenčné vzory s osobnými údajmi — nepushovať
 EXAMPLES/
+
+# Java engine build output
+engine/target/
+Autogram/.build/

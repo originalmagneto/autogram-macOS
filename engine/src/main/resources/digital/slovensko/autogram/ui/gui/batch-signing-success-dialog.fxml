@@ -1,0 +1,33 @@
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.text.*?>
+<?import javafx.scene.shape.*?>
+
+<VBox xmlns="http://javafx.com/javafx"
+    xmlns:fx="http://javafx.com/fxml"
+    fx:id="mainBox" styleClass="autogram-dialog-content">
+    <VBox>
+
+        <VBox styleClass="autogram-prose,autogram-confirmation,autogram-confirmation--success">
+            <TextFlow styleClass="autogram-heading-m">
+                <Text styleClass="autogram-heading-m" text="Dokumenty boli úspešne podpísané" />
+            </TextFlow>
+            <TextFlow styleClass="autogram-body">
+                <Text styleClass="autogram-body">Podpísali ste&#160;</Text>
+                <Text fx:id="successCount" styleClass="autogram-font-weight-bold,autogram-body">X</Text>
+                <Text styleClass="autogram-body">&#160;dokumentov.&#160;</Text>
+            </TextFlow>
+            <TextFlow styleClass="autogram-body">
+                <Text styleClass="autogram-body" text="Podpísané súbor sú uložené v&#160;priečinku " />
+                <Hyperlink styleClass="autogram-body,autogram-link,autogram-font-weight-bold"
+                    fx:id="folderPathText" onAction="#onOpenFolderAction" wrapText="true" />
+                <Text styleClass="autogram-body" text="." />
+            </TextFlow>
+        </VBox>
+
+        <HBox styleClass="autogram-actions">
+            <Button fx:id="mainButton" styleClass="autogram-button,autogram-button--secondary"
+                text="Zavrieť" onAction="#onCloseAction" />
+        </HBox>
+    </VBox>
+</VBox>

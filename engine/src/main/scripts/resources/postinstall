@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+set +x
+
+DEBUG=false
+
+DESTINATION=${2:-"/Applications"}
+
+if [ $DEBUG = true ]; then
+    exec 3>&1 4>&2
+    trap 'exec 2>&4 1>&3' 0 1 2 3
+    exec 1>>"$HOME/autogram-install.log" 2>&1
+fi
+
+echo "Installing Autogram to $DESTINATION"
+
+# chown root:wheel "/Applications"
+chmod a+rX "$DESTINATION"
+chmod +r "$DESTINATION/Autogram.app/Contents/app/"*.jar
+chmod +x "$DESTINATION/Autogram.app/Contents/Resources/Scripts/create-cert.sh"
+
+source "$DESTINATION/Autogram.app/Contents/Resources/Scripts/cert-functions.sh";
+
+function sudo_create_cert() {
+
+    # Write out functions into variable
+    FUNC=$(declare -f)
+
+    # Run function create_cert in "unpriviledged" environment - with real user env
+    sudo -u "$USER" bash -c "$FUNC; remove_cert; create_cert"
+}
+
+
+
+if [[ -f "$HOME/Library/Application Support/Autogram/tls/skip" ]]; then
+    exit 0
+fi
+
+sudo_create_cert
+exit 0

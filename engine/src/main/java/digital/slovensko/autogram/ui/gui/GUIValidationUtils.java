@@ -1,0 +1,331 @@
+package digital.slovensko.autogram.ui.gui;
+
+import java.text.SimpleDateFormat;
+import java.util.List;
+import java.util.ResourceBundle;
+import java.util.function.Consumer;
+
+import javax.security.auth.x500.X500Principal;
+
+import eu.europa.esig.dss.diagnostic.DiagnosticData;
+import eu.europa.esig.dss.enumerations.Indication;
+import eu.europa.esig.dss.enumerations.SignatureForm;
+import eu.europa.esig.dss.enumerations.SignatureQualification;
+import eu.europa.esig.dss.simplereport.SimpleReport;
+import eu.europa.esig.dss.simplereport.jaxb.XmlTimestamp;
+import eu.europa.esig.dss.validation.reports.Reports;
+import javafx.scene.Node;
+import javafx.scene.control.Button;
+import javafx.scene.layout.ColumnConstraints;
+import javafx.scene.layout.GridPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.VBox;
+import javafx.scene.shape.Polygon;
+import javafx.scene.text.Text;
+import javafx.scene.text.TextFlow;
+
+import static eu.europa.esig.dss.enumerations.SignatureForm.*;
+
+public class GUIValidationUtils {
+    public static final SimpleDateFormat format = new SimpleDateFormat("dd.MM.yyyy HH:mm:ss");
+
+    public static Node createWarningText(String message) {
+        var warningText = new Text(message);
+        warningText.getStyleClass().addAll("autogram-heading-s", "autogram-body");
+        var warningTextFlow = new TextFlow(warningText);
+        warningTextFlow.getStyleClass().add("autogram-warning-textflow");
+
+        return warningTextFlow;
+    }
+
+    public static GridPane createSignatureTableRows(Reports reports, boolean isValidated, Consumer<String> callback,
+            int maxRows) {
+        var table = new GridPane();
+        table.getStyleClass().add("autogram-signatures-table");
+
+        var headerLabel = new Text("Podpisy na dokumente");
+        headerLabel.getStyleClass().add("autogram-heading-s");
+        var headerText = new TextFlow(headerLabel);
+        headerText.getStyleClass().addAll("autogram-heading-s", "autogram-signatures-table-cell--left");
+        var headerLink = new TextFlow(createSignatureTableLink(callback));
+        table.addRow(0, headerText, headerLink);
+
+        ColumnConstraints half = new ColumnConstraints();
+        half.setPercentWidth(50);
+        table.getColumnConstraints().addAll(half, half);
+
+        var signatures = reports.getSimpleReport().getSignatureIdList();
+        var totalSignatures = signatures.size();
+        if (totalSignatures > maxRows)
+            signatures = signatures.subList(0, maxRows - 1);
+
+        var currentRow = 1;
+        for (var signatureId : signatures) {
+            var subjectText = new Text(reports.getSimpleReport().getSignedBy(signatureId));
+            subjectText.getStyleClass().add("autogram-body");
+            var subject = new HBox(new TextFlow(subjectText));
+            subject.getStyleClass().addAll("autogram-signatures-table-cell--left", "autogram-signatures-table-row");
+            var type = new HBox(
+                    SignatureBadgeFactory.createCombinedBadgeFromQualification(
+                            isValidated ? reports.getDetailedReport().getSignatureQualification(signatureId) : null,
+                            reports, signatureId, 0));
+            type.getStyleClass().add("autogram-signatures-table-row");
+            table.addRow(currentRow, subject, type);
+            currentRow++;
+        }
+
+        if (totalSignatures > maxRows) {
+            var label = new Text(
+                    "Na dokumente " + createRemainingSignaturesCountString(totalSignatures - maxRows + 1) + ". ");
+            label.getStyleClass().add("autogram-body");
+
+            var button = new Button("Zobraziť všetky podpisy");
+            button.getStyleClass().addAll("autogram-link");
+            button.setWrapText(true);
+            button.setOnMouseClicked(event -> callback.accept(null));
+
+            var flow = new TextFlow(label, button);
+            flow.getStyleClass().addAll("autogram-body", "autogram-font-weight-bold");
+            flow.getStyleClass().add("autogram-signatures-table-row");
+            table.add(flow, 0, currentRow, 2, 1);
+        }
+
+        return table;
+    }
+
+    public static GridPane createSignatureTableRows(ResourceBundle resources, Reports reports, boolean isValidated,
+            Consumer<String> callback, int maxRows) {
+        return createSignatureTableRows(reports, isValidated, callback, maxRows);
+    }
+
+    private static String createRemainingSignaturesCountString(int i) {
+        return switch (i) {
+            case 1 -> "1 podpis";
+            case 2, 3, 4 -> "sú ďalšie " + i + " podpisy";
+            default -> "je ďalších " + i + " podpisov";
+        };
+    }
+
+    public static Button createSignatureTableLink(Consumer<String> callback) {
+        var whoSignedButton = new Button("Zobraziť detail podpisov");
+        whoSignedButton.getStyleClass().addAll("autogram-link");
+        whoSignedButton.wrapTextProperty().setValue(true);
+        whoSignedButton.setOnMouseClicked(event -> {
+            callback.accept(null);
+        });
+
+        return whoSignedButton;
+    }
+
+    public static VBox createSignatureBox(Reports reports, boolean isValidated, String signatureId,
+            Consumer<String> callback, boolean areTLsLoaded) {
+        var simple = reports.getSimpleReport();
+        var diagnostic = reports.getDiagnosticData();
+
+        var isValid = simple.isValid(signatureId);
+        var isFailed = reports.getDetailedReport().getBasicValidationIndication(signatureId).equals(Indication.FAILED);
+        var name = simple.getSignedBy(signatureId);
+        var signingTime = format.format(simple.getSigningTime(signatureId));
+        var subject = getPrettyDNWithoutCN(
+                diagnostic.getSignatureById(signatureId).getSigningCertificate().getCertificateDN());
+        var issuer = getPrettyDN(diagnostic
+                .getCertificateIssuerDN(diagnostic.getSignatureById(signatureId).getSigningCertificate().getId()));
+        var signatureQualification = isValidated ? reports.getDetailedReport().getSignatureQualification(signatureId)
+                : null;
+        var signatureForm = simple.getSignatureFormat(signatureId).getSignatureForm();
+        var timestamps = simple.getSignatureTimestamps(signatureId);
+
+        var nameText = new Text(name);
+        nameText.getStyleClass().add("autogram-body-strong");
+        var nameFlow = new TextFlow(nameText);
+        nameFlow.getStyleClass().add("autogram-summary-header__title");
+        var errors = reports.getSimpleReport().getAdESValidationErrors(signatureId);
+        var isRevocationValidated = true;
+        for (var error : errors)
+            if (error.getValue().contains("No revocation data found for the certificate"))
+                isRevocationValidated = false;
+
+        var isTimestampInvalid = false;
+        var isTimestampIndeterminate = false;
+        for (var timestamp : timestamps) {
+            var indication = timestamp.getIndication();
+            if (indication.equals(Indication.FAILED) || indication.equals(Indication.TOTAL_FAILED))
+                isTimestampInvalid = true;
+
+            if (indication.equals(Indication.INDETERMINATE))
+                isTimestampIndeterminate = true;
+        }
+
+        Node badge = null;
+        if (!isValidated)
+            badge = SignatureBadgeFactory.createInProgressBadge();
+        else if (isFailed)
+            badge = SignatureBadgeFactory.createInvalidBadge("Neplatný podpis");
+        else
+            badge = SignatureBadgeFactory.createCombinedBadgeFromQualification(
+                    isValidated ? signatureQualification : null, reports, signatureId, 300);
+
+        var validFlow = new HBox(badge);
+        validFlow.getStyleClass().add("autogram-summary-header__badge");
+        var nameBox = new HBox(nameFlow, validFlow);
+
+        var signatureDetailsBox = new VBox(
+                createTableRow("Výsledok overenia",
+                        isValidated
+                                ? validityToString(isValid, isFailed, areTLsLoaded, isRevocationValidated,
+                                        signatureQualification, signatureForm, isTimestampInvalid,
+                                        isTimestampIndeterminate)
+                                : "Prebieha overovanie"),
+                createTableRow("Certifikát", subject),
+                createTableRow("Vydavateľ", issuer),
+                createTableRow("Negarantovaný čas podpisu", signingTime));
+
+        var timestampsBox = createTimestampsBox(isValidated, timestamps, simple, diagnostic, e -> {
+            callback.accept(null);
+        });
+        if (!timestampsBox.getChildren().isEmpty()) {
+            signatureDetailsBox.getChildren().add(createTableRow("Typ podpisu",
+                    SignatureBadgeFactory.createBadgeFromQualification(signatureQualification, signatureForm), false));
+            signatureDetailsBox.getChildren().add(createTableRow("Časové pečiatky", timestampsBox, true));
+        } else
+            signatureDetailsBox.getChildren().add(createTableRow("Typ podpisu",
+                    SignatureBadgeFactory.createBadgeFromQualification(signatureQualification, signatureForm), true));
+
+        var signatureBox = new VBox(nameBox, signatureDetailsBox);
+        signatureBox.getStyleClass().add("autogram-signature-box");
+        return signatureBox;
+    }
+
+    public static VBox createSignatureBox(ResourceBundle resources, Reports reports, boolean isValidated,
+            String signatureId, Consumer<String> callback, boolean areTLsLoaded) {
+        return createSignatureBox(reports, isValidated, signatureId, callback, areTLsLoaded);
+    }
+
+    private static String validityToString(boolean isValid, boolean isFailed, boolean areTLsLoaded,
+            boolean isRevocationValidated, SignatureQualification signatureQualification, SignatureForm signatureForm,
+            boolean isTimestampInvalid, boolean isTimestampIndeterminate) {
+
+        if (isFailed || isTimestampInvalid)
+            return "Neplatný";
+
+        if (!List.of(XAdES, CAdES, PAdES).contains(signatureForm))
+            return "Neznámy formát podpisu: " + signatureForm.name();
+
+        if (!areTLsLoaded)
+            return "Nepodarilo sa overiť";
+
+        if (!isRevocationValidated)
+            return "Nepodarilo sa overiť platnosť certifikátu";
+
+        if (signatureQualification.getReadable().contains("Indeterminate") || isTimestampIndeterminate)
+            return "Predbežne platný";
+
+        if (isValid)
+            return "Platný";
+
+        return "Neznámy podpis";
+    }
+
+    public static HBox createTableRow(String label, String value) {
+        return createTableRow(label, value, false);
+    }
+
+    public static HBox createTableRow(String label, Node valueNode, boolean isLast) {
+        var labelNode = createTableCell(label, "autogram-heading-s", isLast, true);
+        labelNode.setMinWidth(120); // Give labels a fixed minimum width
+        labelNode.setPrefWidth(120);
+
+        var cell = new TextFlow(valueNode);
+        cell.getStyleClass().addAll(isLast ? "autogram-table-cell--last" : "autogram-table-cell");
+        cell.getStyleClass().addAll("autogram-table-cell--right");
+        HBox.setHgrow(cell, javafx.scene.layout.Priority.ALWAYS);
+
+        var row = new HBox(labelNode, cell);
+        row.setSpacing(10);
+        return row;
+    }
+
+    public static HBox createTableRow(String label, String value, boolean isLast) {
+        var labelNode = createTableCell(label, "autogram-heading-s", isLast, true);
+        labelNode.setMinWidth(120);
+        labelNode.setPrefWidth(120);
+
+        var valueNode = createTableCell(value, "autogram-body", isLast, false);
+        HBox.setHgrow(valueNode, javafx.scene.layout.Priority.ALWAYS);
+
+        var row = new HBox(labelNode, valueNode);
+        row.setSpacing(10);
+        return row;
+    }
+
+    public static TextFlow createTableCell(String value, String textStyle, boolean isLast, boolean isLeft) {
+        var text = new Text(value);
+        text.getStyleClass().add(textStyle);
+        // Ensure text wraps within its container
+        text.setWrappingWidth(0); // Let TextFlow handle wrapping based on its own width
+
+        var cell = new TextFlow(text);
+        cell.getStyleClass().addAll(isLast ? "autogram-table-cell--last" : "autogram-table-cell");
+        cell.getStyleClass().addAll(isLeft ? "autogram-table-cell--left" : "autogram-table-cell--right");
+
+        // HBox.setHgrow doesn't work directly on TextFlow in this context because it's
+        // usually returned
+        // to be put into an HBox manually. We'll rely on the caller or CSS.
+        return cell;
+    }
+
+    public static VBox createTimestampsBox(boolean isValidated, List<XmlTimestamp> timestamps, SimpleReport simple,
+            DiagnosticData diagnostic, Consumer<String> callback) {
+        var vBox = new VBox();
+        vBox.getStyleClass().add("autogram-timestamps-box");
+
+        for (var timestamp : timestamps) {
+            var isFailed = timestamp.getIndication().equals(Indication.FAILED);
+            var subjectText = new Text(getPrettyDN(
+                    diagnostic.getCertificateDN(diagnostic.getTimestampSigningCertificateId(timestamp.getId()))));
+            subjectText.getStyleClass().add("autogram-body");
+            var subject = new TextFlow(subjectText);
+            var timestampQualification = isValidated ? simple.getTimestampQualification(timestamp.getId()) : null;
+            var qualificationBadge = new TextFlow(
+                    SignatureBadgeFactory.createBadgeFromTSQualification(isFailed, timestampQualification));
+            var timestampDetailsBox = new VBox(subject, qualificationBadge);
+
+            var button = new Button(
+                    format.format(timestamp.getProductionTime()),
+                    new TextFlow(new Polygon(0.0, 0.0, 9.0, 6.0, 0.0, 12.0)));
+
+            button.getStyleClass().addAll("autogram-link");
+            var timestampDetailsVBoxWrapper = new VBox();
+            timestampDetailsVBoxWrapper.setVisible(true);
+            timestampDetailsVBoxWrapper.getChildren().add(timestampDetailsBox);
+            vBox.getChildren().add(new VBox(new TextFlow(button), timestampDetailsVBoxWrapper));
+
+            button.setOnAction(e -> {
+                if (timestampDetailsBox.isVisible()) {
+                    timestampDetailsBox.setVisible(false);
+                    timestampDetailsVBoxWrapper.getChildren().remove(timestampDetailsBox);
+                    callback.accept(null);
+                } else {
+                    timestampDetailsVBoxWrapper.getChildren().add(timestampDetailsBox);
+                    timestampDetailsBox.setVisible(true);
+                    callback.accept(null);
+                }
+            });
+        }
+
+        return vBox;
+    }
+
+    public static String getPrettyDNWithoutCN(String s) {
+        return String
+                .join("\n",
+                        new X500Principal(s).getName(X500Principal.RFC1779).split(", (?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)",
+                                -1))
+                .replaceFirst("(\nCN=.*$|CN=.*\n)", "");
+    }
+
+    public static String getPrettyDN(String s) {
+        return String.join("\n",
+                new X500Principal(s).getName(X500Principal.RFC1779).split(", (?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)", -1));
+    }
+}

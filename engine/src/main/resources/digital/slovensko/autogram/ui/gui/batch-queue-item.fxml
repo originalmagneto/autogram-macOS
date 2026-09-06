@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.text.*?>
+<?import javafx.scene.shape.SVGPath?>
+
+<HBox xmlns="http://javafx.com/javafx"
+      xmlns:fx="http://javafx.com/fxml"
+      fx:controller="digital.slovensko.autogram.ui.gui.QueueItemController"
+      fx:id="mainBox"
+      styleClass="autogram-batch-item"
+      alignment="CENTER_LEFT"
+      spacing="10">
+    
+    <StackPane styleClass="autogram-batch-item-icon-container">
+        <SVGPath fx:id="statusIcon" styleClass="autogram-icon,autogram-icon--small"
+                 content="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z M14 2v6h6" />
+    </StackPane>
+    
+    <VBox HBox.hgrow="ALWAYS" spacing="2">
+        <Label fx:id="fileNameLabel" styleClass="autogram-batch-item-name" text="Document.pdf" />
+        <Label fx:id="statusLabel" styleClass="autogram-batch-item-status" text="Čaká na podpísanie" />
+    </VBox>
+</HBox>

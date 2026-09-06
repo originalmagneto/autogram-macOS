@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Autogram Machine Protocol v1 Request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocolVersion", "requestId", "operation", "payload"],
+  "properties": {
+    "protocolVersion": {
+      "const": 1
+    },
+    "requestId": {
+      "type": "string"
+    },
+    "operation": {
+      "type": "string",
+      "enum": ["CAPABILITIES", "DRIVERS", "CERTIFICATES", "INSPECT", "SIGN"]
+    },
+    "payload": {
+      "type": "object"
+    }
+  }
+}

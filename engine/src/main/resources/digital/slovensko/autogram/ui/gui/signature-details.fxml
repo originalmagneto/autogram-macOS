@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.web.WebView?>
+
+<?import javafx.scene.text.TextFlow?>
+<?import javafx.scene.text.Text?>
+<VBox xmlns="http://javafx.com/javafx"
+      xmlns:fx="http://javafx.com/fxml"
+      fx:id="mainBox"
+      spacing="12"
+      styleClass="autogram-dialog-content,autogram-dialog-content--wide">
+
+    <HBox alignment="CENTER_LEFT" spacing="12">
+        <TextFlow HBox.hgrow="ALWAYS"><Text styleClass="autogram-heading-m" text="Detaily podpisov"/></TextFlow>
+        <Button fx:id="closeButton" styleClass="autogram-button,autogram-button--secondary"
+                text="Zavrieť" onAction="#onCloseButtonAction"/>
+    </HBox>
+
+    <!-- HTML visualization of validation report -->
+    <VBox fx:id="webViewContainer" managed="false" visible="false" VBox.vgrow="ALWAYS">
+        <WebView fx:id="webView" focusTraversable="false" VBox.vgrow="ALWAYS"/>
+    </VBox>
+
+</VBox>
