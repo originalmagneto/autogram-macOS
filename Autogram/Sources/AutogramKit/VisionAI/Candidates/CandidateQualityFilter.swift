@@ -81,6 +81,69 @@ enum CandidateQualityFilter {
         return (Double(onBorder) / Double(ink), ink)
     }
 
+    /// A side counts as ruled when at least this share of its length carries ink.
+    static let minimumRuledSideCoverage = 0.8
+    /// Sides that must be ruled for the box to count as a table cell.
+    static let minimumRuledSides = 3
+    /// Above this share of ink inside OCR boxes the candidate is printed text.
+    static let maximumInkInsideText = 0.5
+
+    /// Number of box sides (0...4) that carry a continuous ink line along the edge,
+    /// measured in a thin band. A table cell scores 4 even when it is full of text;
+    /// a signature scores 0.
+    static func ruledSides(of box: NormalizedRect, pixels: PixelMap, inkThreshold: Double = 0.42) -> Int {
+        let rect = PageCrop.pixelRect(for: box, imageWidth: pixels.width,
+                                      imageHeight: pixels.height, margin: 0).integral
+        let minX = max(0, Int(rect.minX)), minY = max(0, Int(rect.minY))
+        let maxX = min(pixels.width - 1, Int(rect.maxX) - 1)
+        let maxY = min(pixels.height - 1, Int(rect.maxY) - 1)
+        guard maxX > minX + 4, maxY > minY + 4 else { return 0 }
+        let band = max(2, Int(0.03 * Double(min(maxX - minX, maxY - minY))))
+
+        func ink(_ x: Int, _ y: Int) -> Bool { pixels.luminance(x: x, y: y) < inkThreshold }
+        func horizontalCoverage(rows: ClosedRange<Int>) -> Double {
+            var covered = 0
+            for x in minX...maxX where rows.contains(where: { ink(x, $0) }) { covered += 1 }
+            return Double(covered) / Double(maxX - minX + 1)
+        }
+        func verticalCoverage(columns: ClosedRange<Int>) -> Double {
+            var covered = 0
+            for y in minY...maxY where columns.contains(where: { ink($0, y) }) { covered += 1 }
+            return Double(covered) / Double(maxY - minY + 1)
+        }
+        let coverages = [
+            horizontalCoverage(rows: minY...(minY + band)),
+            horizontalCoverage(rows: (maxY - band)...maxY),
+            verticalCoverage(columns: minX...(minX + band)),
+            verticalCoverage(columns: (maxX - band)...maxX)
+        ]
+        return coverages.filter { $0 >= minimumRuledSideCoverage }.count
+    }
+
+    /// Share of the box's ink pixels that fall inside OCR text boxes.
+    static func inkInsideText(of box: NormalizedRect, textBoxes: [NormalizedRect], pixels: PixelMap,
+                              inkThreshold: Double = 0.42) -> (fraction: Double, inkPixels: Int) {
+        let rect = PageCrop.pixelRect(for: box, imageWidth: pixels.width,
+                                      imageHeight: pixels.height, margin: 0).integral
+        let minX = max(0, Int(rect.minX)), minY = max(0, Int(rect.minY))
+        let maxX = min(pixels.width - 1, Int(rect.maxX) - 1)
+        let maxY = min(pixels.height - 1, Int(rect.maxY) - 1)
+        guard maxX >= minX, maxY >= minY, !textBoxes.isEmpty else { return (0, 0) }
+        let textRects = textBoxes.map {
+            PageCrop.pixelRect(for: $0, imageWidth: pixels.width, imageHeight: pixels.height, margin: 0)
+        }
+        var ink = 0, inside = 0
+        for y in minY...maxY {
+            for x in minX...maxX where pixels.luminance(x: x, y: y) < inkThreshold {
+                ink += 1
+                let point = CGPoint(x: Double(x) + 0.5, y: Double(y) + 0.5)
+                if textRects.contains(where: { $0.contains(point) }) { inside += 1 }
+            }
+        }
+        guard ink > 0 else { return (0, 0) }
+        return (Double(inside) / Double(ink), ink)
+    }
+
     /// Kinds a false ruled-box or printed-text candidate can masquerade as.
     /// Stamps, seals and `.other` are exempt: their evidence is colour or shape,
     /// not stroke geometry, and dropping them here would lose real findings.
@@ -98,10 +161,13 @@ enum CandidateQualityFilter {
             return nil
         }
         let ink = inkMeasurement(of: candidate.box, pixels: page.pixels)
-        if ink.inkPixels >= minimumInkPixelsForPerimeterRule,
-           ink.fraction > maximumPerimeterInkFraction {
-            return nil
-        }
+        guard ink.inkPixels >= minimumInkPixelsForPerimeterRule else { return candidate }
+        if ink.fraction > maximumPerimeterInkFraction { return nil }
+        // A table cell keeps its ruled edges no matter how much text sits inside.
+        if ruledSides(of: candidate.box, pixels: page.pixels) >= minimumRuledSides { return nil }
+        // Ink that OCR already read as words is printed text, not a pen stroke.
+        let insideText = inkInsideText(of: candidate.box, textBoxes: page.exclusions.textBoxes, pixels: page.pixels)
+        if insideText.fraction > maximumInkInsideText { return nil }
         return candidate
     }
 }

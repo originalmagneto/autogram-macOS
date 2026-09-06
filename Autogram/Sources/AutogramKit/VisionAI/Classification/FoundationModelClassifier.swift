@@ -44,18 +44,16 @@ struct GeneratedJudgement {
     var isSecurityElement: Bool
     @Guide(description: "one of: stamp, signature, embossedSeal, initial, other, none")
     var kind: String
-    @Guide(description: "one short Slovak sentence describing the visible element, empty if none")
-    var descriptionSK: String
     @Guide(description: "confidence between 0 and 1", .range(0.0...1.0))
     var confidence: Double
 }
 
-/// Live judge. One session per instance; calls are serialised by the actor.
+/// Live judge. Every call gets a fresh session: a `LanguageModelSession` keeps its
+/// transcript, so reusing one across crops would grow the context (images included)
+/// until the model slows down and finally exceeds its window, and a session still
+/// answering an abandoned (timed out) request rejects the next one outright.
 public actor SystemFoundationJudge: FoundationJudging {
-    private let session: LanguageModelSession
-
-    public init() {
-        session = LanguageModelSession(instructions: """
+    private static let instructions = """
         You inspect small crops of scanned Slovak legal documents. Decide only from what is \
         physically visible in the image. Never infer an element from context, expected placement, \
         or surrounding text. A stamp is an inked impression (often round, blue or red, with text or \
@@ -64,23 +62,30 @@ public actor SystemFoundationJudge: FoundationJudging {
         and photographs are not security elements. Printed or typed text, names, addresses, \
         numbers, table cells, form fields, ruled boxes and underlines are NOT security elements \
         even when bold. A handwritten signature shows irregular pen strokes that do not look like \
-        a font. Answer in the requested structure. descriptionSK must be Slovak.
-        """)
-        // Warming the session moves model load off the first real classification.
-        session.prewarm()
+        a font. Answer in the requested structure.
+        """
+
+    public init() {
+        // Warming one throwaway session loads the model before the first real crop.
+        LanguageModelSession(instructions: Self.instructions).prewarm()
     }
 
     public func judge(crop: CGImage, hint: SecurityElement.Kind?, context: String) async throws -> FoundationJudgement {
-        let hintText = hint.map { "A heuristic detector suggested this may be: \($0.rawValue). Verify visually." } ?? ""
+        // The heuristic's guess is deliberately not shown to the model: naming a
+        // kind in the prompt measurably biases it towards confirming that kind.
+        _ = hint
+        let session = LanguageModelSession(instructions: Self.instructions)
         let response = try await session.respond(generating: GeneratedJudgement.self,
                                                  options: GenerationOptions(temperature: 0)) {
-            "Is a physical security element visible in this crop? \(hintText) \(context)"
+            "Is a physical security element visible in this crop? \(context)"
             Attachment(crop)
         }
         let content = response.content
         return FoundationJudgement(isSecurityElement: content.isSecurityElement,
                                    kind: FoundationJudgementKind(rawValue: content.kind) ?? .none,
-                                   descriptionSK: content.descriptionSK,
+                                   // The on-device model cannot write reliable Slovak; the app
+                                   // composes the clause text from kind and position instead.
+                                   descriptionSK: "",
                                    confidence: min(max(content.confidence, 0), 1))
     }
 }

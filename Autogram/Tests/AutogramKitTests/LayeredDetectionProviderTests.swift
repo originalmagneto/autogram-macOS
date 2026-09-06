@@ -1,3 +1,6 @@
+// Providers in these tests render at 380 px: the frozen heuristic's mask passes
+// scale super-linearly with pixel count and take tens of seconds per page in a
+// debug build at the production 760 px, which only tests the compiler.
 import XCTest
 import PDFKit
 import CoreGraphics
@@ -47,7 +50,8 @@ final class LayeredDetectionProviderTests: XCTestCase {
         let counter = CountingClassifier()
         var provider = LayeredDetectionProvider(
             extraSources: [FixedSource(source: .builtIn, boxes: Self.gridBoxes(), fails: false)],
-            classifier: TwoStageClassifier(primary: FixedClassifier(judgement: .unsure), secondary: counter))
+            classifier: TwoStageClassifier(primary: FixedClassifier(judgement: .unsure), secondary: counter),
+            renderTargetWidth: 380)
         provider.foundationModelBudgetPerPage = budget
         let configured = provider
         let doc = TestUncheckedSendable(document)
@@ -68,7 +72,7 @@ final class LayeredDetectionProviderTests: XCTestCase {
             secondary: nil)
         let provider = LayeredDetectionProvider(
             extraSources: [FixedSource(source: .contour, boxes: [.init(x: 0.6, y: 0.1, width: 0.2, height: 0.2)], fails: false)],
-            classifier: classifier)
+            classifier: classifier, renderTargetWidth: 380)
         let doc = TestUncheckedSendable(document)
         let elements = awaitAsync { await provider.detect(in: doc.value, pageAnalyses: analyses) }
         let stamps = elements.filter { $0.kind == .officialStamp }
@@ -87,7 +91,7 @@ final class LayeredDetectionProviderTests: XCTestCase {
         let classifier = TwoStageClassifier(primary: FixedClassifier(judgement: .unsure), secondary: nil)
         let provider = LayeredDetectionProvider(
             extraSources: [FixedSource(source: .saliency, boxes: [], fails: true)],
-            classifier: classifier)
+            classifier: classifier, renderTargetWidth: 380)
         let doc = TestUncheckedSendable(document)
         let elements = awaitAsync { await provider.detect(in: doc.value, pageAnalyses: analyses) }
         // With an unsure kNN and no FM, hints from the built-in provider survive.
@@ -101,7 +105,7 @@ final class LayeredDetectionProviderTests: XCTestCase {
         let classifier = TwoStageClassifier(
             primary: FixedClassifier(judgement: .init(kind: nil, confidence: 0.95, margin: 0.9, decidedBy: .featurePrintKNN, supportCount: 9)),
             secondary: nil)
-        let provider = LayeredDetectionProvider(extraSources: [], classifier: classifier)
+        let provider = LayeredDetectionProvider(extraSources: [], classifier: classifier, renderTargetWidth: 380)
         let doc = TestUncheckedSendable(document)
         let elements = awaitAsync { await provider.detect(in: doc.value, pageAnalyses: analyses) }
         XCTAssertTrue(elements.allSatisfy { $0.kind == .other }, "Len barcode passthrough smie zostať")
@@ -110,9 +114,9 @@ final class LayeredDetectionProviderTests: XCTestCase {
     func testIdentifierListsActiveStages() {
         let classifier = TwoStageClassifier(primary: FixedClassifier(judgement: .unsure),
                                             secondary: FixedClassifier(judgement: .unsure))
-        let provider = LayeredDetectionProvider(classifier: classifier)
+        let provider = LayeredDetectionProvider(classifier: classifier, renderTargetWidth: 380)
         XCTAssertEqual(provider.identifier, "LayeredDetectionProvider/1 builtIn+contour+saliency kNN fm")
-        let noFM = LayeredDetectionProvider(extraSources: [], classifier: TwoStageClassifier(primary: FixedClassifier(judgement: .unsure), secondary: nil))
+        let noFM = LayeredDetectionProvider(extraSources: [], classifier: TwoStageClassifier(primary: FixedClassifier(judgement: .unsure), secondary: nil), renderTargetWidth: 380)
         XCTAssertEqual(noFM.identifier, "LayeredDetectionProvider/1 builtIn kNN")
     }
 
@@ -163,7 +167,7 @@ final class LayeredDetectionProviderTests: XCTestCase {
         let (document, analyses) = try contract()
         let provider = LayeredDetectionProvider(
             extraSources: [FixedSource(source: .saliency, boxes: [], fails: true)],
-            classifier: TwoStageClassifier(primary: FixedClassifier(judgement: .unsure), secondary: nil))
+            classifier: TwoStageClassifier(primary: FixedClassifier(judgement: .unsure), secondary: nil), renderTargetWidth: 380)
         let doc = TestUncheckedSendable(document)
         let stats = awaitAsync { await provider.detectWithStats(in: doc.value, pageAnalyses: analyses).stats }
         XCTAssertFalse(stats.sourceFailures.isEmpty, "Zlyhanie zdroja sa musí objaviť v štatistike behu")
@@ -180,7 +184,7 @@ final class LayeredDetectionProviderTests: XCTestCase {
         let analyses = PDFAnalysisEngine().analyze(document: document).pageAnalyses
         let provider = LayeredDetectionProvider(
             extraSources: [],
-            classifier: TwoStageClassifier(primary: FixedClassifier(judgement: .unsure), secondary: nil))
+            classifier: TwoStageClassifier(primary: FixedClassifier(judgement: .unsure), secondary: nil), renderTargetWidth: 380)
         let doc = TestUncheckedSendable(document)
         let elements = awaitAsync { await provider.detect(in: doc.value, pageAnalyses: analyses) }
         let signatures = elements.filter { $0.kind == .handwrittenSignature || $0.kind == .initial }
@@ -190,7 +194,7 @@ final class LayeredDetectionProviderTests: XCTestCase {
 
     func testDetectionPipelineAcceptsLayeredProvider() throws {
         let (document, analyses) = try contract()
-        let provider = LayeredDetectionProvider(extraSources: [], classifier: TwoStageClassifier(primary: FixedClassifier(judgement: .unsure), secondary: nil))
+        let provider = LayeredDetectionProvider(extraSources: [], classifier: TwoStageClassifier(primary: FixedClassifier(judgement: .unsure), secondary: nil), renderTargetWidth: 380)
         let pipeline = DetectionPipeline(builtin: provider)
         let doc = TestUncheckedSendable(document)
         let elements = awaitAsync { await pipeline.detect(in: doc.value, pageAnalyses: analyses) }

@@ -26,14 +26,18 @@ public struct DetectionRunStats: Sendable, Equatable {
     public var foundationModelUnsure: Int
     /// Candidates dropped by `CandidateQualityFilter` before classification.
     public var filteredCandidates: Int
+    /// Wall-clock seconds spent waiting for the on-device model.
+    public var foundationModelSeconds: Double
 
     public init(foundationModelCalls: Int = 0, pagesProcessed: Int = 0, sourceFailures: [String] = [],
-                foundationModelUnsure: Int = 0, filteredCandidates: Int = 0) {
+                foundationModelUnsure: Int = 0, filteredCandidates: Int = 0,
+                foundationModelSeconds: Double = 0) {
         self.foundationModelCalls = foundationModelCalls
         self.pagesProcessed = pagesProcessed
         self.sourceFailures = sourceFailures
         self.foundationModelUnsure = foundationModelUnsure
         self.filteredCandidates = filteredCandidates
+        self.foundationModelSeconds = foundationModelSeconds
     }
 }
 
@@ -43,12 +47,15 @@ final class CallCountingClassifier: ElementClassifying, @unchecked Sendable {
     let wrapped: any ElementClassifying
     private let calls = OSAllocatedUnfairLock(initialState: 0)
     private let unsureCalls = OSAllocatedUnfairLock(initialState: 0)
+    private let elapsed = OSAllocatedUnfairLock(initialState: 0.0)
 
     init(wrapping wrapped: any ElementClassifying) { self.wrapped = wrapped }
 
     var count: Int { calls.withLock { $0 } }
     /// Calls that produced no usable answer (unsure result or a thrown error).
     var unsure: Int { unsureCalls.withLock { $0 } }
+    /// Wall-clock seconds spent inside the wrapped classifier.
+    var seconds: Double { elapsed.withLock { $0 } }
 
     func classify(crop: CGImage, hint: SecurityElement.Kind?) async throws -> ElementJudgement {
         try await classify(crop: crop, hint: hint, textCoverage: nil)
@@ -57,6 +64,8 @@ final class CallCountingClassifier: ElementClassifying, @unchecked Sendable {
     func classify(crop: CGImage, hint: SecurityElement.Kind?,
                   textCoverage: Double?) async throws -> ElementJudgement {
         calls.withLock { $0 += 1 }
+        let start = Date()
+        defer { let dt = Date().timeIntervalSince(start); elapsed.withLock { $0 += dt } }
         do {
             let result: ElementJudgement
             if let foundationModel = wrapped as? FoundationModelClassifier {
@@ -165,7 +174,9 @@ public struct LayeredDetectionProvider: SecurityElementsProviding {
             for pageIndex in chunkIndices {
                 guard let page = document.page(at: pageIndex),
                       let rendered = BuiltInVisionProvider.render(page: page, targetWidth: renderTargetWidth) else { continue }
-                let exclusions = await BuiltInVisionProvider.visionExclusionBoxes(cgImage: rendered.cgImage)
+                let fast = await BuiltInVisionProvider.visionExclusionBoxes(cgImage: rendered.cgImage)
+                let accurate = await AccurateTextExclusions.textBoxes(in: rendered.cgImage)
+                let exclusions = AccurateTextExclusions.merged(into: fast, accurate: accurate)
                 chunk.append(PreparedPage(pageIndex: pageIndex, pixels: rendered.pixels,
                                           image: rendered.cgImage, exclusions: exclusions))
             }
@@ -189,7 +200,8 @@ public struct LayeredDetectionProvider: SecurityElementsProviding {
                                       pagesProcessed: pagesProcessed,
                                       sourceFailures: sourceFailures,
                                       foundationModelUnsure: counting?.unsure ?? 0,
-                                      filteredCandidates: filteredCandidates)
+                                      filteredCandidates: filteredCandidates,
+                                      foundationModelSeconds: counting?.seconds ?? 0)
         return (elements, stats)
     }
 

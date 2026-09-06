@@ -75,6 +75,50 @@ final class CandidateQualityFilterTests: XCTestCase {
         XCTAssertNil(CandidateQualityFilter.filter(candidate, page: prepared))
     }
 
+    func testRuledCellFullOfTextIsDroppedByEdgeLinesEvenWhenPerimeterInkIsLow() throws {
+        // Thin border plus a heavy "text" block inside: most ink is interior, so the
+        // perimeter rule fails, but all four edges are ruled.
+        let cell = try bitmap { context in
+            context.setStrokeColor(CGColor(gray: 0, alpha: 1))
+            context.setLineWidth(2)
+            context.stroke(CGRect(x: 1, y: 1, width: 98, height: 98))
+            context.setFillColor(CGColor(gray: 0, alpha: 1))
+            context.fill(CGRect(x: 15, y: 30, width: 70, height: 40))
+        }
+        let full = NormalizedRect(x: 0, y: 0, width: 1, height: 1)
+        XCTAssertLessThan(CandidateQualityFilter.perimeterInkFraction(of: full, pixels: cell.pixels), 0.6)
+        XCTAssertEqual(CandidateQualityFilter.ruledSides(of: full, pixels: cell.pixels), 4)
+        let candidate = DetectionCandidate(pageIndex: 0, box: full, sources: [.builtIn],
+                                           kindHint: .handwrittenSignature, hintConfidence: 0.75)
+        XCTAssertNil(CandidateQualityFilter.filter(candidate, page: page(pixels: cell.pixels, image: cell.image, textBoxes: [])))
+
+        let signature = try bitmap { context in
+            context.setStrokeColor(CGColor(gray: 0, alpha: 1))
+            context.setLineWidth(3)
+            context.move(to: CGPoint(x: 10, y: 50))
+            context.addCurve(to: CGPoint(x: 90, y: 50), control1: CGPoint(x: 30, y: 90), control2: CGPoint(x: 70, y: 10))
+            context.strokePath()
+        }
+        XCTAssertEqual(CandidateQualityFilter.ruledSides(of: full, pixels: signature.pixels), 0)
+    }
+
+    func testInkInsideOCRTextIsDroppedButInkOutsideSurvives() throws {
+        let blob = try bitmap { context in
+            context.setFillColor(CGColor(gray: 0, alpha: 1))
+            context.fill(CGRect(x: 20, y: 40, width: 60, height: 20))
+        }
+        let full = NormalizedRect(x: 0, y: 0, width: 1, height: 1)
+        let candidate = DetectionCandidate(pageIndex: 0, box: full, sources: [.builtIn],
+                                           kindHint: .handwrittenSignature, hintConfidence: 0.75)
+        // The blob sits in rows 40...60 of a 100 px bitmap: normalized y 0.4...0.6.
+        let covering = NormalizedRect(x: 0.15, y: 0.35, width: 0.7, height: 0.3)
+        XCTAssertGreaterThan(CandidateQualityFilter.inkInsideText(of: full, textBoxes: [covering], pixels: blob.pixels).fraction, 0.9)
+        XCTAssertNil(CandidateQualityFilter.filter(candidate, page: page(pixels: blob.pixels, image: blob.image, textBoxes: [covering])))
+
+        let elsewhere = NormalizedRect(x: 0.0, y: 0.8, width: 0.2, height: 0.15)
+        XCTAssertNotNil(CandidateQualityFilter.filter(candidate, page: page(pixels: blob.pixels, image: blob.image, textBoxes: [elsewhere])))
+    }
+
     func testRuledBoxWithoutTextIsDroppedByPerimeterInk() throws {
         let hollow = try bitmap { context in
             context.setStrokeColor(CGColor(gray: 0, alpha: 1))

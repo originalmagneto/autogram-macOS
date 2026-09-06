@@ -84,6 +84,29 @@ final class CandidateSourceTests: XCTestCase {
     }
 }
 
+
+final class AccurateTextExclusionsTests: XCTestCase {
+    func testMergedAppendsNewBoxesAndSkipsDuplicates() {
+        var fast = BuiltInVisionProvider.VisionExclusions()
+        fast.textBoxes = [.init(x: 0.1, y: 0.1, width: 0.3, height: 0.05)]
+        let duplicate = NormalizedRect(x: 0.1, y: 0.1, width: 0.3, height: 0.05)
+        let fresh = NormalizedRect(x: 0.5, y: 0.5, width: 0.2, height: 0.05)
+        let merged = AccurateTextExclusions.merged(into: fast, accurate: [duplicate, fresh])
+        XCTAssertEqual(merged.textBoxes.count, 2)
+        XCTAssertEqual(merged.textBoxes.last, fresh)
+    }
+
+    func testAccurateOCRFindsPrintedLinesOnTheContractFixture() throws {
+        let document = try XCTUnwrap(PDFDocument(data: TestPDFBuilder.typicalContractPDF()))
+        let page = try XCTUnwrap(document.page(at: 0))
+        let image = try XCTUnwrap(BuiltInVisionProvider.render(page: page, targetWidth: 760)?.cgImage)
+        let imageBox = TestUncheckedSendable(image)
+        let boxes = awaitAsync { await AccurateTextExclusions.textBoxes(in: imageBox.value) }
+        XCTAssertFalse(boxes.isEmpty, "Presné OCR má nájsť tlačený text fixtúry")
+        XCTAssertTrue(boxes.allSatisfy { $0.x >= 0 && $0.y >= 0 && $0.x + $0.width <= 1.0001 && $0.y + $0.height <= 1.0001 })
+    }
+}
+
 func awaitAsyncThrowing<T: Sendable>(_ body: @escaping @Sendable () async throws -> T) throws -> T {
     let expectation = XCTestExpectation(description: "async")
     nonisolated(unsafe) var result: Result<T, Error>?
