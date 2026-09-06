@@ -65,15 +65,21 @@ public actor SystemFoundationJudge: FoundationJudging {
         a font. Answer in the requested structure.
         """
 
+    /// Retained until the first real call so ARC cannot drop it mid warm-up.
+    private var warmSession: LanguageModelSession?
+
     public init() {
         // Warming one throwaway session loads the model before the first real crop.
-        LanguageModelSession(instructions: Self.instructions).prewarm()
+        let session = LanguageModelSession(instructions: Self.instructions)
+        session.prewarm()
+        warmSession = session
     }
 
     public func judge(crop: CGImage, hint: SecurityElement.Kind?, context: String) async throws -> FoundationJudgement {
         // The heuristic's guess is deliberately not shown to the model: naming a
         // kind in the prompt measurably biases it towards confirming that kind.
         _ = hint
+        warmSession = nil
         let session = LanguageModelSession(instructions: Self.instructions)
         let response = try await session.respond(generating: GeneratedJudgement.self,
                                                  options: GenerationOptions(temperature: 0)) {
