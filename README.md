@@ -101,17 +101,17 @@ Detekcia beží výhradne na zariadení a skladá sa z troch vrstiev. Každá vr
 </tr>
 <tr>
 <td><strong>1 · Kandidáti</strong></td>
-<td>Strana sa vykreslí raz. Tri nezávislé zdroje navrhnú oblasti, ktoré sa zlúčia podľa prekrytia a prefiltrujú cez OCR text a čiarové kódy.</td>
-<td>vstavané HSV heuristiky · <code>DetectContoursRequest</code> · objectness saliency</td>
+<td>Strana sa vykreslí raz a prejde presným OCR. Tri nezávislé zdroje navrhnú oblasti, ktoré sa zlúčia podľa prekrytia; tlačený text, linkované bunky formulárov a čiarové kódy odpadnú ešte pred klasifikáciou.</td>
+<td>vstavané HSV heuristiky · <code>RecognizeTextRequest</code> (accurate) · <code>DetectContoursRequest</code> · objectness saliency</td>
 </tr>
 <tr>
 <td><strong>2 · Klasifikácia</strong></td>
-<td>Každý výrez porovná <em>feature print</em> s lokálne uloženými potvrdenými a zamietnutými príkladmi. Ak je výsledok neistý, rozhodne on-device Apple model, ktorý vráti druh prvku, istotu a slovenský opis. Najviac 12 výrezov na stranu, 8 s limit na výrez.</td>
+<td>Každý výrez porovná <em>feature print</em> s lokálne uloženými potvrdenými a zamietnutými príkladmi. Ak je výsledok neistý, rozhodne on-device Apple model: dostane iba výrez a podiel OCR textu, nie tip heuristiky, a jeho "nie" platí aj pri nulovej istote. Najviac 12 výrezov na stranu, 8 s limit na výrez, každý výrez v čerstvej relácii modelu.</td>
 <td><code>GenerateImageFeaturePrintRequest</code> · Foundation Models (macOS 27, obrazový vstup)</td>
 </tr>
 <tr>
 <td><strong>3 · Kontrola</strong></td>
-<td>Advokát každý nález potvrdí alebo odmietne, upraví rámec ťahaním, alebo klikne na prvok a rámec sa prichytí k jeho obrysu. Bez skontrolovania každej neprázdnej strany aplikácia nepokračuje.</td>
+<td>Plátno drží iba dokument; vpravo sú tri karty: Kontrola strany, Nálezy a Pridať prvok. Advokát nález potvrdí alebo odmietne, upraví rámec ťahaním, alebo zvolí typ a klikne na prvok, aby sa rámec prichytil k obrysu. Po označení strany aplikácia preskočí na ďalšiu neskontrolovanú; bez kontroly každej neprázdnej strany nepokračuje.</td>
 <td><code>GenerateIterativeSegmentationRequest</code> · SwiftUI canvas</td>
 </tr>
 </table>
@@ -192,7 +192,7 @@ swift run vision-eval ~/AutogramEval [--builtin-only] [--no-fm] [--bank <dir>] [
 <tr>
 <td align="center" width="20%"><strong>1 · Import</strong><br><sub>PDF alebo obrazový sken, potvrdenie pôvodu</sub></td>
 <td align="center" width="20%"><strong>2 · Analýza</strong><br><sub>formát strán, neprázdne strany, listy, názov</sub></td>
-<td align="center" width="20%"><strong>3 · Označenie</strong><br><sub>AI Vision, klik-na-prvok, potvrdenie každej strany</sub></td>
+<td align="center" width="20%"><strong>3 · Overenie</strong><br><sub>AI nálezy, klik-na-prvok, kontrola strany za stranou</sub></td>
 <td align="center" width="20%"><strong>4 · Doložka</strong><br><sub>osoba, počítadlá, poloha prvkov, XML, právny preflight</sub></td>
 <td align="center" width="20%"><strong>5 · Autorizácia</strong><br><sub>evidenčné číslo, PDF/A, podpis, evidencia</sub></td>
 </tr>
@@ -305,13 +305,15 @@ Aktuálny macOS build je v [GitHub Releases](https://github.com/originalmagneto/
 </ul>
 </details>
 
-<details>
-<summary><strong>Pripravované · vrstvená AI Vision</strong></summary>
+<details open>
+<summary><strong>Pripravované · vrstvená AI Vision a nová kontrola originálu</strong></summary>
 <ul>
-<li>Kandidáti z troch zdrojov (heuristiky, Vision kontúry, saliency) namiesto samotných heuristík.</li>
+<li>Kandidáti z troch zdrojov (heuristiky, Vision kontúry, saliency) plus presné OCR, ktoré odfiltruje tlačený text a linkované bunky formulárov; na reálnom skene plnomocenstva klesol počet volaní modelu z 24 na 3 a strana bez podpisu ostala čistá.</li>
 <li>Klasifikácia porovnaním s vašimi potvrdenými príkladmi a on-device Apple modelom, bez externých služieb.</li>
+<li>Obrazovka Overenie originálu: dokument na plátne, tri karty vpravo (Kontrola strany, Nálezy, Pridať prvok), jednoriadkové nálezy, "Potvrdiť všetky" a automatický prechod na ďalšiu neskontrolovanú stranu.</li>
 <li>Klik-na-prvok cez Vision segmentáciu a spresnenie rámca jedným tlačidlom.</li>
 <li>Lokálny dataset s exportom pre Create ML a <code>vision-eval</code> na meranie presnosti.</li>
+<li>Nastavenia v zväčšovateľnom okne, poskytovateľ detekcie v spodnej lište pri "Znova analyzovať AI", File ▸ Otvoriť nedávne.</li>
 </ul>
 </details>
 

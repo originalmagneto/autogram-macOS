@@ -9,11 +9,13 @@ Autogram is a 100% native macOS SwiftUI application for Qualified Electronic Sig
 - Core Data / SQLite for Evidence and Conversion registers (CEZZK integration)
 - PKCS#11 bridge for Slovak eID cards, SAK advocate cards, and Disig smartcards
 - PDFKit, CoreGraphics, Apple Vision and FoundationModels for document analysis and security element detection
-  - `LayeredDetectionProvider` (VisionAI/): candidates from `BuiltInVisionProvider` (frozen), `DetectContoursRequest`, objectness saliency; merged by `CandidateMerger`; classified by `TwoStageClassifier` (`FeaturePrintClassifier` kNN over `ExampleBank`, then on-device `FoundationModelClassifier`)
+  - `LayeredDetectionProvider` (VisionAI/): one render plus fast and accurate OCR per page (`AccurateTextExclusions`); candidates from `BuiltInVisionProvider` (frozen, fed the shared exclusions), `DetectContoursRequest`, objectness saliency; merged by `CandidateMerger`, pruned by `CandidateQualityFilter` (text coverage, ruled boxes, ink inside OCR); classified by `TwoStageClassifier` (`FeaturePrintClassifier` kNN over `ExampleBank`, then on-device `FoundationModelClassifier` with a fresh session per crop, no heuristic hint, decisive negatives, 12 crops per page); `DetectionRunStats` carries model calls, unsure calls, filtered candidates and model seconds
+  - `RealScanSmokeTests` runs the whole pipeline on a local scan named by `AUTOGRAM_DIAG_PDF` (skips without it); time it in release with `caffeinate -dimsu swift test -c release -Xswiftc -enable-testing`
   - `ExampleBank` at `~/Library/Application Support/Autogram/VisionBank` records confirm/reject decisions; `CreateMLExporter` writes Create ML object-detector datasets; `vision-eval` target scores precision/recall
   - `SegmentationSnapper` wraps `GenerateIterativeSegmentationRequest` for click-to-snap boxes in `AnalysisCanvasView`
   - Local LLM vision providers: oMLX (Apple Silicon MLX, `localhost:8000/v1`) and Ollama (`localhost:11434`), plus OpenAI-compatible cloud APIs with keys in Keychain
-  - AI provider selection in Settings uses provider cards (`SettingsView.aiProviderRow`); config panel renders under the chosen mode; `LearningDatasetCard` holds the learning toggles and dataset export
+  - AI provider selection in Settings uses provider rows (`SettingsView.aiProviderRow`); config panel renders under the chosen mode; `LearningDatasetCard` holds the learning toggles and dataset export. Settings live in a regular `Window` scene (`SettingsWindow.id`, opened by `OpenSettingsButton`) because the `Settings` scene cannot be resized
+  - `AnalysisCanvasView` review step: canvas holds only the document; the inspector has three cards (`pageReviewCard`, `findingsCard`, `addElementCard`); `ElementRow` is one line until selected; `markPageReviewedAndAdvance` and `confirmAllPendingElements(onPage:)` drive multi-page review; the detection provider menu sits in the `StickyActionBar`
 
 ## Design System & UI/UX Structure
 - **DesignSystem.swift**: Contains `.liquidGlass()` modifiers, `StickyActionBar` containers, `SmartcardHUDStatus` reader badges, `EIDASBadge` verification pills, and `FlowStepBar` subheader stepper navigation.
