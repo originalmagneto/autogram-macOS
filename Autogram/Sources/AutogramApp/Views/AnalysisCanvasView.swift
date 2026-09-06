@@ -94,6 +94,8 @@ struct AnalysisCanvasView: View {
                 .disabled(store.isAnalyzing)
                 .controlSize(.large)
 
+                detectionProviderPicker
+
                 Spacer()
 
                 Button {
@@ -112,11 +114,6 @@ struct AnalysisCanvasView: View {
         }
         .task(id: "\(store.previewPageIndex)-\(store.document == nil)") {
             renderPage()
-        }
-        .toolbar {
-            ToolbarItemGroup(placement: .secondaryAction) {
-                detectionProviderPicker
-            }
         }
     }
 
@@ -248,9 +245,9 @@ struct AnalysisCanvasView: View {
             }
 
         } label: {
-            Image(systemName: "sparkles")
+            Label("Detekcia", systemImage: "sparkles")
         }
-        .menuIndicator(.hidden)
+        .controlSize(.large)
         .fixedSize()
         .accessibilityLabel("Poskytovateľ detekcie")
         .accessibilityValue(currentMode.rawValue)
@@ -456,6 +453,8 @@ struct AnalysisCanvasView: View {
         }
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
+        .controlSize(.mini)
+        .font(.caption.monospacedDigit())
         .fixedSize()
         .help("Spôsob počítania listov: \(store.sheetMethod.rawValue)")
         .onChange(of: store.sheetMethod) { _, _ in
