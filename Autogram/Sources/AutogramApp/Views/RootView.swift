@@ -253,7 +253,7 @@ struct RootView: View {
                 ? "demo podpis"
                 : "kvalifikované podpisovanie KEP"
         case .zako:
-            return "zaručená konverzia (§ 35-39 Zz)"
+            return ""
         case .evidence:
             return "register konverzií a CEZZK"
         }

@@ -116,8 +116,6 @@ struct AnalysisCanvasView: View {
         .toolbar {
             ToolbarItemGroup(placement: .secondaryAction) {
                 detectionProviderPicker
-                sheetCountMenu
-                pageNavBar
             }
         }
     }
@@ -175,6 +173,13 @@ struct AnalysisCanvasView: View {
                                 .padding(4)
                                 .background(.regularMaterial, in: Capsule())
 
+                            if store.reviewedNonEmptyPages.contains(pageIndex) {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(.white, .green)
+                                    .frame(width: 54, height: 72, alignment: .bottomTrailing)
+                                    .offset(x: 3, y: 3)
+                            }
                             if countOnPage > 0 {
                                 Text("\(countOnPage)")
                                     .font(.system(size: 9, weight: .bold))
@@ -243,21 +248,13 @@ struct AnalysisCanvasView: View {
             }
 
         } label: {
-            HStack(spacing: 5) {
-                Image(systemName: "sparkles")
-                Text("Detekcia: \(currentMode.rawValue)")
-                    .lineLimit(1)
-                Image(systemName: "chevron.up.chevron.down")
-                    .font(.system(size: 8, weight: .bold))
-            }
-            .font(.caption)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
+            Image(systemName: "sparkles")
         }
-        .menuStyle(.borderedButton)
         .menuIndicator(.hidden)
         .fixedSize()
-        .help("Apple Vision beží vždy on-device; zvolený režim dopĺňa LLM klasifikáciu. Zmena sa prejaví pri ďalšej analýze.")
+        .accessibilityLabel("Poskytovateľ detekcie")
+        .accessibilityValue(currentMode.rawValue)
+        .help("Detekcia: \(currentMode.rawValue). Apple Vision beží vždy on-device; zvolený režim dopĺňa LLM klasifikáciu. Zmena sa prejaví pri ďalšej analýze.")
     }
 
     private func icon(for mode: AppSettings.AIMode) -> String {
@@ -271,18 +268,20 @@ struct AnalysisCanvasView: View {
     }
 
     private var pageNavBar: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 4) {
             Button {
                 store.previewPageIndex = max(store.previewPageIndex - 1, 0)
             } label: {
                 Image(systemName: "chevron.left")
             }
+            .buttonStyle(.borderless)
             .disabled(store.previewPageIndex <= 0)
             .controlSize(.small)
             .accessibilityLabel("Predchádzajúca strana")
 
             Text("Strana \(store.previewPageIndex + 1) z \(max(store.analysis.totalPages, 1))")
-                .font(.caption.monospacedDigit().weight(.medium))
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(.secondary)
                 .fixedSize()
 
             Button {
@@ -291,12 +290,11 @@ struct AnalysisCanvasView: View {
             } label: {
                 Image(systemName: "chevron.right")
             }
+            .buttonStyle(.borderless)
             .disabled(store.previewPageIndex >= max(store.analysis.totalPages - 1, 0))
             .controlSize(.small)
             .accessibilityLabel("Nasledujúca strana")
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
     }
 
     private func toolButton(kind: SecurityElement.Kind, title: String, icon: String) -> some View {
@@ -421,12 +419,12 @@ struct AnalysisCanvasView: View {
     /// One quiet line under the page instead of four chips: the numbers matter,
     /// the decoration competed with the document.
     private var countersRow: some View {
-        Text([
-            SlovakCount.phrase(store.analysis.totalPages, "strana", "strany", "strán"),
-            "\(store.analysis.nonEmptyPages) neprázdne",
-            SlovakCount.phrase(store.effectiveSheetCount, "list", "listy", "listov") + " (odhad)",
-            SlovakCount.phrase(store.securityElements.count, "prvok", "prvky", "prvkov")
-        ].joined(separator: " · "))
+        HStack(spacing: 4) {
+            Text(SlovakCount.phrase(store.analysis.totalPages, "strana", "strany", "strán")
+                 + " · \(store.analysis.nonEmptyPages) neprázdne ·")
+            sheetCountMenu
+            Text("· " + SlovakCount.phrase(store.securityElements.count, "prvok", "prvky", "prvkov"))
+        }
         .font(.caption.monospacedDigit())
         .foregroundStyle(.secondary)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -448,22 +446,37 @@ struct AnalysisCanvasView: View {
                         in: 1...999)
             }
         } label: {
-            Label("Spôsob: \(store.sheetMethod.rawValue)", systemImage: "rectangle.stack.badge.plus")
-                .font(.caption)
+            HStack(spacing: 2) {
+                Text(SlovakCount.phrase(store.effectiveSheetCount, "list", "listy", "listov")
+                     + (store.sheetMethod == .manual ? "" : " (odhad)"))
+                Image(systemName: "chevron.down").font(.system(size: 8, weight: .semibold))
+            }
+            .font(.caption.monospacedDigit())
+            .foregroundStyle(.secondary)
         }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("Spôsob počítania listov: \(store.sheetMethod.rawValue)")
         .onChange(of: store.sheetMethod) { _, _ in
             store.applySheetMethodChange()
         }
     }
     private var elementsPanel: some View {
         VStack(spacing: 0) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 12) {
-                    pageReviewCard
-                    findingsCard
-                    addElementCard
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 12) {
+                        pageReviewCard
+                        findingsCard
+                        addElementCard
+                    }
+                    .padding(12)
                 }
-                .padding(12)
+                .onChange(of: store.selectedElementID) { _, id in
+                    guard let id else { return }
+                    withAnimation { proxy.scrollTo(id, anchor: .center) }
+                }
             }
         }
         .background(.regularMaterial)
@@ -475,10 +488,23 @@ struct AnalysisCanvasView: View {
     /// Findings of the current page plus the collapsed numeric inspector.
     private var findingsCard: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack {
+            let pendingOnPage = store.securityElements.filter {
+                $0.pageIndex == store.previewPageIndex && $0.reviewState == .pending
+            }.count
+            HStack(spacing: 8) {
                 Label("Nálezy", systemImage: "checklist")
                     .font(.headline)
+                Text("\(store.securityElements.filter { $0.pageIndex == store.previewPageIndex }.count) z \(store.securityElements.count) celkom")
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
                 Spacer()
+                if pendingOnPage > 1 {
+                    Button("Potvrdiť všetky (\(pendingOnPage))") {
+                        store.confirmAllPendingElements(onPage: store.previewPageIndex)
+                    }
+                    .controlSize(.small)
+                    .help("Potvrdí všetky nálezy na tejto strane, ktoré ešte čakajú na kontrolu")
+                }
                 if store.lastDeletedElement != nil {
                     Button {
                         store.undoDelete()
@@ -501,6 +527,7 @@ struct AnalysisCanvasView: View {
                     ForEach(pageElements) { element in
                         ElementRow(element: element,
                                    isSelected: store.selectedElementID == element.id,
+                                   isExpanded: store.selectedElementID == element.id,
                                    onSelect: { store.selectedElementID = element.id },
                                    onDelete: {
                                        if store.selectedElementID == element.id {
@@ -521,6 +548,7 @@ struct AnalysisCanvasView: View {
                                    onDescriptionChange: { text in
                                        store.updateElementDescription(id: element.id, text: text)
                                    })
+                        .id(element.id)
                     }
 
             if store.selectedElementID != nil {
@@ -546,15 +574,13 @@ struct AnalysisCanvasView: View {
                 Label("Kontrola strany", systemImage: "checkmark.shield")
                     .font(.headline)
                 Spacer()
-                Text("Strana \(pageIndex + 1) z \(max(store.analysis.totalPages, 1))")
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(.secondary)
+                pageNavBar
             }
             Text("\(store.confirmedSecurityElements.count) potvrdené · \(store.pendingSecurityElementCount) čaká · \(rejected) odmietnuté")
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(.secondary)
             Button {
-                if isReviewed { store.unmarkPageReviewed(pageIndex) } else { store.markPageReviewed(pageIndex) }
+                if isReviewed { store.unmarkPageReviewed(pageIndex) } else { store.markPageReviewedAndAdvance(pageIndex) }
             } label: {
                 Label(isReviewed ? "Strana skontrolovaná" : "Označiť stranu ako skontrolovanú",
                       systemImage: isReviewed ? "checkmark.circle.fill" : "circle")
@@ -707,18 +733,23 @@ struct FlowChips: View {
     let onSelect: (Int) -> Void
 
     var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 6) {
-                ForEach(pages, id: \.self) { pageIndex in
-                    Button {
-                        onSelect(pageIndex)
-                    } label: {
-                        Text("Str. \(pageIndex + 1)")
-                            .font(.caption.weight(.medium))
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
+        let shown = Array(pages.prefix(6))
+        HStack(spacing: 6) {
+            ForEach(shown, id: \.self) { pageIndex in
+                Button {
+                    onSelect(pageIndex)
+                } label: {
+                    Text("\(pageIndex + 1)")
+                        .font(.caption.monospacedDigit().weight(.medium))
                 }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .accessibilityLabel("Strana \(pageIndex + 1)")
+            }
+            if pages.count > shown.count {
+                Text("+\(pages.count - shown.count) ďalších")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
     }
@@ -866,6 +897,7 @@ struct ElementOverlay: View {
 struct ElementRow: View {
     let element: SecurityElement
     let isSelected: Bool
+    let isExpanded: Bool
     let onSelect: () -> Void
     let onDelete: () -> Void
     let onDuplicate: () -> Void
@@ -877,134 +909,85 @@ struct ElementRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // Row 1: kind (as the menu label itself) and confidence.
+            // Compact header: always visible, one line, tap selects.
             HStack(spacing: 8) {
-                Button(action: onSelect) {
-                    Image(systemName: element.kind.sfSymbol)
-                        .foregroundStyle(ElementKindColor.color(for: element.kind))
-                        .frame(width: 16)
+                Image(systemName: element.kind.sfSymbol)
+                    .foregroundStyle(ElementKindColor.color(for: element.kind))
+                    .frame(width: 16)
+                if isExpanded {
+                    kindMenu
+                } else {
+                    Text(element.kind.rawValue)
+                        .font(.callout.weight(.medium))
+                        .lineLimit(1)
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("\(element.kind.rawValue), stav: \(element.reviewState.label), \(UXLabels.provenanceLabel(detectedByAI: element.detectedByAI))")
-                .accessibilityValue("\(UXLabels.confidenceLabel(for: element.confidence)); \(isSelected ? "Vybraný" : "Nevybraný")")
-                .accessibilityAddTraits(isSelected ? .isSelected : [])
-
-                Menu {
-                    ForEach(SecurityElement.Kind.allCases, id: \.self) { kind in
-                        Button {
-                            onKindChange(kind)
-                        } label: {
-                            Label(kind.rawValue, systemImage: kind.sfSymbol)
-                        }
-                    }
-                } label: {
-                    HStack(spacing: 3) {
-                        Text(element.kind.rawValue)
-                            .font(.callout.weight(.medium))
-                        Image(systemName: "chevron.down")
-                            .font(.system(size: 9, weight: .semibold))
-                            .foregroundStyle(.secondary)
-                    }
-                    .lineLimit(1)
-                }
-                .menuStyle(.borderlessButton)
-                .menuIndicator(.hidden)
-                .fixedSize()
-                .accessibilityLabel("Typ prvku")
-                .accessibilityValue(element.kind.rawValue)
-
                 Spacer(minLength: 6)
-
-                ConfidenceBar(confidence: element.confidence)
                 Text(UXLabels.confidenceLabel(for: element.confidence))
                     .font(.caption2.monospacedDigit())
                     .foregroundStyle(.secondary)
                     .fixedSize()
-            }
-            .lineLimit(1)
-
-            // Row 2: description.
-            TextField("Popis prvku", text: Binding(
-                get: { element.verbalDescription },
-                set: { onDescriptionChange($0) }
-            ), axis: .vertical)
-            .lineLimit(2...4)
-            .textFieldStyle(.roundedBorder)
-            .accessibilityLabel("Popis prvku")
-
-            // Row 3: review state and actions. Every label is fixed-size so nothing
-            // wraps mid-word in a narrow sidebar.
-            HStack(alignment: .center, spacing: 6) {
                 Label(element.reviewState.label, systemImage: reviewIcon)
                     .font(.caption2)
-                    .labelStyle(.titleAndIcon)
-                    .fixedSize()
+                    .labelStyle(.iconOnly)
                     .foregroundStyle(reviewColor)
-
-                Spacer(minLength: 6)
-
-                if element.reviewState == .pending {
-                    Button("Potvrdiť") {
-                        onReviewStateChange(.confirmed)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.small)
-                    .fixedSize()
-                    Button("Odmietnuť") {
-                        onReviewStateChange(.rejected)
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .fixedSize()
-                } else if element.reviewState == .rejected {
-                    Button("Vrátiť na kontrolu") {
-                        onReviewStateChange(.pending)
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .fixedSize()
+                    .help(element.reviewState.label)
+                if element.reviewState == .pending && !isExpanded {
+                    Button { onReviewStateChange(.confirmed) } label: { Image(systemName: "checkmark") }
+                        .buttonStyle(.borderless).controlSize(.small).help("Potvrdiť")
+                    Button { onReviewStateChange(.rejected) } label: { Image(systemName: "xmark") }
+                        .buttonStyle(.borderless).controlSize(.small).help("Odmietnuť")
                 }
-
-                Button {
-                    onDuplicate()
-                } label: {
-                    Label("Duplikovať prvok", systemImage: "plus.square.on.square")
-                }
-                .labelStyle(.iconOnly)
-                .buttonStyle(.borderless)
-                .help("Duplikovať prvok")
-                .foregroundStyle(.secondary)
-
-                Button {
-                    onRefine()
-                } label: {
-                    Label("Spresniť rámec", systemImage: "wand.and.stars")
-                }
-                .labelStyle(.iconOnly)
-                .buttonStyle(.borderless)
-                .help("Spresniť rámec podľa obrysu (Apple Vision)")
-                .foregroundStyle(.secondary)
-
-                Button(role: .destructive) {
-                    showDeleteConfirmation = true
-                } label: {
-                    Label("Odstrániť prvok", systemImage: "trash")
-                }
-                .labelStyle(.iconOnly)
-                .buttonStyle(.borderless)
-                .help("Odstrániť prvok")
-                .foregroundStyle(.red)
             }
             .lineLimit(1)
+            .contentShape(Rectangle())
+            .onTapGesture(perform: onSelect)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("\(element.kind.rawValue), stav: \(element.reviewState.label), \(UXLabels.provenanceLabel(detectedByAI: element.detectedByAI))")
+            .accessibilityValue("\(UXLabels.confidenceLabel(for: element.confidence)); \(isSelected ? "Vybraný" : "Nevybraný")")
+            .accessibilityAddTraits(isSelected ? .isSelected : [])
 
-            // Row 4: how this element was found.
-            Text(sourceCaption)
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
+            if isExpanded {
+                TextField("Popis prvku", text: Binding(
+                    get: { element.verbalDescription },
+                    set: { onDescriptionChange($0) }
+                ), axis: .vertical)
+                .lineLimit(2...4)
+                .textFieldStyle(.roundedBorder)
+                .accessibilityLabel("Popis prvku")
+
+                HStack(alignment: .center, spacing: 6) {
+                    Label(element.reviewState.label, systemImage: reviewIcon)
+                        .font(.caption2)
+                        .labelStyle(.titleAndIcon)
+                        .fixedSize()
+                        .foregroundStyle(reviewColor)
+                    Spacer(minLength: 6)
+                    if element.reviewState == .pending {
+                        Button("Potvrdiť") { onReviewStateChange(.confirmed) }
+                            .buttonStyle(.borderedProminent).controlSize(.small).fixedSize()
+                        Button("Odmietnuť") { onReviewStateChange(.rejected) }
+                            .buttonStyle(.bordered).controlSize(.small).fixedSize()
+                    } else {
+                        Button("Vrátiť na kontrolu") { onReviewStateChange(.pending) }
+                            .buttonStyle(.bordered).controlSize(.small).fixedSize()
+                    }
+                    Button { onDuplicate() } label: { Label("Duplikovať prvok", systemImage: "plus.square.on.square") }
+                        .labelStyle(.iconOnly).buttonStyle(.borderless).help("Duplikovať prvok").foregroundStyle(.secondary)
+                    Button { onRefine() } label: { Label("Spresniť rámec", systemImage: "wand.and.stars") }
+                        .labelStyle(.iconOnly).buttonStyle(.borderless).help("Spresniť rámec podľa obrysu (Apple Vision)").foregroundStyle(.secondary)
+                    Button(role: .destructive) { showDeleteConfirmation = true } label: { Label("Odstrániť prvok", systemImage: "trash") }
+                        .labelStyle(.iconOnly).buttonStyle(.borderless).help("Odstrániť prvok").foregroundStyle(.red)
+                }
                 .lineLimit(1)
-                .truncationMode(.tail)
+
+                Text(sourceCaption)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
         }
-        .padding(10)
+        .padding(isExpanded ? 10 : 8)
         .background(isSelected ? Color.accentColor.opacity(0.1) : Color.primary.opacity(0.03),
                     in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         .overlay(
@@ -1023,6 +1006,25 @@ struct ElementRow: View {
 
     private var sourceCaption: String {
         DetectionSourceLabel.slovak(element.detectionSource)
+    }
+
+    private var kindMenu: some View {
+        Menu {
+            ForEach(SecurityElement.Kind.allCases, id: \.self) { kind in
+                Button { onKindChange(kind) } label: { Label(kind.rawValue, systemImage: kind.sfSymbol) }
+            }
+        } label: {
+            HStack(spacing: 3) {
+                Text(element.kind.rawValue).font(.callout.weight(.medium))
+                Image(systemName: "chevron.down").font(.system(size: 9, weight: .semibold)).foregroundStyle(.secondary)
+            }
+            .lineLimit(1)
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .accessibilityLabel("Typ prvku")
+        .accessibilityValue(element.kind.rawValue)
     }
 
     private var reviewIcon: String {

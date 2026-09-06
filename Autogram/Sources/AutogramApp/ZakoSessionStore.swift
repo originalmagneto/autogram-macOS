@@ -486,6 +486,24 @@ final class ZakoSessionStore {
         recomputePreflight()
     }
 
+    /// Marks the page reviewed and moves the preview to the next page that still
+    /// needs a look, so a long document is one click per page.
+    func markPageReviewedAndAdvance(_ pageIndex: Int) {
+        markPageReviewed(pageIndex)
+        let remaining = unconfirmedNonEmptyPages
+        if let next = remaining.first(where: { $0 > pageIndex }) ?? remaining.first {
+            previewPageIndex = next
+        }
+    }
+
+    /// Confirms every pending finding on one page after the advocate checked
+    /// them on the canvas. Rejection stays per element on purpose.
+    func confirmAllPendingElements(onPage pageIndex: Int) {
+        for element in securityElements where element.pageIndex == pageIndex && element.reviewState == .pending {
+            confirmSecurityElement(id: element.id)
+        }
+    }
+
     func unmarkPageReviewed(_ pageIndex: Int) {
         reviewedNonEmptyPages.remove(pageIndex)
         touchReview()
