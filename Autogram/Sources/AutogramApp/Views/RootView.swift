@@ -234,7 +234,7 @@ struct RootView: View {
             .controlSize(.small)
 
             HStack {
-                SettingsLink {
+                OpenSettingsButton {
                     Image(systemName: "gearshape")
                 }
                 .buttonStyle(.borderless)

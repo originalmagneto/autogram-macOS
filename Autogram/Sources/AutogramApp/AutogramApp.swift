@@ -59,11 +59,14 @@ struct AutogramApp: App {
             AutogramCommands()
         }
 
-        Settings {
+        // A regular window instead of the Settings scene: the Settings scene sizes
+        // its window from the hosting view's preferred size and cannot be resized.
+        Window("Nastavenia", id: SettingsWindow.id) {
             SettingsView(settingsStore: model.settingsStore)
                 .environment(model.ezzkSessionController)
+                .frame(minWidth: 900, minHeight: 560)
         }
-        .defaultSize(width: 1080, height: 940)
+        .defaultSize(width: 940, height: 720)
         .windowResizability(.contentMinSize)
     }
 }
@@ -95,7 +98,7 @@ private struct AutogramCommands: Commands {
         }
 
         CommandGroup(replacing: .appSettings) {
-            SettingsLink {
+            OpenSettingsButton {
                 Text("Nastavenia…")
             }
             .keyboardShortcut(",", modifiers: .command)
@@ -107,5 +110,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
 
         FinderQuickActionService.installQuickAction()
+    }
+}
+
+enum SettingsWindow {
+    static let id = "settings"
+}
+
+/// Opens (or fronts) the settings window; replaces `SettingsLink` now that the
+/// settings live in a regular `Window` scene.
+struct OpenSettingsButton<Label: View>: View {
+    @Environment(\.openWindow) private var openWindow
+    @ViewBuilder var label: () -> Label
+
+    var body: some View {
+        Button {
+            openWindow(id: SettingsWindow.id)
+        } label: {
+            label()
+        }
     }
 }

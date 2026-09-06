@@ -65,7 +65,7 @@ struct SettingsView: View {
             settingsTabContent(profilesTab)
             .tabItem { Label("Profily advokáta", systemImage: "person.crop.circle.badge.checkmark") }
         }
-        .frame(minWidth: 720, idealWidth: 860, minHeight: 560, idealHeight: 720)
+        .frame(minWidth: 720, maxWidth: .infinity, minHeight: 560, maxHeight: .infinity)
         .confirmationDialog("Naozaj chcete odstrániť tento TSA server?",
                            isPresented: $showTSADeleteConfirmation,
                            titleVisibility: .visible) {
