@@ -5,21 +5,51 @@ enum QuickActionRunnerError: LocalizedError {
     case invalidArguments(String)
     case missingHelper
     case invalidPIN
-    case machineRequestFailed
+    case machineRequestFailed(HelperFailure)
+    case helperExitedWithoutResult(Int32)
 
     var errorDescription: String? {
         switch self {
         case .invalidArguments(let message): message
         case .missingHelper: "Autogram macOS helper was not found."
         case .invalidPIN: "The signing PIN could not be read."
-        case .machineRequestFailed: "Autogram macOS signing helper did not complete the request."
+        case .machineRequestFailed(let failure): failure.userMessage
+        case .helperExitedWithoutResult(let status):
+            "Autogram macOS signing helper exited (status \(status)) without reporting a result."
         }
+    }
+}
+
+/// Payload of a `session.failed` event, surfaced verbatim so the Quick Action dialog
+/// names the actual cause (missing card, wrong PIN, ...) instead of a generic failure.
+struct HelperFailure {
+    let code: String
+    let message: String
+    let recovery: String?
+    let retryable: Bool
+
+    init(payload: [String: Any]) {
+        code = payload["code"] as? String ?? "UNKNOWN"
+        message = payload["fallbackMessage"] as? String ?? "The machine request could not be completed."
+        recovery = payload["recovery"] as? String
+        retryable = payload["retryable"] as? Bool ?? false
+    }
+
+    var userMessage: String {
+        var text = "Autogram macOS signing helper failed [\(code)]: \(message)"
+        if let recovery, !recovery.isEmpty {
+            text += " \(recovery)"
+        }
+        if retryable {
+            text += " (retryable)"
+        }
+        return text
     }
 }
 
 private enum HelperTerminalEvent {
     case completed
-    case failed
+    case failed(HelperFailure)
 }
 
 private final class HelperTerminationController {
@@ -98,7 +128,7 @@ private final class HelperOutputCollector {
                 terminalEvent = .completed
                 shouldTerminate = true
             case "session.failed":
-                terminalEvent = .failed
+                terminalEvent = .failed(HelperFailure(payload: event["payload"] as? [String: Any] ?? [:]))
                 shouldTerminate = true
             default:
                 break
@@ -229,8 +259,13 @@ struct AutogramQuickActionRunner {
                 FileHandle.standardOutput.write(result.standardOutput)
             }
             FileHandle.standardError.write(result.standardError)
-            guard result.terminalEvent == .completed else {
-                throw QuickActionRunnerError.machineRequestFailed
+            switch result.terminalEvent {
+            case .completed:
+                break
+            case .failed(let failure):
+                throw QuickActionRunnerError.machineRequestFailed(failure)
+            case nil:
+                throw QuickActionRunnerError.helperExitedWithoutResult(result.terminationStatus)
             }
         } catch {
             FileHandle.standardError.write(Data("\(error.localizedDescription)\n".utf8))
@@ -238,7 +273,14 @@ struct AutogramQuickActionRunner {
         }
     }
 
-    private static func run(_ request: QuickActionRequest) throws -> (standardOutput: Data, standardError: Data, terminalEvent: HelperTerminalEvent?) {
+    private struct HelperRunResult {
+        let standardOutput: Data
+        let standardError: Data
+        let terminalEvent: HelperTerminalEvent?
+        let terminationStatus: Int32
+    }
+
+    private static func run(_ request: QuickActionRequest) throws -> HelperRunResult {
         var pin = try readPIN()
         defer { pin.removeAll(keepingCapacity: false) }
         var machineRequest = try requestData(for: request, pin: pin)
@@ -295,7 +337,11 @@ struct AutogramQuickActionRunner {
         input.fileHandleForWriting.closeFile()
         drainGroup.wait()
         process.waitUntilExit()
-        return collector.result()
+        let collected = collector.result()
+        return HelperRunResult(standardOutput: collected.standardOutput,
+                               standardError: collected.standardError,
+                               terminalEvent: collected.terminalEvent,
+                               terminationStatus: process.terminationStatus)
     }
 
     private static func readPIN() throws -> String {

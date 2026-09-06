@@ -80,6 +80,12 @@ public final class EngineBridgeSigningProvider: QualifiedSigningProviding, @unch
                 friendly = "Nesprávny PIN — overte ho a skúste znova."
             } else if message.contains("PIN_LOCKED") {
                 friendly = "PIN karty je zablokovaný — odomknite ju PUK kódom cez nástroj výrobcu karty."
+            } else if message.contains("TOKEN_NOT_PRESENT") {
+                friendly = "V čítačke nie je karta: vložte ju, počkajte na kontrolku čítačky a skúste znova."
+            } else if message.contains("TOKEN_NOT_RECOGNIZED") {
+                friendly = "Karta v čítačke nezodpovedá zvolenému ovládaču: prepnite eID klient alebo I.CA SecureStore."
+            } else if message.contains("OPERATION_CANCELLED") {
+                friendly = "Operácia s kartou bola zrušená."
             } else if message.contains("DRIVER_UNAVAILABLE") || message.contains("DRIVER_NOT_FOUND") {
                 friendly = "Karta nie je dostupná — vložte ju do čítačky."
             } else {
@@ -571,11 +577,23 @@ public final class EngineBridgeSigningProvider: QualifiedSigningProviding, @unch
     /// Zjednodušené čitateľné hlásenia pre známe kódy engine-u.
     static func localizedEngineMessage(_ message: String) -> String {
         func code(_ name: String) -> Bool { message.contains("[\(name)]") || message.contains(name) }
+        if code("TOKEN_NOT_PRESENT") {
+            return "V čítačke nie je karta: vložte ju a skúste znova."
+        }
+        if code("TOKEN_NOT_RECOGNIZED") {
+            return "Karta v čítačke nezodpovedá zvolenému ovládaču (eID klient alebo I.CA SecureStore)."
+        }
         if code("DRIVER_UNAVAILABLE") || code("DRIVER_NOT_FOUND") {
             return "Karta nie je dostupná — vložte ju do čítačky a skúste znova."
         }
         if code("PIN_INCORRECT") {
             return "Nesprávny PIN alebo BOK."
+        }
+        if code("PIN_LOCKED") {
+            return "PIN karty je zablokovaný: odomknite ho PUK kódom cez nástroj výrobcu karty."
+        }
+        if code("OPERATION_CANCELLED") {
+            return "Operácia s kartou bola zrušená."
         }
         if code("CERTIFICATE_NOT_FOUND") || code("CERTIFICATE_AMBIGUOUS") {
             return "Zvolený certifikát už nie je na karte — obnovte zoznam certifikátov."

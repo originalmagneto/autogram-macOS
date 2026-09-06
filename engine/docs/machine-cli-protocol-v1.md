@@ -85,7 +85,7 @@ Terminal machine errors use this stable payload:
 | `69` | Required driver, service, token, or platform capability is unavailable. |
 | `70` | Internal machine-mode failure. |
 
-Stable error codes include `PROTOCOL_INVALID_REQUEST`, `PROTOCOL_UNSUPPORTED_VERSION`, `OPERATION_MISMATCH`, `PIN_INCORRECT`, `DRIVER_NOT_FOUND`, `DRIVER_UNAVAILABLE`, `MACHINE_PLATFORM_UNSUPPORTED`, `SIGNING_UNAVAILABLE`, `TRUSTED_LIST_UNAVAILABLE`, and `INTERNAL_ERROR`.
+Stable error codes include `PROTOCOL_INVALID_REQUEST`, `PROTOCOL_UNSUPPORTED_VERSION`, `OPERATION_MISMATCH`, `PIN_INCORRECT`, `PIN_LOCKED`, `OPERATION_CANCELLED`, `DRIVER_NOT_FOUND`, `DRIVER_UNAVAILABLE`, `TOKEN_NOT_PRESENT` (driver installed, no card in the reader), `TOKEN_NOT_RECOGNIZED` (card does not match the driver), `MACHINE_PLATFORM_UNSUPPORTED`, `SIGNING_UNAVAILABLE`, `TRUSTED_LIST_UNAVAILABLE`, and `INTERNAL_ERROR`. An `INTERNAL_ERROR` `fallbackMessage` names the exception classes along the cause chain, never their messages.
 
 ## Privacy and signing guarantees
 

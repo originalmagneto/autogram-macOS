@@ -5,6 +5,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import digital.slovensko.autogram.ui.machine.MachineDriverService;
 import digital.slovensko.autogram.ui.machine.MachineInspectionService;
+import digital.slovensko.autogram.ui.machine.MachineErrorMapper;
 import digital.slovensko.autogram.ui.machine.MachineEventWriter;
 import digital.slovensko.autogram.ui.machine.MachineProtocolException;
 import digital.slovensko.autogram.ui.machine.MachineSigningService;
@@ -78,7 +79,8 @@ public final class MachineV2CliApp {
         } catch (MachineProtocolException exception) {
             writer.failed(requestId, exception.getMessage());
         } catch (Exception exception) {
-            writer.failed(requestId, "INTERNAL_ERROR");
+            // Card and PIN faults get their stable codes; anything else stays INTERNAL_ERROR.
+            writer.failed(requestId, new MachineErrorMapper().map(exception).code());
         }
     }
 

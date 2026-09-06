@@ -215,10 +215,11 @@ public final class MachineSigningService {
     }
 
     private static String failureCode(Throwable exception, String fallback) {
+        var tokenCode = MachineErrorMapper.tokenFailureCode(exception);
+        if (tokenCode != null) {
+            return tokenCode;
+        }
         for (var cause = exception; cause != null && cause.getCause() != cause; cause = cause.getCause()) {
-            if (cause instanceof PINIncorrectException || "CKR_PIN_INCORRECT".equals(cause.getMessage())) {
-                return "PIN_INCORRECT";
-            }
             if (cause instanceof MachineProtocolException protocolException) {
                 return switch (protocolException.getMessage()) {
                     case "OUTPUT_CLEANUP_FAILED", "OUTPUT_VALIDATION_FAILED", "TIMESTAMP_QUALIFICATION_FAILED",
