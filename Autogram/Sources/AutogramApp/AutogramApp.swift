@@ -28,6 +28,10 @@ struct AutogramCommandActions {
     let openDocument: () -> Void
     let addFiles: () -> Void
     let toggleSidebar: () -> Void
+    /// Recent documents for the File menu; empty when the feature is off.
+    let recentDocuments: [RecentDocumentStore.RecentDocument]
+    let openRecent: (RecentDocumentStore.RecentDocument) -> Void
+    let clearRecent: () -> Void
 }
 
 private struct AutogramCommandActionsKey: FocusedValueKey {
@@ -86,6 +90,24 @@ private struct AutogramCommands: Commands {
                 actions?.addFiles()
             }
             .keyboardShortcut("o", modifiers: [.command, .shift])
+            .disabled(actions == nil)
+
+            Menu("Otvoriť nedávne") {
+                let recents = actions?.recentDocuments ?? []
+                if recents.isEmpty {
+                    Text("Žiadne nedávne dokumenty")
+                } else {
+                    ForEach(recents) { entry in
+                        Button(entry.displayName) {
+                            actions?.openRecent(entry)
+                        }
+                    }
+                    Divider()
+                    Button("Vymazať menu") {
+                        actions?.clearRecent()
+                    }
+                }
+            }
             .disabled(actions == nil)
         }
 

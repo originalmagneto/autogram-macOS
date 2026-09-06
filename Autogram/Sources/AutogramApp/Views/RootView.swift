@@ -61,12 +61,7 @@ struct RootView: View {
                             let isAvailable = recentDocumentStore.isAvailable(entry)
                             Button {
                                 guard isAvailable else { return }
-                                selection = .signing
-                                Task {
-                                    await recentDocumentStore.withResolvedURL(entry) { resolvedURL in
-                                        await signingStore.loadDocument(at: resolvedURL)
-                                    }
-                                }
+                                openRecent(entry)
                             } label: {
                                 HStack(spacing: 8) {
                                     Image(systemName: isAvailable ? "clock.arrow.circlepath" : "doc.badge.ellipsis")
@@ -193,7 +188,10 @@ struct RootView: View {
         .focusedValue(\.autogramCommandActions, AutogramCommandActions(
             openDocument: openDocument,
             addFiles: openMoreFiles,
-            toggleSidebar: toggleSidebar))
+            toggleSidebar: toggleSidebar,
+            recentDocuments: recentDocumentStore.isEnabled ? recentDocumentStore.entries : [],
+            openRecent: openRecent,
+            clearRecent: { recentDocumentStore.clear() }))
         .confirmationDialog(
             "Naozaj chcete odstrániť dokument z fronty?",
             isPresented: $showQueueDeleteConfirmation,
@@ -294,6 +292,17 @@ struct RootView: View {
         case .signing: .orange
         case .signed: .green
         case .failed: .red
+        }
+    }
+
+    /// Opens a recent document in the signing flow, where it was recorded.
+    private func openRecent(_ entry: RecentDocumentStore.RecentDocument) {
+        guard recentDocumentStore.isAvailable(entry) else { return }
+        selection = .signing
+        Task {
+            await recentDocumentStore.withResolvedURL(entry) { resolvedURL in
+                await signingStore.loadDocument(at: resolvedURL)
+            }
         }
     }
 
