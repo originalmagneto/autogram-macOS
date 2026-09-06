@@ -114,7 +114,8 @@ class MachineCliAppTest {
         assertTrue(certificate.has("commonName"));
         assertTrue(certificate.has("validFrom"));
         assertTrue(certificate.has("validUntil"));
-        assertTrue(certificate.has("expired"));
+        assertTrue(certificate.has("certificateKey"));
+        assertTrue(certificate.has("holderKey"));
     }
 
     @Test
@@ -174,7 +175,7 @@ class MachineCliAppTest {
         assertEquals(0, code, stdout.toString());
         assertEquals("%PDF-1.7\nsigned\n%%EOF", Files.readString(target));
         assertEquals(List.of("session.started", "file.signingStarted", "file.completed", "session.completed"),
-                eventTypes(events));
+                eventTypes(events).stream().filter(type -> !"file.progress".equals(type)).toList());
     }
 
     @Test

@@ -11,17 +11,18 @@ enum QuickActionRunnerError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidArguments(let message): message
-        case .missingHelper: "Autogram macOS helper was not found."
-        case .invalidPIN: "The signing PIN could not be read."
+        case .missingHelper: "Pomocný program Autogram macOS (AutogramCLI-arm64) sa nenašiel."
+        case .invalidPIN: "Podpisový PIN sa nepodarilo načítať."
         case .machineRequestFailed(let failure): failure.userMessage
         case .helperExitedWithoutResult(let status):
-            "Autogram macOS signing helper exited (status \(status)) without reporting a result."
+            "Podpisový engine Autogramu skončil (stav \(status)) bez toho, aby oznámil výsledok."
         }
     }
 }
 
-/// Payload of a `session.failed` event, surfaced verbatim so the Quick Action dialog
-/// names the actual cause (missing card, wrong PIN, ...) instead of a generic failure.
+/// Payload of a `session.failed` event. The engine speaks English over the machine protocol;
+/// the runner translates known codes for the Finder dialog and keeps the engine text for
+/// codes it does not know, so the actual cause (missing card, wrong PIN, ...) is always named.
 struct HelperFailure {
     let code: String
     let message: String
@@ -36,15 +37,42 @@ struct HelperFailure {
     }
 
     var userMessage: String {
-        var text = "Autogram macOS signing helper failed [\(code)]: \(message)"
+        if let slovak = Self.slovakMessages[code] {
+            return "Autogram: \(slovak) [\(code)]"
+        }
+        var text = "Autogram: podpisový engine požiadavku nedokončil [\(code)]: \(message)"
         if let recovery, !recovery.isEmpty {
             text += " \(recovery)"
         }
         if retryable {
-            text += " (retryable)"
+            text += " Skúste znova."
         }
         return text
     }
+
+    private static let slovakMessages: [String: String] = [
+        "TOKEN_NOT_PRESENT": "V čítačke nie je karta pre zvolený ovládač. Vložte kartu, počkajte na kontrolku čítačky a skúste znova.",
+        "TOKEN_NOT_RECOGNIZED": "Karta v čítačke nezodpovedá zvolenému ovládaču. Zvoľte ovládač podľa karty (eID klient alebo I.CA SecureStore) a skúste znova.",
+        "PIN_INCORRECT": "Zadaný PIN nebol prijatý. Overte PIN a skúste znova.",
+        "PIN_LOCKED": "PIN karty je zablokovaný. Odomknite ho PUK kódom cez nástroj výrobcu karty.",
+        "OPERATION_CANCELLED": "Operácia s kartou bola zrušená. Skúste znova.",
+        "DRIVER_NOT_FOUND": "Zvolený ovládač karty nie je nainštalovaný alebo sa nenašiel.",
+        "DRIVER_UNAVAILABLE": "Ovládač karty sa nepodarilo načítať. Skontrolujte inštaláciu eID klienta alebo I.CA SecureStore.",
+        "CERTIFICATE_NOT_FOUND": "Zvolený certifikát sa na karte nenašiel. Obnovte zoznam certifikátov.",
+        "CERTIFICATE_AMBIGUOUS": "Zvolenému certifikátu zodpovedá viac kľúčov na karte. Obnovte zoznam certifikátov.",
+        "SIGNING_UNAVAILABLE": "Podpisovanie nie je dostupné. Skontrolujte kartu, ovládač a pripojenie na internet.",
+        "SIGNING_FAILED": "Podpis sa nepodarilo vytvoriť.",
+        "TRUSTED_LIST_UNAVAILABLE": "Dôveryhodný zoznam certifikačných autorít nie je dostupný. Skontrolujte pripojenie na internet.",
+        "TIMESTAMP_FAILED": "Nepodarilo sa získať kvalifikovanú časovú pečiatku (TSA).",
+        "TIMESTAMP_QUALIFICATION_FAILED": "Časová pečiatka nie je kvalifikovaná. Skontrolujte adresu TSA servera.",
+        "TSA_REQUIRED": "Chýba adresa TSA servera pre časovú pečiatku.",
+        "OUTPUT_TARGET_EXISTS": "Cieľový súbor už existuje.",
+        "OUTPUT_WRITE_FAILED": "Podpísaný súbor sa nepodarilo zapísať.",
+        "OUTPUT_VALIDATION_FAILED": "Engine odmietol výsledok podpisu (výstupná validácia).",
+        "OUTPUT_CLEANUP_FAILED": "Dočasné súbory podpisu sa nepodarilo odstrániť.",
+        "MACHINE_PLATFORM_UNSUPPORTED": "Táto platforma nie je podporovaná (vyžaduje sa Apple Silicon).",
+        "PROTOCOL_INVALID_REQUEST": "Požiadavka pre podpisový engine je neplatná (chyba Quick Action skriptu).",
+    ]
 }
 
 private enum HelperTerminalEvent {

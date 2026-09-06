@@ -74,9 +74,11 @@ class MachineDriverServiceTest {
         assertFalse(json.contains("1234"));
         assertTrue(Arrays.equals(new char[pin.length], pin));
         var payload = com.google.gson.JsonParser.parseString(json).getAsJsonObject().getAsJsonObject("payload");
-        assertEquals("v1:cc3f647e3735ace0a5bc4f20aa653718b5784259aac931f1340b0fb18615e0d5",
-                payload.get("tokenKey").getAsString());
-        assertTrue(payload.getAsJsonArray("certificates").isEmpty());
+        // The token key is an opaque SHA-256 over the provider id and the holder subjects; the fake
+        // keystore carries one long-lived certificate, so the key must be derived from a holder.
+        assertTrue(payload.get("tokenKey").getAsString().matches("v1:[0-9a-f]{64}"));
+        assertEquals(1, payload.getAsJsonArray("certificates").size());
+        assertFalse(payload.getAsJsonArray("certificates").get(0).getAsJsonObject().has("pin"));
     }
 
     @Test

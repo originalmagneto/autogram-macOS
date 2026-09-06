@@ -73,7 +73,7 @@ public final class MachineCliApp {
             case CAPABILITIES -> dispatchCapabilities(writer, request, driverService);
             case DRIVERS -> dispatchDrivers(writer, request, driverService);
             case CERTIFICATES -> dispatchCertificates(writer, request, driverService);
-            case INSPECT -> dispatchInspection(writer, request, inspectionService, trustInitializer);
+            case INSPECT -> dispatchInspection(writer, request, inspectionService);
             case SIGN -> dispatchSigning(writer, request, inspectionService, trustInitializer, signingServiceFactory);
         };
     }
@@ -106,7 +106,7 @@ public final class MachineCliApp {
     }
 
     private static int dispatchInspection(MachineEventWriter writer, MachineRequest request,
-            MachineInspectionService inspectionService, Runnable trustInitializer) {
+            MachineInspectionService inspectionService) {
         var inspection = requiredInspectionRequest(request.payload());
         writer.write("session.started", request.requestId(), null, new JsonObject());
         for (var file : inspection.files()) {
