@@ -195,23 +195,38 @@ struct AnalysisCanvasView: View {
     }
 
     // MARK: - Markup Toolbar
-    private var markupToolbar: some View {
-        HStack(spacing: 4) {
-            toolButton(kind: nil, title: "Vybrať", icon: "arrow.up.left.and.arrow.down.right")
-            Divider().frame(height: 16)
-            toolButton(kind: .officialStamp, title: "Pečiatka", icon: "seal.fill")
-            toolButton(kind: .handwrittenSignature, title: "Podpis", icon: "signature")
-            toolButton(kind: .embossedSeal, title: "Pečať", icon: "rosette")
-            toolButton(kind: .initial, title: "Parafa", icon: "text.badge.checkmark")
+    /// Manual marking lives in the inspector, not over the page: pick a kind,
+    /// then click the element in the document. Picking it again leaves the mode.
+    private var addElementCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("Pridať prvok", systemImage: "plus.circle")
+                .font(.headline)
+            Grid(horizontalSpacing: 6, verticalSpacing: 6) {
+                GridRow {
+                    toolButton(kind: .officialStamp, title: "Pečiatka", icon: "seal.fill")
+                    toolButton(kind: .handwrittenSignature, title: "Podpis", icon: "signature")
+                }
+                GridRow {
+                    toolButton(kind: .embossedSeal, title: "Pečať", icon: "rosette")
+                    toolButton(kind: .initial, title: "Parafa", icon: "text.badge.checkmark")
+                }
+            }
+            if let progress = store.snapAssetProgress {
+                HStack(spacing: 6) {
+                    ProgressView(value: progress).frame(width: 80)
+                    Text("Sťahujem model výberu…").font(.caption2).foregroundStyle(.secondary)
+                }
+            } else if let reason = store.snapUnavailableReason {
+                Text(reason).font(.caption2).foregroundStyle(.secondary)
+            } else {
+                Text(store.activeTool == nil
+                     ? "Zvoľte typ a kliknite na prvok v dokumente; rámec sa prichytí k jeho obrysu."
+                     : "Kliknite na prvok v dokumente. Ťahaním nakreslíte rámec ručne.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
         }
-        .padding(.horizontal, 4)
-        .padding(.vertical, 3)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(Color.accentColor.opacity(0.5), lineWidth: 1)
-        }
-        .shadow(color: .black.opacity(0.16), radius: 8, y: 3)
+        .glassCard(cornerRadius: 12, padding: 12)
     }
 
     /// Indicator + inline switcher for the detection provider. Apple Vision
@@ -284,28 +299,26 @@ struct AnalysisCanvasView: View {
         .padding(.vertical, 4)
     }
 
-    private func toolButton(kind: SecurityElement.Kind?, title: String, icon: String) -> some View {
+    private func toolButton(kind: SecurityElement.Kind, title: String, icon: String) -> some View {
         let isSelected = store.activeTool == kind
         return Button {
-            store.activeTool = kind
+            store.activeTool = isSelected ? nil : kind
         } label: {
-            HStack(spacing: 4) {
-                Image(systemName: icon)
-                    .font(.system(size: 11, weight: .medium))
-                Text(title)
-                    .font(.caption.weight(isSelected ? .semibold : .regular))
-                    .lineLimit(1)
-            }
-            .padding(.horizontal, 6)
-            .padding(.vertical, 4)
-            .background(isSelected ? Color.accentColor.opacity(0.2) : Color.clear, in: RoundedRectangle(cornerRadius: 8))
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .strokeBorder(isSelected ? Color.accentColor : Color.clear, lineWidth: 1)
-            )
-            .foregroundStyle(isSelected ? Color.accentColor : Color.primary)
+            Label(title, systemImage: icon)
+                .font(.callout.weight(isSelected ? .semibold : .regular))
+                .lineLimit(1)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 5)
+                .background(isSelected ? Color.accentColor.opacity(0.16) : Color.primary.opacity(0.04),
+                            in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .strokeBorder(isSelected ? Color.accentColor : Color.primary.opacity(0.08), lineWidth: 1)
+                )
+                .foregroundStyle(isSelected ? Color.accentColor : Color.primary)
         }
         .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
 
@@ -348,32 +361,10 @@ struct AnalysisCanvasView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                VStack {
-                    HStack {
-                        Spacer()
-                        markupToolbar
-                    }
-                    .padding(14)
-
-                    if let progress = store.snapAssetProgress {
-                        HStack(spacing: 6) {
-                            ProgressView(value: progress)
-                                .frame(width: 80)
-                            Text("Sťahujem model výberu…").font(.caption2)
-                        }
-                        .padding(6)
-                        .background(.regularMaterial, in: Capsule())
-                    } else if let reason = store.snapUnavailableReason {
-                        Text(reason).font(.caption2).foregroundStyle(.secondary)
-                    }
-
-                    Spacer()
-                }
-
                 if let tool = store.activeTool {
                     VStack {
                         HStack {
-                            Label("Režim pridávania: \(tool.rawValue) - klik na prázdne miesto pridá, klik na prvok ho vyberie", systemImage: "plus.viewfinder")
+                            Label("\(tool.rawValue): kliknite na prvok v dokumente", systemImage: "plus.viewfinder")
                                 .font(.caption.weight(.semibold))
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 5)
@@ -468,19 +459,44 @@ struct AnalysisCanvasView: View {
         VStack(spacing: 0) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
-                    pageHeader
+                    pageReviewCard
+                    findingsCard
+                    addElementCard
+                }
+                .padding(12)
+            }
+        }
+        .background(.regularMaterial)
+        .overlay(alignment: .leading) {
+            Rectangle().fill(Color.primary.opacity(0.08)).frame(width: 1)
+        }
+    }
 
-                    if !store.unconfirmedNonEmptyPages.isEmpty && !store.isAnalyzing {
-                        unconfirmedWarning
+    /// Findings of the current page plus the collapsed numeric inspector.
+    private var findingsCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Label("Nálezy", systemImage: "checklist")
+                    .font(.headline)
+                Spacer()
+                if store.lastDeletedElement != nil {
+                    Button {
+                        store.undoDelete()
+                    } label: {
+                        Label("Vrátiť", systemImage: "arrow.uturn.backward")
                     }
+                    .controlSize(.small)
+                    .help("Vrátiť zmazaný prvok")
+                }
+            }
 
-                    let pageElements = store.securityElements
-                        .filter { $0.pageIndex == store.previewPageIndex }
-                        .sorted { $0.boundingBox.y < $1.boundingBox.y }
+            let pageElements = store.securityElements
+                .filter { $0.pageIndex == store.previewPageIndex }
+                .sorted { $0.boundingBox.y < $1.boundingBox.y }
 
-                    if pageElements.isEmpty && !store.isAnalyzing {
-                        emptyHint
-                    }
+            if pageElements.isEmpty && !store.isAnalyzing {
+                emptyHint
+            }
 
                     ForEach(pageElements) { element in
                         ElementRow(element: element,
@@ -507,60 +523,53 @@ struct AnalysisCanvasView: View {
                                    })
                     }
 
-                    if store.selectedElementID != nil {
-                        DisclosureGroup("Presná poloha", isExpanded: $showPrecisePlacement) {
-                            selectedElementInspector
-                        }
-                        .font(.caption.weight(.semibold))
-                        .help("Číselné umiestnenie a klávesové posuny. Ťahanie na plátne a klik na prvok sú rýchlejšie.")
-                    }
+            if store.selectedElementID != nil {
+                DisclosureGroup("Presná poloha", isExpanded: $showPrecisePlacement) {
+                    selectedElementInspector
                 }
-                .padding(14)
+                .font(.caption.weight(.semibold))
+                .help("Číselné umiestnenie a klávesové posuny. Ťahanie na plátne a klik na prvok sú rýchlejšie.")
             }
         }
-        .background(.regularMaterial)
-        .overlay(alignment: .leading) {
-            Rectangle().fill(Color.primary.opacity(0.08)).frame(width: 1)
-        }
+        .glassCard(cornerRadius: 12, padding: 12)
     }
 
-    /// Page title, review counts and the reviewed toggle in one row.
-    private var pageHeader: some View {
+    /// Review status of the current page: counts, the reviewed toggle, and the
+    /// pages that still need a look.
+    private var pageReviewCard: some View {
         let pageIndex = store.previewPageIndex
         let isReviewed = store.reviewedNonEmptyPages.contains(pageIndex)
         let isEmptyPage = store.analysis.pageAnalyses.first(where: { $0.pageIndex == pageIndex })?.isEmpty != false
         let rejected = store.securityElements.filter { $0.reviewState == .rejected }.count
-        return VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 8) {
-                Text("Strana \(pageIndex + 1)")
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Label("Kontrola strany", systemImage: "checkmark.shield")
                     .font(.headline)
                 Spacer()
-                if store.lastDeletedElement != nil {
-                    Button {
-                        store.undoDelete()
-                    } label: {
-                        Label("Vrátiť", systemImage: "arrow.uturn.backward")
-                    }
-                    .controlSize(.small)
-                    .help("Vrátiť zmazaný prvok")
-                }
-                Button {
-                    if isReviewed { store.unmarkPageReviewed(pageIndex) } else { store.markPageReviewed(pageIndex) }
-                } label: {
-                    Label(isReviewed ? "Skontrolovaná" : "Označiť ako skontrolovanú",
-                          systemImage: isReviewed ? "checkmark.circle.fill" : "circle")
-                        .fixedSize()
-                }
-                .buttonStyle(.bordered)
-                .tint(isReviewed ? .green : .accentColor)
-                .controlSize(.small)
-                .disabled(isEmptyPage)
-                .help(isReviewed ? "Zrušiť označenie strany" : "Každá neprázdna strana musí byť skontrolovaná")
+                Text("Strana \(pageIndex + 1) z \(max(store.analysis.totalPages, 1))")
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
             }
             Text("\(store.confirmedSecurityElements.count) potvrdené · \(store.pendingSecurityElementCount) čaká · \(rejected) odmietnuté")
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(.secondary)
+            Button {
+                if isReviewed { store.unmarkPageReviewed(pageIndex) } else { store.markPageReviewed(pageIndex) }
+            } label: {
+                Label(isReviewed ? "Strana skontrolovaná" : "Označiť stranu ako skontrolovanú",
+                      systemImage: isReviewed ? "checkmark.circle.fill" : "circle")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .tint(isReviewed ? .green : .accentColor)
+            .disabled(isEmptyPage)
+            .help(isReviewed ? "Kliknutím zrušíte označenie" : "Každá neprázdna strana musí byť skontrolovaná")
+
+            if !store.unconfirmedNonEmptyPages.isEmpty && !store.isAnalyzing {
+                unconfirmedWarning
+            }
         }
+        .glassCard(cornerRadius: 12, padding: 12)
     }
 
     @ViewBuilder
