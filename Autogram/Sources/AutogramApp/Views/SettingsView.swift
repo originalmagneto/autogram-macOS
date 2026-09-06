@@ -65,7 +65,7 @@ struct SettingsView: View {
             settingsTabContent(profilesTab)
             .tabItem { Label("Profily advokáta", systemImage: "person.crop.circle.badge.checkmark") }
         }
-        .frame(minWidth: 980, idealWidth: 1080, minHeight: 840, idealHeight: 940)
+        .frame(minWidth: 720, idealWidth: 860, minHeight: 560, idealHeight: 720)
         .confirmationDialog("Naozaj chcete odstrániť tento TSA server?",
                            isPresented: $showTSADeleteConfirmation,
                            titleVisibility: .visible) {
@@ -131,12 +131,12 @@ struct SettingsView: View {
 
     // MARK: - Tab 1: AI Vision
     private var aiTab: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 8) {
                 Text("Poskytovateľ AI Vision detekcie")
                     .font(.headline)
 
-                VStack(spacing: 8) {
+                VStack(spacing: 4) {
                     aiProviderRow(
                         mode: .omlxLocal,
                         title: "oMLX (Apple Silicon MLX)",
@@ -180,7 +180,7 @@ struct SettingsView: View {
 
                 aiReadinessRows
             }
-            .glassCard(cornerRadius: 14, padding: 16)
+            .glassCard(cornerRadius: 12, padding: 12)
 
             VStack(alignment: .leading, spacing: 10) {
                 Label("Naposledy otvorené dokumenty", systemImage: "clock.arrow.circlepath")
@@ -194,7 +194,7 @@ struct SettingsView: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
-            .glassCard(cornerRadius: 14, padding: 16)
+            .glassCard(cornerRadius: 12, padding: 12)
 
             if settingsStore.settings.aiMode == .omlxLocal {
                 VStack(alignment: .leading, spacing: 12) {
@@ -224,7 +224,7 @@ struct SettingsView: View {
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
-                .glassCard(cornerRadius: 14, padding: 16)
+                .glassCard(cornerRadius: 12, padding: 12)
             }
 
             if settingsStore.settings.aiMode == .ollamaLocal {
@@ -255,7 +255,7 @@ struct SettingsView: View {
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
-                .glassCard(cornerRadius: 14, padding: 16)
+                .glassCard(cornerRadius: 12, padding: 12)
             }
 
             if settingsStore.settings.aiMode == .customAPIKey {
@@ -302,11 +302,12 @@ struct SettingsView: View {
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
-                .glassCard(cornerRadius: 14, padding: 16)
+                .glassCard(cornerRadius: 12, padding: 12)
             }
 
             let promptEnabled = settingsStore.settings.aiMode.supportsPromptOverride
-            VStack(alignment: .leading, spacing: 10) {
+            if promptEnabled {
+            VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Text("Klasifikačný prompt pre LLM")
                         .font(.headline)
@@ -341,7 +342,7 @@ struct SettingsView: View {
                                 ? nil : newValue
                     }))
                     .font(.system(size: 11, design: .monospaced))
-                    .frame(height: 100)
+                    .frame(height: 64)
                     .padding(4)
                     .background(Color.primary.opacity(0.03), in: RoundedRectangle(cornerRadius: 8))
                     .overlay(
@@ -350,18 +351,17 @@ struct SettingsView: View {
                     )
                     .disabled(!promptEnabled)
 
-                Text(promptEnabled
-                     ? "Prázdne pole znamená schválený predvolený prompt. Prompt sa použije iba pre oMLX, Ollama a vlastné API."
-                     : "Vstavaný detektor beží vždy. Prompt sa pre interný alebo vypnutý režim nepoužíva.")
+                Text("Prázdne pole znamená schválený predvolený prompt. Prompt sa použije iba pre oMLX, Ollama a vlastné API.")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
-            .glassCard(cornerRadius: 14, padding: 16)
+            .glassCard(cornerRadius: 12, padding: 12)
             .onAppear {
                 let current = settingsStore.settings.aiPrompt
                 selectedPromptPreset = AIPromptPreset.allCases.first {
                     $0.promptText == current
                 } ?? (current == nil ? .legalDocuments : .customPrompt)
+            }
             }
 
             LearningDatasetCard(settingsStore: settingsStore, bank: settingsStore.exampleBank)
@@ -440,20 +440,20 @@ struct SettingsView: View {
                     .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
                     .frame(width: 22)
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                        .font(.callout.weight(isSelected ? .semibold : .medium))
-                        .foregroundStyle(Color.primary)
-                    Text(subtitle)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                }
+                Text(title)
+                    .font(.callout.weight(isSelected ? .semibold : .medium))
+                    .foregroundStyle(Color.primary)
+                    .lineLimit(1)
+                Text(subtitle)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
 
                 Spacer(minLength: 0)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
             .background(isSelected ? Color.accentColor.opacity(0.08) : Color.primary.opacity(0.02),
                         in: RoundedRectangle(cornerRadius: 10, style: .continuous))
             .overlay(
@@ -485,7 +485,7 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            .glassCard(cornerRadius: 14, padding: 16)
+            .glassCard(cornerRadius: 12, padding: 12)
 
             VStack(alignment: .leading, spacing: 14) {
                 Label("Časová pečiatka (RFC 3161 TSA)", systemImage: "clock.badge.checkmark")
@@ -572,7 +572,7 @@ struct SettingsView: View {
                     }
                 }
             }
-            .glassCard(cornerRadius: 14, padding: 16)
+            .glassCard(cornerRadius: 12, padding: 12)
         }
     }
 
@@ -663,7 +663,7 @@ struct SettingsView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .glassCard(cornerRadius: 14, padding: 16)
+        .glassCard(cornerRadius: 12, padding: 12)
     }
 
     private func ezzkEndpointRow(label: String, value: String) -> some View {
@@ -795,7 +795,7 @@ struct SettingsView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .glassCard(cornerRadius: 14, padding: 16)
+        .glassCard(cornerRadius: 12, padding: 12)
     }
 
     private func ezzkEvidenceCard(_ controller: EZZKSessionController) -> some View {
@@ -833,7 +833,7 @@ struct SettingsView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .glassCard(cornerRadius: 14, padding: 16)
+        .glassCard(cornerRadius: 12, padding: 12)
     }
 
     private var ezzkSubmissionCard: some View {
@@ -851,7 +851,7 @@ struct SettingsView: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .glassCard(cornerRadius: 14, padding: 16)
+        .glassCard(cornerRadius: 12, padding: 12)
     }
 
     private var ezzkMigrationCard: some View {
@@ -882,7 +882,7 @@ struct SettingsView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .glassCard(cornerRadius: 14, padding: 16)
+        .glassCard(cornerRadius: 12, padding: 12)
     }
 
     private func requestEZZKEvidenceNumbers() {
@@ -960,7 +960,7 @@ struct SettingsView: View {
             }
 
             .frame(maxWidth: .infinity, alignment: .leading)
-            .glassCard(cornerRadius: 14, padding: 16)
+            .glassCard(cornerRadius: 12, padding: 12)
 
             VStack(alignment: .leading, spacing: 10) {
                 Label("Aktivácia vo Findere", systemImage: "questionmark.circle")
@@ -987,7 +987,7 @@ struct SettingsView: View {
                 .fixedSize(horizontal: false, vertical: true)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .glassCard(cornerRadius: 14, padding: 16)
+            .glassCard(cornerRadius: 12, padding: 12)
         }
     }
 
@@ -1112,7 +1112,7 @@ struct SettingsView: View {
                             .font(.callout)
                             .toggleStyle(.switch)
                     }
-                    .glassCard(cornerRadius: 14, padding: 16)
+                    .glassCard(cornerRadius: 12, padding: 12)
                 }
             }
         }
@@ -1170,7 +1170,7 @@ struct LearningDatasetCard: View {
                 Text(exportMessage).font(.caption2).foregroundStyle(.secondary)
             }
         }
-        .glassCard(cornerRadius: 14, padding: 16)
+        .glassCard(cornerRadius: 12, padding: 12)
         .task { await refreshCounts() }
         .confirmationDialog("Vymazať všetky uložené príklady?", isPresented: $showDeleteConfirmation) {
             Button("Vymazať", role: .destructive) {

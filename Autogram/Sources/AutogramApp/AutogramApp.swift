@@ -64,7 +64,7 @@ struct AutogramApp: App {
                 .environment(model.ezzkSessionController)
         }
         .defaultSize(width: 1080, height: 940)
-        .windowResizability(.contentSize)
+        .windowResizability(.contentMinSize)
     }
 }
 

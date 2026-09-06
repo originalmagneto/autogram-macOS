@@ -4,6 +4,7 @@ import AutogramKit
 
 struct AnalysisCanvasView: View {
     @Bindable var store: ZakoSessionStore
+    @State private var showPrecisePlacement = false
     @State private var interaction: Interaction?
     @State private var pageImage: NSImage?
     @State private var pageAspect: CGFloat = 1.414
@@ -347,29 +348,6 @@ struct AnalysisCanvasView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                VStack(spacing: 0) {
-                    HStack {
-                        Label("Označte bezpečnostné prvky",
-                              systemImage: "shield.checkerboard")
-                            .font(.callout.weight(.semibold))
-                        Spacer()
-                        Text("AI nálezy môžete skontrolovať a upraviť")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 9)
-                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .strokeBorder(Color.accentColor.opacity(0.35), lineWidth: 1)
-                    }
-                    .padding(12)
-                    .allowsHitTesting(false)
-
-                    Spacer()
-                }
-
                 VStack {
                     HStack {
                         Spacer()
@@ -449,19 +427,19 @@ struct AnalysisCanvasView: View {
         .accessibilityLabel("Prebieha analýza dokumentu")
     }
 
+    /// One quiet line under the page instead of four chips: the numbers matter,
+    /// the decoration competed with the document.
     private var countersRow: some View {
-        HStack(spacing: 10) {
-            StatChip(title: "Strany", value: "\(store.analysis.totalPages)", symbol: "doc.on.doc", tint: .blue)
-            StatChip(title: "Neprázdne",
-                     value: "\(store.analysis.nonEmptyPages)",
-                     symbol: "doc.text.fill", tint: .teal)
-            StatChip(title: "Listy (odhad)",
-                     value: "\(store.effectiveSheetCount)",
-                     symbol: "rectangle.stack", tint: .indigo)
-            StatChip(title: "Prvky",
-                     value: "\(store.securityElements.count)",
-                     symbol: "shield.checkerboard", tint: .green)
-        }
+        Text([
+            SlovakCount.phrase(store.analysis.totalPages, "strana", "strany", "strán"),
+            "\(store.analysis.nonEmptyPages) neprázdne",
+            SlovakCount.phrase(store.effectiveSheetCount, "list", "listy", "listov") + " (odhad)",
+            SlovakCount.phrase(store.securityElements.count, "prvok", "prvky", "prvkov")
+        ].joined(separator: " · "))
+        .font(.caption.monospacedDigit())
+        .foregroundStyle(.secondary)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityLabel("Súhrn dokumentu")
     }
 
     private var sheetCountMenu: some View {
@@ -490,25 +468,11 @@ struct AnalysisCanvasView: View {
         VStack(spacing: 0) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        Label("Prvky: strana \(store.previewPageIndex + 1)", systemImage: "shield.checkerboard")
-                            .font(.headline)
-                        Spacer()
-                        if store.lastDeletedElement != nil {
-                            Button {
-                                store.undoDelete()
-                            } label: {
-                                Label("Vrátiť zmazaný prvok", systemImage: "arrow.uturn.backward")
-                            }
-                            .controlSize(.small)
-                        }
-                    }
+                    pageHeader
 
                     if !store.unconfirmedNonEmptyPages.isEmpty && !store.isAnalyzing {
                         unconfirmedWarning
                     }
-
-                    reviewProgressCard
 
                     let pageElements = store.securityElements
                         .filter { $0.pageIndex == store.previewPageIndex }
@@ -544,21 +508,14 @@ struct AnalysisCanvasView: View {
                     }
 
                     if store.selectedElementID != nil {
-                        selectedElementInspector
-                    }
-
-                    Divider().padding(.vertical, 4)
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Manipulácia:")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                        Text("Ovládacie prvky nižšie umožňujú presun a zmenu veľkosti bez myši. Ťahanie na plátne zostáva rýchlejšou alternatívou.")
-                            .font(.caption2)
-                            .foregroundStyle(.tertiary)
+                        DisclosureGroup("Presná poloha", isExpanded: $showPrecisePlacement) {
+                            selectedElementInspector
+                        }
+                        .font(.caption.weight(.semibold))
+                        .help("Číselné umiestnenie a klávesové posuny. Ťahanie na plátne a klik na prvok sú rýchlejšie.")
                     }
                 }
-                .padding(16)
+                .padding(14)
             }
         }
         .background(.regularMaterial)
@@ -567,34 +524,43 @@ struct AnalysisCanvasView: View {
         }
     }
 
-    private var reviewProgressCard: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Label("Kontrola bezpečnostných prvkov", systemImage: "checkmark.shield")
-                .font(.footnote.weight(.semibold))
-            Text("Potvrdené: \(store.confirmedSecurityElements.count) · čaká na kontrolu: \(store.pendingSecurityElementCount) · odmietnuté: \(store.securityElements.filter { $0.reviewState == .rejected }.count)")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+    /// Page title, review counts and the reviewed toggle in one row.
+    private var pageHeader: some View {
+        let pageIndex = store.previewPageIndex
+        let isReviewed = store.reviewedNonEmptyPages.contains(pageIndex)
+        let isEmptyPage = store.analysis.pageAnalyses.first(where: { $0.pageIndex == pageIndex })?.isEmpty != false
+        let rejected = store.securityElements.filter { $0.reviewState == .rejected }.count
+        return VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
-                Button("Označiť stranu ako skontrolovanú") {
-                    store.markPageReviewed(store.previewPageIndex)
-                }
-                .disabled(store.analysis.pageAnalyses.first(where: { $0.pageIndex == store.previewPageIndex })?.isEmpty != false ||
-                          store.reviewedNonEmptyPages.contains(store.previewPageIndex))
-                .controlSize(.small)
-                if store.reviewedNonEmptyPages.contains(store.previewPageIndex) {
-                    Label("Strana skontrolovaná", systemImage: "checkmark.circle.fill")
-                        .font(.caption2)
-                        .foregroundStyle(.green)
-                    Button("Zrušiť") {
-                        store.unmarkPageReviewed(store.previewPageIndex)
+                Text("Strana \(pageIndex + 1)")
+                    .font(.headline)
+                Spacer()
+                if store.lastDeletedElement != nil {
+                    Button {
+                        store.undoDelete()
+                    } label: {
+                        Label("Vrátiť", systemImage: "arrow.uturn.backward")
                     }
                     .controlSize(.small)
+                    .help("Vrátiť zmazaný prvok")
                 }
+                Button {
+                    if isReviewed { store.unmarkPageReviewed(pageIndex) } else { store.markPageReviewed(pageIndex) }
+                } label: {
+                    Label(isReviewed ? "Skontrolovaná" : "Označiť ako skontrolovanú",
+                          systemImage: isReviewed ? "checkmark.circle.fill" : "circle")
+                        .fixedSize()
+                }
+                .buttonStyle(.bordered)
+                .tint(isReviewed ? .green : .accentColor)
+                .controlSize(.small)
+                .disabled(isEmptyPage)
+                .help(isReviewed ? "Zrušiť označenie strany" : "Každá neprázdna strana musí byť skontrolovaná")
             }
+            Text("\(store.confirmedSecurityElements.count) potvrdené · \(store.pendingSecurityElementCount) čaká · \(rejected) odmietnuté")
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(.secondary)
         }
-        .padding(10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.accentColor.opacity(0.07), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
     @ViewBuilder
@@ -720,15 +686,10 @@ struct AnalysisCanvasView: View {
     }
 
     private var emptyHint: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Na tejto strane zatiaľ nie sú detegované prvky.")
-                .font(.callout)
-                .foregroundStyle(.secondary)
-            Text("Spustite AI analýzu alebo zvoľte nástroj a kliknite do dokumentu pre manuálne pridanie.")
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
-        }
-        .padding(.vertical, 6)
+        Text("Žiadne prvky. Zvoľte nástroj a kliknite na prvok v dokumente.")
+            .font(.callout)
+            .foregroundStyle(.secondary)
+            .padding(.vertical, 6)
     }
 }
 
@@ -1069,5 +1030,18 @@ struct ElementRow: View {
         case .confirmed: return .green
         case .rejected: return .secondary
         }
+    }
+}
+
+/// Slovak count phrases: 1 strana, 2-4 strany, 5+ strán.
+enum SlovakCount {
+    static func phrase(_ n: Int, _ one: String, _ few: String, _ many: String) -> String {
+        let word: String
+        switch n {
+        case 1: word = one
+        case 2...4: word = few
+        default: word = many
+        }
+        return "\(n) \(word)"
     }
 }
