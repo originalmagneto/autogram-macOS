@@ -296,8 +296,29 @@ swift run vision-eval ~/AutogramEval [--builtin-only] [--no-fm] [--bank <dir>] [
 
 Aktuálny macOS build je v [GitHub Releases](https://github.com/originalmagneto/autogram-macOS/releases/latest) ako DMG.
 
+<details open>
+<summary><strong>Prvé spustenie (aplikácia nie je notarizovaná)</strong></summary>
+
+<p>Build je podpísaný lokálne, nie Apple Developer ID, takže Gatekeeper ho pri prvom spustení zastaví. Toto je štandardný postup, žiadne nastavenia sa nemenia natrvalo:</p>
+
+<ol>
+<li>Otvorte DMG a presuňte <code>Autogram macOS.app</code> do priečinka <strong>Applications</strong>.</li>
+<li>Spustite aplikáciu. macOS ohlási, že ju nemôže overiť, a ponúkne len "Presunúť do koša" alebo "Hotovo". Zvoľte <strong>Hotovo</strong>.</li>
+<li>Otvorte <strong>Systémové nastavenia ▸ Súkromie a bezpečnosť</strong>, zrolujte nadol k hláseniu o Autograme a kliknite na <strong>Aj tak otvoriť</strong>. Potvrďte heslom alebo Touch ID.</li>
+<li>Od tejto chvíle sa aplikácia spúšťa normálne.</li>
+</ol>
+
+<p>Alternatíva z Terminálu, ktorá zruší karanténny príznak stiahnutého súboru:</p>
+
+```bash
+xattr -d com.apple.quarantine "/Applications/Autogram macOS.app"
+```
+
+<p>Overenie stiahnutého DMG: v poznámkach k vydaniu je SHA-256 odtlačok; porovnajte ho s výstupom <code>shasum -a 256 Autogram-macOS-v0.3.0.dmg</code>.</p>
+</details>
+
 <details>
-<summary><strong>v0.2.3 · aktuálne vydanie</strong></summary>
+<summary><strong>v0.2.3 · predchádzajúce vydanie</strong></summary>
 <ul>
 <li>I.CA SecureStore správne vyberá slot s kartou aj pri prázdnej čítačke na prvej pozícii.</li>
 <li>Existujúce XAdES podpisy v ASiC-E sa načítajú cez ľahkú inšpekciu bez blokovania na nedostupnom trust liste.</li>
@@ -306,7 +327,7 @@ Aktuálny macOS build je v [GitHub Releases](https://github.com/originalmagneto/
 </details>
 
 <details open>
-<summary><strong>Pripravované · vrstvená AI Vision a nová kontrola originálu</strong></summary>
+<summary><strong>v0.3.0 · aktuálne vydanie: vrstvená AI Vision a nová kontrola originálu</strong></summary>
 <ul>
 <li>Kandidáti z troch zdrojov (heuristiky, Vision kontúry, saliency) plus presné OCR, ktoré odfiltruje tlačený text a linkované bunky formulárov; na reálnom skene plnomocenstva klesol počet volaní modelu z 24 na 3 a strana bez podpisu ostala čistá.</li>
 <li>Klasifikácia porovnaním s vašimi potvrdenými príkladmi a on-device Apple modelom, bez externých služieb.</li>
