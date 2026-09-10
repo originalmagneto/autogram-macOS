@@ -396,13 +396,17 @@ final class SigningSessionStore {
             pdfaPrepared = false
             pdfaAfterSign = false
             var visualStampWasPreapplied = false
-            if convertToPDFA, includeVisibleSignature, outputFormat == .attachedASIC {
+            // The card path lets the Java engine draw the PAdES appearance; the AVM server
+            // cannot, so signing with mobile bakes the stamp into the PDF like the ASiC-E path.
+            let preappliesVisualStamp = outputFormat == .attachedASIC
+                || (viaMobile && outputFormat == .embeddedPAdES)
+            if convertToPDFA, includeVisibleSignature, preappliesVisualStamp {
                 let imageData = visualArtworkOverride
                     ?? VisualSignatureStore.imageData(for: selectedVisualAppearanceID)
                 let stamp = VisibleSignatureStamper.StampData(
                     fullName: displayName(),
                     timestamp: Date(),
-                    pageIndex: min(signaturePage, analysis.totalPages - 1),
+                    pageIndex: visualPlacement?.pageIndex ?? min(signaturePage, analysis.totalPages - 1),
                     normalizedRect: signatureRect,
                     imagePNG: imageData,
                     certificateName: identities.first(where: { $0.id == selectedIdentityID })?.label,
@@ -445,13 +449,13 @@ final class SigningSessionStore {
                 pdfaPrepared = true
                 statusText = "PDF/A je pripravené, podpisujem…"
             }
-            if !convertToPDFA, includeVisibleSignature, outputFormat == .attachedASIC {
+            if !convertToPDFA, includeVisibleSignature, preappliesVisualStamp {
                 let imageData = visualArtworkOverride
                     ?? VisualSignatureStore.imageData(for: selectedVisualAppearanceID)
                 let stamp = VisibleSignatureStamper.StampData(
                     fullName: displayName(),
                     timestamp: Date(),
-                    pageIndex: min(signaturePage, analysis.totalPages - 1),
+                    pageIndex: visualPlacement?.pageIndex ?? min(signaturePage, analysis.totalPages - 1),
                     normalizedRect: signatureRect,
                     imagePNG: imageData,
                     certificateName: identities.first(where: { $0.id == selectedIdentityID })?.label,
