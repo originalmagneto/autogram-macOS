@@ -332,6 +332,13 @@ struct SigningPrepareView: View {
                 visualState.setContent(signerName: "Certifikát sa nenačítal", qualification: error)
             } else if store.isResolvingCertificate {
                 visualState.setContent(signerName: "Načítavam certifikát…", qualification: nil)
+            } else if store.isMobileSigningAvailable {
+                // Without a PIN the card is unknown; mobile signing never needs one, so show the
+                // neutral content that both paths can honour.
+                visualState.setContent(
+                    signerName: store.displayName(),
+                    qualification: SigningSessionStore.qualifiedSignatureLabel,
+                    timestampAuthorityName: store.includeQualifiedTimestamp ? store.settings.activeTSA.name : nil)
             } else {
                 visualState.setContent(signerName: "Podpisový certifikát", qualification: "Zadajte PIN pre náhľad")
             }

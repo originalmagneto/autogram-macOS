@@ -358,6 +358,22 @@ final class SigningSessionStore {
         document != nil && selectedIdentityID != nil && !isSigning
     }
 
+    /// Mobile signing always uses the qualified certificate on the eID, which is known only
+    /// after the phone signs, so the baked stamp describes the channel instead of the card.
+    static let mobileStampCertificateName = "Občiansky preukaz (eID) cez Autogram v mobile"
+    static let qualifiedSignatureLabel = "Kvalifikovaný elektronický podpis"
+
+    func stampCertificateName(viaMobile: Bool) -> String? {
+        if viaMobile { return Self.mobileStampCertificateName }
+        return identities.first(where: { $0.id == selectedIdentityID })?.label
+    }
+
+    func stampQualification(viaMobile: Bool) -> String? {
+        if viaMobile { return Self.qualifiedSignatureLabel }
+        return identities.first(where: { $0.id == selectedIdentityID })?.isQualified == true
+            ? Self.qualifiedSignatureLabel : nil
+    }
+
     var isMobileSigningAvailable: Bool {
         settings.mobileSigningEnabled && !signingProviderIsDemo
     }
@@ -409,9 +425,8 @@ final class SigningSessionStore {
                     pageIndex: visualPlacement?.pageIndex ?? min(signaturePage, analysis.totalPages - 1),
                     normalizedRect: signatureRect,
                     imagePNG: imageData,
-                    certificateName: identities.first(where: { $0.id == selectedIdentityID })?.label,
-                    certificateQualification: identities.first(where: { $0.id == selectedIdentityID })?.isQualified == true
-                        ? "Kvalifikovaný elektronický podpis" : nil,
+                    certificateName: stampCertificateName(viaMobile: viaMobile),
+                    certificateQualification: stampQualification(viaMobile: viaMobile),
                     timestampAuthorityName: includeQualifiedTimestamp ? settings.activeTSA.name : nil)
                 let stampedData = await Self.stampPDFData(
                     pdfData,
@@ -458,9 +473,8 @@ final class SigningSessionStore {
                     pageIndex: visualPlacement?.pageIndex ?? min(signaturePage, analysis.totalPages - 1),
                     normalizedRect: signatureRect,
                     imagePNG: imageData,
-                    certificateName: identities.first(where: { $0.id == selectedIdentityID })?.label,
-                    certificateQualification: identities.first(where: { $0.id == selectedIdentityID })?.isQualified == true
-                        ? "Kvalifikovaný elektronický podpis" : nil,
+                    certificateName: stampCertificateName(viaMobile: viaMobile),
+                    certificateQualification: stampQualification(viaMobile: viaMobile),
                     timestampAuthorityName: includeQualifiedTimestamp ? settings.activeTSA.name : nil)
                 pdfData = await Self.stampPDFData(
                     pdfData,
@@ -1482,7 +1496,7 @@ final class SigningSessionStore {
         displayName()
     }
 
-    private func displayName() -> String {
+    func displayName() -> String {
         if let identity = identities.first(where: { $0.id == selectedIdentityID }),
            identity.label != "DEMO podpis (vývojový režim)" {
             return identity.label
