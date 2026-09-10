@@ -105,7 +105,7 @@
     <text x="948" y="472" text-anchor="middle" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="8.5" font-weight="400" fill="#7a8399">evidenčné číslo · serverový čas · zápis</text>
     <rect x="800" y="492" width="296" height="36" rx="6" fill="rgba(45,49,66,0.05)" stroke="#4f5d75" stroke-width="0.8"/>
     <text x="948" y="506" text-anchor="middle">QualifiedSigningProviding</text>
-    <text x="948" y="520" text-anchor="middle" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="8.5" font-weight="400" fill="#7a8399">Keychain identities · mandát · demo ASiC-E</text>
+    <text x="948" y="520" text-anchor="middle" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="8.5" font-weight="400" fill="#7a8399">Keychain · PKCS#11 · AVM mobil · mandát</text>
     <rect x="800" y="540" width="296" height="36" rx="6" fill="rgba(45,49,66,0.05)" stroke="#4f5d75" stroke-width="0.8"/>
     <text x="948" y="554" text-anchor="middle">LocalEvidenceStore · KeychainStore</text>
     <text x="948" y="568" text-anchor="middle" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="8.5" font-weight="400" fill="#7a8399">register JSON · CSV export · tajomstvá</text>

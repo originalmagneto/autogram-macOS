@@ -236,6 +236,23 @@ kontrakt a samostatný podpísaný ASiC record v konverznom workflow.
 
 ---
 
+## Podpis mobilom (Autogram v mobile)
+
+Fáza pridaná 2026-09-11 na vetve `feature/avm-mobile-signing`. Mac nemá NFC, preto ide
+podpis občianskym preukazom cez relay Slovensko.Digital: `AVMClient` nahrá dokument
+zašifrovaný 32-bajtovým kľúčom (`X-Encryption-Key`, `payloadMimeType` s príponou
+`;base64`), `AVMSigningSession` ukáže QR kód (`/qr-code?guid&key`) a polluje
+`GET /documents/{guid}` s `If-Modified-Since`, kým iPhone s Autogram v mobile dokument
+nepodpíše. `MobileSigningCoordinator` a `MobileSigningSheet` riadia UI, stores menia len
+posledný krok (`sign(viaMobile:)`, `authorizeAndSign(viaMobile:)`).
+
+Overené na reálnom serveri: PAdES aj ASiC-E, pečiatka pri úrovni `_T`, `signers` ako
+celé DN. Nepodpísaný ASiC-E server odmieta, preto ZaKo cez mobil podpisuje finálne PDF/A
+s vloženou doložkou a server ho zabalí do kontajnera. Podpis bez mandátneho certifikátu
+ZaKo odmietne. `swift run avm-probe <súbor>` slúži na kontrolu protokolu.
+
+---
+
 ## Obmedzenia a ďalšie kroky
 
 | Oblasť | Stav | Poznámka |
@@ -247,6 +264,7 @@ kontrakt a samostatný podpísaný ASiC record v konverznom workflow.
 | Mandát atribút | heuristika CN/issuer strings | presný OID mandátu doplniť po analýze reálneho SAK certifikátu |
 | Formuláre 1.2 (2027) | verziované konštanty v `ZakoCodelists` | auto-update artefaktov z formulare.slovensko.sk (FormularyRepository) |
 | XAdES_ZEP | netvorí sa | zakázaný podľa eIDAS IR 2015/1506 |
+| Podpis mobilom | funguje pre PAdES a ASiC-E s eID | mandátny certifikát na eID neoverený; XDCF v ZaKo kontajneri nie je podpísaný samostatne; SAK karta cez AVM nejde |
 
 ## Právna kotva
 - Zákon č. 305/2013 Z. z., § 35–39
