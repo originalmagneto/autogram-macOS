@@ -136,3 +136,11 @@ kontajnera a mandátneho certifikátu proti reálnemu serveru pred UI prácou.
 
 Push notifikácie a registrácia integrácie, vlastný AVM server, Quick Action, hromadný
 podpis jedným QR kódom (viac súborov = viac QR kódov, sekvenčne cez existujúcu frontu).
+
+## Overené na serveri
+
+- 2026-09-11, `avm-probe` proti `https://autogram.slovensko.digital/api/v1` bez telefónu:
+  `POST /documents` s PDF a `PAdES_BASELINE_T` vrátil 200 a GUID, polling `GET /documents/{guid}`
+  s `If-Modified-Since` vracal 304, `DELETE` po timeoute prešiel. QR link a PNG sa vygenerovali.
+- Zostáva overiť s iPhonom a eID: časová pečiatka pri `_T`, podpis nepodpísaného ZaKo ASiC-E
+  (oba súbory), a či `signers` obsahuje mandátny certifikát.
