@@ -40,6 +40,9 @@ final class SigningSessionStore {
     var result: SignedConversionResult?
     var outputDirectory: URL?
     var lastError: String?
+    let mobileSigning: MobileSigningCoordinator
+    /// Which path the current `sign` run uses; drives the button labels.
+    private(set) var isSigningViaMobile = false
     var existingSignatures: [DocumentSignatureInfo] = []
     var isInspectingSignatures = false
     var signedOutputURL: URL?
@@ -210,6 +213,7 @@ final class SigningSessionStore {
         self.signingProvider = signingProvider
         self.settingsStore = settingsStore
         self.recentDocumentStore = recentDocumentStore
+        self.mobileSigning = MobileSigningCoordinator(settingsStore: settingsStore)
     }
 
     func loadDocument(at url: URL) async {
@@ -354,14 +358,23 @@ final class SigningSessionStore {
         document != nil && selectedIdentityID != nil && !isSigning
     }
 
-    func sign() async {
+    var isMobileSigningAvailable: Bool {
+        settings.mobileSigningEnabled && !signingProviderIsDemo
+    }
+
+    var canSignViaMobile: Bool {
+        document != nil && !isSigning && isMobileSigningAvailable
+    }
+
+    func sign(viaMobile: Bool = false) async {
         guard let document else { return }
         lastError = nil
         isSigning = true
+        isSigningViaMobile = viaMobile
         statusText = includeVisibleSignature ? "Pripravujem vizuálny podpis…" : "Podpisujem…"
 
         do {
-            if includeVisibleSignature, !signingProviderIsDemo, !hasResolvedCertificate {
+            if !viaMobile, includeVisibleSignature, !signingProviderIsDemo, !hasResolvedCertificate {
                 statusText = "Načítavam certifikát pre vizuálny podpis…"
                 await resolveCertificateForPreview(force: true)
                 guard hasResolvedCertificate else {
@@ -455,10 +468,7 @@ final class SigningSessionStore {
 
             
 
-            statusText = "Podpisujem kvalifikovaným podpisom…"
-            guard let identityID = selectedIdentityID else {
-                throw SigningError.identityUnavailable
-            }
+            statusText = viaMobile ? "Čakám na podpis z mobilu…" : "Podpisujem kvalifikovaným podpisom…"
             let pdfName = sourceURL?.lastPathComponent ?? "dokument.pdf"
             let artworkPNG = visualArtworkOverride ?? VisualSignatureStore.imageData(for: selectedVisualAppearanceID)
             let visualStamp: VisualStampSpec?
@@ -472,35 +482,54 @@ final class SigningSessionStore {
                     // Po PDF/A rasteri sú iné rozmery strany: vždy mapovať z normalizovaného rectu na aktuálne PDF.
                     pdfPageRect: convertToPDFA ? nil : visualPlacement?.pageRect,
                     rotationDegrees: visualPlacement?.rotationDegrees ?? 0,
-                    qualification: identities.first(where: { $0.id == identityID })?.isQualified == true
+                    qualification: identities.first(where: { $0.id == selectedIdentityID })?.isQualified == true
                         ? "Kvalifikovaný elektronický podpis" : nil,
-                    certificateName: identities.first(where: { $0.id == identityID })?.label,
+                    certificateName: identities.first(where: { $0.id == selectedIdentityID })?.label,
                     timestampAuthorityName: includeQualifiedTimestamp ? settings.activeTSA.name : nil)
             } else {
                 visualStamp = nil
             }
-            func makeRequest(with data: Data) -> SigningRequest {
-                SigningRequest(pdfData: data,
-                               identityID: identityID,
-                               includeTimestamp: includeQualifiedTimestamp,
-                               tsaURL: includeQualifiedTimestamp ? selectedTSAURL : nil,
-                               outputFormat: outputFormat,
-                               pin: signingPIN.isEmpty ? nil : signingPIN,
-                               extraFiles: [ASiCEPackager.Entry(path: pdfName, data: data)],
-                               visualStamp: visualStamp)
-            }
             let signed: SignedConversionResult
-            do {
-                signed = try await signingProvider.sign(makeRequest(with: pdfData))
-            } catch {
-                let text = error.localizedDescription
-                if convertToPDFA, pdfaPrepared,
-                   text.contains("SIGNING_UNAVAILABLE") || text.contains("SIGNING_FAILED") {
-                    statusText = "PDF/A sa nepodarilo podpísať, skúšam pôvodný dokument…"
-                    pdfaPrepared = false
-                    signed = try await signingProvider.sign(makeRequest(with: originalPdfData))
-                } else {
-                    throw error
+            if viaMobile {
+                // The phone signs on the AVM server; only the final step differs from the card path.
+                let level: AVMSignatureLevel = outputFormat == .embeddedPAdES
+                    ? .pades(timestamp: includeQualifiedTimestamp)
+                    : .xades(timestamp: includeQualifiedTimestamp)
+                let upload = AVMUploadRequest(filename: pdfName,
+                                              data: pdfData,
+                                              mimeType: AVMUploadRequest.pdfMimeType,
+                                              level: level,
+                                              container: outputFormat == .attachedASIC ? .asicE : nil)
+                let document = try await mobileSigning.sign(upload)
+                signed = try AVMResultMapper.conversionResult(from: document,
+                                                              outputFormat: outputFormat,
+                                                              uploadedPDF: pdfData)
+            } else {
+                guard let identityID = selectedIdentityID else {
+                    throw SigningError.identityUnavailable
+                }
+                func makeRequest(with data: Data) -> SigningRequest {
+                    SigningRequest(pdfData: data,
+                                   identityID: identityID,
+                                   includeTimestamp: includeQualifiedTimestamp,
+                                   tsaURL: includeQualifiedTimestamp ? selectedTSAURL : nil,
+                                   outputFormat: outputFormat,
+                                   pin: signingPIN.isEmpty ? nil : signingPIN,
+                                   extraFiles: [ASiCEPackager.Entry(path: pdfName, data: data)],
+                                   visualStamp: visualStamp)
+                }
+                do {
+                    signed = try await signingProvider.sign(makeRequest(with: pdfData))
+                } catch {
+                    let text = error.localizedDescription
+                    if convertToPDFA, pdfaPrepared,
+                       text.contains("SIGNING_UNAVAILABLE") || text.contains("SIGNING_FAILED") {
+                        statusText = "PDF/A sa nepodarilo podpísať, skúšam pôvodný dokument…"
+                        pdfaPrepared = false
+                        signed = try await signingProvider.sign(makeRequest(with: originalPdfData))
+                    } else {
+                        throw error
+                    }
                 }
             }
 
@@ -540,14 +569,23 @@ final class SigningSessionStore {
             statusText = ""
             step = .done
         } catch {
-            lastError = error.localizedDescription
             statusText = ""
-            if let index = queue.firstIndex(where: { $0.id == selectedQueueID }) {
-                queue[index].status = .failed
-                queue[index].errorMessage = error.localizedDescription
+            if let avmError = error as? AVMError, avmError == .cancelled {
+                // The user closed the QR sheet; the document stays ready for another attempt.
+                if let index = queue.firstIndex(where: { $0.id == selectedQueueID }),
+                   queue[index].status == .signing {
+                    queue[index].status = .ready
+                }
+            } else {
+                lastError = error.localizedDescription
+                if let index = queue.firstIndex(where: { $0.id == selectedQueueID }) {
+                    queue[index].status = .failed
+                    queue[index].errorMessage = error.localizedDescription
+                }
             }
         }
         isSigning = false
+        isSigningViaMobile = false
     }
 
     var unsignedQueueItems: [SigningQueueItem] {

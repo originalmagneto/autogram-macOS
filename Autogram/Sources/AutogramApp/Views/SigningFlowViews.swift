@@ -262,6 +262,7 @@ struct SigningPrepareView: View {
 
                     Spacer()
 
+                    mobileSignButton
                     signButton
                 }
             }
@@ -269,6 +270,12 @@ struct SigningPrepareView: View {
             .background(.bar)
             .overlay(alignment: .leading) {
                 Rectangle().fill(Color.primary.opacity(0.08)).frame(width: 1)
+            }
+        }
+        .sheet(isPresented: Bindable(store.mobileSigning).isPresented) {
+            if let session = store.mobileSigning.session {
+                MobileSigningSheet(session: session) { store.mobileSigning.cancel() }
+                    .interactiveDismissDisabled()
             }
         }
         .task(id: store.document?.dataRepresentation()?.count ?? 0) {
@@ -708,6 +715,30 @@ struct SigningPrepareView: View {
         .controlSize(.large)
         .disabled(!store.canSign)
         .keyboardShortcut(.defaultAction)
+    }
+
+    @ViewBuilder
+    private var mobileSignButton: some View {
+        if store.isMobileSigningAvailable {
+            Button {
+                Task { await store.sign(viaMobile: true) }
+            } label: {
+                HStack(spacing: 8) {
+                    if store.isSigning, store.isSigningViaMobile {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Image(systemName: "iphone.gen3.radiowaves.left.and.right")
+                    }
+                    Text("Podpísať mobilom")
+                        .font(.body.weight(.semibold))
+                }
+                .padding(.horizontal, 6)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.large)
+            .disabled(!store.canSignViaMobile)
+            .help("Podpis občianskym preukazom s NFC cez iPhone a aplikáciu Autogram v mobile")
+        }
     }
 }
 
