@@ -573,6 +573,8 @@ struct SettingsView: View {
                 }
             }
             .glassCard(cornerRadius: 12, padding: 12)
+
+            MobileSigningCard(settingsStore: settingsStore)
         }
     }
 
@@ -1209,5 +1211,38 @@ struct LearningDatasetCard: View {
                 exportMessage = "Export zlyhal: \(error.localizedDescription)"
             }
         }
+    }
+}
+
+struct MobileSigningCard: View {
+    @Bindable var settingsStore: AppSettingsStore
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Label("Podpisovanie mobilom (Autogram v mobile)", systemImage: "iphone.gen3.radiowaves.left.and.right")
+                .font(.headline)
+
+            Toggle("Ponúkať podpis občianskym preukazom s NFC cez iPhone",
+                   isOn: $settingsStore.settings.mobileSigningEnabled)
+            Text("Dokument sa zašifruje kľúčom, ktorý pozná len tento Mac, nahrá sa na server Slovensko.Digital a po naskenovaní QR kódu ho podpíšete v aplikácii Autogram v mobile. Server dokument zmaže do 24 hodín.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 10) {
+                GridRow {
+                    Text("Server")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 140, alignment: .leading)
+                    TextField("https://autogram.slovensko.digital/api/v1", text: $settingsStore.settings.avmBaseURL)
+                        .textFieldStyle(.roundedBorder)
+                        .disabled(!settingsStore.settings.mobileSigningEnabled)
+                }
+            }
+            Text("Aplikácia Autogram v mobile otvára len odkazy z autogram.slovensko.digital. Iný server je určený len na testovanie.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .glassCard(cornerRadius: 12, padding: 12)
     }
 }
