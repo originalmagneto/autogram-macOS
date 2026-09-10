@@ -57,7 +57,14 @@ struct AuthorizeView: View {
 
                 Spacer()
 
+                mobileAuthorizeButton
                 authorizeButton
+            }
+        }
+        .sheet(isPresented: Bindable(store.mobileSigning).isPresented) {
+            if let session = store.mobileSigning.session {
+                MobileSigningSheet(session: session) { store.mobileSigning.cancel() }
+                    .interactiveDismissDisabled()
             }
         }
         .task { await store.refreshIdentities() }
@@ -276,6 +283,30 @@ struct AuthorizeView: View {
         .tint(.indigo)
         .disabled(store.isAuthorizing || store.isResolvingCertificate || !store.isPreflightComplete)
         .keyboardShortcut(.defaultAction)
+    }
+
+    @ViewBuilder
+    private var mobileAuthorizeButton: some View {
+        if store.isMobileSigningAvailable {
+            Button {
+                Task { await store.authorizeAndSign(viaMobile: true) }
+            } label: {
+                HStack(spacing: 8) {
+                    if store.isAuthorizing, store.isAuthorizingViaMobile {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Image(systemName: "iphone.gen3.radiowaves.left.and.right")
+                    }
+                    Text("Autorizovať mobilom")
+                        .font(.body.weight(.semibold))
+                }
+                .padding(.horizontal, 6)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.large)
+            .disabled(store.isAuthorizing || !store.isMobilePreflightComplete)
+            .help("Vyžaduje mandátny certifikát na občianskom preukaze. Bez neho sa konverzia odmietne.")
+        }
     }
 }
 
