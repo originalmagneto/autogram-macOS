@@ -5,6 +5,9 @@ import UniformTypeIdentifiers
 import AutogramKit
 
 // Usage: avm-probe <file.pdf|file.asice> [--level PAdES_BASELINE_B] [--container ASiC-E] [--base-url <url>] [--out <dir>] [--timeout <seconds>]
+//        avm-probe --make-zako-sample <file.pdf> [--out <dir>]
+// The second form writes an unsigned ZaKo ASiC-E (PDF plus a sample clause XML) built by the
+// app's own ASiCEPackager, for probing whether the server signs every file in the container.
 // Uploads the file to the AVM server, prints the QR link, writes avm-qr.png into the
 // output directory, polls until the phone signs, then saves the signed file and prints signers.
 
@@ -12,6 +15,28 @@ import AutogramKit
 setlinebuf(stdout)
 
 var args = Array(CommandLine.arguments.dropFirst())
+if let flag = args.firstIndex(of: "--make-zako-sample"), flag + 1 < args.count {
+    let pdfURL = URL(fileURLWithPath: args[flag + 1])
+    var outDirectory = FileManager.default.currentDirectoryPath
+    if let o = args.firstIndex(of: "--out"), o + 1 < args.count { outDirectory = args[o + 1] }
+    let pdf = try Data(contentsOf: pdfURL)
+    let clause = """
+    <?xml version="1.0" encoding="UTF-8"?>
+    <OsvedcovaciaDolozka xmlns="urn:autogram:avm-probe:sample">
+      <Poznamka>Vzorová doložka pre test podpisu kontajnera cez Autogram v mobile.</Poznamka>
+    </OsvedcovaciaDolozka>
+    """
+    let packager = ASiCEPackager()
+    let entries = packager.zakoContainer(pdfData: pdf,
+                                         pdfFileName: pdfURL.lastPathComponent,
+                                         dolozkaXML: Data(clause.utf8),
+                                         dolozkaFileName: "osvedcovacia-dolozka.xml")
+    let container = try packager.package(files: entries)
+    let target = URL(fileURLWithPath: outDirectory, isDirectory: true).appendingPathComponent("unsigned-zako.asice")
+    try container.write(to: target)
+    print("Unsigned ZaKo container: \(target.path) (\(container.count) bytes, entries: \(entries.map(\.path).joined(separator: ", ")))")
+    exit(0)
+}
 guard let inputPath = args.first else {
     FileHandle.standardError.write(Data("usage: avm-probe <file> [--level L] [--container C] [--base-url U] [--out DIR] [--timeout S]\n".utf8))
     exit(2)

@@ -145,5 +145,9 @@ podpis jedným QR kódom (viac súborov = viac QR kódov, sekvenčne cez existuj
 - 2026-09-11, kontrola kódovania: `payloadMimeType` musí niesť príponu `;base64`
   (`application/pdf;base64`), inak server obsah zakóduje do base64 druhýkrát (overené cez
   `GET /documents/{guid}`: s príponou 593 B a `%PDF`, bez nej 792 B base64 textu). `DELETE` vracia 204.
-- Zostáva overiť s iPhonom a eID: časová pečiatka pri `_T`, podpis nepodpísaného ZaKo ASiC-E
-  (oba súbory), a či `signers` obsahuje mandátny certifikát.
+- 2026-09-11, prvý podpis s iPhonom a eID (PDF, `PAdES_BASELINE_T`): podpísané PDF prišlo
+  za pár sekúnd, CMS obsahuje `signatureTimeStampToken`, takže `_T` pri uploade pečiatku
+  vynúti bez ohľadu na prepínač v appke. `signers.signedBy` a `issuedBy` sú celé RFC 2253 DN
+  (napr. `CN=SVK eID ACA2, O=Disig a.s., ...`), `Qualified: true`, `Mandate: false` pre osobný certifikát.
+- Zostáva overiť s iPhonom a eID: podpis nepodpísaného ZaKo ASiC-E (oba súbory) a či DN
+  mandátneho certifikátu obsahuje "mandát" alebo "oprávnenie" (heuristika `isMandate`).
