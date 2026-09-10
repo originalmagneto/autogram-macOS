@@ -19,8 +19,10 @@ public enum AVMContainer: String, Codable, Sendable {
 
 /// Body of `POST /documents`.
 public struct AVMUploadRequest: Encodable, Sendable, Equatable {
-    public static let pdfMimeType = "application/pdf"
-    public static let asicEMimeType = "application/vnd.etsi.asic-e+zip"
+    /// The `;base64` suffix tells avm-server that `content` is already base64.
+    /// Without it the server base64-encodes the payload a second time.
+    public static let pdfMimeType = "application/pdf;base64"
+    public static let asicEMimeType = "application/vnd.etsi.asic-e+zip;base64"
 
     public struct Document: Encodable, Sendable, Equatable {
         public var filename: String

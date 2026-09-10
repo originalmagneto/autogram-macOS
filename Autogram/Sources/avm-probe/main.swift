@@ -8,6 +8,9 @@ import AutogramKit
 // Uploads the file to the AVM server, prints the QR link, writes avm-qr.png into the
 // output directory, polls until the phone signs, then saves the signed file and prints signers.
 
+// Line-buffer stdout so progress shows up when the output is piped or redirected.
+setlinebuf(stdout)
+
 var args = Array(CommandLine.arguments.dropFirst())
 guard let inputPath = args.first else {
     FileHandle.standardError.write(Data("usage: avm-probe <file> [--level L] [--container C] [--base-url U] [--out DIR] [--timeout S]\n".utf8))

@@ -15,7 +15,7 @@ final class AVMClientTests: XCTestCase {
         let parameters = try XCTUnwrap(json?["parameters"] as? [String: Any])
         XCTAssertEqual(parameters["level"] as? String, "PAdES_BASELINE_T")
         XCTAssertNil(parameters["container"])
-        XCTAssertEqual(json?["payloadMimeType"] as? String, "application/pdf")
+        XCTAssertEqual(json?["payloadMimeType"] as? String, "application/pdf;base64")
     }
 
     func testSignedDocumentDecodesContentAndSigners() throws {

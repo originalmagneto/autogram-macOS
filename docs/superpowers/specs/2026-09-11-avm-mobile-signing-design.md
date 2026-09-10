@@ -142,5 +142,8 @@ podpis jedným QR kódom (viac súborov = viac QR kódov, sekvenčne cez existuj
 - 2026-09-11, `avm-probe` proti `https://autogram.slovensko.digital/api/v1` bez telefónu:
   `POST /documents` s PDF a `PAdES_BASELINE_T` vrátil 200 a GUID, polling `GET /documents/{guid}`
   s `If-Modified-Since` vracal 304, `DELETE` po timeoute prešiel. QR link a PNG sa vygenerovali.
+- 2026-09-11, kontrola kódovania: `payloadMimeType` musí niesť príponu `;base64`
+  (`application/pdf;base64`), inak server obsah zakóduje do base64 druhýkrát (overené cez
+  `GET /documents/{guid}`: s príponou 593 B a `%PDF`, bez nej 792 B base64 textu). `DELETE` vracia 204.
 - Zostáva overiť s iPhonom a eID: časová pečiatka pri `_T`, podpis nepodpísaného ZaKo ASiC-E
   (oba súbory), a či `signers` obsahuje mandátny certifikát.
