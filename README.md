@@ -53,7 +53,7 @@ Natívna macOS aplikácia v SwiftUI pre kvalifikované elektronické podpisovani
 </tr>
 <tr>
 <td><strong>Integrácie</strong></td>
-<td>eID, advokátske preukazy, PKCS#11, Keychain, Finder Quick Action, EZZK (OAuth2/PKCE, fail-closed).</td>
+<td>eID, advokátske preukazy, PKCS#11, Keychain, Finder Quick Action, podpis mobilom cez Autogram v mobile (NFC eID na iPhone), EZZK (OAuth2/PKCE, fail-closed).</td>
 <td>natívny pracovný tok</td>
 </tr>
 </table>
@@ -69,6 +69,7 @@ Natívna macOS aplikácia v SwiftUI pre kvalifikované elektronické podpisovani
 <li>Výber eID, I.CA SecureStore, PKCS#11 a Keychain tokenov, vrátane čítačiek s viacerými slotmi.</li>
 <li>PAdES a ASiC-E výstupy s kvalifikovanou časovou pečiatkou.</li>
 <li>Vizuálny podpis, dávkové spracovanie a bezpečné zrušenie operácie.</li>
+<li>Podpis bez čítačky: QR kód, iPhone s aplikáciou Autogram v mobile a občiansky preukaz s NFC.</li>
 <li>Neplatný vstupný podpis blokuje konkrétny dokument; nedostupná trust služba zostáva iba informatívna.</li>
 </ul>
 </td>
@@ -216,8 +217,28 @@ swift run vision-eval ~/AutogramEval [--builtin-only] [--no-fm] [--bank <dir>] [
 2. Pri viacerých dokumentoch vyberte **Pripraviť dávku podpisov**.
 3. Prejdite preflight kontrolou vstupov a nastavení.
 4. Vyberte formát, certifikát a voliteľný vizuálny podpis alebo QTS.
-5. Spustite podpisovanie cez **Podpísať KEP** alebo sticky action bar.
+5. Spustite podpisovanie cez **Podpísať KEP** (karta v čítačke) alebo **Podpísať mobilom** (občiansky preukaz s NFC cez iPhone).
 6. Skontrolujte výsledný PDF, XML alebo ASiC-E artefakt.
+
+### Podpis mobilom
+
+Bez čítačky kariet podpíšete dokument občianskym preukazom s NFC a iPhonom s aplikáciou [Autogram v mobile](https://sluzby.slovensko.digital/autogram-v-mobile/). Mac dokument zašifruje náhodným kľúčom, ktorý pozná len on, nahrá ho na server Slovensko.Digital, zobrazí QR kód a čaká. Po naskenovaní kódu telefón dokument podpíše a Mac si podpísaný súbor stiahne, overí a uloží rovnako ako pri karte.
+
+<p align="center">
+  <img src="docs/diagrams/mobile-signing.svg" alt="Sekvencia podpisu mobilom cez Autogram v mobile" width="100%">
+</p>
+
+<table>
+<tr>
+<th align="left" width="30%">Čo platí</th>
+<th align="left">Detail</th>
+</tr>
+<tr><td>Formát a pečiatka</td><td>Rovnaké voľby ako pri karte: PAdES v PDF alebo ASiC-E (XAdES), kvalifikovanú časovú pečiatku pridá server pri úrovni <code>_T</code>.</td></tr>
+<tr><td>Vizuálny podpis</td><td>Vypáli sa do PDF lokálne ešte pred odoslaním; karta uvádza "Občiansky preukaz (eID) cez Autogram v mobile", lebo certifikát je známy až po podpise.</td></tr>
+<tr><td>Zaručená konverzia</td><td>Vyžaduje mandátny certifikát. Podpis z mobilu bez neho aplikácia odmietne, nič neuloží a evidenciu nezmení. Kontajner podpisuje finálne PDF/A s vloženou doložkou; XDCF sa ukladá vedľa.</td></tr>
+<tr><td>Súkromie</td><td>Server dokument dešifruje len v pamäti pri podpise a zmaže ho do 24 hodín. Kľúč sa neposiela nikam inam než v hlavičke k danému dokumentu.</td></tr>
+<tr><td>Hranice</td><td>Aplikácia Autogram v mobile číta len občiansky preukaz a otvára len odkazy z <code>autogram.slovensko.digital</code>; SAK karta a vlastný server cez mobil nejdú. Finder Quick Action ostáva len pre kartu.</td></tr>
+</table>
 
 <details>
 <summary><strong>Stavy podpisu a dôveryhodnosti</strong></summary>
@@ -245,6 +266,7 @@ swift run vision-eval ~/AutogramEval [--builtin-only] [--no-fm] [--bank <dir>] [
 <li><a href="docs/gallery.html">Diagramová galéria</a></li>
 <li><a href="docs/diagrams/architecture.svg">Architektúra aplikácie</a></li>
 <li><a href="docs/diagrams/process-zako.svg">Proces zaručenej konverzie</a></li>
+<li><a href="docs/diagrams/mobile-signing.svg">Podpis mobilom (AVM)</a></li>
 </ul>
 </td>
 <td width="50%" valign="top">
@@ -272,6 +294,9 @@ swift run vision-eval ~/AutogramEval [--builtin-only] [--no-fm] [--bank <dir>] [
 <h3>Finder Quick Action</h3>
 <p>Samostatný runner zobrazí výber ovládača, certifikátu a PIN/BOK, podpíše PDF na pozadí a uloží výsledok bez otvorenia hlavného okna.</p>
 <p align="center"><img src="docs/diagrams/finder-quick-action.svg" alt="Finder Quick Action" width="100%"></p>
+
+<h3>Podpis mobilom</h3>
+<p>Mac nahrá zašifrovaný dokument na AVM server, iPhone ho po naskenovaní QR kódu podpíše občianskym preukazom cez NFC a Mac si podpísaný súbor stiahne pollingom. Rovnaký diagram je v sekcii Podpisovanie.</p>
 
 <h3>Stavový automat evidencie</h3>
 <p>Kedy je dokument iba pripravený, kedy prešiel kontrolou a kedy už vznikol podpísaný alebo konvertovaný artefakt.</p>
@@ -398,6 +423,7 @@ swift test --filter FoundationModelClassifierTests
 <tr><td>Register konverzií</td><td><code>~/Library/Application Support/Autogram/Evidence/register.json</code>, bez obsahu dokumentov.</td></tr>
 <tr><td>Dataset AI Vision</td><td><code>~/Library/Application Support/Autogram/VisionBank</code>: náhľady strán, výrezy a feature printy posúdených prvkov. Lokálne, vymazateľné.</td></tr>
 <tr><td>Tajomstvá</td><td>Keychain (API kľúče, EZZK session). Security-scoped bookmarks pre prístup k súborom.</td></tr>
+<tr><td>Podpis mobilom</td><td>Dokument dočasne na <code>autogram.slovensko.digital</code>, zašifrovaný kľúčom z tohto Macu, zmazaný po podpise alebo do 24 hodín. Bez registrácie a bez API kľúča.</td></tr>
 </table>
 
 Aktuálny ZaKo profil je implementačný P2E pilot s PDF/A-2b. Lokálny `PDFAValidator` nie je náhradou za veraPDF alebo Acrobat Preflight. Produkčné EZZK endpointy, aktívne formuláre a externé požiadavky treba overiť samostatne.
@@ -413,10 +439,11 @@ Aktuálny ZaKo profil je implementačný P2E pilot s PDF/A-2b. Lokálny `PDFAVal
 <tr><td><strong>Session stores</strong></td><td><code>SigningSessionStore</code>, <code>ZakoSessionStore</code> a <code>RecentDocumentStore</code> riadia workflow a stav.</td></tr>
 <tr><td><strong>AutogramKit</strong></td><td>PDF analýza, <code>LayeredDetectionProvider</code> (kandidáti, klasifikácia, učenie, segmentácia), XML doložka, PDF/A, podpisovanie, ASiC-E a evidencia.</td></tr>
 <tr><td><strong>EngineBridge</strong></td><td>Persistentný machine session helper pre Java/DSS, PDFBox a PKCS#11 integrácie.</td></tr>
+<tr><td><strong>Signing/AVM</strong></td><td><code>AVMClient</code>, <code>AVMSigningSession</code> a <code>MobileSigningCoordinator</code>: podpis mobilom cez relay Autogram v mobile (upload, QR kód, polling, mapovanie výsledku, kontrola mandátu). <code>avm-probe</code> overuje protokol proti reálnemu serveru.</td></tr>
 <tr><td><strong>vision-eval</strong></td><td>Samostatný CLI target na meranie presnosti detekcie; nie je súčasťou aplikácie.</td></tr>
 </table>
 
-Kompletná implementačná dokumentácia je v [`docs/PHASES.md`](docs/PHASES.md); návrh vrstvenej detekcie v [`Autogram/docs/superpowers/specs/2026-09-05-layered-security-element-detection-design.md`](Autogram/docs/superpowers/specs/2026-09-05-layered-security-element-detection-design.md).
+Kompletná implementačná dokumentácia je v [`docs/PHASES.md`](docs/PHASES.md); návrh podpisu mobilom v [`docs/superpowers/specs/2026-09-11-avm-mobile-signing-design.md`](docs/superpowers/specs/2026-09-11-avm-mobile-signing-design.md); návrh vrstvenej detekcie v [`Autogram/docs/superpowers/specs/2026-09-05-layered-security-element-detection-design.md`](Autogram/docs/superpowers/specs/2026-09-05-layered-security-element-detection-design.md).
 
 ## Právne a bezpečnostné upozornenie
 

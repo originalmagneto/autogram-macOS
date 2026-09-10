@@ -85,6 +85,28 @@ final class ZakoSessionStore {
     var submissionStatus: EvidenceRecord.Status?
     var outputDirectory: URL?
     var lastError: String?
+    let mobileSigning: MobileSigningCoordinator
+    private(set) var isAuthorizingViaMobile = false
+
+    static let mobileMandateRefusalMessage =
+        "Podpis z mobilu nebol vytvorený mandátnym certifikátom. Zaručená konverzia vyžaduje mandátny certifikát advokáta, konverzia nebola autorizovaná a do evidencie sa nič nezapísalo."
+
+    var isMobileSigningAvailable: Bool {
+        settings.mobileSigningEnabled && !signingProviderIsDemo
+    }
+
+    /// Preflight for the mobile path: the certificate is known only after the phone
+    /// signs, so identity and mandate checks move to the post-signature refusal.
+    var isMobilePreflightComplete: Bool {
+        let result = AttestationPreflight.evaluate(
+            attestation,
+            securityElements: securityElements,
+            hasSelectedIdentity: true,
+            mandateRequirementSatisfied: true,
+            inputSignatureInspection: inputSignatureInspection,
+            unreviewedNonEmptyPages: unreviewedNonEmptyPages)
+        return result.isComplete && preflightErrors.isEmpty && evidenceNumberError == nil
+    }
     var serverTimeUsed: Date?
     var inputSignatureInspection = InputSignatureInspectionResult.unavailable(
         detail: "Kontrola podpisov ešte neprebehla.")
@@ -162,6 +184,7 @@ final class ZakoSessionStore {
          formPackRepository: FormPackRepository = FormPackRepository(),
          exampleBank: ExampleBank = ExampleBank(directory: ExampleBank.defaultDirectory)) {
         self.settingsStore = settingsStore
+        self.mobileSigning = MobileSigningCoordinator(settingsStore: settingsStore)
         self.pdfaConverter = PDFAConverter()
         self.clauseGenerator = AttestationClauseGenerator()
         self.embeddedFileService = EmbeddedFileService()
@@ -895,18 +918,20 @@ final class ZakoSessionStore {
         validationErrors = allErrors
         return allErrors
     }
-    func authorizeAndSign() async {
+    func authorizeAndSign(viaMobile: Bool = false) async {
         guard !isAuthorizing else { return }
         isAuthorizing = true
+        isAuthorizingViaMobile = viaMobile
         defer {
             isAuthorizing = false
+            isAuthorizingViaMobile = false
             analysisProgressText = ""
         }
 
         lastError = nil
         validationErrors = []
         preparePreflight()
-        guard isPreflightComplete else { return }
+        guard viaMobile ? isMobilePreflightComplete : isPreflightComplete else { return }
         let confirmedElementsSnapshot = confirmedSecurityElements
         let securityReviewSnapshot = securityReviewStamp
 
@@ -981,8 +1006,8 @@ final class ZakoSessionStore {
                 throw ComplianceValidationError(domain: "PDF/A-2b", issues: pdfaCheck.issues)
             }
 
-            analysisProgressText = "Autorizujem kvalifikovaným podpisom…"
-            if isCertificateTypePending {
+            analysisProgressText = viaMobile ? "Čakám na podpis z mobilu…" : "Autorizujem kvalifikovaným podpisom…"
+            if !viaMobile, isCertificateTypePending {
                 analysisProgressText = "Overujem certifikát na karte…"
                 let resolved = await signingProvider.resolveIdentities(pin: signingPIN)
                 guard let resolved, !resolved.isEmpty else {
@@ -992,10 +1017,7 @@ final class ZakoSessionStore {
                 selectedIdentityID = resolved.first(where: { $0.isMandateCertificate })?.id
                     ?? resolved.first?.id
             }
-            guard let identityID = selectedIdentityID else {
-                throw SigningError.identityUnavailable
-            }
-            if requiresMandateOverride {
+            if !viaMobile, requiresMandateOverride {
                 lastError = "Zvolený certifikát nie je mandátnym certifikátom pre zaručenú konverziu. Pokračovanie je možné len s výslovným override (audit záznam)."
                 return
             }
@@ -1025,13 +1047,38 @@ final class ZakoSessionStore {
                                                         pdfFileName: docFileName,
                                                         dolozkaXML: Data(xml.utf8),
                                                         dolozkaFileName: xdcfFileName)
-            let signed = try await signingProvider.sign(SigningRequest(
-                pdfData: finalPDF,
-                identityID: identityID,
-                includeTimestamp: includeQualifiedTimestamp,
-                tsaURL: includeQualifiedTimestamp ? settings.selectedTSAURL : nil,
-                pin: signingPIN.isEmpty ? nil : signingPIN,
-                extraFiles: containerFiles))
+            let signed: SignedConversionResult
+            if viaMobile {
+                // avm-server rejects unsigned ASiC-E input (422 "Level can't be empty if document
+                // is not signed yet"), so the phone signs the final PDF/A, which already carries the
+                // clause XML as an embedded file, and the server wraps it into a fresh ASiC-E.
+                // The XDCF is still written next to the container below.
+                let upload = AVMUploadRequest(
+                    filename: docFileName,
+                    data: finalPDF,
+                    mimeType: AVMUploadRequest.pdfMimeType,
+                    level: .xades(timestamp: includeQualifiedTimestamp),
+                    container: .asicE)
+                let document = try await mobileSigning.sign(upload)
+                guard AVMResultMapper.isMandate(signers: document.signers ?? []) else {
+                    lastError = Self.mobileMandateRefusalMessage
+                    return
+                }
+                signed = try AVMResultMapper.conversionResult(from: document,
+                                                              outputFormat: .attachedASIC,
+                                                              uploadedPDF: finalPDF)
+            } else {
+                guard let identityID = selectedIdentityID else {
+                    throw SigningError.identityUnavailable
+                }
+                signed = try await signingProvider.sign(SigningRequest(
+                    pdfData: finalPDF,
+                    identityID: identityID,
+                    includeTimestamp: includeQualifiedTimestamp,
+                    tsaURL: includeQualifiedTimestamp ? settings.selectedTSAURL : nil,
+                    pin: signingPIN.isEmpty ? nil : signingPIN,
+                    extraFiles: containerFiles))
+            }
 
             if let asic = signed.asicData {
                 let containerCheck = ASiCEContainerVerifier().verify(asic)
@@ -1109,6 +1156,9 @@ final class ZakoSessionStore {
             result = signed
             step = .done
         } catch {
+            if let avmError = error as? AVMError, avmError == .cancelled {
+                return
+            }
             lastError = error.localizedDescription
         }
     }

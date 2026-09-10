@@ -136,3 +136,26 @@ kontajnera a mandátneho certifikátu proti reálnemu serveru pred UI prácou.
 
 Push notifikácie a registrácia integrácie, vlastný AVM server, Quick Action, hromadný
 podpis jedným QR kódom (viac súborov = viac QR kódov, sekvenčne cez existujúcu frontu).
+
+## Overené na serveri
+
+- 2026-09-11, `avm-probe` proti `https://autogram.slovensko.digital/api/v1` bez telefónu:
+  `POST /documents` s PDF a `PAdES_BASELINE_T` vrátil 200 a GUID, polling `GET /documents/{guid}`
+  s `If-Modified-Since` vracal 304, `DELETE` po timeoute prešiel. QR link a PNG sa vygenerovali.
+- 2026-09-11, kontrola kódovania: `payloadMimeType` musí niesť príponu `;base64`
+  (`application/pdf;base64`), inak server obsah zakóduje do base64 druhýkrát (overené cez
+  `GET /documents/{guid}`: s príponou 593 B a `%PDF`, bez nej 792 B base64 textu). `DELETE` vracia 204.
+- 2026-09-11, prvý podpis s iPhonom a eID (PDF, `PAdES_BASELINE_T`): podpísané PDF prišlo
+  za pár sekúnd, CMS obsahuje `signatureTimeStampToken`, takže `_T` pri uploade pečiatku
+  vynúti bez ohľadu na prepínač v appke. `signers.signedBy` a `issuedBy` sú celé RFC 2253 DN
+  (napr. `CN=SVK eID ACA2, O=Disig a.s., ...`), `Qualified: true`, `Mandate: false` pre osobný certifikát.
+- 2026-09-11, kontajnery: nepodpísaný ASiC-E server odmietne s 422
+  `UNPROCESSABLE_INPUT: Parameters.Level can't be empty if document is not signed yet`
+  (pri ASiC vstupe zahodí úroveň, počíta so už podpísaným kontajnerom). PDF s
+  `container: ASiC-E` a `XAdES_BASELINE_B` prešlo: vrátený `.asice` má mimetype ako prvú
+  položku, manifest s koreňom `/` a `META-INF/signatures001.xml`, takže prejde
+  `ASiCEContainerVerifier`. ZaKo cez mobil preto posiela finálne PDF/A (s vloženou doložkou
+  XML) s `container: ASiC-E`; XDCF sa ukladá vedľa kontajnera ako doteraz, ale nie je v ňom
+  podpísaný. Či to pre zaručenú konverziu stačí, je právne rozhodnutie používateľa.
+- Zostáva overiť: či DN mandátneho certifikátu obsahuje "mandát" alebo "oprávnenie"
+  (heuristika `isMandate`); vyžaduje mandátny certifikát na eID.

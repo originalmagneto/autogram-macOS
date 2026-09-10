@@ -85,6 +85,19 @@ public struct AppSettings: Codable, Sendable {
     public var useFoundationModelClassifier: Bool
     /// Record confirmed and rejected elements into the local example bank.
     public var learnFromReviews: Bool
+    /// Show "Podpísať mobilom" and allow signing through Autogram v mobile.
+    public var mobileSigningEnabled: Bool
+    /// AVM server base URL. Only the public host works with the App Store app; kept configurable for testing.
+    public var avmBaseURL: String
+
+    public var avmBaseURLValue: URL {
+        let trimmed = avmBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let url = URL(string: trimmed), let scheme = url.scheme?.lowercased(),
+              scheme == "https" || scheme == "http", url.host != nil else {
+            return AVMClient.publicBaseURL
+        }
+        return url
+    }
 
     private enum CodingKeys: String, CodingKey {
         case aiMode, aiPrompt
@@ -96,6 +109,7 @@ public struct AppSettings: Codable, Sendable {
         case ezzkICO, ezzkUsername, ezzkNotificationEmail, ezzkEdeskAddress
         case retainRecentDocuments
         case useFoundationModelClassifier, learnFromReviews
+        case mobileSigningEnabled, avmBaseURL
     }
 
     public init(aiMode: AIMode = .builtInOnDevice,
@@ -117,7 +131,9 @@ public struct AppSettings: Codable, Sendable {
                 ezzkEdeskAddress: String = "",
                 retainRecentDocuments: Bool = false,
                 useFoundationModelClassifier: Bool = true,
-                learnFromReviews: Bool = true) {
+                learnFromReviews: Bool = true,
+                mobileSigningEnabled: Bool = true,
+                avmBaseURL: String = AVMClient.publicBaseURL.absoluteString) {
         self.aiMode = aiMode
         self.aiPrompt = aiPrompt
         self.omlxURL = omlxURL
@@ -138,6 +154,8 @@ public struct AppSettings: Codable, Sendable {
         self.retainRecentDocuments = retainRecentDocuments
         self.useFoundationModelClassifier = useFoundationModelClassifier
         self.learnFromReviews = learnFromReviews
+        self.mobileSigningEnabled = mobileSigningEnabled
+        self.avmBaseURL = avmBaseURL
     }
 
     public init(from decoder: Decoder) throws {
@@ -181,6 +199,8 @@ public struct AppSettings: Codable, Sendable {
         self.retainRecentDocuments = try container.decodeIfPresent(Bool.self, forKey: .retainRecentDocuments) ?? false
         self.useFoundationModelClassifier = try container.decodeIfPresent(Bool.self, forKey: .useFoundationModelClassifier) ?? true
         self.learnFromReviews = try container.decodeIfPresent(Bool.self, forKey: .learnFromReviews) ?? true
+        self.mobileSigningEnabled = try container.decodeIfPresent(Bool.self, forKey: .mobileSigningEnabled) ?? true
+        self.avmBaseURL = try container.decodeIfPresent(String.self, forKey: .avmBaseURL) ?? AVMClient.publicBaseURL.absoluteString
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -205,6 +225,8 @@ public struct AppSettings: Codable, Sendable {
         try container.encode(retainRecentDocuments, forKey: .retainRecentDocuments)
         try container.encode(useFoundationModelClassifier, forKey: .useFoundationModelClassifier)
         try container.encode(learnFromReviews, forKey: .learnFromReviews)
+        try container.encode(mobileSigningEnabled, forKey: .mobileSigningEnabled)
+        try container.encode(avmBaseURL, forKey: .avmBaseURL)
     }
 
     public var availableTSAServers: [TimestampAuthority] {
