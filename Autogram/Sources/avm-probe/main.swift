@@ -43,8 +43,9 @@ func writePNG(_ image: CGImage, to url: URL) {
     CGImageDestinationFinalize(destination)
 }
 
+// Top-level code runs on the main actor and the semaphore blocks it, so the work must be detached.
 let semaphore = DispatchSemaphore(value: 0)
-Task {
+Task.detached {
     do {
         print("Uploading \(input.lastPathComponent) (\(data.count) bytes) as \(mimeType), level \(level.rawValue), container \(container?.rawValue ?? "none")")
         let reference = try await client.upload(request, key: key)
