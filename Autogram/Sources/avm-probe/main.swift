@@ -25,7 +25,13 @@ func option(_ name: String) -> String? {
 }
 
 let input = URL(fileURLWithPath: inputPath)
-let data = try Data(contentsOf: input)
+let data: Data
+do {
+    data = try Data(contentsOf: input)
+} catch {
+    FileHandle.standardError.write(Data("error: cannot read \(input.path): \(error.localizedDescription)\n".utf8))
+    exit(2)
+}
 let ext = input.pathExtension.lowercased()
 let isContainer = ext == "asice" || ext == "sce"
 let mimeType = isContainer ? AVMUploadRequest.asicEMimeType : AVMUploadRequest.pdfMimeType
