@@ -1049,13 +1049,16 @@ final class ZakoSessionStore {
                                                         dolozkaFileName: xdcfFileName)
             let signed: SignedConversionResult
             if viaMobile {
-                // The unsigned container goes to the AVM server; the phone signs every file in it.
-                let containerData = try packager.package(files: containerFiles)
+                // avm-server rejects unsigned ASiC-E input (422 "Level can't be empty if document
+                // is not signed yet"), so the phone signs the final PDF/A, which already carries the
+                // clause XML as an embedded file, and the server wraps it into a fresh ASiC-E.
+                // The XDCF is still written next to the container below.
                 let upload = AVMUploadRequest(
-                    filename: ConversionOutputNaming.asicFileName(pdfFileName: docFileName),
-                    data: containerData,
-                    mimeType: AVMUploadRequest.asicEMimeType,
-                    level: .xades(timestamp: includeQualifiedTimestamp))
+                    filename: docFileName,
+                    data: finalPDF,
+                    mimeType: AVMUploadRequest.pdfMimeType,
+                    level: .xades(timestamp: includeQualifiedTimestamp),
+                    container: .asicE)
                 let document = try await mobileSigning.sign(upload)
                 guard AVMResultMapper.isMandate(signers: document.signers ?? []) else {
                     lastError = Self.mobileMandateRefusalMessage

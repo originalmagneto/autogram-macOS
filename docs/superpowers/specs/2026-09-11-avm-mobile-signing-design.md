@@ -149,5 +149,13 @@ podpis jedným QR kódom (viac súborov = viac QR kódov, sekvenčne cez existuj
   za pár sekúnd, CMS obsahuje `signatureTimeStampToken`, takže `_T` pri uploade pečiatku
   vynúti bez ohľadu na prepínač v appke. `signers.signedBy` a `issuedBy` sú celé RFC 2253 DN
   (napr. `CN=SVK eID ACA2, O=Disig a.s., ...`), `Qualified: true`, `Mandate: false` pre osobný certifikát.
-- Zostáva overiť s iPhonom a eID: podpis nepodpísaného ZaKo ASiC-E (oba súbory) a či DN
-  mandátneho certifikátu obsahuje "mandát" alebo "oprávnenie" (heuristika `isMandate`).
+- 2026-09-11, kontajnery: nepodpísaný ASiC-E server odmietne s 422
+  `UNPROCESSABLE_INPUT: Parameters.Level can't be empty if document is not signed yet`
+  (pri ASiC vstupe zahodí úroveň, počíta so už podpísaným kontajnerom). PDF s
+  `container: ASiC-E` a `XAdES_BASELINE_B` prešlo: vrátený `.asice` má mimetype ako prvú
+  položku, manifest s koreňom `/` a `META-INF/signatures001.xml`, takže prejde
+  `ASiCEContainerVerifier`. ZaKo cez mobil preto posiela finálne PDF/A (s vloženou doložkou
+  XML) s `container: ASiC-E`; XDCF sa ukladá vedľa kontajnera ako doteraz, ale nie je v ňom
+  podpísaný. Či to pre zaručenú konverziu stačí, je právne rozhodnutie používateľa.
+- Zostáva overiť: či DN mandátneho certifikátu obsahuje "mandát" alebo "oprávnenie"
+  (heuristika `isMandate`); vyžaduje mandátny certifikát na eID.
