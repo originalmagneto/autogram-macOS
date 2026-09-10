@@ -25,6 +25,10 @@ let package = Package(
             name: "vision-eval",
             dependencies: ["AutogramKit"]
         ),
+        .executableTarget(
+            name: "avm-probe",
+            dependencies: ["AutogramKit"]
+        ),
         .testTarget(
             name: "AutogramKitTests",
             dependencies: ["AutogramKit"]
