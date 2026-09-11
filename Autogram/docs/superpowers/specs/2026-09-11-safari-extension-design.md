@@ -102,4 +102,4 @@ Done and tested: the eForm and XDC attributes over the machine protocol, with Ba
 
 Open: the D.Signer adapters; the sign handler that turns a portal request into a real signature through the existing certificate and PIN flow; and the Safari half of the spike.
 
-Unrelated defect found on the way: `PDFAConverter.normalizeWithEngine` calls `digital.slovensko.autogram.core.PdfaNormalize`, a class that has never existed in this fork, so engine-based PDF/A normalization has always silently fallen back. Tracked separately.
+Unrelated defect found on the way and fixed: `PDFAConverter.normalizeWithEngine` called `digital.slovensko.autogram.core.PdfaNormalize`, a class that had never existed in this fork, so engine-based PDF/A normalization always silently fell back. The normalizer is now implemented and covered by tests on both sides.
