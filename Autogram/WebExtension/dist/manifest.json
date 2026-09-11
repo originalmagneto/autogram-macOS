@@ -1,0 +1,46 @@
+{
+  "manifest_version": 3,
+  "name": "Autogram macOS na štátnych weboch",
+  "version": "0.1.0",
+  "description": "Podpisovanie na štátnych weboch cez Autogram macOS. Komunikuje výhradne natívnou správou s aplikáciou, neotvára žiadny port.",
+  "default_locale": "sk",
+  "permissions": ["nativeMessaging", "storage"],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.slovensko.sk/*",
+        "https://prihlasenie.slovensko.sk/*",
+        "https://schranka.slovensko.sk/*",
+        "https://pfseform.financnasprava.sk/*",
+        "https://www.financnasprava.sk/*",
+        "https://cep.financnasprava.sk/*",
+        "https://eformulare.socpoist.sk/*",
+        "https://sluzby.orsr.sk/*",
+        "https://obcan.justice.sk/*"
+      ],
+      "js": ["content.js"],
+      "all_frames": true,
+      "run_at": "document_start"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["inject.js"],
+      "matches": [
+        "https://www.slovensko.sk/*",
+        "https://prihlasenie.slovensko.sk/*",
+        "https://schranka.slovensko.sk/*",
+        "https://pfseform.financnasprava.sk/*",
+        "https://www.financnasprava.sk/*",
+        "https://cep.financnasprava.sk/*",
+        "https://eformulare.socpoist.sk/*",
+        "https://sluzby.orsr.sk/*",
+        "https://obcan.justice.sk/*"
+      ]
+    }
+  ]
+}

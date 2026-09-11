@@ -37,6 +37,14 @@ let package = Package(
             name: "AutogramWebExtensionHandler",
             dependencies: ["AutogramWebBridge"]
         ),
+        .executableTarget(
+            name: "autogram-webbridge-agent",
+            dependencies: ["AutogramWebBridge"]
+        ),
+        .executableTarget(
+            name: "webbridge-probe",
+            dependencies: ["AutogramWebBridge"]
+        ),
         .testTarget(
             name: "AutogramKitTests",
             dependencies: ["AutogramKit"]

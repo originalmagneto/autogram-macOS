@@ -225,6 +225,91 @@ cat > "$CONTENTS/PkgInfo" <<'PKG'
 APPL????
 PKG
 
+# ---------------------------------------------------------------------------
+# Safari web extension: a hand-assembled .appex, because this project builds
+# with SwiftPM and has no Xcode target to produce one.
+#
+# The extension is sandboxed by Safari and only relays native messages to the
+# app over a Mach service, which the temporary-exception entitlement lets it
+# look up. That exception needs neither a Team ID nor an app group, so it also
+# holds under the adhoc signature used here. Distribution still needs a
+# Developer ID and notarization; unsigned, Safari loads it only while
+# "Allow Unsigned Extensions" is on in the Develop menu.
+# ---------------------------------------------------------------------------
+# launchd agent that owns the Mach service name. A GUI app cannot publish one:
+# launchd hands the receive right only to the process it launches for the name.
+# The agent is a rendezvous point, no document ever passes through it.
+AGENT_BIN="$BIN_DIR/autogram-webbridge-agent"
+if [[ -x "$AGENT_BIN" ]]; then
+    cp "$AGENT_BIN" "$CONTENTS/Helpers/autogram-webbridge-agent" 2>/dev/null \
+        || { mkdir -p "$CONTENTS/Helpers" && cp "$AGENT_BIN" "$CONTENTS/Helpers/autogram-webbridge-agent"; }
+fi
+
+EXTENSION_BIN="$BIN_DIR/AutogramWebExtensionHandler"
+if [[ -x "$EXTENSION_BIN" ]]; then
+    APPEX="$CONTENTS/PlugIns/AutogramWebExtension.appex"
+    rm -rf "$APPEX"
+    mkdir -p "$APPEX/Contents/MacOS" "$APPEX/Contents/Resources"
+    cp "$EXTENSION_BIN" "$APPEX/Contents/MacOS/AutogramWebExtension"
+
+    if [[ -d "WebExtension/dist" ]]; then
+        ditto "WebExtension/dist" "$APPEX/Contents/Resources"
+    else
+        echo "  (upozornenie: WebExtension/dist chýba, rozšírenie bude bez web častí)"
+    fi
+
+    cat > "$APPEX/Contents/Info.plist" <<'APPEXPLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleName</key>
+    <string>Autogram na štátnych weboch</string>
+    <key>CFBundleDisplayName</key>
+    <string>Autogram na štátnych weboch</string>
+    <key>CFBundleIdentifier</key>
+    <string>sk.autogram.Autogram.WebExtension</string>
+    <key>CFBundleExecutable</key>
+    <string>AutogramWebExtension</string>
+    <key>CFBundlePackageType</key>
+    <string>XPC!</string>
+    <key>CFBundleShortVersionString</key>
+    <string>0.1.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>NSExtension</key>
+    <dict>
+        <key>NSExtensionPointIdentifier</key>
+        <string>com.apple.Safari.web-extension</string>
+        <key>NSExtensionPrincipalClass</key>
+        <string>AutogramWebExtensionHandler</string>
+    </dict>
+</dict>
+APPEXPLIST
+    echo '</plist>' >> "$APPEX/Contents/Info.plist"
+
+    APPEX_ENTITLEMENTS="$(mktemp -t autogram-appex-entitlements).plist"
+    cat > "$APPEX_ENTITLEMENTS" <<'ENTPLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>com.apple.security.app-sandbox</key>
+    <true/>
+    <key>com.apple.security.temporary-exception.mach-lookup.global-name</key>
+    <array>
+        <string>sk.autogram.Autogram.webbridge</string>
+    </array>
+</dict>
+</plist>
+ENTPLIST
+
+    codesign --force --sign - --entitlements "$APPEX_ENTITLEMENTS" "$APPEX" >/dev/null 2>&1 \
+        || echo "  (upozornenie: appex sa nepodarilo podpísať)"
+    rm -f "$APPEX_ENTITLEMENTS"
+    echo "▸ Safari rozšírenie: $APPEX"
+fi
+
 codesign --force --sign - "$APP_DIR" >/dev/null 2>&1 || true
 
 echo "✔ Hotovo: $APP_DIR"

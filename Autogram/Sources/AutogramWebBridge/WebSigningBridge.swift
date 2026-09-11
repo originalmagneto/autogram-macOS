@@ -66,10 +66,28 @@ public enum WebSigningBridge {
     /// for exactly this name, which needs neither a Team ID nor an app group.
     public static let machServiceName = "sk.autogram.Autogram.webbridge"
 
+    /// Label of the launchd agent that owns ``machServiceName``.
+    public static let agentLabel = "sk.autogram.Autogram.webbridge"
+
     /// Payloads at or below this size travel inline as base64 inside the XPC
     /// message. Larger ones are handed over as a file, because the ceiling on a
     /// native message is undocumented and reported to fail opaquely.
     public static let inlinePayloadLimit = 256 * 1024
+}
+
+/// Rendezvous published by the launchd agent.
+///
+/// A plain GUI app cannot publish a named Mach service: launchd owns the name
+/// and hands the receive right to the process it launches for it. So a tiny
+/// on-demand agent owns the name, the app registers its own anonymous endpoint
+/// with it, and the extension asks for that endpoint and then talks to the app
+/// directly. The agent is a phone book, not a relay.
+@objc public protocol WebBridgeRendezvousProtocol {
+    /// Called by the app at launch to publish where it can be reached.
+    func registerApp(endpoint: NSXPCListenerEndpoint)
+
+    /// Called by the extension handler to find the running app.
+    func appEndpoint(reply: @escaping (NSXPCListenerEndpoint?) -> Void)
 }
 
 /// Methods the app exposes to the web extension handler.

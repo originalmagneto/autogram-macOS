@@ -13,6 +13,7 @@ final class WebBridgeListener: NSObject, NSXPCListenerDelegate, @unchecked Senda
 
     private let log = Logger(subsystem: "sk.autogram.Autogram", category: "web-bridge")
     private var listener: NSXPCListener?
+    private var rendezvous: NSXPCConnection?
     private let lock = NSLock()
     private var signHandler: (@Sendable (WebSignRequest) async throws -> WebSignResponse)?
 
@@ -24,16 +25,36 @@ final class WebBridgeListener: NSObject, NSXPCListenerDelegate, @unchecked Senda
         signHandler = handler
     }
 
+    /// Publishes an anonymous listener and registers it with the launchd agent.
+    ///
+    /// launchd owns the Mach service name and only hands it to the process it
+    /// launches, so the app cannot claim it directly. It publishes an anonymous
+    /// endpoint instead and leaves the name to the agent.
     func start() {
         guard listener == nil else { return }
-        let listener = NSXPCListener(machServiceName: WebSigningBridge.machServiceName)
+        let listener = NSXPCListener.anonymous()
         listener.delegate = self
         listener.resume()
         self.listener = listener
-        log.info("Web bridge listening on \(WebSigningBridge.machServiceName, privacy: .public)")
+
+        let connection = NSXPCConnection(machServiceName: WebSigningBridge.machServiceName, options: [])
+        connection.remoteObjectInterface = NSXPCInterface(with: WebBridgeRendezvousProtocol.self)
+        connection.resume()
+        self.rendezvous = connection
+
+        guard let proxy = connection.remoteObjectProxyWithErrorHandler({ [log] error in
+            log.error("Web bridge agent unreachable: \(error.localizedDescription, privacy: .public)")
+        }) as? WebBridgeRendezvousProtocol else {
+            log.error("Web bridge agent proxy unavailable")
+            return
+        }
+        proxy.registerApp(endpoint: listener.endpoint)
+        log.info("Web bridge registered with \(WebSigningBridge.machServiceName, privacy: .public)")
     }
 
     func stop() {
+        rendezvous?.invalidate()
+        rendezvous = nil
         listener?.invalidate()
         listener = nil
     }

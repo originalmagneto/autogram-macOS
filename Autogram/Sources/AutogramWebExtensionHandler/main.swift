@@ -31,30 +31,61 @@ final class AutogramWebExtensionHandler: NSObject, NSExtensionRequestHandling {
             return
         }
 
-        let connection = NSXPCConnection(machServiceName: WebSigningBridge.machServiceName, options: [])
-        connection.remoteObjectInterface = NSXPCInterface(with: WebSigningBridgeProtocol.self)
-        connection.resume()
+        // The sandbox forbids looking up an arbitrary Mach service, but the
+        // temporary-exception entitlement covers this one name. What comes back
+        // is an anonymous endpoint, and connecting to that involves no name
+        // lookup at all.
+        let agent = NSXPCConnection(machServiceName: WebSigningBridge.machServiceName, options: [])
+        agent.remoteObjectInterface = NSXPCInterface(with: WebBridgeRendezvousProtocol.self)
+        agent.resume()
 
         // Only one reply may ever be delivered: the sandbox turns a missing app
         // into an interruption rather than an error, so both paths land here.
         let replied = Replied()
+        let unavailable = ["ok": false, "error": "Autogram macOS nebeží alebo nie je dostupný."] as [String: Any]
+        var appConnection: NSXPCConnection?
         let finish: ([String: Any]) -> Void = { payload in
             guard replied.claim() else { return }
-            connection.invalidate()
+            appConnection?.invalidate()
+            agent.invalidate()
             completion(payload)
         }
 
-        let unavailable = ["ok": false, "error": "Autogram macOS nebeží alebo nie je dostupný."] as [String: Any]
-        connection.interruptionHandler = { finish(unavailable) }
-        connection.invalidationHandler = { finish(unavailable) }
+        agent.interruptionHandler = { finish(unavailable) }
+        agent.invalidationHandler = { finish(unavailable) }
 
-        guard let proxy = connection.remoteObjectProxyWithErrorHandler({ error in
-            finish(["ok": false, "error": "Spojenie s Autogramom zlyhalo: \(error.localizedDescription)"])
-        }) as? WebSigningBridgeProtocol else {
+        guard let rendezvous = agent.remoteObjectProxyWithErrorHandler({ error in
+            finish(["ok": false, "error": "Služba Autogramu nie je dostupná: \(error.localizedDescription)"])
+        }) as? WebBridgeRendezvousProtocol else {
             finish(unavailable)
             return
         }
 
+        rendezvous.appEndpoint { endpoint in
+            guard let endpoint else {
+                finish(unavailable)
+                return
+            }
+            let connection = NSXPCConnection(listenerEndpoint: endpoint)
+            connection.remoteObjectInterface = NSXPCInterface(with: WebSigningBridgeProtocol.self)
+            connection.resume()
+            appConnection = connection
+            connection.interruptionHandler = { finish(unavailable) }
+            connection.invalidationHandler = { finish(unavailable) }
+
+            guard let proxy = connection.remoteObjectProxyWithErrorHandler({ error in
+                finish(["ok": false, "error": "Spojenie s Autogramom zlyhalo: \(error.localizedDescription)"])
+            }) as? WebSigningBridgeProtocol else {
+                finish(unavailable)
+                return
+            }
+            Self.dispatch(kind: kind, message: message, proxy: proxy, finish: finish)
+        }
+    }
+
+    private static func dispatch(kind: String, message: [String: Any],
+                                 proxy: WebSigningBridgeProtocol,
+                                 finish: @escaping ([String: Any]) -> Void) {
         switch kind {
         case "status":
             proxy.status { ready, version in
