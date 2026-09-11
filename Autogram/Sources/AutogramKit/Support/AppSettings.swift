@@ -89,6 +89,12 @@ public struct AppSettings: Codable, Sendable {
     public var mobileSigningEnabled: Bool
     /// AVM server base URL. Only the public host works with the App Store app; kept configurable for testing.
     public var avmBaseURL: String
+    /// Keep a copy of documents signed from the browser. A browser signature has
+    /// no original file to sit next to, the way an in-app signature does, so
+    /// without this there is no local trace of what was signed.
+    public var webSigningSavesLocally: Bool
+    /// Folder for those copies. Empty means the app's own output folder.
+    public var webSigningOutputPath: String
 
     public var avmBaseURLValue: URL {
         let trimmed = avmBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -110,6 +116,7 @@ public struct AppSettings: Codable, Sendable {
         case retainRecentDocuments
         case useFoundationModelClassifier, learnFromReviews
         case mobileSigningEnabled, avmBaseURL
+        case webSigningSavesLocally, webSigningOutputPath
     }
 
     public init(aiMode: AIMode = .builtInOnDevice,
@@ -133,7 +140,9 @@ public struct AppSettings: Codable, Sendable {
                 useFoundationModelClassifier: Bool = true,
                 learnFromReviews: Bool = true,
                 mobileSigningEnabled: Bool = true,
-                avmBaseURL: String = AVMClient.publicBaseURL.absoluteString) {
+                avmBaseURL: String = AVMClient.publicBaseURL.absoluteString,
+                webSigningSavesLocally: Bool = true,
+                webSigningOutputPath: String = "") {
         self.aiMode = aiMode
         self.aiPrompt = aiPrompt
         self.omlxURL = omlxURL
@@ -156,6 +165,8 @@ public struct AppSettings: Codable, Sendable {
         self.learnFromReviews = learnFromReviews
         self.mobileSigningEnabled = mobileSigningEnabled
         self.avmBaseURL = avmBaseURL
+        self.webSigningSavesLocally = webSigningSavesLocally
+        self.webSigningOutputPath = webSigningOutputPath
     }
 
     public init(from decoder: Decoder) throws {
@@ -201,6 +212,8 @@ public struct AppSettings: Codable, Sendable {
         self.learnFromReviews = try container.decodeIfPresent(Bool.self, forKey: .learnFromReviews) ?? true
         self.mobileSigningEnabled = try container.decodeIfPresent(Bool.self, forKey: .mobileSigningEnabled) ?? true
         self.avmBaseURL = try container.decodeIfPresent(String.self, forKey: .avmBaseURL) ?? AVMClient.publicBaseURL.absoluteString
+        self.webSigningSavesLocally = try container.decodeIfPresent(Bool.self, forKey: .webSigningSavesLocally) ?? true
+        self.webSigningOutputPath = try container.decodeIfPresent(String.self, forKey: .webSigningOutputPath) ?? ""
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -227,6 +240,8 @@ public struct AppSettings: Codable, Sendable {
         try container.encode(learnFromReviews, forKey: .learnFromReviews)
         try container.encode(mobileSigningEnabled, forKey: .mobileSigningEnabled)
         try container.encode(avmBaseURL, forKey: .avmBaseURL)
+        try container.encode(webSigningSavesLocally, forKey: .webSigningSavesLocally)
+        try container.encode(webSigningOutputPath, forKey: .webSigningOutputPath)
     }
 
     public var availableTSAServers: [TimestampAuthority] {

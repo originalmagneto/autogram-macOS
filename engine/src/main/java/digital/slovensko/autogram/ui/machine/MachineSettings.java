@@ -11,6 +11,15 @@ public final class MachineSettings extends UserSettings {
     private final String disabledKeystorePath = disabledPath("keystore");
     private final String disabledPkcs11DriverPath = disabledPath("pkcs11");
     private final List<String> trustedList = List.copyOf(UserSettings.load().getTrustedList());
+    private EFormRequest eform;
+
+    public EFormRequest getEform() {
+        return eform;
+    }
+
+    public void setEform(EFormRequest eform) {
+        this.eform = eform;
+    }
 
     public MachineSettings() {
         this(false);

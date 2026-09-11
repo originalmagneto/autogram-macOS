@@ -9,6 +9,8 @@ final class AutogramAppModel {
     let signingStore: SigningSessionStore
     let zakoStore: ZakoSessionStore
     let ezzkSessionController: EZZKSessionController
+    let signedDocumentStore: SignedDocumentStore
+    let webSigning: WebSigningCoordinator
 
     init() {
         let settings = AppSettingsStore()
@@ -21,6 +23,17 @@ final class AutogramAppModel {
             settingsStore: settings,
             recentDocumentStore: recentDocuments)
         zakoStore = ZakoSessionStore(settingsStore: settings, exampleBank: settings.exampleBank)
+        let signedDocuments = SignedDocumentStore()
+        signedDocumentStore = signedDocuments
+        signingStore.signedDocumentStore = signedDocuments
+        webSigning = WebSigningCoordinator(settingsStore: settings, signedDocumentStore: signedDocuments)
+
+        // Browser requests reach the app through the Safari extension and the
+        // launchd rendezvous; nothing signs without the sheet this raises.
+        let coordinator = webSigning
+        WebBridgeListener.shared.setSignHandler { request in
+            try await coordinator.handle(request)
+        }
     }
 }
 
@@ -132,6 +145,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
 
         FinderQuickActionService.installQuickAction()
+        WebBridgeListener.shared.start()
     }
 }
 

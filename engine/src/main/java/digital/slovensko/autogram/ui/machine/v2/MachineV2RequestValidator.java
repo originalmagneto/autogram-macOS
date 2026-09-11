@@ -2,6 +2,7 @@ package digital.slovensko.autogram.ui.machine.v2;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import digital.slovensko.autogram.ui.machine.EFormRequest;
 import digital.slovensko.autogram.ui.machine.MachineProtocolException;
 
 import java.nio.ByteBuffer;
@@ -14,17 +15,23 @@ import java.util.ArrayList;
 import java.util.List;
 
 public final class MachineV2RequestValidator {
+    private static final java.util.Set<String> EFORM_FIELDS = java.util.Set.of(
+            "containerXmlns", "schema", "transformation", "identifier", "schemaIdentifier",
+            "transformationIdentifier", "transformationLanguage", "transformationMediaDestinationTypeDescription",
+            "transformationTargetEnvironment", "embedUsedSchemas", "autoLoadEform", "fsFormId", "packaging");
+
     private MachineV2RequestValidator() {
     }
 
     public static ValidatedSignRequest validateSign(JsonObject payload) {
-        if (payload == null || payload.size() != 6 || !string(payload, "driver") || !string(payload, "certificateSerial")
+        if (payload == null || (payload.size() != 6 && payload.size() != 7) || !string(payload, "driver") || !string(payload, "certificateSerial")
                 || !string(payload, "pin") || !string(payload, "signatureLevel") || !payload.has("timestamp")
-                || !payload.get("timestamp").isJsonObject() || !payload.has("files") || !payload.get("files").isJsonArray()) {
+                || !payload.get("timestamp").isJsonObject() || !payload.has("files") || !payload.get("files").isJsonArray()
+                || (payload.size() == 7 && !payload.has("eform"))) {
             throw invalid();
         }
         var signatureLevel = payload.get("signatureLevel").getAsString();
-        validateTimestamp(payload.getAsJsonObject("timestamp"));
+        validateTimestamp(payload.getAsJsonObject("timestamp"), signatureLevel, payload.has("eform"));
         var files = new ArrayList<ValidatedSignFile>();
         for (var value : payload.getAsJsonArray("files")) {
             if (!value.isJsonObject()) {
@@ -50,7 +57,55 @@ public final class MachineV2RequestValidator {
         }
         return new ValidatedSignRequest(payload.get("driver").getAsString(), payload.get("certificateSerial").getAsString(),
                 payload.get("pin").getAsString().toCharArray(), signatureLevel,
-                timestamp(payload.getAsJsonObject("timestamp")), List.copyOf(files));
+                timestamp(payload.getAsJsonObject("timestamp")), List.copyOf(files),
+                payload.has("eform") ? eform(payload.get("eform")) : null);
+    }
+
+    private static EFormRequest eform(JsonElement value) {
+        if (value == null || !value.isJsonObject()) {
+            throw invalid();
+        }
+        var eform = value.getAsJsonObject();
+        for (var field : eform.keySet()) {
+            if (!EFORM_FIELDS.contains(field)) {
+                throw invalid();
+            }
+        }
+        return new EFormRequest(
+                optionalString(eform, "containerXmlns"),
+                optionalString(eform, "schema"),
+                optionalString(eform, "transformation"),
+                optionalString(eform, "identifier"),
+                optionalString(eform, "schemaIdentifier"),
+                optionalString(eform, "transformationIdentifier"),
+                optionalString(eform, "transformationLanguage"),
+                optionalString(eform, "transformationMediaDestinationTypeDescription"),
+                optionalString(eform, "transformationTargetEnvironment"),
+                optionalBoolean(eform, "embedUsedSchemas"),
+                optionalBoolean(eform, "autoLoadEform"),
+                optionalString(eform, "fsFormId"),
+                optionalString(eform, "packaging"));
+    }
+
+    private static String optionalString(JsonObject object, String field) {
+        if (!object.has(field) || object.get(field).isJsonNull()) {
+            return null;
+        }
+        if (!string(object, field)) {
+            throw invalid();
+        }
+        return object.get(field).getAsString();
+    }
+
+    private static boolean optionalBoolean(JsonObject object, String field) {
+        if (!object.has(field) || object.get(field).isJsonNull()) {
+            return false;
+        }
+        var value = object.get(field);
+        if (!value.isJsonPrimitive() || !value.getAsJsonPrimitive().isBoolean()) {
+            throw invalid();
+        }
+        return value.getAsBoolean();
     }
 
     private static VisibleSignatureAppearance visibleAppearance(JsonElement value) {
@@ -81,10 +136,20 @@ public final class MachineV2RequestValidator {
         return new Timestamp(List.copyOf(servers), authentication(value));
     }
 
-    private static void validateTimestamp(JsonObject value) {
+    private static void validateTimestamp(JsonObject value, String signatureLevel, boolean isEform) {
         if ((value.size() != 2 && value.size() != 3) || !value.has("required") || !value.get("required").isJsonPrimitive()
-                || !value.get("required").getAsBoolean() || !value.has("servers") || !value.get("servers").isJsonArray()
-                || value.getAsJsonArray("servers").isEmpty()) {
+                || !value.has("servers") || !value.get("servers").isJsonArray()) {
+            throw invalid();
+        }
+        // Baseline B carries no timestamp and is only ever accepted for eForms.
+        if (!signatureLevel.endsWith("_T")) {
+            if (!isEform || value.get("required").getAsBoolean()
+                    || !value.getAsJsonArray("servers").isEmpty()) {
+                throw invalid();
+            }
+            return;
+        }
+        if (!value.get("required").getAsBoolean() || value.getAsJsonArray("servers").isEmpty()) {
             throw invalid();
         }
         for (var server : value.getAsJsonArray("servers")) {
@@ -180,7 +245,7 @@ public final class MachineV2RequestValidator {
     }
 
     public record ValidatedSignRequest(String driver, String certificateSerial, char[] pin, String signatureLevel,
-            Timestamp timestamp, List<ValidatedSignFile> files) {
+            Timestamp timestamp, List<ValidatedSignFile> files, EFormRequest eform) {
         public ValidatedSignRequest {
             pin = pin.clone();
         }

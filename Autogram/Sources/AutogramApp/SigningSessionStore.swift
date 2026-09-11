@@ -182,6 +182,8 @@ final class SigningSessionStore {
     let signingProvider: any QualifiedSigningProviding
     let settingsStore: AppSettingsStore
     let recentDocumentStore: RecentDocumentStore
+    /// Optional so existing tests can build the store without a history.
+    var signedDocumentStore: SignedDocumentStore?
     let outputService = OutputService()
     let stamper = VisibleSignatureStamper()
 
@@ -570,6 +572,15 @@ final class SigningSessionStore {
             } else {
                 signedOutputURL = directory.appendingPathComponent("\(stem).pdf")
             }
+            signedDocumentStore?.record(
+                displayName: signedOutputURL?.lastPathComponent ?? pdfName,
+                origin: .app,
+                method: viaMobile ? .mobile : .card,
+                signatureLevel: outputFormat == .embeddedPAdES
+                    ? (includeQualifiedTimestamp ? "PAdES_BASELINE_T" : "PAdES_BASELINE_B")
+                    : (includeQualifiedTimestamp ? "XAdES_BASELINE_T" : "XAdES_BASELINE_B"),
+                signedBy: signed.signatureLabel,
+                url: signedOutputURL)
             if let index = queue.firstIndex(where: { $0.id == selectedQueueID }) {
                 queue[index].status = .signed
                 queue[index].signedOutputURL = signedOutputURL

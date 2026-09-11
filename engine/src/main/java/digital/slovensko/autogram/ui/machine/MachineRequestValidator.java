@@ -16,6 +16,11 @@ import java.util.Locale;
 import java.util.Set;
 
 public final class MachineRequestValidator {
+    private static final Set<String> TIMESTAMPED_SIGNATURE_LEVELS = Set.of(
+            "PAdES_BASELINE_T", "XAdES_BASELINE_T");
+    private static final Set<String> SUPPORTED_SIGNATURE_LEVELS = Set.of(
+            "PAdES_BASELINE_T", "XAdES_BASELINE_T", "PAdES_BASELINE_B", "XAdES_BASELINE_B");
+
     private MachineRequestValidator() {
     }
 
@@ -45,11 +50,16 @@ public final class MachineRequestValidator {
                 || request.pin() == null || request.pin().length == 0 || request.files() == null || request.files().isEmpty()) {
             throw invalidRequest();
         }
-        if (!"PAdES_BASELINE_T".equals(request.signatureLevel())
-                && !"XAdES_BASELINE_T".equals(request.signatureLevel())) {
+        // Baseline B produces a signature with no timestamp, which this app must
+        // never emit for ordinary file signing. State portals do ask for it on
+        // eForms, so it is accepted only there.
+        var allowedLevels = request.eform() == null ? TIMESTAMPED_SIGNATURE_LEVELS : SUPPORTED_SIGNATURE_LEVELS;
+        if (!allowedLevels.contains(request.signatureLevel())) {
             throw new MachineProtocolException("SIGNATURE_LEVEL_REQUIRED");
         }
-        validateTimestamp(request.timestamp());
+        if (request.signatureLevel().endsWith("_T")) {
+            validateTimestamp(request.timestamp());
+        }
         return new ValidatedSignRequest(request, validateFiles(request.files()));
     }
 

@@ -198,9 +198,16 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
                 do {
                     try await helperOperationGate.withPermit {
                         try await withTaskCancellationHandler {
-                            let timestamp = try qualifiedTimestampRequest()
-                            if request.files.contains(where: { $0.visibleAppearance != nil }) {
-                                try await signVisiblePAdES(request: request, timestamp: timestamp, continuation: continuation)
+                            let usesMachineV2 = request.eform != nil
+                                || request.files.contains(where: { $0.visibleAppearance != nil })
+                            // Baseline-B asks for no timestamp, so no TSA needs configuring.
+                            let wantsTimestamp = (request.signatureLevelOverride ?? request.outputFormat.signatureLevel)
+                                .hasSuffix("_T")
+                            let timestamp: (endpoints: [String], authentication: TimestampAuthenticationSecret?) =
+                                wantsTimestamp ? try qualifiedTimestampRequest() : (endpoints: [], authentication: nil)
+                            if usesMachineV2 {
+                                try await signWithMachineV2(request: request, timestamp: timestamp,
+                                    continuation: continuation)
                                 continuation.finish()
                                 return
                             }
@@ -299,31 +306,41 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
         await machineSession.stop()
     }
 
-    private func signVisiblePAdES(
+    /// Machine protocol v2 signing. Carries the visible PAdES appearance and the
+    /// eForm attributes, neither of which protocol v1 can express.
+    private func signWithMachineV2(
         request: EngineSigningRequest,
         timestamp: (endpoints: [String], authentication: TimestampAuthenticationSecret?),
         continuation: AsyncThrowingStream<SigningEvent, Error>.Continuation
     ) async throws {
-        guard request.outputFormat != .asiceXAdES else {
+        let hasAppearance = request.files.contains { $0.visibleAppearance != nil }
+        guard request.outputFormat != .asiceXAdES || !hasAppearance else {
             throw SigningFailure.engine("Visible appearance requires PAdES Baseline T.")
         }
+        let outputExtension = request.eform != nil ? "asice" : "pdf"
         let files = try request.files.map { file -> JSONValue in
-            let reservation = try reservation(for: file.id, sourceURL: file.sourceURL, outputExtension: "pdf")
+            let reservation = try reservation(for: file.id, sourceURL: file.sourceURL,
+                outputExtension: outputExtension)
             try? FileManager.default.removeItem(at: reservation.temporaryURL)
             return machineV2File(id: file.id, sourceURL: file.sourceURL, targetURL: reservation.temporaryURL,
                 appearance: file.visibleAppearance)
         }
         let requestID = request.sessionID.uuidString
-        let machineRequest = MachineV2Request(protocolVersion: 2, requestID: requestID, operation: .sign, payload: [
+        var signPayload: [String: JSONValue] = [
             "driver": .string(request.driverID),
             "certificateSerial": .string(request.certificateSerial),
-            "signatureLevel": .string(request.outputFormat.signatureLevel),
+            "signatureLevel": .string(request.signatureLevelOverride ?? request.outputFormat.signatureLevel),
             "timestamp": .object([
-                "required": .bool(true),
+                "required": .bool(!timestamp.endpoints.isEmpty),
                 "servers": .array(timestamp.endpoints.map(JSONValue.string))
             ]),
             "files": .array(files)
-        ])
+        ]
+        if let eform = request.eform {
+            signPayload["eform"] = eformPayload(eform)
+        }
+        let machineRequest = MachineV2Request(protocolVersion: 2, requestID: requestID, operation: .sign,
+            payload: signPayload)
         let events = try await runV2(SecureMachineV2Request(envelope: machineRequest, pin: request.pin,
             timestampAuthentication: timestamp.authentication))
         var completedFileIDs: [String] = []
@@ -466,6 +483,36 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
             "source": .string(source),
             "target": .string(target)
         ])
+    }
+
+    /// Encodes eForm attributes for the machine protocol. Schema and transformation
+    /// travel base64, matching what the engine's own HTTP server expects.
+    private func eformPayload(_ attributes: EFormSigningAttributes) -> JSONValue {
+        var fields: [String: JSONValue] = [
+            "embedUsedSchemas": .bool(attributes.embedUsedSchemas),
+            "autoLoadEform": .bool(attributes.autoLoadEform)
+        ]
+        func put(_ key: String, _ value: String?) {
+            guard let value, !value.isEmpty else { return }
+            fields[key] = .string(value)
+        }
+        func putBase64(_ key: String, _ value: String?) {
+            guard let value, !value.isEmpty else { return }
+            fields[key] = .string(Data(value.utf8).base64EncodedString())
+        }
+        put("containerXmlns", attributes.containerXmlns)
+        putBase64("schema", attributes.schema)
+        putBase64("transformation", attributes.transformation)
+        put("identifier", attributes.identifier)
+        put("schemaIdentifier", attributes.schemaIdentifier)
+        put("transformationIdentifier", attributes.transformationIdentifier)
+        put("transformationLanguage", attributes.transformationLanguage)
+        put("transformationMediaDestinationTypeDescription",
+            attributes.transformationMediaDestinationTypeDescription)
+        put("transformationTargetEnvironment", attributes.transformationTargetEnvironment)
+        put("fsFormId", attributes.fsFormID)
+        put("packaging", attributes.packaging)
+        return .object(fields)
     }
 
     private func machineV2File(id: String, sourceURL: URL, targetURL: URL,

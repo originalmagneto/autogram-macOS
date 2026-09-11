@@ -33,16 +33,52 @@ public struct AVMUploadRequest: Encodable, Sendable, Equatable {
     public struct Parameters: Encodable, Sendable, Equatable {
         public var level: AVMSignatureLevel
         public var container: AVMContainer?
+        /// eForm and XML Data Container attributes. The relay accepts the same
+        /// set as the local engine, so a state-portal form can be signed on the
+        /// phone as well as with a card. Omitted entirely for plain documents.
+        public var containerXmlns: String?
+        public var identifier: String?
+        public var schema: String?
+        public var transformation: String?
+        public var schemaIdentifier: String?
+        public var transformationIdentifier: String?
+        public var transformationLanguage: String?
+        public var transformationMediaDestinationTypeDescription: String?
+        public var transformationTargetEnvironment: String?
+        public var embedUsedSchemas: Bool?
+        public var autoLoadEform: Bool?
+        public var packaging: String?
     }
 
     public var document: Document
     public var parameters: Parameters
     public var payloadMimeType: String
 
+    public static let xmlMimeType = "application/xml;base64"
+
     public init(filename: String, data: Data, mimeType: String,
-                level: AVMSignatureLevel, container: AVMContainer? = nil) {
+                level: AVMSignatureLevel, container: AVMContainer? = nil,
+                eform: EFormSigningAttributes? = nil) {
         self.document = Document(filename: filename, content: data.base64EncodedString())
-        self.parameters = Parameters(level: level, container: container)
+        var parameters = Parameters(level: level, container: container)
+        if let eform {
+            // The relay expects the schema and transformation base64 encoded,
+            // exactly as the engine's own HTTP server does.
+            parameters.containerXmlns = eform.containerXmlns
+            parameters.identifier = eform.identifier
+            parameters.schema = eform.schema.map { Data($0.utf8).base64EncodedString() }
+            parameters.transformation = eform.transformation.map { Data($0.utf8).base64EncodedString() }
+            parameters.schemaIdentifier = eform.schemaIdentifier
+            parameters.transformationIdentifier = eform.transformationIdentifier
+            parameters.transformationLanguage = eform.transformationLanguage
+            parameters.transformationMediaDestinationTypeDescription =
+                eform.transformationMediaDestinationTypeDescription
+            parameters.transformationTargetEnvironment = eform.transformationTargetEnvironment
+            parameters.embedUsedSchemas = eform.embedUsedSchemas
+            parameters.autoLoadEform = eform.autoLoadEform
+            parameters.packaging = eform.packaging
+        }
+        self.parameters = parameters
         self.payloadMimeType = mimeType
     }
 }

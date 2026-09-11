@@ -270,7 +270,14 @@ public final class EngineBridgeSigningProvider: QualifiedSigningProviding, @unch
 
         let wantsPAdES = request.outputFormat == .embeddedPAdES
         var sourceURL: URL
-        if !wantsPAdES, !request.extraFiles.isEmpty {
+        if request.eform != nil {
+            // The engine decides how to treat the payload from the file extension,
+            // so an eForm has to arrive as XML rather than under a .pdf name.
+            let name = request.filename.map { ($0 as NSString).lastPathComponent } ?? "form.xml"
+            let extensionIsXML = ["xml", "xdcf"].contains((name as NSString).pathExtension.lowercased())
+            sourceURL = workDirectory.appendingPathComponent(extensionIsXML ? name : "form.xml")
+            try request.pdfData.write(to: sourceURL, options: [.atomic])
+        } else if !wantsPAdES, !request.extraFiles.isEmpty {
             sourceURL = workDirectory.appendingPathComponent("kontajner.asice")
             try Self.packageContainer(entries: request.extraFiles)
                 .write(to: sourceURL, options: [.atomic])
@@ -298,7 +305,9 @@ public final class EngineBridgeSigningProvider: QualifiedSigningProviding, @unch
             certificateSerial: certificate.serialNumber,
             pin: Secret(pin),
             files: [signingFile],
-            outputFormat: wantsPAdES ? .pades : .asiceXAdES)
+            outputFormat: wantsPAdES ? .pades : .asiceXAdES,
+            eform: request.eform,
+            signatureLevelOverride: request.signatureLevelOverride)
 
         statusLog("Podpisujem kvalifikovaným podpisom (DSS)…")
         var outputURL: URL?

@@ -575,6 +575,7 @@ struct SettingsView: View {
             .glassCard(cornerRadius: 12, padding: 12)
 
             MobileSigningCard(settingsStore: settingsStore)
+            WebSigningStorageCard(settingsStore: settingsStore)
         }
     }
 
@@ -1210,6 +1211,69 @@ struct LearningDatasetCard: View {
             } catch {
                 exportMessage = "Export zlyhal: \(error.localizedDescription)"
             }
+        }
+    }
+}
+
+/// Where browser signatures are kept.
+///
+/// An in-app signature is written next to the file it came from. A browser
+/// signature has no such file, so without a folder of its own it would leave no
+/// local trace at all.
+struct WebSigningStorageCard: View {
+    @Bindable var settingsStore: AppSettingsStore
+
+    private var resolvedFolder: String {
+        let configured = settingsStore.settings.webSigningOutputPath
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if configured.isEmpty {
+            return SigningSessionStore.outputDirectoryURL().path
+        }
+        return (configured as NSString).expandingTildeInPath
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Label("Podpisovanie z prehliadača", systemImage: "safari")
+                .font(.headline)
+
+            Toggle("Ukladať podpísané dokumenty aj lokálne",
+                   isOn: $settingsStore.settings.webSigningSavesLocally)
+            Text("Podpis z prehliadača sa vracia stránke. Bez tejto možnosti po ňom na Macu nezostane žiadny súbor, ktorý by sa dal neskôr overiť.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 10) {
+                GridRow {
+                    Text("Priečinok")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 140, alignment: .leading)
+                    HStack(spacing: 8) {
+                        TextField("Predvolený priečinok aplikácie",
+                                  text: $settingsStore.settings.webSigningOutputPath)
+                            .textFieldStyle(.roundedBorder)
+                        Button("Vybrať…") { chooseFolder() }
+                    }
+                    .disabled(!settingsStore.settings.webSigningSavesLocally)
+                }
+            }
+            Text("Aktuálne: \(resolvedFolder)")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .textSelection(.enabled)
+        }
+        .glassCard(cornerRadius: 12, padding: 12)
+    }
+
+    private func chooseFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.prompt = "Vybrať"
+        if panel.runModal() == .OK, let url = panel.url {
+            settingsStore.settings.webSigningOutputPath = url.path
         }
     }
 }

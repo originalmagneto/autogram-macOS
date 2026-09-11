@@ -10,8 +10,12 @@ let package = Package(
     ],
     targets: [
         .target(
-            name: "AutogramKit",
+            name: "AutogramWebBridge",
             dependencies: []
+        ),
+        .target(
+            name: "AutogramKit",
+            dependencies: ["AutogramWebBridge"]
         ),
         .executableTarget(
             name: "AutogramApp",
@@ -28,6 +32,18 @@ let package = Package(
         .executableTarget(
             name: "avm-probe",
             dependencies: ["AutogramKit"]
+        ),
+        .executableTarget(
+            name: "AutogramWebExtensionHandler",
+            dependencies: ["AutogramWebBridge"]
+        ),
+        .executableTarget(
+            name: "autogram-webbridge-agent",
+            dependencies: ["AutogramWebBridge"]
+        ),
+        .executableTarget(
+            name: "webbridge-probe",
+            dependencies: ["AutogramWebBridge"]
         ),
         .testTarget(
             name: "AutogramKitTests",

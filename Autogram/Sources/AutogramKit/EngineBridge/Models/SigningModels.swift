@@ -1,4 +1,5 @@
 import Foundation
+@_exported import AutogramWebBridge
 
 enum EngineSigningOutputFormat: String, CaseIterable, Identifiable, Sendable {
     case automatic
@@ -60,6 +61,10 @@ struct EngineSigningRequest: Sendable {
     let pin: Secret
     let files: [SigningFile]
     let outputFormat: EngineSigningOutputFormat
+    let eform: EFormSigningAttributes?
+    /// Overrides the level derived from `outputFormat`. State portals ask for
+    /// Baseline B, which carries no timestamp.
+    let signatureLevelOverride: String?
 
     init(
         sessionID: UUID,
@@ -67,7 +72,9 @@ struct EngineSigningRequest: Sendable {
         certificateSerial: String,
         pin: Secret,
         files: [SigningFile],
-        outputFormat: EngineSigningOutputFormat = .automatic
+        outputFormat: EngineSigningOutputFormat = .automatic,
+        eform: EFormSigningAttributes? = nil,
+        signatureLevelOverride: String? = nil
     ) {
         self.sessionID = sessionID
         self.driverID = driverID
@@ -75,6 +82,8 @@ struct EngineSigningRequest: Sendable {
         self.pin = pin
         self.files = files
         self.outputFormat = outputFormat
+        self.eform = eform
+        self.signatureLevelOverride = signatureLevelOverride
     }
 }
 

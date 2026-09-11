@@ -585,6 +585,81 @@ class MachineSigningServiceTest {
         assertTrue(Arrays.equals(new char[issuedSecret.get().length], issuedSecret.get()));
     }
 
+    private static final String PROBE_NS = "http://probe.local/form/1.0";
+
+    private static String probeForm() {
+        return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+                + "<Ziadost xmlns=\"" + PROBE_NS + "\"><Meno>Test</Meno></Ziadost>";
+    }
+
+    private static String probeSchema() {
+        return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+                + "<xs:schema xmlns:xs=\"http://www.w3.org/2001/XMLSchema\" xmlns=\"" + PROBE_NS + "\" "
+                + "targetNamespace=\"" + PROBE_NS + "\" elementFormDefault=\"qualified\">"
+                + "<xs:element name=\"Ziadost\"><xs:complexType><xs:sequence>"
+                + "<xs:element name=\"Meno\" type=\"xs:string\"/>"
+                + "</xs:sequence></xs:complexType></xs:element></xs:schema>";
+    }
+
+    private static String probeTransformation() {
+        return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+                + "<xsl:stylesheet version=\"1.0\" xmlns:xsl=\"http://www.w3.org/1999/XSL/Transform\" "
+                + "xmlns:z=\"" + PROBE_NS + "\"><xsl:template match=\"/\"><html><body><h1>"
+                + "<xsl:value-of select=\"z:Ziadost/z:Meno\"/></h1></body></html></xsl:template></xsl:stylesheet>";
+    }
+
+    private static String base64(String value) {
+        return java.util.Base64.getEncoder().encodeToString(value.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    }
+
+    /**
+     * The namespace is deliberately not a government one, so no live UPVS, ORSR or
+     * FS registry lookup happens and the request's own schema and transformation
+     * are used. Keeps the test hermetic.
+     */
+    @Test
+    void signingJobBuildsAnXmlDataContainerFromEFormAttributes() throws Exception {
+        var source = temporaryDirectory.resolve("probe-form.xml");
+        Files.writeString(source, probeForm());
+        var responder = new MachineFileResponder(new MemoryRetainedFile(), () -> { });
+        var settings = new MachineSettings(true);
+        settings.setSignatureLevel(SignatureLevel.XAdES_BASELINE_B);
+        settings.setEform(new EFormRequest(
+                "http://data.gov.sk/def/container/xmldatacontainer+xml/1.1",
+                base64(probeSchema()),
+                base64(probeTransformation()),
+                PROBE_NS,
+                null, null, "sk", "HTML", "probe",
+                true, false, null, null));
+
+        var job = MachineSigningService.DefaultSigningSession.signingJob(Files.readAllBytes(source), source.toString(),
+                responder, settings);
+
+        assertEquals(SignatureLevel.XAdES_BASELINE_B, job.getParameters().getLevel());
+        assertEquals(ASiCContainerType.ASiC_E, job.getParameters().getContainer());
+        try (var stream = job.getDocument().openStream()) {
+            var content = new String(stream.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+            assertTrue(content.contains("XMLDataContainer"), "expected an XML Data Container, got: " + content);
+            assertTrue(content.contains("UsedXSDEmbedded"), "expected the schema to be embedded");
+            assertTrue(content.contains("<Meno>Test</Meno>"), "expected the form payload to survive");
+        }
+    }
+
+    @Test
+    void signingJobWithoutEFormAttributesStillTreatsPdfAsPades() throws Exception {
+        var source = Path.of(MachineSigningServiceTest.class
+                .getResource("/digital/slovensko/autogram/sample.pdf").getFile());
+        var responder = new MachineFileResponder(new MemoryRetainedFile(), () -> { });
+        var settings = new MachineSettings(true);
+        settings.setTsaServer("https://tsa.example.test");
+        settings.setTsaEnabled(true);
+
+        var job = MachineSigningService.DefaultSigningSession.signingJob(Files.readAllBytes(source), source.toString(),
+                responder, settings);
+
+        assertEquals(SignatureForm.PAdES, job.getParameters().getSignatureType());
+    }
+
     @Test
     void signingJobUsesTheRequiredPadesBaselineTPolicy() throws Exception {
         var source = Path.of(MachineSigningServiceTest.class

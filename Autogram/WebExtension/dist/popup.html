@@ -1,0 +1,26 @@
+<meta charset="utf-8">
+<title>Autogram macOS</title>
+<style>
+  :root { color-scheme: light dark; }
+  body {
+    font: 13px -apple-system, system-ui, sans-serif;
+    margin: 0; padding: 14px; width: 280px;
+  }
+  h1 { font-size: 13px; font-weight: 600; margin: 0 0 2px; }
+  .host { color: color-mix(in srgb, currentColor 55%, transparent); margin-bottom: 12px;
+          word-break: break-all; font-size: 11px; }
+  .row { display: flex; align-items: center; gap: 10px; }
+  .row label { flex: 1; }
+  .note { margin-top: 10px; font-size: 11px;
+          color: color-mix(in srgb, currentColor 55%, transparent); }
+  .status { margin-top: 10px; font-size: 11px; }
+</style>
+<h1>Autogram macOS</h1>
+<div class="host" id="host">—</div>
+<div class="row">
+  <label for="enabled">Podpisovať cez Autogram macOS</label>
+  <input type="checkbox" id="enabled" checked>
+</div>
+<div class="note" id="note"></div>
+<div class="status" id="status"></div>
+<script src="popup.js"></script>

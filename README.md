@@ -47,6 +47,11 @@ Natívna macOS aplikácia v SwiftUI pre kvalifikované elektronické podpisovani
 <td><code>PDF/A-2b</code> · <code>XML doložka</code> · evidencia</td>
 </tr>
 <tr>
+<td><strong>Štátne weby</strong></td>
+<td>Rozšírenie do Safari, ktoré podpisovanie na portáloch obslúži cez túto aplikáciu: natívna správa namiesto otvoreného portu, potvrdenie v plávajúcom okne, kartou alebo mobilom.</td>
+<td><code>PDF</code> · <code>ASiC-E</code> · <code>XDCF</code></td>
+</tr>
+<tr>
 <td><strong>Register</strong></td>
 <td>Lokálne záznamy o konverziách, stavy, vyhľadávanie a CSV export.</td>
 <td><code>register.json</code> · <code>CSV</code></td>
@@ -256,6 +261,45 @@ Bez čítačky kariet podpíšete dokument občianskym preukazom s NFC a iPhonom
 </table>
 </details>
 
+## Podpisovanie na štátnych weboch
+
+Rozšírenie do Safari podpisuje priamo na slovensko.sk, financnasprava.sk, sluzby.orsr.sk, socpoist a obcan.justice.sk. Portál volá svoje obvyklé rozhranie D.Signer a Autogram macOS ho obslúži namiesto pôvodného podpisovača. Dokumenty necestujú cez žiadny otvorený port: rozšírenie hovorí s aplikáciou natívnou správou.
+
+<table>
+<tr>
+<th align="left" width="30%">Čo platí</th>
+<th align="left">Detail</th>
+</tr>
+<tr><td>Transport</td><td>Natívny messaging, žiadny HTTP server a žiaden počúvajúci port. Meno Mach služby vlastní malý launchd agent, ktorý slúži len ako miesto stretnutia; aplikácia uňho zaregistruje anonymný endpoint a rozšírenie sa naň pripojí priamo. Cez agenta neprejde ani jeden dokument.</td></tr>
+<tr><td>Spustenie</td><td>Aplikácia sa spustí sama, keď príde požiadavka, a otvorí sa bez aktivácie, takže neberie prehliadaču zameranie.</td></tr>
+<tr><td>Potvrdenie</td><td>Stránka nepodpíše nič ticho. Každá požiadavka otvorí plávajúce okno nad prehliadačom s tým, čo sa podpisuje, a čaká na certifikát a PIN alebo na mobil. Naraz sa spracúva jedna požiadavka.</td></tr>
+<tr><td>Mobil</td><td>Podpísať sa dá aj občianskym preukazom cez NFC. Relay prijíma tie isté eForm atribúty ako lokálny engine, takže mobilom sa dá podpísať aj elektronický formulár, nielen PDF.</td></tr>
+<tr><td>Formát</td><td>Určuje ho portál, nie nastavenia: PDF objekt sa podpíše ako PAdES, elektronický formulár ako XAdES v ASiC-E s XML Data Containerom.</td></tr>
+<tr><td>Časová pečiatka</td><td>Portály pýtajú úroveň Baseline B, teda bez pečiatky, a aplikácia im predvolene pošle presne to. Prepínač v okne úroveň povýši na Baseline T; portál však môže podpis, ktorý si nevyžiadal, odmietnuť.</td></tr>
+<tr><td>Ukladanie</td><td>Podpis z prehliadača sa vracia stránke. Kópiu si aplikácia predvolene odkladá do vlastného priečinka, ktorý sa dá zmeniť alebo ukladanie vypnúť.</td></tr>
+<tr><td>Návrat k pôvodnému</td><td>Prepínač v rozšírení vráti konkrétnu stránku jej pôvodnému podpisovaču, napríklad D.Bridge 2, bez vypínania celého rozšírenia a bez obnovenia stránky.</td></tr>
+<tr><td>Hranice</td><td>Rozšírenie nie je podpísané Developer ID, takže Safari ho načíta len pri zapnutom <strong>Develop &gt; Allow Unsigned Extensions</strong>, a to po každom štarte. Podporované sú zatiaľ formuláre XAdES s XML Data Containerom a PDF; ostatné typy objektov hlásia nepodporovaný typ.</td></tr>
+</table>
+
+<details>
+<summary><strong>Inštalácia rozšírenia</strong></summary>
+
+```bash
+DEVELOPER_DIR="/Applications/Xcode-beta.app/Contents/Developer" ./build_app.sh --release install
+./scripts/install-webbridge-agent.sh
+./scripts/safari-spike.sh
+```
+
+`safari-spike.sh` overí všetko, čo sa overiť dá bez Safari: prítomnosť appexu, jeho entitlement, registráciu agenta a spojenie s aplikáciou. Potom vypíše tri kroky, ktoré treba spraviť v Safari ručne.
+
+Podpis bez Safari sa dá vyskúšať priamo:
+
+```bash
+"$(swift build --show-bin-path)/webbridge-probe" --sign dokument.pdf
+```
+
+</details>
+
 ## Vizuálny guide
 
 <table>
@@ -436,14 +480,15 @@ Aktuálny ZaKo profil je implementačný P2E pilot s PDF/A-2b. Lokálny `PDFAVal
 <th align="left">Zodpovednosť</th>
 </tr>
 <tr><td><strong>AutogramApp</strong></td><td>SwiftUI views, menu commands, Settings, drag and drop, Finder routing a lifecycle.</td></tr>
-<tr><td><strong>Session stores</strong></td><td><code>SigningSessionStore</code>, <code>ZakoSessionStore</code> a <code>RecentDocumentStore</code> riadia workflow a stav.</td></tr>
+<tr><td><strong>Session stores</strong></td><td><code>SigningSessionStore</code>, <code>ZakoSessionStore</code>, <code>RecentDocumentStore</code> a <code>SignedDocumentStore</code> riadia workflow, stav a históriu podpisov.</td></tr>
 <tr><td><strong>AutogramKit</strong></td><td>PDF analýza, <code>LayeredDetectionProvider</code> (kandidáti, klasifikácia, učenie, segmentácia), XML doložka, PDF/A, podpisovanie, ASiC-E a evidencia.</td></tr>
 <tr><td><strong>EngineBridge</strong></td><td>Persistentný machine session helper pre Java/DSS, PDFBox a PKCS#11 integrácie.</td></tr>
 <tr><td><strong>Signing/AVM</strong></td><td><code>AVMClient</code>, <code>AVMSigningSession</code> a <code>MobileSigningCoordinator</code>: podpis mobilom cez relay Autogram v mobile (upload, QR kód, polling, mapovanie výsledku, kontrola mandátu). <code>avm-probe</code> overuje protokol proti reálnemu serveru.</td></tr>
+<tr><td><strong>WebBridge</strong></td><td><code>AutogramWebBridge</code> nesie kontrakt medzi rozšírením a aplikáciou, <code>autogram-webbridge-agent</code> je launchd rendezvous vlastniaci meno Mach služby, <code>AutogramWebExtensionHandler</code> je appex v <code>Contents/PlugIns</code> a <code>WebExtension/</code> samotné rozšírenie. <code>webbridge-probe</code> otestuje celú appkovú polovicu bez Safari.</td></tr>
 <tr><td><strong>vision-eval</strong></td><td>Samostatný CLI target na meranie presnosti detekcie; nie je súčasťou aplikácie.</td></tr>
 </table>
 
-Kompletná implementačná dokumentácia je v [`docs/PHASES.md`](docs/PHASES.md); návrh podpisu mobilom v [`docs/superpowers/specs/2026-09-11-avm-mobile-signing-design.md`](docs/superpowers/specs/2026-09-11-avm-mobile-signing-design.md); návrh vrstvenej detekcie v [`Autogram/docs/superpowers/specs/2026-09-05-layered-security-element-detection-design.md`](Autogram/docs/superpowers/specs/2026-09-05-layered-security-element-detection-design.md).
+Kompletná implementačná dokumentácia je v [`docs/PHASES.md`](docs/PHASES.md); návrh podpisu mobilom v [`docs/superpowers/specs/2026-09-11-avm-mobile-signing-design.md`](docs/superpowers/specs/2026-09-11-avm-mobile-signing-design.md); návrh podpisovania na štátnych weboch v [`Autogram/docs/superpowers/specs/2026-09-11-safari-extension-design.md`](Autogram/docs/superpowers/specs/2026-09-11-safari-extension-design.md); návrh vrstvenej detekcie v [`Autogram/docs/superpowers/specs/2026-09-05-layered-security-element-detection-design.md`](Autogram/docs/superpowers/specs/2026-09-05-layered-security-element-detection-design.md).
 
 ## Právne a bezpečnostné upozornenie
 
