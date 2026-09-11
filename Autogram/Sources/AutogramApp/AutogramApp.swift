@@ -132,6 +132,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
 
         FinderQuickActionService.installQuickAction()
+        WebBridgeListener.shared.start()
     }
 }
 

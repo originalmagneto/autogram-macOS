@@ -1,4 +1,5 @@
 import Foundation
+@_exported import AutogramWebBridge
 
 enum EngineSigningOutputFormat: String, CaseIterable, Identifiable, Sendable {
     case automatic
@@ -51,60 +52,6 @@ struct VisibleSignatureRequest: Sendable, Equatable {
     let width: Double
     let height: Double
     let signingTime: Date
-}
-
-/// eForm and XML Data Container attributes for a state-portal signing request.
-///
-/// The field set mirrors the engine's `ServerSigningParameters` so the machine
-/// protocol and the engine's own HTTP entry point cannot drift apart. `schema`
-/// and `transformation` are the raw XSD and XSLT; they are base64 encoded on
-/// the wire, exactly as the engine's HTTP server expects them.
-struct EFormSigningAttributes: Sendable, Equatable {
-    let containerXmlns: String?
-    let schema: String?
-    let transformation: String?
-    let identifier: String?
-    let schemaIdentifier: String?
-    let transformationIdentifier: String?
-    let transformationLanguage: String?
-    let transformationMediaDestinationTypeDescription: String?
-    let transformationTargetEnvironment: String?
-    let embedUsedSchemas: Bool
-    let autoLoadEform: Bool
-    let fsFormID: String?
-    let packaging: String?
-
-    static let xmlDataContainerXmlns = "http://data.gov.sk/def/container/xmldatacontainer+xml/1.1"
-
-    init(
-        containerXmlns: String? = xmlDataContainerXmlns,
-        schema: String? = nil,
-        transformation: String? = nil,
-        identifier: String? = nil,
-        schemaIdentifier: String? = nil,
-        transformationIdentifier: String? = nil,
-        transformationLanguage: String? = nil,
-        transformationMediaDestinationTypeDescription: String? = nil,
-        transformationTargetEnvironment: String? = nil,
-        embedUsedSchemas: Bool = false,
-        autoLoadEform: Bool = false,
-        fsFormID: String? = nil,
-        packaging: String? = nil
-    ) {
-        self.containerXmlns = containerXmlns
-        self.schema = schema
-        self.transformation = transformation
-        self.identifier = identifier
-        self.schemaIdentifier = schemaIdentifier
-        self.transformationIdentifier = transformationIdentifier
-        self.transformationLanguage = transformationLanguage
-        self.transformationMediaDestinationTypeDescription = transformationMediaDestinationTypeDescription
-        self.transformationTargetEnvironment = transformationTargetEnvironment
-        self.embedUsedSchemas = embedUsedSchemas
-        self.autoLoadEform = autoLoadEform
-        self.fsFormID = fsFormID
-        self.packaging = packaging
-    }
 }
 
 struct EngineSigningRequest: Sendable {
