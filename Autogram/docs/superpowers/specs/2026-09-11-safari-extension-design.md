@@ -6,7 +6,9 @@ Autogram macOS signs documents for Slovak state portals (slovensko.sk, financnas
 
 **Verified by running it.** eForm and XDC signing is reachable from Swift over the machine protocol: a hermetic test builds a full `xdc:XMLDataContainer` with embedded schemas from a self-contained eForm (476 engine tests green, 0 failures). The extension reaches the app: `webbridge-probe` goes through the launchd agent to the running app and gets its status back, with no Safari involved.
 
-**Not verified, and it needs the user.** Whether Safari loads a hand-assembled adhoc `.appex`, and what the native-message size ceiling is. Enabling an unsigned extension is an in-memory Safari setting with no preference key, so it cannot be scripted. `scripts/safari-spike.sh` checks everything else and prints the three manual steps.
+**Verified in Safari on 2026-09-11.** The whole chain answers from a state portal: `await window.autogramMacOS.status()` on slovensko.sk returned `{ok: true, ready: false, version: "0.3.1"}`. So Safari does load a hand-assembled adhoc `.appex`, and `com.apple.security.temporary-exception.mach-lookup.global-name` does hold without a Team ID. One catch cost a round of debugging: pluginkit registers the extension without `CFBundleSupportedPlatforms`, `LSMinimumSystemVersion` and `CFBundleInfoDictionaryVersion`, but Safari will not list it. Xcode adds those; a hand-assembled bundle must set them itself.
+
+**Still unmeasured.** The native-message size ceiling, which decides whether documents travel inline or as files (section 3 assumes a 256 KB threshold until measured).
 
 **Not built yet.** The D.Signer adapters, so slovensko.sk cannot drive signing through `window.ditec` yet; and the sign handler on the app side, so the bridge answers `ready: false` by design.
 
