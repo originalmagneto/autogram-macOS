@@ -31,7 +31,7 @@ public final class MachineV2RequestValidator {
             throw invalid();
         }
         var signatureLevel = payload.get("signatureLevel").getAsString();
-        validateTimestamp(payload.getAsJsonObject("timestamp"), signatureLevel);
+        validateTimestamp(payload.getAsJsonObject("timestamp"), signatureLevel, payload.has("eform"));
         var files = new ArrayList<ValidatedSignFile>();
         for (var value : payload.getAsJsonArray("files")) {
             if (!value.isJsonObject()) {
@@ -136,14 +136,15 @@ public final class MachineV2RequestValidator {
         return new Timestamp(List.copyOf(servers), authentication(value));
     }
 
-    private static void validateTimestamp(JsonObject value, String signatureLevel) {
+    private static void validateTimestamp(JsonObject value, String signatureLevel, boolean isEform) {
         if ((value.size() != 2 && value.size() != 3) || !value.has("required") || !value.get("required").isJsonPrimitive()
                 || !value.has("servers") || !value.get("servers").isJsonArray()) {
             throw invalid();
         }
-        // Baseline-B carries no timestamp; state portals ask for it on eForms.
+        // Baseline B carries no timestamp and is only ever accepted for eForms.
         if (!signatureLevel.endsWith("_T")) {
-            if (value.get("required").getAsBoolean() || !value.getAsJsonArray("servers").isEmpty()) {
+            if (!isEform || value.get("required").getAsBoolean()
+                    || !value.getAsJsonArray("servers").isEmpty()) {
                 throw invalid();
             }
             return;

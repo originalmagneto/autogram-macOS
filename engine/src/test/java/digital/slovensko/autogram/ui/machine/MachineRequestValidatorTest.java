@@ -27,6 +27,22 @@ class MachineRequestValidatorTest {
     }
 
     @Test
+    void acceptsBaselineBOnlyForEFormRequests() throws Exception {
+        var plain = signRequest("XAdES_BASELINE_B", files(pdf("source.pdf"), target("signed.asice")));
+        assertEquals("SIGNATURE_LEVEL_REQUIRED",
+                assertThrows(MachineProtocolException.class,
+                        () -> MachineRequestValidator.validateSign(plain)).getMessage());
+
+        var eform = new SignRequest(plain.driver(), plain.certificateSerial(), plain.pin(),
+                "XAdES_BASELINE_B", plain.timestamp(), plain.files(),
+                new EFormRequest("http://data.gov.sk/def/container/xmldatacontainer+xml/1.1",
+                        null, null, "http://probe.local/form/1.0", null, null, null, null, null,
+                        false, false, null, null));
+
+        assertDoesNotThrow(() -> MachineRequestValidator.validateSign(eform));
+    }
+
+    @Test
     void acceptsOnlyCanonicalAbsolutePdfSourceAndNewExplicitTarget() throws Exception {
         var request = signRequest("PAdES_BASELINE_T", files(pdf("source.pdf"), target("signed.pdf")));
 
