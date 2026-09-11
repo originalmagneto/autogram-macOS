@@ -47,8 +47,7 @@
      * Signs one document.
      *
      * `request` matches WebSignRequest in the app: requestID, filename,
-     * payload (inline base64 or a file reference), payloadMimeType,
-     * signatureLevel and the optional eform attributes.
+     * content (base64), payloadMimeType, signatureLevel and optional eform.
      */
     async sign(request) {
       return call("sign", JSON.stringify(request));

@@ -109,26 +109,23 @@ public enum WebSigningBridge {
 ///
 /// Mirrors what the ditec shim gives the extension.
 public struct WebSignRequest: Codable, Sendable, Equatable {
-    public enum Payload: Codable, Sendable, Equatable {
-        /// Base64 document content. Measurement showed no reason to hand large
-        /// documents over as files, so this is the only case.
-        case inline(String)
-    }
-
     public let requestID: String
     public let filename: String
-    public let payload: Payload
+    /// Base64 document content. A plain field on purpose: an enum with an
+    /// associated value encodes as {"inline":{"_0":"..."}} in Swift and as
+    /// {"inline":"..."} everywhere else, and the extension is the other side.
+    public let content: String
     public let payloadMimeType: String
     public let signatureLevel: String
     public let container: String?
     public let eform: EFormSigningAttributes?
 
-    public init(requestID: String, filename: String, payload: Payload, payloadMimeType: String,
+    public init(requestID: String, filename: String, content: String, payloadMimeType: String,
                 signatureLevel: String, container: String? = nil,
                 eform: EFormSigningAttributes? = nil) {
         self.requestID = requestID
         self.filename = filename
-        self.payload = payload
+        self.content = content
         self.payloadMimeType = payloadMimeType
         self.signatureLevel = signatureLevel
         self.container = container

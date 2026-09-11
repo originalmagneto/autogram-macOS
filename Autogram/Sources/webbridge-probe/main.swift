@@ -79,7 +79,7 @@ rendezvous.appEndpoint { endpoint in
         let request = WebSignRequest(
             requestID: UUID().uuidString,
             filename: (path as NSString).lastPathComponent,
-            payload: .inline(data.base64EncodedString()),
+            content: data.base64EncodedString(),
             payloadMimeType: isXML ? "application/xml;base64" : "application/pdf;base64",
             signatureLevel: isXML ? "XAdES_BASELINE_B" : "PAdES_BASELINE_T",
             eform: eform)

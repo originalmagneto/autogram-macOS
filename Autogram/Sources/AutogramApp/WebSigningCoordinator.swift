@@ -278,13 +278,10 @@ final class WebSigningCoordinator {
     }
 
     private static func decode(_ request: WebSignRequest) throws -> Data {
-        switch request.payload {
-        case .inline(let text):
-            guard let data = Data(base64Encoded: text) ?? text.data(using: .utf8) else {
-                throw Failure.malformedPayload
-            }
-            return data
+        guard let data = Data(base64Encoded: request.content) ?? request.content.data(using: .utf8) else {
+            throw Failure.malformedPayload
         }
+        return data
     }
 
     private static func describeSize(_ bytes: Int) -> String {

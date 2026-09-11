@@ -87,7 +87,7 @@
       return {
         requestID: session.signatureId || ("ditec-" + Date.now()),
         filename: (object.objectId || "dokument") + ".pdf",
-        payload: { inline: object.sourcePdfBase64 },
+        content: object.sourcePdfBase64,
         payloadMimeType: "application/pdf;base64",
         signatureLevel: options.level || "PAdES_BASELINE_B"
       };
@@ -122,7 +122,7 @@
     return {
       requestID: session.signatureId || ("ditec-" + Date.now()),
       filename: (object.objectId || "formular") + ".xml",
-      payload: { inline: toBase64(xml) },
+      content: toBase64(xml),
       payloadMimeType: "application/xml;base64",
       signatureLevel: level,
       container: options.container || "ASiC_E",

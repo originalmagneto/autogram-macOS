@@ -102,8 +102,19 @@ extension WebBridgeListener: WebSigningBridgeProtocol {
         do {
             decoded = try JSONDecoder().decode(WebSignRequest.self, from: request)
         } catch {
+            // The detail goes back to the page on purpose: without it a wire
+            // format mismatch looks the same as a corrupt document, and the
+            // console is the only place this is ever debugged.
+            let detail: String
+            if let decoding = error as? DecodingError, case let .keyNotFound(key, _) = decoding {
+                detail = "chýba pole \(key.stringValue)"
+            } else if let decoding = error as? DecodingError, case let .typeMismatch(_, context) = decoding {
+                detail = "nesprávny typ poľa \(context.codingPath.map(\.stringValue).joined(separator: "."))"
+            } else {
+                detail = String(describing: error)
+            }
             log.error("Rejected a malformed web sign request: \(String(describing: error), privacy: .public)")
-            reply(nil, "Požiadavka na podpis je poškodená.")
+            reply(nil, "Požiadavka na podpis je poškodená: \(detail)")
             return
         }
 
