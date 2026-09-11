@@ -86,6 +86,7 @@ final class WebSigningCoordinator {
     private var continuation: CheckedContinuation<WebSignResponse, Error>?
     private let settingsStore: AppSettingsStore
     private let signedDocumentStore: SignedDocumentStore
+    private let prompt = WebSigningPrompt()
     let mobileSigning: MobileSigningCoordinator
 
     init(settingsStore: AppSettingsStore, signedDocumentStore: SignedDocumentStore) {
@@ -156,13 +157,7 @@ final class WebSigningCoordinator {
                           kindDescription: Self.describeKind(request))
         pin = ""
         errorText = nil
-        // Activating the app is not enough when it has no key window: the sheet
-        // then opens behind whatever the person was looking at.
-        NSApp.activate(ignoringOtherApps: true)
-        if let window = NSApp.windows.first(where: { $0.canBecomeKey && !$0.isMiniaturized }) {
-            window.makeKeyAndOrderFront(nil)
-        }
-        NSApp.requestUserAttention(.criticalRequest)
+        prompt.show(coordinator: self)
         await refreshIdentities()
 
         return try await withCheckedThrowingContinuation { continuation in
@@ -283,6 +278,7 @@ final class WebSigningCoordinator {
         self.continuation = nil
         pending = nil
         pin = ""
+        prompt.hide()
         continuation.resume(with: result)
     }
 

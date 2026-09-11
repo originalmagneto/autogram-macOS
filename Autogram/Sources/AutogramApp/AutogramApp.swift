@@ -67,14 +67,6 @@ struct AutogramApp: App {
         WindowGroup {
             RootView(model: model)
                 .environment(model.ezzkSessionController)
-                // Dismissing the sheet by any route cancels the request, so a
-                // page is never left waiting on a window that is gone.
-                .sheet(isPresented: Binding(
-                    get: { model.webSigning.pending != nil },
-                    set: { presented in if !presented { model.webSigning.cancel() } }
-                )) {
-                    WebSigningSheet(coordinator: model.webSigning)
-                }
                 .frame(minWidth: MacOS27Layout.rootMinimumWidth, minHeight: 640)
                 .frame(idealWidth: 1320, idealHeight: 860)
         }
