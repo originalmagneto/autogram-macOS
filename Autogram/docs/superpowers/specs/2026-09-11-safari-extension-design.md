@@ -10,7 +10,7 @@ Autogram macOS signs documents for Slovak state portals (slovensko.sk, financnas
 
 **Measured on 2026-09-11.** No native-message size ceiling up to 16 MB, at better than 100 MB/s: 256 KB took 7 ms, 4 MB 36 ms, 16 MB 151 ms, measured from the page through the extension, the appex, the agent and into the app. The 80 ms on the first call is the launchd agent starting. Documents therefore travel inline and the file-handover design was dropped.
 
-**Not built yet.** The D.Signer adapters, so slovensko.sk cannot drive signing through `window.ditec` yet; and the sign handler on the app side, so the bridge answers `ready: false` by design.
+**Signed on a real portal, 2026-09-11.** A submission on `message-constructor-web.slovensko.sk` was signed through the extension and accepted by the portal. Two defects surfaced only there and are fixed: the document travelled in an enum with an associated value, which Swift and JavaScript encode differently, so every Swift-to-Swift test passed while the real path failed; and the container held a doubled extension because the portal's `objectId` already carries one.
 
 ## Background
 
@@ -100,6 +100,8 @@ Branch `feature/safari-extension`.
 
 Done and tested: the eForm and XDC attributes over the machine protocol, with Baseline B accepted only for eForm requests so ordinary file signing still cannot produce an untimestamped signature; the launchd rendezvous, the XPC bridge, the hand-assembled appex, the build wiring, and a dependency-free extension skeleton.
 
-Open: the D.Signer adapters; the sign handler that turns a portal request into a real signature through the existing certificate and PIN flow; and the Safari half of the spike.
+Also done since: the D.Signer adapters, the sign handler, signing with a phone from the browser, a signing history that records origin and method, a per-site switch back to the portal's own D.Signer, and starting the app on demand.
+
+Open: object types beyond XAdES eForms and PDF; Developer ID signing, without which Safari needs "Allow Unsigned Extensions" at every launch; and the iOS extension.
 
 Unrelated defect found on the way and fixed: `PDFAConverter.normalizeWithEngine` called `digital.slovensko.autogram.core.PdfaNormalize`, a class that had never existed in this fork, so engine-based PDF/A normalization always silently fell back. The normalizer is now implemented and covered by tests on both sides.
