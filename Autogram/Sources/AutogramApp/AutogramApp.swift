@@ -9,6 +9,7 @@ final class AutogramAppModel {
     let signingStore: SigningSessionStore
     let zakoStore: ZakoSessionStore
     let ezzkSessionController: EZZKSessionController
+    let webSigning: WebSigningCoordinator
 
     init() {
         let settings = AppSettingsStore()
@@ -21,6 +22,14 @@ final class AutogramAppModel {
             settingsStore: settings,
             recentDocumentStore: recentDocuments)
         zakoStore = ZakoSessionStore(settingsStore: settings, exampleBank: settings.exampleBank)
+        webSigning = WebSigningCoordinator(settingsStore: settings)
+
+        // Browser requests reach the app through the Safari extension and the
+        // launchd rendezvous; nothing signs without the sheet this raises.
+        let coordinator = webSigning
+        WebBridgeListener.shared.setSignHandler { request in
+            try await coordinator.handle(request)
+        }
     }
 }
 
@@ -54,6 +63,14 @@ struct AutogramApp: App {
         WindowGroup {
             RootView(model: model)
                 .environment(model.ezzkSessionController)
+                // Dismissing the sheet by any route cancels the request, so a
+                // page is never left waiting on a window that is gone.
+                .sheet(isPresented: Binding(
+                    get: { model.webSigning.pending != nil },
+                    set: { presented in if !presented { model.webSigning.cancel() } }
+                )) {
+                    WebSigningSheet(coordinator: model.webSigning)
+                }
                 .frame(minWidth: MacOS27Layout.rootMinimumWidth, minHeight: 640)
                 .frame(idealWidth: 1320, idealHeight: 860)
         }

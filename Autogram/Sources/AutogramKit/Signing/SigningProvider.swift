@@ -229,13 +229,24 @@ public struct SigningRequest: Sendable {
     public var pin: String?
     public var extraFiles: [ASiCEPackager.Entry]
     public var visualStamp: VisualStampSpec?
+    /// eForm and XDC attributes, set only for documents that came from a state
+    /// portal. When present the engine builds an XML Data Container.
+    public var eform: EFormSigningAttributes?
+    /// Overrides the level implied by `outputFormat`. Portals ask for Baseline B.
+    public var signatureLevelOverride: String?
+    /// Filename the document should keep inside the container. The browser path
+    /// knows the real name; the app path derives one from the source URL.
+    public var filename: String?
 
     public init(pdfData: Data, identityID: String,
                 includeTimestamp: Bool, tsaURL: String? = nil,
                 outputFormat: SigningOutputFormat = .attachedASIC,
                 pin: String? = nil,
                 extraFiles: [ASiCEPackager.Entry] = [],
-                visualStamp: VisualStampSpec? = nil) {
+                visualStamp: VisualStampSpec? = nil,
+                eform: EFormSigningAttributes? = nil,
+                signatureLevelOverride: String? = nil,
+                filename: String? = nil) {
         self.pdfData = pdfData
         self.identityID = identityID
         self.includeTimestamp = includeTimestamp
@@ -244,6 +255,9 @@ public struct SigningRequest: Sendable {
         self.pin = pin
         self.extraFiles = extraFiles
         self.visualStamp = visualStamp
+        self.eform = eform
+        self.signatureLevelOverride = signatureLevelOverride
+        self.filename = filename
     }
 }
 
