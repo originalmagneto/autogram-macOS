@@ -69,10 +69,11 @@ public enum WebSigningBridge {
     /// Label of the launchd agent that owns ``machServiceName``.
     public static let agentLabel = "sk.autogram.Autogram.webbridge"
 
-    /// Payloads at or below this size travel inline as base64 inside the XPC
-    /// message. Larger ones are handed over as a file, because the ceiling on a
-    /// native message is undocumented and reported to fail opaquely.
-    public static let inlinePayloadLimit = 256 * 1024
+    /// Documents travel inline. Measured on 2026-09-11: 16 MB crosses the page,
+    /// the extension, the appex, the agent and the app in 151 ms with no ceiling
+    /// reached, so no file handover is needed. The cap exists only so a runaway
+    /// page cannot wedge the app.
+    public static let maximumPayloadBytes = 32 * 1024 * 1024
 }
 
 /// Rendezvous published by the launchd agent.
@@ -106,15 +107,12 @@ public enum WebSigningBridge {
 /// A signing request as it arrives from a state portal, before the app turns it
 /// into an engine request.
 ///
-/// Mirrors what the ditec shim gives the extension. `content` and `source` are
-/// mutually exclusive: small documents travel inline, large ones as a file.
+/// Mirrors what the ditec shim gives the extension.
 public struct WebSignRequest: Codable, Sendable, Equatable {
     public enum Payload: Codable, Sendable, Equatable {
-        /// Base64 document content, for payloads within ``WebSigningBridge/inlinePayloadLimit``.
+        /// Base64 document content. Measurement showed no reason to hand large
+        /// documents over as files, so this is the only case.
         case inline(String)
-        /// Absolute path inside the extension's own container, plus the SHA-256
-        /// of the bytes so the app can refuse anything that was swapped.
-        case file(path: String, sha256: String)
     }
 
     public let requestID: String

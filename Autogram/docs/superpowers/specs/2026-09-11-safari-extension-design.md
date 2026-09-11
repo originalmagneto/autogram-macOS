@@ -8,7 +8,7 @@ Autogram macOS signs documents for Slovak state portals (slovensko.sk, financnas
 
 **Verified in Safari on 2026-09-11.** The whole chain answers from a state portal: `await window.autogramMacOS.status()` on slovensko.sk returned `{ok: true, ready: false, version: "0.3.1"}`. So Safari does load a hand-assembled adhoc `.appex`, and `com.apple.security.temporary-exception.mach-lookup.global-name` does hold without a Team ID. One catch cost a round of debugging: pluginkit registers the extension without `CFBundleSupportedPlatforms`, `LSMinimumSystemVersion` and `CFBundleInfoDictionaryVersion`, but Safari will not list it. Xcode adds those; a hand-assembled bundle must set them itself.
 
-**Still unmeasured.** The native-message size ceiling, which decides whether documents travel inline or as files (section 3 assumes a 256 KB threshold until measured).
+**Measured on 2026-09-11.** No native-message size ceiling up to 16 MB, at better than 100 MB/s: 256 KB took 7 ms, 4 MB 36 ms, 16 MB 151 ms, measured from the page through the extension, the appex, the agent and into the app. The 80 ms on the first call is the launchd agent starting. Documents therefore travel inline and the file-handover design was dropped.
 
 **Not built yet.** The D.Signer adapters, so slovensko.sk cannot drive signing through `window.ditec` yet; and the sign handler on the app side, so the bridge answers `ready: false` by design.
 
@@ -68,9 +68,9 @@ Fallback if the spike fails: an internal HTTP server bound to 127.0.0.1 on a ran
 
 ### Section 3: Document transport
 
-Documents are megabytes and the native-message ceiling is undocumented. Payloads above 256 KB travel as files, not inline: the sender writes to a temporary file and the message carries the path plus a SHA-256 digest. Below that threshold the content stays inline as base64, which keeps the common eForm case a single round trip.
+Documents travel inline as base64 inside the message. The design originally routed anything above 256 KB through a file in the appex container, because the native-message ceiling is undocumented and reported to fail opaquely. Measurement removed the need: 16 MB crosses the whole chain in 151 ms with no ceiling reached, so the file path, its SHA-256 check, its path validation and its cleanup were all dropped as unnecessary machinery.
 
-The appex is sandboxed and the app is not, so the file lives in the appex container (`~/Library/Containers/<appex-id>/Data/tmp`), which the appex may write and the unsandboxed app may read. Every file is removed once the response is delivered, and the app rejects any path outside that directory.
+A cap stays worth having so a runaway page cannot wedge the app. Requests above 32 MB are refused with a clear message rather than attempted.
 
 ### Section 4: Engine and the machine protocol
 
