@@ -31,6 +31,67 @@ struct RootView: View {
 
     private var settingsStore: AppSettingsStore { model.settingsStore }
     private var recentDocumentStore: RecentDocumentStore { model.recentDocumentStore }
+    private var signedDocumentStore: SignedDocumentStore { model.signedDocumentStore }
+
+    /// One signed document: what it was, where it came from and whether a copy
+    /// was kept. A browser signature can legitimately have no file, so the row
+    /// says so instead of offering a dead link.
+    @ViewBuilder
+    private func signedDocumentRow(_ entry: SignedDocumentStore.SignedDocument) -> some View {
+        let isAvailable = entry.isAvailable
+        Button {
+            guard let url = entry.url, isAvailable else { return }
+            NSWorkspace.shared.activateFileViewerSelecting([url])
+        } label: {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 8) {
+                    Image(systemName: entry.method.sfSymbol)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 16)
+                    Text(entry.displayName)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .font(.callout)
+                }
+                HStack(spacing: 6) {
+                    Text(entry.origin.label)
+                    Text("·")
+                    Text(entry.method.label)
+                    Text("·")
+                    Text(entry.levelLabel)
+                }
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .padding(.leading, 24)
+
+                if !entry.wasSavedLocally {
+                    Text("Neuložené lokálne")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .padding(.leading, 24)
+                } else if !isAvailable {
+                    Text("Súbor už neexistuje")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .padding(.leading, 24)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .disabled(!isAvailable)
+        .accessibilityLabel("Podpísaný dokument \(entry.displayName)")
+        .accessibilityValue("\(entry.origin.label), \(entry.method.label)")
+        .contextMenu {
+            if isAvailable, let url = entry.url {
+                Button("Zobraziť vo Finderi") {
+                    NSWorkspace.shared.activateFileViewerSelecting([url])
+                }
+            }
+            Button("Odstrániť zo zoznamu", role: .destructive) {
+                signedDocumentStore.remove(id: entry.id)
+            }
+        }
+    }
 
     private var signingStore: SigningSessionStore { model.signingStore }
 
@@ -53,6 +114,21 @@ struct RootView: View {
 
                     Label(SidebarSection.evidence.rawValue, systemImage: SidebarSection.evidence.symbol)
                         .tag(SidebarSection.evidence)
+                }
+
+                if !signedDocumentStore.entries.isEmpty {
+                    Section {
+                        ForEach(signedDocumentStore.entries) { entry in
+                            signedDocumentRow(entry)
+                        }
+                    } header: {
+                        Text("Podpísané dokumenty")
+                            .contextMenu {
+                                Button("Vymazať históriu podpisov", role: .destructive) {
+                                    signedDocumentStore.clear()
+                                }
+                            }
+                    }
                 }
 
                 if recentDocumentStore.isEnabled && !recentDocumentStore.entries.isEmpty {

@@ -82,14 +82,14 @@ final class WebSigningCoordinator {
 
     private var continuation: CheckedContinuation<WebSignResponse, Error>?
     private let settingsStore: AppSettingsStore
-    private let recentDocumentStore: RecentDocumentStore
+    private let signedDocumentStore: SignedDocumentStore
     let mobileSigning: MobileSigningCoordinator
 
-    init(settingsStore: AppSettingsStore, recentDocumentStore: RecentDocumentStore) {
+    init(settingsStore: AppSettingsStore, signedDocumentStore: SignedDocumentStore) {
         let defaults = UserDefaults.standard
         self.addsQualifiedTimestamp = defaults.object(forKey: Self.timestampPreferenceKey) as? Bool ?? true
         self.settingsStore = settingsStore
-        self.recentDocumentStore = recentDocumentStore
+        self.signedDocumentStore = signedDocumentStore
         self.mobileSigning = MobileSigningCoordinator(settingsStore: settingsStore)
     }
 
@@ -100,7 +100,12 @@ final class WebSigningCoordinator {
     /// nothing in the sidebar.
     @discardableResult
     private func archive(_ data: Data, for request: WebSignRequest) -> URL? {
-        let directory = SigningSessionStore.outputDirectoryURL()
+        guard settingsStore.settings.webSigningSavesLocally else { return nil }
+        let configured = settingsStore.settings.webSigningOutputPath
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let directory = configured.isEmpty
+            ? SigningSessionStore.outputDirectoryURL()
+            : URL(fileURLWithPath: (configured as NSString).expandingTildeInPath, isDirectory: true)
         let base = (request.filename as NSString).deletingPathExtension
         let stem = (base.isEmpty ? "dokument" : base) + "_podpisane"
         let ext = request.eform == nil ? "pdf" : "asice"
@@ -113,7 +118,6 @@ final class WebSigningCoordinator {
                 url = directory.appendingPathComponent("\(stem)-\(stamp)").appendingPathExtension(ext)
             }
             try data.write(to: url, options: [.atomic])
-            recentDocumentStore.record(url: url)
             return url
         } catch {
             // A failed archive must not fail the signature: the page already has
@@ -201,7 +205,13 @@ final class WebSigningCoordinator {
                 throw Failure.malformedPayload
             }
             let signers = document.signers ?? []
-            archive(content, for: pending.request)
+            let saved = archive(content, for: pending.request)
+            signedDocumentStore.record(displayName: pending.request.filename,
+                                       origin: .browser,
+                                       method: .mobile,
+                                       signatureLevel: requested,
+                                       signedBy: AVMResultMapper.signatureLabel(signers: signers),
+                                       url: saved)
             finish(.success(WebSignResponse(
                 requestID: pending.request.requestID,
                 content: content.base64EncodedString(),
@@ -240,7 +250,13 @@ final class WebSigningCoordinator {
 
             let signed = try await provider.sign(signingRequest)
             let payload = pending.request.eform == nil ? signed.pdfData : (signed.asicData ?? signed.pdfData)
-            archive(payload, for: pending.request)
+            let saved = archive(payload, for: pending.request)
+            signedDocumentStore.record(displayName: pending.request.filename,
+                                       origin: .browser,
+                                       method: .card,
+                                       signatureLevel: level,
+                                       signedBy: signed.signatureLabel,
+                                       url: saved)
             finish(.success(WebSignResponse(
                 requestID: pending.request.requestID,
                 content: payload.base64EncodedString(),

@@ -9,6 +9,7 @@ final class AutogramAppModel {
     let signingStore: SigningSessionStore
     let zakoStore: ZakoSessionStore
     let ezzkSessionController: EZZKSessionController
+    let signedDocumentStore: SignedDocumentStore
     let webSigning: WebSigningCoordinator
 
     init() {
@@ -22,7 +23,10 @@ final class AutogramAppModel {
             settingsStore: settings,
             recentDocumentStore: recentDocuments)
         zakoStore = ZakoSessionStore(settingsStore: settings, exampleBank: settings.exampleBank)
-        webSigning = WebSigningCoordinator(settingsStore: settings, recentDocumentStore: recentDocuments)
+        let signedDocuments = SignedDocumentStore()
+        signedDocumentStore = signedDocuments
+        signingStore.signedDocumentStore = signedDocuments
+        webSigning = WebSigningCoordinator(settingsStore: settings, signedDocumentStore: signedDocuments)
 
         // Browser requests reach the app through the Safari extension and the
         // launchd rendezvous; nothing signs without the sheet this raises.
