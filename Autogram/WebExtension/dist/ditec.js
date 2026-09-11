@@ -52,6 +52,18 @@
     }
   }
 
+  /// The portal's objectId often already carries an extension, for instance
+  /// "Vseobecna_agenda.xdcf". The payload is the form XML, and the engine names
+  /// the container it builds after the source, so the source must be named .xml
+  /// or the container ends up as "Vseobecna_agenda.xdcf.xdcf".
+  function xmlSourceName(objectId) {
+    var base = String(objectId || "formular");
+    // Only known extensions, never the last dot: an objectId like
+    // "App.GeneralAgenda" is a name, not a file with a ".GeneralAgenda" suffix.
+    base = base.replace(/\.(xdcf|xml)$/i, "");
+    return base + ".xml";
+  }
+
   function emptyToNull(value) {
     return value === undefined || value === null || value === "" ? null : value;
   }
@@ -86,7 +98,10 @@
     if (object.type === "XadesPdf" || object.type === "XadesBpPdf") {
       return {
         requestID: session.signatureId || ("ditec-" + Date.now()),
-        filename: (object.objectId || "dokument") + ".pdf",
+        filename: (function (id) {
+          var name = String(id || "dokument");
+          return /\.pdf$/i.test(name) ? name : name + ".pdf";
+        })(object.objectId),
         content: object.sourcePdfBase64,
         payloadMimeType: "application/pdf;base64",
         signatureLevel: options.level || "PAdES_BASELINE_B"
@@ -121,7 +136,7 @@
 
     return {
       requestID: session.signatureId || ("ditec-" + Date.now()),
-      filename: (object.objectId || "formular") + ".xml",
+      filename: xmlSourceName(object.objectId),
       content: toBase64(xml),
       payloadMimeType: "application/xml;base64",
       signatureLevel: level,

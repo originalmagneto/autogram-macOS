@@ -57,10 +57,13 @@ final class WebSigningCoordinator {
 
     private static let timestampPreferenceKey = "webSigningAddsQualifiedTimestamp"
 
-    /// Portals ask for Baseline B, which carries no timestamp, so without this
-    /// the phone would only ever offer the handwritten-equivalent signature.
-    /// Upgrading to Baseline T adds a qualified timestamp; a portal that insists
-    /// on exactly what it asked for is the reason this can be turned off.
+    /// Portals ask for Baseline B, which carries no timestamp, and the phone
+    /// then offers only the handwritten-equivalent signature. Turning this on
+    /// upgrades to Baseline T and adds a qualified timestamp.
+    ///
+    /// Off by default: slovensko.sk rejected a submission whose signature
+    /// carried a timestamp it had not asked for. The portal decides what it
+    /// accepts, so the safe default is to send exactly what it requested.
     var addsQualifiedTimestamp: Bool {
         didSet { UserDefaults.standard.set(addsQualifiedTimestamp, forKey: Self.timestampPreferenceKey) }
     }
@@ -87,7 +90,7 @@ final class WebSigningCoordinator {
 
     init(settingsStore: AppSettingsStore, signedDocumentStore: SignedDocumentStore) {
         let defaults = UserDefaults.standard
-        self.addsQualifiedTimestamp = defaults.object(forKey: Self.timestampPreferenceKey) as? Bool ?? true
+        self.addsQualifiedTimestamp = defaults.object(forKey: Self.timestampPreferenceKey) as? Bool ?? false
         self.settingsStore = settingsStore
         self.signedDocumentStore = signedDocumentStore
         self.mobileSigning = MobileSigningCoordinator(settingsStore: settingsStore)
@@ -153,7 +156,13 @@ final class WebSigningCoordinator {
                           kindDescription: Self.describeKind(request))
         pin = ""
         errorText = nil
+        // Activating the app is not enough when it has no key window: the sheet
+        // then opens behind whatever the person was looking at.
         NSApp.activate(ignoringOtherApps: true)
+        if let window = NSApp.windows.first(where: { $0.canBecomeKey && !$0.isMiniaturized }) {
+            window.makeKeyAndOrderFront(nil)
+        }
+        NSApp.requestUserAttention(.criticalRequest)
         await refreshIdentities()
 
         return try await withCheckedThrowingContinuation { continuation in

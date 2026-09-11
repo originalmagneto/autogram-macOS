@@ -90,7 +90,7 @@ struct WebSigningSheet: View {
                 Text("Pridať kvalifikovanú časovú pečiatku")
                     .font(.callout)
                 Text(coordinator.addsQualifiedTimestamp
-                     ? "Podpíše sa ako osvedčený podpis (\(coordinator.effectiveLevelDescription))."
+                     ? "Podpíše sa ako osvedčený podpis (\(coordinator.effectiveLevelDescription)). Portál môže takýto podpis odmietnuť, ak si ho nevyžiadal."
                      : "Podpíše sa presne tak, ako pýta stránka (\(coordinator.effectiveLevelDescription)).")
                     .font(.caption)
                     .foregroundStyle(.secondary)
