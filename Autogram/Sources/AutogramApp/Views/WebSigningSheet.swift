@@ -16,6 +16,11 @@ struct WebSigningSheet: View {
                 documentCard(pending)
             }
 
+            if coordinator.mobileSigningAvailable {
+                mobileOption
+                Divider()
+            }
+
             identityPicker
             pinField
 
@@ -30,6 +35,13 @@ struct WebSigningSheet: View {
         }
         .padding(24)
         .frame(width: 480)
+        .sheet(isPresented: Bindable(coordinator.mobileSigning).isPresented) {
+            if let session = coordinator.mobileSigning.session {
+                MobileSigningSheet(session: session) {
+                    coordinator.mobileSigning.cancel()
+                }
+            }
+        }
     }
 
     private var header: some View {
@@ -68,9 +80,35 @@ struct WebSigningSheet: View {
         .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 10))
     }
 
+    /// Signing with the phone needs no reader and no PIN here, so it is offered
+    /// first: on this path the eID is read over NFC and the PIN stays on the
+    /// phone.
+    private var mobileOption: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "iphone.gen3.radiowaves.left.and.right")
+                .font(.title3)
+                .foregroundStyle(.tint)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Podpísať mobilom")
+                    .font(.callout.weight(.medium))
+                Text("Občiansky preukaz cez NFC, bez čítačky.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Button("Použiť mobil") {
+                guard !coordinator.isWorking else { return }
+                Task { await coordinator.confirmViaMobile() }
+            }
+            .disabled(coordinator.isWorking)
+        }
+        .padding(12)
+        .background(.tint.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+    }
+
     private var identityPicker: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Podpisový certifikát")
+            Text("Alebo podpisovou kartou")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             if coordinator.identities.isEmpty {

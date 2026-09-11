@@ -22,7 +22,7 @@ final class AutogramAppModel {
             settingsStore: settings,
             recentDocumentStore: recentDocuments)
         zakoStore = ZakoSessionStore(settingsStore: settings, exampleBank: settings.exampleBank)
-        webSigning = WebSigningCoordinator(settingsStore: settings)
+        webSigning = WebSigningCoordinator(settingsStore: settings, recentDocumentStore: recentDocuments)
 
         // Browser requests reach the app through the Safari extension and the
         // launchd rendezvous; nothing signs without the sheet this raises.

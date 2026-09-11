@@ -59,12 +59,30 @@ rendezvous.appEndpoint { endpoint in
             return
         }
         let isXML = path.lowercased().hasSuffix(".xml")
+        // An XML payload is treated as a state-portal eForm, with a self-contained
+        // namespace so no registry lookup happens.
+        let eform: EFormSigningAttributes? = isXML ? EFormSigningAttributes(
+            schema: """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns="http://probe.local/form/1.0"             targetNamespace="http://probe.local/form/1.0" elementFormDefault="qualified">            <xs:element name="Ziadost"><xs:complexType><xs:sequence>            <xs:element name="Meno" type="xs:string"/></xs:sequence></xs:complexType></xs:element></xs:schema>
+            """,
+            transformation: """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform"             xmlns:z="http://probe.local/form/1.0"><xsl:template match="/"><html><body><h1>            <xsl:value-of select="z:Ziadost/z:Meno"/></h1></body></html></xsl:template></xsl:stylesheet>
+            """,
+            identifier: "http://probe.local/form/1.0",
+            transformationLanguage: "sk",
+            transformationMediaDestinationTypeDescription: "HTML",
+            transformationTargetEnvironment: "probe",
+            embedUsedSchemas: true,
+            packaging: "ENVELOPING") : nil
         let request = WebSignRequest(
             requestID: UUID().uuidString,
             filename: (path as NSString).lastPathComponent,
             payload: .inline(data.base64EncodedString()),
             payloadMimeType: isXML ? "application/xml;base64" : "application/pdf;base64",
-            signatureLevel: isXML ? "XAdES_BASELINE_T" : "PAdES_BASELINE_T")
+            signatureLevel: isXML ? "XAdES_BASELINE_B" : "PAdES_BASELINE_T",
+            eform: eform)
         print("Posielam požiadavku na podpis: \(request.filename) (\(data.count) B)")
         print("V aplikácii sa má otvoriť okno so žiadosťou o PIN.")
         proxy.sign(request: try! JSONEncoder().encode(request)) { response, error in

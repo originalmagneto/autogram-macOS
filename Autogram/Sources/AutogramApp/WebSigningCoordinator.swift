@@ -3,6 +3,7 @@ import AppKit
 import AutogramKit
 import AutogramWebBridge
 import Observation
+import os
 
 /// Drives one signing request that arrived from a state portal through the
 /// browser extension.
@@ -52,12 +53,57 @@ final class WebSigningCoordinator {
     private(set) var isWorking = false
     private(set) var errorText: String?
 
+    private let log = Logger(subsystem: "sk.autogram.Autogram", category: "web-signing")
+
     private var continuation: CheckedContinuation<WebSignResponse, Error>?
     private let settingsStore: AppSettingsStore
+    private let recentDocumentStore: RecentDocumentStore
+    let mobileSigning: MobileSigningCoordinator
 
-    init(settingsStore: AppSettingsStore) {
+    init(settingsStore: AppSettingsStore, recentDocumentStore: RecentDocumentStore) {
         self.settingsStore = settingsStore
+        self.recentDocumentStore = recentDocumentStore
+        self.mobileSigning = MobileSigningCoordinator(settingsStore: settingsStore)
     }
+
+    /// Keeps a copy of what was signed and lists it among recent documents.
+    ///
+    /// The page gets its own copy over the bridge, so without this the signature
+    /// would leave no trace on the Mac at all: nothing to re-check later, and
+    /// nothing in the sidebar.
+    @discardableResult
+    private func archive(_ data: Data, for request: WebSignRequest) -> URL? {
+        let directory = SigningSessionStore.outputDirectoryURL()
+        let base = (request.filename as NSString).deletingPathExtension
+        let stem = (base.isEmpty ? "dokument" : base) + "_podpisane"
+        let ext = request.eform == nil ? "pdf" : "asice"
+
+        do {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            var url = directory.appendingPathComponent(stem).appendingPathExtension(ext)
+            if FileManager.default.fileExists(atPath: url.path) {
+                let stamp = Self.fileStampFormatter.string(from: Date())
+                url = directory.appendingPathComponent("\(stem)-\(stamp)").appendingPathExtension(ext)
+            }
+            try data.write(to: url, options: [.atomic])
+            recentDocumentStore.record(url: url)
+            return url
+        } catch {
+            // A failed archive must not fail the signature: the page already has
+            // a valid signed document either way.
+            log.error("Web signature archive failed: \(String(describing: error), privacy: .public)")
+            return nil
+        }
+    }
+
+    private static let fileStampFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyyMMdd-HHmmss"
+        return formatter
+    }()
+
+    /// Whether signing with a phone is offered for this request.
+    var mobileSigningAvailable: Bool { settingsStore.settings.mobileSigningEnabled }
 
     private var provider: any QualifiedSigningProviding { settingsStore.signingProvider }
 
@@ -96,6 +142,50 @@ final class WebSigningCoordinator {
         finish(.failure(Failure.cancelled))
     }
 
+    /// Signs with the eID over NFC on a phone through the Autogram v mobile
+    /// relay. Needs no card reader and no PIN here: the phone collects both.
+    /// The relay accepts the same eForm attributes as the local engine, so a
+    /// state-portal form works on this path too.
+    func confirmViaMobile() async {
+        guard let pending else { return }
+        isWorking = true
+        errorText = nil
+        defer { isWorking = false }
+
+        do {
+            let bytes = try Self.decode(pending.request)
+            let isEForm = pending.request.eform != nil
+            let wantsTimestamp = pending.request.signatureLevel.hasSuffix("_T")
+            let level: AVMSignatureLevel = isEForm || pending.request.signatureLevel.hasPrefix("XAdES")
+                ? (wantsTimestamp ? .xadesT : .xadesB)
+                : (wantsTimestamp ? .padesT : .padesB)
+
+            let upload = AVMUploadRequest(
+                filename: pending.request.filename,
+                data: bytes,
+                mimeType: isEForm ? AVMUploadRequest.xmlMimeType : AVMUploadRequest.pdfMimeType,
+                level: level,
+                container: isEForm ? .asicE : nil,
+                eform: pending.request.eform)
+
+            let document = try await mobileSigning.sign(upload)
+            guard let content = document.data else {
+                throw Failure.malformedPayload
+            }
+            let signers = document.signers ?? []
+            archive(content, for: pending.request)
+            finish(.success(WebSignResponse(
+                requestID: pending.request.requestID,
+                content: content.base64EncodedString(),
+                signedBy: AVMResultMapper.signatureLabel(signers: signers),
+                issuedBy: signers.first?.issuedBy ?? "")))
+        } catch is CancellationError {
+            errorText = "Podpisovanie mobilom ste zrušili."
+        } catch {
+            errorText = error.localizedDescription
+        }
+    }
+
     func confirm() async {
         guard let pending, let identityID = selectedIdentityID else {
             errorText = Failure.identityUnavailable.errorDescription
@@ -120,6 +210,7 @@ final class WebSigningCoordinator {
 
             let signed = try await provider.sign(signingRequest)
             let payload = pending.request.eform == nil ? signed.pdfData : (signed.asicData ?? signed.pdfData)
+            archive(payload, for: pending.request)
             finish(.success(WebSignResponse(
                 requestID: pending.request.requestID,
                 content: payload.base64EncodedString(),
