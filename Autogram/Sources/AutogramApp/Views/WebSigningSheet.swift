@@ -16,6 +16,8 @@ struct WebSigningSheet: View {
                 documentCard(pending)
             }
 
+            timestampToggle
+
             if coordinator.mobileSigningAvailable {
                 mobileOption
                 Divider()
@@ -78,6 +80,23 @@ struct WebSigningSheet: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
         .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 10))
+    }
+
+    /// State portals ask for Baseline B, so without this the phone offers only
+    /// the handwritten-equivalent signature and the qualified one stays greyed out.
+    private var timestampToggle: some View {
+        Toggle(isOn: $coordinator.addsQualifiedTimestamp) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Pridať kvalifikovanú časovú pečiatku")
+                    .font(.callout)
+                Text(coordinator.addsQualifiedTimestamp
+                     ? "Podpíše sa ako osvedčený podpis (\(coordinator.effectiveLevelDescription))."
+                     : "Podpíše sa presne tak, ako pýta stránka (\(coordinator.effectiveLevelDescription)).")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .toggleStyle(.switch)
     }
 
     /// Signing with the phone needs no reader and no PIN here, so it is offered

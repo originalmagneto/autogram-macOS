@@ -55,12 +55,39 @@ final class WebSigningCoordinator {
 
     private let log = Logger(subsystem: "sk.autogram.Autogram", category: "web-signing")
 
+    private static let timestampPreferenceKey = "webSigningAddsQualifiedTimestamp"
+
+    /// Portals ask for Baseline B, which carries no timestamp, so without this
+    /// the phone would only ever offer the handwritten-equivalent signature.
+    /// Upgrading to Baseline T adds a qualified timestamp; a portal that insists
+    /// on exactly what it asked for is the reason this can be turned off.
+    var addsQualifiedTimestamp: Bool {
+        didSet { UserDefaults.standard.set(addsQualifiedTimestamp, forKey: Self.timestampPreferenceKey) }
+    }
+
+    /// The level actually used, after the timestamp preference is applied.
+    private func effectiveLevel(for request: WebSignRequest) -> String {
+        guard addsQualifiedTimestamp, request.signatureLevel.hasSuffix("_B") else {
+            return request.signatureLevel
+        }
+        // Only the trailing marker, never the "_B" inside "_BASELINE".
+        return request.signatureLevel.dropLast(2) + "_T"
+    }
+
+    /// Shown in the sheet so the consequence of the toggle is visible before signing.
+    var effectiveLevelDescription: String {
+        guard let pending else { return "" }
+        return effectiveLevel(for: pending.request).replacingOccurrences(of: "_", with: " ")
+    }
+
     private var continuation: CheckedContinuation<WebSignResponse, Error>?
     private let settingsStore: AppSettingsStore
     private let recentDocumentStore: RecentDocumentStore
     let mobileSigning: MobileSigningCoordinator
 
     init(settingsStore: AppSettingsStore, recentDocumentStore: RecentDocumentStore) {
+        let defaults = UserDefaults.standard
+        self.addsQualifiedTimestamp = defaults.object(forKey: Self.timestampPreferenceKey) as? Bool ?? true
         self.settingsStore = settingsStore
         self.recentDocumentStore = recentDocumentStore
         self.mobileSigning = MobileSigningCoordinator(settingsStore: settingsStore)
@@ -155,8 +182,9 @@ final class WebSigningCoordinator {
         do {
             let bytes = try Self.decode(pending.request)
             let isEForm = pending.request.eform != nil
-            let wantsTimestamp = pending.request.signatureLevel.hasSuffix("_T")
-            let level: AVMSignatureLevel = isEForm || pending.request.signatureLevel.hasPrefix("XAdES")
+            let requested = effectiveLevel(for: pending.request)
+            let wantsTimestamp = requested.hasSuffix("_T")
+            let level: AVMSignatureLevel = isEForm || requested.hasPrefix("XAdES")
                 ? (wantsTimestamp ? .xadesT : .xadesB)
                 : (wantsTimestamp ? .padesT : .padesB)
 
@@ -197,15 +225,17 @@ final class WebSigningCoordinator {
 
         do {
             let bytes = try Self.decode(pending.request)
+            let level = effectiveLevel(for: pending.request)
+            let wantsTimestamp = level.hasSuffix("_T")
             let signingRequest = SigningRequest(
                 pdfData: bytes,
                 identityID: identityID,
-                includeTimestamp: pending.request.signatureLevel.hasSuffix("_T"),
-                tsaURL: pending.request.signatureLevel.hasSuffix("_T") ? settingsStore.settings.activeTSA.url : nil,
+                includeTimestamp: wantsTimestamp,
+                tsaURL: wantsTimestamp ? settingsStore.settings.activeTSA.url : nil,
                 outputFormat: pending.request.eform == nil ? .embeddedPAdES : .attachedASIC,
                 pin: pin.isEmpty ? nil : pin,
                 eform: pending.request.eform,
-                signatureLevelOverride: pending.request.signatureLevel,
+                signatureLevelOverride: level,
                 filename: pending.request.filename)
 
             let signed = try await provider.sign(signingRequest)
