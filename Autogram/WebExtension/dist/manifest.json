@@ -15,12 +15,11 @@
   "content_scripts": [
     {
       "matches": [
-        "https://www.slovensko.sk/*",
-        "https://prihlasenie.slovensko.sk/*",
-        "https://schranka.slovensko.sk/*",
+        "https://*.slovensko.sk/*",
+        "https://slovensko.sk/*",
+        "https://schranka.upvsfixnew.gov.sk/*",
         "https://pfseform.financnasprava.sk/*",
-        "https://www.financnasprava.sk/*",
-        "https://cep.financnasprava.sk/*",
+        "https://*.financnasprava.sk/*",
         "https://eformulare.socpoist.sk/*",
         "https://sluzby.orsr.sk/*",
         "https://obcan.justice.sk/*"
@@ -39,12 +38,11 @@
         "ditec.js"
       ],
       "matches": [
-        "https://www.slovensko.sk/*",
-        "https://prihlasenie.slovensko.sk/*",
-        "https://schranka.slovensko.sk/*",
+        "https://*.slovensko.sk/*",
+        "https://slovensko.sk/*",
+        "https://schranka.upvsfixnew.gov.sk/*",
         "https://pfseform.financnasprava.sk/*",
-        "https://www.financnasprava.sk/*",
-        "https://cep.financnasprava.sk/*",
+        "https://*.financnasprava.sk/*",
         "https://eformulare.socpoist.sk/*",
         "https://sluzby.orsr.sk/*",
         "https://obcan.justice.sk/*"

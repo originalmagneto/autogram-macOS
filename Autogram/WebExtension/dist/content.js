@@ -1,6 +1,8 @@
 // Content script. Injects the page-context shim and relays its requests to the
 // background worker, which is the only caller of native messaging.
 
+console.log("[Autogram macOS] content script beží na", location.href);
+
 const CHANNEL_REQUEST = "autogram-macos-request";
 const CHANNEL_RESPONSE = "autogram-macos-response";
 
