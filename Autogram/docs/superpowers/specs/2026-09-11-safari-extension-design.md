@@ -4,7 +4,11 @@ Autogram macOS signs documents for Slovak state portals (slovensko.sk, financnas
 
 ## Verified and unverified
 
-Filled in at the end of the implementation session. See "Status" at the bottom.
+**Verified by running it.** eForm and XDC signing is reachable from Swift over the machine protocol: a hermetic test builds a full `xdc:XMLDataContainer` with embedded schemas from a self-contained eForm (476 engine tests green, 0 failures). The extension reaches the app: `webbridge-probe` goes through the launchd agent to the running app and gets its status back, with no Safari involved.
+
+**Not verified, and it needs the user.** Whether Safari loads a hand-assembled adhoc `.appex`, and what the native-message size ceiling is. Enabling an unsigned extension is an in-memory Safari setting with no preference key, so it cannot be scripted. `scripts/safari-spike.sh` checks everything else and prints the three manual steps.
+
+**Not built yet.** The D.Signer adapters, so slovensko.sk cannot drive signing through `window.ditec` yet; and the sign handler on the app side, so the bridge answers `ready: false` by design.
 
 ## Background
 
@@ -52,9 +56,11 @@ Manifest v3. The only added permission is `nativeMessaging`. The background work
 
 Safari delivers `sendNativeMessage` to a sandboxed app extension inside our bundle. That extension cannot spawn the engine or reach PKCS#11, and the sandbox forbids connecting to an arbitrary XPC endpoint.
 
-The app registers `NSXPCListener(machServiceName: "sk.autogram.Autogram.xpc")`. The appex holds `com.apple.security.temporary-exception.mach-lookup.global-name` for that name, which needs neither a Team ID nor an app group, so it should hold under adhoc signing. The appex stays as thin as the Xcode echo template plus one XPC call.
+The first design here was for the app to publish `NSXPCListener(machServiceName:)` directly. **That does not work, and the spike proved it**: launchd owns Mach service names and hands the receive right only to the process it launches for the name, so the listener never registered and `launchctl print` did not know the service.
 
-Three unknowns ride on this: whether Safari loads a hand-assembled adhoc appex, whether the exception entitlement holds without a team, and what the native-message size ceiling is. They are settled by one spike before any message format is designed.
+A small on-demand launchd agent owns the name instead and acts as a rendezvous. The app publishes an anonymous listener and registers its endpoint with the agent; the extension asks the agent for that endpoint and then connects to the app directly. No document passes through the agent, and connecting to an anonymous endpoint involves no name lookup, so the extension sandbox does not block it. The extension still needs `com.apple.security.temporary-exception.mach-lookup.global-name` to reach the agent, which needs neither a Team ID nor an app group and therefore holds under adhoc signing.
+
+`scripts/install-webbridge-agent.sh` registers the agent; `build_app.sh` puts its binary in `Contents/Helpers`.
 
 Fallback if the spike fails: an internal HTTP server bound to 127.0.0.1 on a random port with a shared token in a header, known only to our extension. That is still not an open door for arbitrary pages.
 
@@ -88,4 +94,10 @@ Machine protocol v3 gets a hermetic round-trip test that feeds a self-contained 
 
 ## Status
 
-To be completed at the end of the implementation session.
+Branch `feature/safari-extension`.
+
+Done and tested: the eForm and XDC attributes over the machine protocol, with Baseline B accepted only for eForm requests so ordinary file signing still cannot produce an untimestamped signature; the launchd rendezvous, the XPC bridge, the hand-assembled appex, the build wiring, and a dependency-free extension skeleton.
+
+Open: the D.Signer adapters; the sign handler that turns a portal request into a real signature through the existing certificate and PIN flow; and the Safari half of the spike.
+
+Unrelated defect found on the way: `PDFAConverter.normalizeWithEngine` calls `digital.slovensko.autogram.core.PdfaNormalize`, a class that has never existed in this fork, so engine-based PDF/A normalization has always silently fallen back. Tracked separately.
