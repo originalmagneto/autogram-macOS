@@ -277,6 +277,19 @@ if [[ -x "$EXTENSION_BIN" ]]; then
     <string>0.1.0</string>
     <key>CFBundleVersion</key>
     <string>1</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>sk</string>
+    <!-- Safari lists an extension only when the bundle says which platform it
+         is for and how far back it runs. pluginkit registers it without these,
+         which is why a missing entry shows up as "registered but not listed". -->
+    <key>CFBundleSupportedPlatforms</key>
+    <array>
+        <string>MacOSX</string>
+    </array>
+    <key>LSMinimumSystemVersion</key>
+    <string>13.0</string>
     <key>NSExtension</key>
     <dict>
         <key>NSExtensionPointIdentifier</key>
