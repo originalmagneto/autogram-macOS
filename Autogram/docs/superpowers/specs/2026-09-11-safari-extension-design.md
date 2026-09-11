@@ -36,9 +36,9 @@ slovensko.sk page
     -> extension background worker                  (only place that calls native)
     -> browser.runtime.sendNativeMessage
     -> SafariWebExtensionHandler (.appex, sandboxed, in our bundle)
-    -> NSXPCConnection to a Mach service
+    -> launchd rendezvous agent, then straight to the app
     -> Autogram macOS (unsandboxed): cert pick, PIN, signing job
-    -> engine helper over machine protocol v3      (XDC built here)
+    -> engine helper over the machine protocol      (XDC built here)
     -> signed container back up the same chain
 ```
 
@@ -70,13 +70,13 @@ Documents are megabytes and the native-message ceiling is undocumented. Payloads
 
 The appex is sandboxed and the app is not, so the file lives in the appex container (`~/Library/Containers/<appex-id>/Data/tmp`), which the appex may write and the unsandboxed app may read. Every file is removed once the response is delivered, and the app rejects any path outside that directory.
 
-### Section 4: Engine and machine protocol v3
+### Section 4: Engine and the machine protocol
 
-Protocol v3 adds the eForm attributes that v2 lacks, copied verbatim from `ServerSigningParameters` so the two entry points cannot drift: `containerXmlns`, `schema`, `transformation`, `identifier`, `autoLoadEform`, `fsFormId`, `embedUsedSchemas`, `packaging`, `transformationMediaDestinationTypeDescription`, `transformationLanguage`, `transformationTargetEnvironment`. `schema` and `transformation` are base64, as on the server. `signatureLevel` opens to the `_B` variants alongside the existing `_T` ones, because pages ask for `XAdES_BASELINE_B`.
+Protocol v2 gains the eForm attributes it lacked, copied verbatim from `ServerSigningParameters` so the two entry points cannot drift: `containerXmlns`, `schema`, `transformation`, `identifier`, `autoLoadEform`, `fsFormId`, `embedUsedSchemas`, `packaging`, `transformationMediaDestinationTypeDescription`, `transformationLanguage`, `transformationTargetEnvironment`. `schema` and `transformation` are base64, as on the server. `signatureLevel` opens to the `_B` variants alongside the existing `_T` ones, because pages ask for `XAdES_BASELINE_B`.
 
 `MachineSigningService` builds its `SigningParameters` through the same `SigningParameters.buildParameters(...)` that the HTTP `SignEndpoint` reaches, so `XDCBuilder` and the eForm resolvers are reused unchanged rather than reimplemented.
 
-v1 and v2 stay accepted so the existing card flow, the Quick Action and the CLI keep working.
+The fields are optional and the level set only widens, so nothing that worked before stops working. A parallel v3 was considered and rejected: the engine ships inside the app bundle, so there is no version skew to protect against, and a second protocol would have meant duplicating the whole v2 CLI app. Baseline B is accepted only when the request carries eForm attributes, which preserves the existing guarantee that ordinary file signing never emits an untimestamped signature.
 
 eForm resolution reaches the network: a namespace under `schemas.gov.sk/form/`, `data.gov.sk/doc/eform/` or `data.gov.sk/id/egov/eform/` is looked up in the live UPVS registry, and ORSR and FS have their own resolvers. An unknown form fails with `UNKNOWN_EFORM`. Only a non-government namespace uses the schema and transformation supplied in the request. Tests therefore use a self-contained namespace and stay hermetic.
 
