@@ -6,7 +6,8 @@
   "default_locale": "sk",
   "permissions": [
     "nativeMessaging",
-    "storage"
+    "storage",
+    "tabs"
   ],
   "background": {
     "service_worker": "background.js",
@@ -48,5 +49,9 @@
         "https://obcan.justice.sk/*"
       ]
     }
-  ]
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Autogram macOS"
+  }
 }
