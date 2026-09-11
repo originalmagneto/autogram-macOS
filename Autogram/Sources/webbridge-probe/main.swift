@@ -8,16 +8,21 @@ import AutogramWebBridge
 
 let semaphore = DispatchSemaphore(value: 0)
 var exitCode: Int32 = 1
+// Tearing the connection down at the end fires the invalidation handler too,
+// and reporting that as a failure would contradict the result just printed.
+nonisolated(unsafe) var finished = false
 
 let agent = NSXPCConnection(machServiceName: WebSigningBridge.machServiceName, options: [])
 agent.remoteObjectInterface = NSXPCInterface(with: WebBridgeRendezvousProtocol.self)
 agent.resume()
 
 agent.interruptionHandler = {
+    guard !finished else { return }
     FileHandle.standardError.write(Data("XPC spojenie prerušené: appka pravdepodobne nebeží.\n".utf8))
     semaphore.signal()
 }
 agent.invalidationHandler = {
+    guard !finished else { return }
     FileHandle.standardError.write(Data("XPC spojenie neplatné: služba \(WebSigningBridge.machServiceName) nie je publikovaná.\n".utf8))
     semaphore.signal()
 }
@@ -83,6 +88,7 @@ rendezvous.appEndpoint { endpoint in
             print("Vydal    : \(decoded.issuedBy)")
             print("Súbor    : \(out.path) (\(signed.count) B)")
             exitCode = 0
+            finished = true
             semaphore.signal()
         }
         return
@@ -95,6 +101,7 @@ rendezvous.appEndpoint { endpoint in
         print("")
         print("Transport funguje: agent našiel aplikáciu a tá odpovedala cez XPC.")
         exitCode = 0
+        finished = true
         semaphore.signal()
     }
 }
