@@ -37,7 +37,7 @@ guard let rendezvous = agent.remoteObjectProxyWithErrorHandler({ error in
 
 rendezvous.appEndpoint { endpoint in
     guard let endpoint else {
-        FileHandle.standardError.write(Data("Agent beží, ale aplikácia sa uňho nezaregistrovala.\n".utf8))
+        FileHandle.standardError.write(Data("Agent beží, ale Autogram sa nepodarilo spustiť ani po 20 s.\n".utf8))
         semaphore.signal()
         return
     }

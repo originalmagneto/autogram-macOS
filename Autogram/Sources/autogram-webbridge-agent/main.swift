@@ -1,4 +1,5 @@
 import Foundation
+import AppKit
 import AutogramWebBridge
 
 // On-demand launchd agent that owns the Mach service name.
@@ -29,7 +30,63 @@ final class Rendezvous: NSObject, NSXPCListenerDelegate, WebBridgeRendezvousProt
         lock.lock()
         let current = endpoint
         lock.unlock()
-        reply(current)
+        if let current {
+            reply(current)
+            return
+        }
+        // Nobody has registered, so Autogram is not running. Start it and wait:
+        // otherwise every signature would need the person to launch the app
+        // first, and the page would only ever hear that nothing is available.
+        // The app can do nothing on its own with this - it raises a prompt that
+        // has to be confirmed - so a page can cost the user a window, never a
+        // signature.
+        launchApp()
+        waitForRegistration(reply: reply)
+    }
+
+    private func launchApp() {
+        let workspace = NSWorkspace.shared
+        if let url = appBundleURL() {
+            let configuration = NSWorkspace.OpenConfiguration()
+            configuration.activates = false
+            workspace.openApplication(at: url, configuration: configuration)
+        } else {
+            FileHandle.standardError.write(Data("Autogram bundle not found\n".utf8))
+        }
+    }
+
+    /// The agent is installed inside the app bundle, so the app is three levels
+    /// up from the binary. Falls back to asking the system by bundle id, which
+    /// covers an agent copied elsewhere.
+    private func appBundleURL() -> URL? {
+        let binary = URL(fileURLWithPath: CommandLine.arguments[0]).resolvingSymlinksInPath()
+        let candidate = binary
+            .deletingLastPathComponent()   // Helpers
+            .deletingLastPathComponent()   // Contents
+            .deletingLastPathComponent()   // Autogram macOS.app
+        if candidate.pathExtension == "app", FileManager.default.fileExists(atPath: candidate.path) {
+            return candidate
+        }
+        return NSWorkspace.shared.urlForApplication(withBundleIdentifier: "sk.autogram.Autogram")
+    }
+
+    private func waitForRegistration(reply: @escaping (NSXPCListenerEndpoint?) -> Void) {
+        let deadline = Date().addingTimeInterval(20)
+        func poll() {
+            lock.lock()
+            let current = endpoint
+            lock.unlock()
+            if let current {
+                reply(current)
+                return
+            }
+            guard Date() < deadline else {
+                reply(nil)
+                return
+            }
+            DispatchQueue.global().asyncAfter(deadline: .now() + 0.25, execute: poll)
+        }
+        poll()
     }
 }
 
