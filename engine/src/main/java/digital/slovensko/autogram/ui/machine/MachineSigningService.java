@@ -16,7 +16,13 @@ import digital.slovensko.autogram.util.DSSUtils;
 import eu.europa.esig.dss.asic.cades.validation.ASiCContainerWithCAdESValidator;
 import eu.europa.esig.dss.asic.xades.validation.ASiCContainerWithXAdESValidator;
 import eu.europa.esig.dss.enumerations.MimeTypeEnum;
+import eu.europa.esig.dss.enumerations.ASiCContainerType;
+import eu.europa.esig.dss.enumerations.DigestAlgorithm;
+import eu.europa.esig.dss.enumerations.SignatureForm;
 import eu.europa.esig.dss.enumerations.SignatureLevel;
+import eu.europa.esig.dss.enumerations.SignaturePackaging;
+import eu.europa.esig.dss.enumerations.MimeType;
+import digital.slovensko.autogram.core.AutogramMimeType;
 import eu.europa.esig.dss.model.InMemoryDocument;
 import eu.europa.esig.dss.token.AbstractKeyStoreTokenConnection;
 import eu.europa.esig.dss.token.DSSPrivateKeyEntry;
@@ -130,7 +136,7 @@ public final class MachineSigningService {
             return sign(requestId, new SignRequest(request.driver(), request.certificateSerial(), pin,
                     request.signatureLevel(), new QualifiedTimestampRequest(true, request.timestamp().servers(),
                     authentication == null ? null : new TimestampAuthentication(authentication.type(), authentication.username(),
-                            authentication.secret())), files));
+                            authentication.secret())), files, request.eform()));
         } finally {
             Arrays.fill(pin, '\0');
             request.clearPin();
@@ -392,6 +398,35 @@ public final class MachineSigningService {
         return hasPdfHeader(content) || isAsic(source, content);
     }
 
+    private static MimeType detectMimeType(String filename, byte[] content) {
+        if (isAsic(filename, content)) {
+            return MimeTypeEnum.ASICE;
+        }
+        var lower = filename.toLowerCase(java.util.Locale.ROOT);
+        if (lower.endsWith(".xdcf")) {
+            return AutogramMimeType.XML_DATACONTAINER_WITH_CHARSET;
+        }
+        if (lower.endsWith(".xml")) {
+            return MimeTypeEnum.XML;
+        }
+        return MimeTypeEnum.PDF;
+    }
+
+    private static ASiCContainerType containerTypeFor(SignatureLevel level) {
+        return level != null && level.getSignatureForm() == SignatureForm.XAdES ? ASiCContainerType.ASiC_E : null;
+    }
+
+    private static SignaturePackaging packagingOf(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return SignaturePackaging.valueOf(value);
+        } catch (IllegalArgumentException exception) {
+            throw new MachineProtocolException("PROTOCOL_INVALID_REQUEST", exception);
+        }
+    }
+
     private static boolean isAsic(String name, byte[] content) {
         return name.toLowerCase(java.util.Locale.ROOT).endsWith(".asice")
                 && content.length >= 4 && content[0] == 'P' && content[1] == 'K'
@@ -463,8 +498,14 @@ public final class MachineSigningService {
             var timestampDataLoader = MachineTimestampDataLoader.create(request.timestamp());
             try {
                 settings.setSignatureLevel(SignatureLevel.valueOf(request.signatureLevel()));
-                settings.setTsaServer(String.join(",", request.timestamp().servers()), timestampDataLoader);
-                settings.setTsaEnabled(true);
+                settings.setEform(request.eform());
+                // Baseline-B carries no timestamp, so no TSA is configured for it.
+                if (request.signatureLevel().endsWith("_T")) {
+                    settings.setTsaServer(String.join(",", request.timestamp().servers()), timestampDataLoader);
+                    settings.setTsaEnabled(true);
+                } else {
+                    settings.setTsaEnabled(false);
+                }
                 var driver = driverDetector.getAvailableDrivers().stream()
                         .filter(candidate -> candidate.getShortname().equals(request.driver()))
                         .findFirst()
@@ -550,8 +591,7 @@ public final class MachineSigningService {
         static SigningJob signingJob(byte[] source, String name, MachineFileResponder responder, MachineSettings settings,
                 VisibleSignatureAppearance.Snapshot appearance) throws Exception {
             var filename = Path.of(name).getFileName().toString();
-            var document = new InMemoryDocument(source, filename,
-                    isAsic(filename, source) ? MimeTypeEnum.ASICE : MimeTypeEnum.PDF);
+            var document = new InMemoryDocument(source, filename, detectMimeType(filename, source));
             var parameters = signingParameters(document, settings);
             if (appearance != null) {
                 var field = appearance.appearance();
@@ -562,6 +602,28 @@ public final class MachineSigningService {
         }
 
         private static SigningParameters signingParameters(InMemoryDocument document, MachineSettings settings) throws Exception {
+            var eform = settings.getEform();
+            if (eform != null) {
+                // Same entry point the HTTP SignEndpoint uses, so XDCBuilder and the
+                // eForm resolvers are reused rather than reimplemented here.
+                return SigningParameters.buildParameters(
+                        settings.getSignatureLevel(),
+                        DigestAlgorithm.SHA256,
+                        containerTypeFor(settings.getSignatureLevel()),
+                        packagingOf(eform.packaging()),
+                        false,
+                        null,
+                        null,
+                        null,
+                        eform.toAttributes(),
+                        eform.autoLoadEform(),
+                        eform.fsFormId(),
+                        false,
+                        0,
+                        document,
+                        settings.getTspSource(),
+                        false);
+            }
             if (document.getMimeType().equals(MimeTypeEnum.ASICE)) {
                 var validator = DSSUtils.createDocumentValidator(document);
                 if (validator instanceof ASiCContainerWithXAdESValidator) {
@@ -788,7 +850,13 @@ record SignRequest(
         char[] pin,
         String signatureLevel,
         QualifiedTimestampRequest timestamp,
-        List<MachineFile> files) {
+        List<MachineFile> files,
+        EFormRequest eform) {
+
+    SignRequest(String driver, String certificateSerial, char[] pin, String signatureLevel,
+            QualifiedTimestampRequest timestamp, List<MachineFile> files) {
+        this(driver, certificateSerial, pin, signatureLevel, timestamp, files, null);
+    }
 }
 
 record QualifiedTimestampRequest(boolean required, List<String> servers, TimestampAuthentication authentication) {

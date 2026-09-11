@@ -16,6 +16,9 @@ import java.util.Locale;
 import java.util.Set;
 
 public final class MachineRequestValidator {
+    private static final Set<String> SUPPORTED_SIGNATURE_LEVELS = Set.of(
+            "PAdES_BASELINE_T", "XAdES_BASELINE_T", "PAdES_BASELINE_B", "XAdES_BASELINE_B");
+
     private MachineRequestValidator() {
     }
 
@@ -45,11 +48,13 @@ public final class MachineRequestValidator {
                 || request.pin() == null || request.pin().length == 0 || request.files() == null || request.files().isEmpty()) {
             throw invalidRequest();
         }
-        if (!"PAdES_BASELINE_T".equals(request.signatureLevel())
-                && !"XAdES_BASELINE_T".equals(request.signatureLevel())) {
+        if (!SUPPORTED_SIGNATURE_LEVELS.contains(request.signatureLevel())) {
             throw new MachineProtocolException("SIGNATURE_LEVEL_REQUIRED");
         }
-        validateTimestamp(request.timestamp());
+        // Baseline-B carries no timestamp; state portals ask for it on eForms.
+        if (request.signatureLevel().endsWith("_T")) {
+            validateTimestamp(request.timestamp());
+        }
         return new ValidatedSignRequest(request, validateFiles(request.files()));
     }
 
