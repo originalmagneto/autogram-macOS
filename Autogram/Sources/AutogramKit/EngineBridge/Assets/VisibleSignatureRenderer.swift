@@ -131,11 +131,9 @@ public struct VisibleSignatureRenderer {
         context.setShouldAntialias(true)
         context.setShouldSmoothFonts(true)
 
-        // Card frame.
+        // Card frame (transparent background).
         let cardRect = NSRect(x: 6, y: 6, width: size.width - 12, height: size.height - 12)
-        NSColor.white.withAlphaComponent(0.92).setFill()
         let cardShape = NSBezierPath(roundedRect: cardRect, xRadius: 12, yRadius: 12)
-        cardShape.fill()
         Self.inkColor.withAlphaComponent(0.45).setStroke()
         cardShape.lineWidth = 1.5
         cardShape.stroke()

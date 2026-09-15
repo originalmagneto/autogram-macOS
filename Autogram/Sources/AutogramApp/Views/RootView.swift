@@ -323,9 +323,15 @@ struct RootView: View {
     private var subtitle: String {
         switch selection {
         case .signing:
-            return settingsStore.signingProvider is DemoSigningProvider
-                ? "demo podpis"
-                : "kvalifikované podpisovanie KEP"
+            let mode = settingsStore.signingProvider is DemoSigningProvider ? "demo" : "KEP"
+            switch signingStore.step {
+            case .intake:
+                return "výber dokumentu · \(mode)"
+            case .prepare:
+                return "nastavenie podpisu · \(mode)"
+            case .done:
+                return "podpísané · \(mode)"
+            }
         case .zako:
             return ""
         case .evidence:

@@ -26,6 +26,7 @@ struct ZakoFlowView: View {
             stepContent
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .safeAreaPadding(.top)
         .background(Color(nsColor: .windowBackgroundColor))
         .overlay {
             if isTargeted { targetedOverlay }
