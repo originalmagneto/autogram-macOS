@@ -36,7 +36,7 @@ final class CandidateMergerTests: XCTestCase {
     }
 
     func testExtremeAspectIsDropped() {
-        let line = cand(0.1, 0.5, 0.5, 0.02, source: .contour) // aspect 25 > 18
+        let line = cand(0.1, 0.5, 0.5, 0.005, source: .contour) // aspect 100 exceeds the structural-candidate limit
         XCTAssertTrue(CandidateMerger.merge([line], exclusions: .empty).isEmpty)
     }
 

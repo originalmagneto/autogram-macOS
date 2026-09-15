@@ -3,6 +3,16 @@ import CoreGraphics
 @testable import AutogramKit
 
 final class CandidateQualityFilterTests: XCTestCase {
+    func testLongCordCandidateReachesClassificationInsteadOfBeingDiscardedAsARule() throws {
+        let bitmap = try bitmap { context in
+            context.setFillColor(CGColor(gray: 0, alpha: 1))
+            context.fill(CGRect(x: 10, y: 10, width: 2, height: 80))
+        }
+        let candidate = DetectionCandidate(pageIndex: 0, box: .init(x: 0.1, y: 0.1, width: 0.02, height: 0.8), sources: [.contour])
+        let prepared = page(pixels: bitmap.pixels, image: bitmap.image, textBoxes: [])
+        XCTAssertTrue(CandidateMerger.passesGates(candidate, exclusions: prepared.exclusions))
+        XCTAssertNotNil(CandidateQualityFilter.filter(candidate, page: prepared))
+    }
     /// Draws into a white 100x100 bitmap and returns both the pixels and the image.
     private func bitmap(_ draw: (CGContext) -> Void) throws -> (pixels: PixelMap, image: CGImage) {
         let side = 100

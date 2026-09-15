@@ -49,15 +49,12 @@ final class AttestationXMLTests: XCTestCase {
                        "<CodelistCode>12</CodelistCode>",
                        "<ItemCode>A4</ItemCode>",
                        "<PaperSizeNumberOfSheets>3</PaperSizeNumberOfSheets>",
-                       "<CodelistCode>15</CodelistCode>",
-                       "<ItemCode>okrúhla pečiatka so štátnym znakom</ItemCode>",
-                       "<SecurityElementVerbalDescription>Úradná pečiatka",
+                       "<OriginalDocumentSecurityElementsDescription>Odtlačok pečiatky: Úradná pečiatka v pravej dolnej časti.</OriginalDocumentSecurityElementsDescription>",
                        "<OriginalDocumentSecurityElementsPage>1</OriginalDocumentSecurityElementsPage>",
                        "<OriginalDocumentSecurityElementsSheet>1</OriginalDocumentSecurityElementsSheet>",
                        "<OriginalDocumentSecurityElementsPage>5</OriginalDocumentSecurityElementsPage>",
                        "<OriginalDocumentSecurityElementsSheet>3</OriginalDocumentSecurityElementsSheet>",
-                       "<CodelistCode>11</CodelistCode>",
-                       "<ItemCode>Right down</ItemCode>",
+                       "<OriginalDocumentSecurityElementsLocation>Dole vpravo</OriginalDocumentSecurityElementsLocation>",
                        "<NewDocumentInfo>",
                        "<NewDocumentName>Zmluva o dielo.pdf</NewDocumentName>",
                        "<CodelistCode>53</CodelistCode>",
@@ -77,6 +74,174 @@ final class AttestationXMLTests: XCTestCase {
                        "<ConversionRecordEvidenceNumber>https://data.gov.sk/id/egov/conversion-record/1563-231114-42</ConversionRecordEvidenceNumber>",
                        "</ConversionRecord>"] {
             XCTAssertTrue(xml.contains(marker), "Chýba fragment: \(marker)\n---\n\(xml)")
+        }
+    }
+
+    private func securityDetails(_ xml: String) throws -> [XMLElement] {
+        let document = try XMLDocument(xmlString: xml, options: [.nodeLoadExternalEntitiesNever])
+        return try document.nodes(forXPath: "//*[local-name()='DocumentSecurityElementsDetails']").compactMap { $0 as? XMLElement }
+    }
+
+    private func validate(_ xml: String, input: AttestationClauseGenerator.Input) -> [String] {
+        AttestationXMLValidator().validate(xml, context: .init(
+            fingerprintSHA256Hex: input.newDocumentFingerprintSHA256Hex,
+            securityElementCount: input.securityElements.count))
+    }
+
+    func testRecordSecurityDetailsHaveExactPlainTextStructure() throws {
+        var input = sampleInput()
+        input.securityElements[0].kind = .bindingCord
+        input.securityElements[0].verbalDescription = "Červená šnúrka & uzol <zachované>"
+        let xml = try AttestationClauseGenerator().generateXML(input: input, formPack: FormPackRepository.currentLegacyUnverified)
+        let details = try securityDetails(xml)
+        XCTAssertEqual(details.count, 2)
+        let children = try XCTUnwrap(details.first?.children).compactMap { $0 as? XMLElement }
+        XCTAssertEqual(children.map(\.localName), ["OriginalDocumentSecurityElementsDescription",
+            "OriginalDocumentSecurityElementsPage", "OriginalDocumentSecurityElementsSheet",
+            "OriginalDocumentSecurityElementsLocation", "NewDocumentSecurityElementsPage"])
+        XCTAssertEqual(children[0].stringValue, "Trikolóra / viazacia šnúrka: Červená šnúrka & uzol <zachované>")
+        XCTAssertEqual(children[3].stringValue, "Dole vpravo")
+        XCTAssertTrue(children.allSatisfy { !($0.children ?? []).contains { $0 is XMLElement } })
+        XCTAssertFalse(xml.contains("SecurityElementVerbalDescription"))
+        XCTAssertTrue(validate(xml, input: input).isEmpty)
+    }
+
+    func testNonEmptyOriginalPageOrdinalKeepsPhysicalSheetAndOutputPage() throws {
+        var input = sampleInput()
+        input.originalNonEmptyPageIndices = [0, 2, 4]
+        let xml = try AttestationClauseGenerator().generateXML(input: input, formPack: FormPackRepository.currentLegacyUnverified)
+        let detail = try XCTUnwrap(securityDetails(xml).last)
+        XCTAssertEqual(detail.elements(forName: "OriginalDocumentSecurityElementsPage").first?.stringValue, "3")
+        XCTAssertEqual(detail.elements(forName: "OriginalDocumentSecurityElementsSheet").first?.stringValue, "3")
+        XCTAssertEqual(detail.elements(forName: "NewDocumentSecurityElementsPage").first?.stringValue, "5")
+    }
+
+    func testMappedOriginalPageMustExist() throws {
+        var input = sampleInput()
+        input.originalNonEmptyPageIndices = [0, 2]
+        XCTAssertThrowsError(try AttestationClauseGenerator().generateXML(input: input, formPack: FormPackRepository.currentLegacyUnverified)) {
+            XCTAssertEqual($0 as? AttestationGenerationError, .invalidSecurityElementPage)
+        }
+        XCTAssertEqual(try securityDetails(AttestationClauseGenerator().generateXML(input: input)).count, 1)
+    }
+
+    func testPhysicalObservationUsesExplicitLocationAndOutputPage() throws {
+        var input = sampleInput()
+        input.securityElements = [SecurityElement(kind: .watermark, pageIndex: 4, boundingBox: .zero,
+            confidence: 1, verbalDescription: "Overené proti svetlu", detectedByAI: false,
+            observation: .physicalOriginal, originalLocation: "  Horný okraj & stred  ", newDocumentPageIndex: 7)]
+        let xml = try AttestationClauseGenerator().generateXML(input: input, formPack: FormPackRepository.currentLegacyUnverified)
+        let detail = try XCTUnwrap(securityDetails(xml).first)
+        XCTAssertEqual(detail.elements(forName: "OriginalDocumentSecurityElementsLocation").first?.stringValue, "Horný okraj & stred")
+        XCTAssertEqual(detail.elements(forName: "OriginalDocumentSecurityElementsPage").first?.stringValue, "5")
+        XCTAssertEqual(detail.elements(forName: "OriginalDocumentSecurityElementsSheet").first?.stringValue, "3")
+        XCTAssertEqual(detail.elements(forName: "NewDocumentSecurityElementsPage").first?.stringValue, "8")
+        XCTAssertTrue(validate(xml, input: input).isEmpty)
+    }
+
+    func testIncompletePhysicalObservationThrowsAndLegacyOmitsIt() throws {
+        for (location, outputPage) in [("Horný okraj", nil), ("Horný okraj", -1), (" \n ", 0)] as [(String, Int?)] {
+            var input = sampleInput()
+            input.securityElements = [SecurityElement(kind: .watermark, pageIndex: 0, boundingBox: .zero,
+                confidence: 1, detectedByAI: false, observation: .physicalOriginal,
+                originalLocation: location, newDocumentPageIndex: outputPage)]
+            XCTAssertThrowsError(try AttestationClauseGenerator().generateXML(input: input, formPack: FormPackRepository.currentLegacyUnverified)) {
+                XCTAssertEqual($0 as? AttestationGenerationError, .incompletePhysicalSecurityElement)
+            }
+            let xml = AttestationClauseGenerator().generateXML(input: input)
+            XCTAssertTrue(try securityDetails(xml).isEmpty)
+            XCTAssertTrue(validate(xml, input: input).contains { $0.contains("Počet prvkov") })
+        }
+    }
+
+    func testSecurityPageIndicesMustFitRecordRange() {
+        for page in [-1, 99_999, Int.max] {
+            var input = sampleInput()
+            input.securityElements[0].pageIndex = page
+            XCTAssertThrowsError(try AttestationClauseGenerator().generateXML(input: input, formPack: FormPackRepository.currentLegacyUnverified)) {
+                XCTAssertEqual($0 as? AttestationGenerationError, .invalidSecurityElementPage)
+            }
+        }
+    }
+
+    func testValidatorAcceptsNoSecurityElementsWhenExpectedCountIsZero() {
+        var input = sampleInput()
+        input.securityElements = []
+        let xml = AttestationClauseGenerator().generateXML(input: input)
+        XCTAssertTrue(validate(xml, input: input).isEmpty)
+    }
+
+    func testValidatorRejectsMissingEmptyNestedAndUnexpectedSecurityFields() throws {
+        let input = sampleInput()
+        let xml = AttestationClauseGenerator().generateXML(input: input)
+        let fields = ["OriginalDocumentSecurityElementsDescription", "OriginalDocumentSecurityElementsPage",
+                      "OriginalDocumentSecurityElementsSheet", "OriginalDocumentSecurityElementsLocation", "NewDocumentSecurityElementsPage"]
+        for field in fields {
+            for mutation in ["missing", "empty", "nested"] {
+                let document = try XMLDocument(xmlString: xml, options: [.nodeLoadExternalEntitiesNever])
+                let node = try XCTUnwrap(document.nodes(forXPath: "//*[local-name()='DocumentSecurityElementsDetails']/*[local-name()='\(field)']").first as? XMLElement)
+                switch mutation {
+                case "missing": node.detach()
+                case "empty": node.stringValue = " \n "
+                default:
+                    node.stringValue = ""
+                    node.addChild(XMLElement(name: "Codelist", stringValue: "1"))
+                }
+                XCTAssertFalse(validate(document.xmlString, input: input).isEmpty, "\(mutation) \(field)")
+            }
+        }
+        let unexpected = xml.replacingOccurrences(of: "</DocumentSecurityElementsDetails>",
+            with: "<SecurityElementVerbalDescription>text</SecurityElementVerbalDescription></DocumentSecurityElementsDetails>")
+        XCTAssertTrue(validate(unexpected, input: input).contains { $0.contains("poradie") })
+        let document = try XMLDocument(xmlString: xml, options: [.nodeLoadExternalEntitiesNever])
+        let first = try XCTUnwrap(document.nodes(forXPath: "//*[local-name()='DocumentSecurityElementsDetails']").first as? XMLElement)
+        let location = try XCTUnwrap(first.elements(forName: "OriginalDocumentSecurityElementsLocation").first)
+        location.detach()
+        first.insertChild(location, at: 0)
+        XCTAssertTrue(validate(document.xmlString, input: input).contains { $0.contains("poradie") })
+    }
+
+    func testValidatorRejectsInvalidSecurityPageAndSheetNumbers() {
+        let input = sampleInput()
+        let xml = AttestationClauseGenerator().generateXML(input: input)
+        for field in ["OriginalDocumentSecurityElementsPage", "OriginalDocumentSecurityElementsSheet", "NewDocumentSecurityElementsPage"] {
+            for value in ["0", "-1", "100000", "1.5", "+1"] {
+                let invalid = xml.replacingOccurrences(of: "<\(field)>1</\(field)>", with: "<\(field)>\(value)</\(field)>")
+                XCTAssertTrue(validate(invalid, input: input).contains { $0.contains(field) }, "\(field)=\(value)")
+            }
+        }
+    }
+
+    func testSecurityFragmentsValidateAgainstExtractedOfficialRecordSchema() throws {
+        let executable = URL(fileURLWithPath: "/usr/bin/xmllint")
+        guard FileManager.default.isExecutableFile(atPath: executable.path) else {
+            throw XCTSkip("xmllint is needed to validate the extracted official XSD fragment.")
+        }
+        let package = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let schema = package.appendingPathComponent("docs/reference/security-elements/record-1.0-security-fragment.xsd")
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        var input = sampleInput()
+        input.securityElements.append(SecurityElement(kind: .watermark, pageIndex: 4, boundingBox: .zero,
+            confidence: 1, detectedByAI: false, observation: .physicalOriginal,
+            originalLocation: "Celá plocha listu", newDocumentPageIndex: 4))
+        let xml = try AttestationClauseGenerator().generateXML(input: input, formPack: FormPackRepository.currentLegacyUnverified)
+        let details = try securityDetails(xml)
+        for (index, detail) in details.enumerated() {
+            // Give the extracted fragment its inherited official record namespace.
+            detail.addNamespace(XMLNode.namespace(withName: "", stringValue: AttestationXMLConstants.namespaceP2E) as! XMLNode)
+            let file = directory.appendingPathComponent("element-\(index).xml")
+            try detail.xmlString.write(to: file, atomically: true, encoding: .utf8)
+            let process = Process()
+            process.executableURL = executable
+            process.arguments = ["--nonet", "--noout", "--schema", schema.path, file.path]
+            let stderr = Pipe()
+            process.standardError = stderr
+            try process.run()
+            process.waitUntilExit()
+            let message = String(decoding: stderr.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+            XCTAssertEqual(process.terminationStatus, 0, message)
         }
     }
 

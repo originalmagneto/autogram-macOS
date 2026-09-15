@@ -74,16 +74,30 @@ public struct AttestationXMLValidator: Sendable {
         }
 
         let elementDetails = children(info, "DocumentSecurityElementsDetails")
-        if elementDetails.isEmpty {
-            issues.append("Doložka neuvádza žiadne bezpečnostné prvky.")
-        }
+        let securityFields = ["OriginalDocumentSecurityElementsDescription",
+                              "OriginalDocumentSecurityElementsPage",
+                              "OriginalDocumentSecurityElementsSheet",
+                              "OriginalDocumentSecurityElementsLocation",
+                              "NewDocumentSecurityElementsPage"]
         for (index, detail) in elementDetails.enumerated() {
-            if child(detail, "OriginalDocumentSecurityElementsDescription") == nil {
-                issues.append("Prvok \(index + 1): chýba popis (codelist 15).")
+            let fields = (detail.children ?? []).compactMap { $0 as? XMLElement }
+            if fields.map(\.localName) != securityFields.map(Optional.some) {
+                issues.append("Prvok \(index + 1): nesprávne polia alebo poradie údajov bezpečnostného prvku.")
             }
-            let pageText = value(detail, "OriginalDocumentSecurityElementsPage")
-            if (pageText.flatMap(Int.init) ?? 0) < 1 {
-                issues.append("Prvok \(index + 1): neplatná strana.")
+            for field in securityFields {
+                guard let node = child(detail, field),
+                      let text = node.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else {
+                    issues.append("Prvok \(index + 1): \(field) je prázdne alebo chýba.")
+                    continue
+                }
+                if (node.children ?? []).contains(where: { $0 is XMLElement }) {
+                    issues.append("Prvok \(index + 1): \(field) musí obsahovať iba text.")
+                }
+                if field.hasSuffix("Page") || field.hasSuffix("Sheet") {
+                    if text.count > 5 || !text.allSatisfy({ $0 >= "0" && $0 <= "9" }) || (Int(text) ?? 0) < 1 {
+                        issues.append("Prvok \(index + 1): \(field) musí byť číslo od 1 do 99999.")
+                    }
+                }
             }
         }
         if elementDetails.count != context.securityElementCount {

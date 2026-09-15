@@ -4,6 +4,7 @@ import AutogramKit
 
 struct AnalysisCanvasView: View {
     @Bindable var store: ZakoSessionStore
+    @State private var showPhysicalElementSheet = false
     @State private var showPrecisePlacement = false
     @State private var interaction: Interaction?
     @State private var pageImage: NSImage?
@@ -112,6 +113,7 @@ struct AnalysisCanvasView: View {
                 .keyboardShortcut(.defaultAction)
             }
         }
+        .sheet(isPresented: $showPhysicalElementSheet) { PhysicalSecurityElementSheet(store: store) }
         .task(id: "\(store.previewPageIndex)-\(store.document == nil)") {
             renderPage()
         }
@@ -214,10 +216,21 @@ struct AnalysisCanvasView: View {
                     toolButton(kind: .handwrittenSignature, title: "Podpis", icon: "signature")
                 }
                 GridRow {
-                    toolButton(kind: .embossedSeal, title: "Pečať", icon: "rosette")
+                    toolButton(kind: .embossedSeal, title: "Slepotlač", icon: "rosette")
                     toolButton(kind: .initial, title: "Parafa", icon: "text.badge.checkmark")
                 }
+                GridRow {
+                    toolButton(kind: .bindingCord, title: "Šnúrka", icon: "link")
+                    toolButton(kind: .securityTape, title: "Páska / štítok", icon: "rectangle")
+                }
             }
+
+            Menu("Ďalší prvok v skene") { SecurityElementKindOptions { store.activeTool = $0 } }
+            if let kind = store.activeTool {
+                Text("Označte v skene: \(kind.label)").font(.caption).foregroundStyle(.secondary)
+            }
+            Button("Skontrolované na origináli…") { showPhysicalElementSheet = true }
+                .disabled(store.document == nil)
 
             Button {
                 let kind = store.activeTool ?? .officialStamp
@@ -570,7 +583,9 @@ struct AnalysisCanvasView: View {
                         .id(element.id)
                     }
 
-            if store.selectedElementID != nil {
+            if let selected = store.securityElements.first(where: { $0.id == store.selectedElementID }), selected.observation == .physicalOriginal {
+                selectedElementInspector
+            } else if store.selectedElementID != nil {
                 DisclosureGroup("Presná poloha", isExpanded: $showPrecisePlacement) {
                     selectedElementInspector
                 }
@@ -607,12 +622,20 @@ struct AnalysisCanvasView: View {
             }
             .buttonStyle(.bordered)
             .tint(isReviewed ? .green : .accentColor)
-            .disabled(isEmptyPage)
+            .disabled(isEmptyPage || store.securityElements.contains { $0.pageIndex == pageIndex && $0.reviewState == .pending })
             .help(isReviewed ? "Kliknutím zrušíte označenie" : "Každá neprázdna strana musí byť skontrolovaná")
 
             if !store.unconfirmedNonEmptyPages.isEmpty && !store.isAnalyzing {
                 unconfirmedWarning
             }
+            if store.confirmedSecurityElements.isEmpty {
+                Toggle("Originál som skontroloval: bez bezpečnostných prvkov", isOn: Binding(
+                    get: { store.attestation.noSecurityElementsConfirmed },
+                    set: { if $0 { store.confirmNoSecurityElements() } else { store.attestation.noSecurityElementsConfirmed = false } }))
+                    .font(.caption)
+                    .disabled(!store.canConfirmNoSecurityElements)
+            }
+
         }
         .glassCard(cornerRadius: 12, padding: 12)
     }
@@ -620,8 +643,11 @@ struct AnalysisCanvasView: View {
     @ViewBuilder
     private var selectedElementInspector: some View {
         if let element = store.securityElements.first(where: { $0.id == store.selectedElementID }) {
+            if element.observation == .physicalOriginal {
+                PhysicalSecurityElementInspector(store: store, element: element)
+            } else {
             VStack(alignment: .leading, spacing: 8) {
-                Label("Vybraný prvok: \(element.kind.rawValue)", systemImage: element.kind.sfSymbol)
+                Label("Vybraný prvok: \(element.kind.label)", systemImage: element.kind.sfSymbol)
                     .font(.caption.weight(.semibold))
                 Text("Umiestnenie a veľkosť (0 až 1)")
                     .font(.caption2)
@@ -684,6 +710,7 @@ struct AnalysisCanvasView: View {
             .background(Color.accentColor.opacity(0.07), in: RoundedRectangle(cornerRadius: 10))
             .accessibilityElement(children: .contain)
             .accessibilityValue("\(UXLabels.confidenceLabel(for: element.confidence)); \(UXLabels.provenanceLabel(detectedByAI: element.detectedByAI))")
+            }
         }
     }
 
@@ -785,7 +812,7 @@ struct ElementOverlay: View {
         GeometryReader { geometry in
             Canvas { context, _ in
                 for element in store.securityElements
-                where element.pageIndex == store.previewPageIndex {
+                where element.pageIndex == store.previewPageIndex && element.hasScanRegion {
                     draw(context: context, element: element)
                 }
             }
@@ -815,7 +842,7 @@ struct ElementOverlay: View {
                                with: .color(.white), lineWidth: 1.2)
             }
 
-            let labelText = "\(element.kind.rawValue) (\(Int(element.confidence * 100)) %)"
+            let labelText = "\(element.kind.label) (\(Int(element.confidence * 100)) %)"
             let labelSize = CGSize(width: 170, height: 14)
             let labelFrame = CGRect(x: rect.minX,
                                     y: max(rect.minY - labelSize.height - 2, 0),
@@ -936,7 +963,7 @@ struct ElementRow: View {
                 if isExpanded {
                     kindMenu
                 } else {
-                    Text(element.kind.rawValue)
+                    Text(element.kind.label)
                         .font(.callout.weight(.medium))
                         .lineLimit(1)
                 }
@@ -961,7 +988,7 @@ struct ElementRow: View {
             .contentShape(Rectangle())
             .onTapGesture(perform: onSelect)
             .accessibilityElement(children: .combine)
-            .accessibilityLabel("\(element.kind.rawValue), stav: \(element.reviewState.label), \(UXLabels.provenanceLabel(detectedByAI: element.detectedByAI))")
+            .accessibilityLabel("\(element.kind.label), stav: \(element.reviewState.label), \(UXLabels.provenanceLabel(detectedByAI: element.detectedByAI))")
             .accessibilityValue("\(UXLabels.confidenceLabel(for: element.confidence)); \(isSelected ? "Vybraný" : "Nevybraný")")
             .accessibilityAddTraits(isSelected ? [.isSelected, .isButton] : [.isButton])
             .accessibilityAction(named: "Vybrať prvok", onSelect)
@@ -1034,17 +1061,15 @@ struct ElementRow: View {
     }
 
     private var sourceCaption: String {
-        DetectionSourceLabel.slovak(element.detectionSource)
+        element.observation == .physicalOriginal ? "Kontrola originálu" : DetectionSourceLabel.slovak(element.detectionSource)
     }
 
     private var kindMenu: some View {
         Menu {
-            ForEach(SecurityElement.Kind.allCases, id: \.self) { kind in
-                Button { onKindChange(kind) } label: { Label(kind.rawValue, systemImage: kind.sfSymbol) }
-            }
+            SecurityElementKindOptions(select: onKindChange)
         } label: {
             HStack(spacing: 3) {
-                Text(element.kind.rawValue).font(.callout.weight(.medium))
+                Text(element.kind.label).font(.callout.weight(.medium))
                 Image(systemName: "chevron.down").font(.system(size: 9, weight: .semibold)).foregroundStyle(.secondary)
             }
             .lineLimit(1)
@@ -1053,7 +1078,7 @@ struct ElementRow: View {
         .menuIndicator(.hidden)
         .fixedSize()
         .accessibilityLabel("Typ prvku")
-        .accessibilityValue(element.kind.rawValue)
+        .accessibilityValue(element.kind.label)
     }
 
     private var reviewIcon: String {

@@ -287,7 +287,7 @@ struct ElementKindColor {
         case .handwrittenSignature: return .green
         case .embossedSeal: return .orange
         case .initial: return .purple
-        case .other: return .gray
+        default: return .gray
         }
     }
 }

@@ -33,6 +33,7 @@ enum AIPromptPreset: String, CaseIterable, Identifiable {
 
 struct SettingsView: View {
     @Bindable var settingsStore: AppSettingsStore
+    var waitForLearningWrites: @MainActor () async -> Void = {}
     @State private var newTSAURL = ""
     @State private var tsaTestStatus: String?
     @State private var isTestingTSA = false
@@ -365,7 +366,7 @@ struct SettingsView: View {
             }
             }
 
-            LearningDatasetCard(settingsStore: settingsStore, bank: settingsStore.exampleBank)
+            LearningDatasetCard(settingsStore: settingsStore, bank: settingsStore.exampleBank, waitForLearningWrites: waitForLearningWrites)
         }
     }
 
@@ -1134,6 +1135,8 @@ enum LearningCardText {
         func n(_ label: BankLabel) -> Int { counts[label] ?? 0 }
         return "Pečiatky: \(n(.kind(.officialStamp))) · Podpisy: \(n(.kind(.handwrittenSignature))) · " +
                "Slepotlač: \(n(.kind(.embossedSeal))) · Parafy: \(n(.kind(.initial))) · " +
+               "Šnúrky: \(n(.kind(.bindingCord))) · Pásky: \(n(.kind(.securityTape))) · Pečate: \(n(.kind(.waxSeal))) · " +
+               "Ochranné prvky: \([SecurityElement.Kind.watermark, .securityPattern, .opticallyVariable, .securityFoil, .lamination].reduce(0) { $0 + n(.kind($1)) }) · " +
                "Iné: \(n(.kind(.other))) · Zamietnuté: \(n(.negative))"
     }
 }
@@ -1141,6 +1144,7 @@ enum LearningCardText {
 struct LearningDatasetCard: View {
     @Bindable var settingsStore: AppSettingsStore
     let bank: ExampleBank
+    var waitForLearningWrites: @MainActor () async -> Void = {}
     @State private var counts: [BankLabel: Int] = [:]
     @State private var exportMessage: String?
     @State private var showDeleteConfirmation = false
@@ -1161,6 +1165,8 @@ struct LearningDatasetCard: View {
             Toggle("Učiť sa z potvrdených a odmietnutých prvkov", isOn: $settingsStore.settings.learnFromReviews)
             Text(LearningCardText.summary(counts: counts))
                 .font(.caption.monospacedDigit())
+            Text("Export pre Create ML obsahuje iba úplne skontrolované strany. Kontroly originálu bez obrazovej oblasti sa neučia. Potvrdenia dopĺňajú lokálne príklady, nepretrénovávajú systémový model.")
+                .font(.caption2).foregroundStyle(.secondary)
             Text("Dataset zostáva na tomto Macu. Obsahuje náhľady strán dokumentov, ktorých prvky ste potvrdili alebo odmietli. Nikdy sa neodosiela.")
                 .font(.caption2).foregroundStyle(.secondary)
 
@@ -1180,6 +1186,7 @@ struct LearningDatasetCard: View {
             Button("Vymazať", role: .destructive) {
                 Task {
                     do {
+                        await waitForLearningWrites()
                         try await bank.removeAll()
                         exportMessage = "Lokálny dataset bol vymazaný."
                     } catch {
@@ -1207,6 +1214,7 @@ struct LearningDatasetCard: View {
         guard panel.runModal() == .OK, let folder = panel.url else { return }
         Task {
             do {
+                await waitForLearningWrites()
                 let url = try await CreateMLExporter.export(bank: bank, to: folder)
                 exportMessage = "Export hotový: \(url.path)"
             } catch {

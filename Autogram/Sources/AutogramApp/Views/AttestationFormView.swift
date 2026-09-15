@@ -262,6 +262,8 @@ struct AttestationFormView: View {
         let sak = store.attestation.performingPerson.registrationNumber.isEmpty ? "XXXX" : store.attestation.performingPerson.registrationNumber
         let evidence = store.attestation.evidenceNumber ?? "XXXXXX"
 
+        let elementSummary = store.attestation.noSecurityElementsConfirmed ? "Bez bezpečnostných prvkov (potvrdené kontrolou originálu)" : store.confirmedSecurityElements.map { "\($0.descriptionForRecord), \($0.locationDescription(pageSizePt: .zero))" }.joined(separator: "; ")
+
         return """
         OSVEDČOVACIA DOLOŽKA O ZARUČENEJ KONVERZII
         podľa § 35 až 39 zákona č. 305/2013 Z. z. o e-Governmente
@@ -270,7 +272,7 @@ struct AttestationFormView: View {
         2. Druh pôvodného dokumentu: \(store.attestation.originalDocumentTypeLabel)
         3. Počet listov pôvodného dokumentu: \(store.effectiveSheetCount)
         4. Počet neprázdnych strán pôvodného dokumentu: \(store.analysis.nonEmptyPages)
-        5. Bezpečnostné prvky pôvodného dokumentu: \(store.confirmedSecurityElements.count) potvrdených prvkov
+        5. Bezpečnostné prvky pôvodného dokumentu: \(elementSummary)
         6. Osoba vykonávajúca konverziu: \(person), advokát, ev. č. SAK: \(sak)
         7. Evidenčné číslo záznamu o zaručenej konverzii: \(evidence)
         8. Čas konverzie: bude určený časovou pečiatkou QTS pri autorizácii

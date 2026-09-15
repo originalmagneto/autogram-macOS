@@ -79,7 +79,7 @@ struct AutogramApp: App {
         // A regular window instead of the Settings scene: the Settings scene sizes
         // its window from the hosting view's preferred size and cannot be resized.
         Window("Nastavenia", id: SettingsWindow.id) {
-            SettingsView(settingsStore: model.settingsStore)
+            SettingsView(settingsStore: model.settingsStore, waitForLearningWrites: { await model.zakoStore.waitForBankWrites() })
                 .environment(model.ezzkSessionController)
                 .frame(minWidth: 900, minHeight: 560)
         }

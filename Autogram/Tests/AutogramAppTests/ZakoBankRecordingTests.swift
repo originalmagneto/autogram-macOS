@@ -54,6 +54,29 @@ final class ZakoBankRecordingTests: XCTestCase {
         XCTAssertEqual(remainingIDs, [noise.id])
     }
 
+    func testPhysicalObservationInvalidatesAndExcludesBothReferencedPages() async throws {
+        let (store, bank) = try makeStore(learn: true)
+        // Use two pages so the original and converted page references differ.
+        store.document!.insert(try XCTUnwrap(store.document!.page(at: 0)?.copy() as? PDFPage), at: 1)
+        store.documentData = try XCTUnwrap(store.document!.dataRepresentation())
+        store.analysis = PDFAnalysisEngine().analyze(document: store.document!)
+        store.markPageReviewed(0)
+        store.markPageReviewed(1)
+        await store.waitForBankWrites()
+        let before = try await bank.reviewedPages()
+        XCTAssertEqual(Set(before.map(\.pageIndex)), [0, 1])
+        let id = store.addPhysicalSecurityElement(kind: .bindingCord, pageIndex: 0,
+            description: "Trikolóra", location: "Ľavý okraj", newDocumentPageIndex: 1)
+        store.confirmSecurityElement(id: id)
+        store.markPageReviewed(0)
+        store.markPageReviewed(1)
+        await store.waitForBankWrites()
+        let pages = try await bank.reviewedPages()
+        let crops = await bank.entries()
+        XCTAssertTrue(pages.isEmpty)
+        XCTAssertTrue(crops.isEmpty)
+    }
+
     func testLearningOffWritesNothing() async throws {
         let (store, bank) = try makeStore(learn: false)
         let stamp = SecurityElement(kind: .officialStamp, pageIndex: 0,

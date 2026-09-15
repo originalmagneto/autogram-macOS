@@ -1,0 +1,50 @@
+<?xml version='1.0' encoding='utf-8'?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns="https://data.gov.sk/id/egov/eform/50349287.ConversionRecordOfPaperToElectronicDocument.sk/1.0" targetNamespace="https://data.gov.sk/id/egov/eform/50349287.ConversionRecordOfPaperToElectronicDocument.sk/1.0" elementFormDefault="qualified" attributeFormDefault="unqualified">
+  <xs:element name="DocumentSecurityElementsDetails">
+    <xs:annotation>
+      <xs:documentation xml:lang="sk">Informacie o vsetkych bezpecnostnych prvkoch, ktore su na povodnom listinnom dokumente, resp. na vsetkych listinnych dokumentoch, ktore su predmetom konverzie. Tato sekcia moze popisovat viacero bezpecnostnych prvkov, alebo nemusi obsahovat popis ziadneho bezpecnostneho prvku, ak povodny listinny dokument taky neobsahuje. Pre kazdy bezpecnostny prvok sa uvadzaju nasledovne udaje:</xs:documentation>
+    </xs:annotation>
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="OriginalDocumentSecurityElementsDescription" type="MandatoryStringType" minOccurs="1" maxOccurs="1">
+          <xs:annotation>
+            <xs:documentation xml:lang="sk">
+                  D.6.3.5 Obsahuje vecny opis vsetkych identifikovanych prvkov povodneho dokumentu v listinnej podobe.
+                  [Hodnoty: Popis bezpecnostneho prvku, napr. vlastnorucny podpis osoby, uradne osvedceny podpis osoby, okruhla peciatka so statnym znakom, reliefna peciatka, vodotlac a pod.]
+                </xs:documentation>
+          </xs:annotation>
+        </xs:element>
+        <xs:element name="OriginalDocumentSecurityElementsPage" type="IntMax5ReqType" minOccurs="1" maxOccurs="1">
+          <xs:annotation>
+            <xs:documentation xml:lang="sk">Cislo strany v povodnom dokumente, na ktorom sa nachadza popisovany bezpecnostny prvok. Pocitaju sa neprazdne strany. Oznacenie strany v povodnom dokumente ak sa odlisuje od realneho poradia strany, sa neberie do uvahy.</xs:documentation>
+          </xs:annotation>
+        </xs:element>
+        <xs:element name="OriginalDocumentSecurityElementsSheet" type="IntMax5ReqType" minOccurs="1" maxOccurs="1">
+          <xs:annotation>
+            <xs:documentation xml:lang="sk">Cislo listu v povodnom dokumente, na ktorom sa nachadza popisovany bezpecnostny prvok.</xs:documentation>
+          </xs:annotation>
+        </xs:element>
+        <xs:element name="OriginalDocumentSecurityElementsLocation" type="MandatoryStringType" minOccurs="1" maxOccurs="1">
+          <xs:annotation>
+            <xs:documentation xml:lang="sk">Popis miesta na strane, kde je bezpecnostny prvok umiestneny (napr. vpravo hore, nalavo v strede a pod.).</xs:documentation>
+          </xs:annotation>
+        </xs:element>
+        <xs:element name="NewDocumentSecurityElementsPage" type="IntMax5ReqType" minOccurs="1" maxOccurs="1">
+          <xs:annotation>
+            <xs:documentation xml:lang="sk">Cislo strany v konvertovanom (novom) dokumente, na ktorom sa nachadza popisovany bezpecnostny prvok. Novy dokument vznika ako postupnost stran obsahujuca konvertovany obraz vsetkych povodnych dokumentov v poradi, v akom boli ku konverzii predlozene.</xs:documentation>
+          </xs:annotation>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:simpleType name="MandatoryStringType">
+    <xs:restriction base="xs:string">
+      <xs:minLength value="1" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="IntMax5ReqType">
+    <xs:restriction base="xs:int">
+      <xs:pattern value="\d{1,5}" />
+    </xs:restriction>
+  </xs:simpleType>
+</xs:schema>

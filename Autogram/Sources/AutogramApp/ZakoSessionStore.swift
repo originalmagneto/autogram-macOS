@@ -18,10 +18,14 @@ final class ZakoSessionStore {
     }
     private(set) var detectorIdentifier: String = LayeredDetectionProvider(
         classifier: TwoStageClassifier(primary: NoOpClassifier(), secondary: nil)).identifier
-    private var bankWriteTasks: [UUID: Task<Void, Never>] = [:]
+    private var bankWork: Task<Void, Never>?
+    private var resettingSecurityReview = false
+    private var blankPagesWithConfirmedElements: Set<Int> = []
     private var bankWarningShown = false
     var analysis: DocumentAnalysis = .empty()
-    var securityElements: [SecurityElement] = []
+    var securityElements: [SecurityElement] = [] {
+        didSet { securityElementsChanged(from: oldValue) }
+    }
     var reviewedNonEmptyPages: Set<Int> = []
     var attestation = AttestationData()
     var sheetMethod: SheetCountingMethod = .duplexEstimate
@@ -104,7 +108,7 @@ final class ZakoSessionStore {
             hasSelectedIdentity: true,
             mandateRequirementSatisfied: true,
             inputSignatureInspection: inputSignatureInspection,
-            unreviewedNonEmptyPages: unreviewedNonEmptyPages)
+            unreviewedNonEmptyPages: unreviewedNonEmptyPages, documentPageCount: analysis.totalPages)
         return result.isComplete && preflightErrors.isEmpty && evidenceNumberError == nil
     }
     var serverTimeUsed: Date?
@@ -120,7 +124,7 @@ final class ZakoSessionStore {
                 || hasValidMandateOverride
                 || isCertificateTypePending,
             inputSignatureInspection: inputSignatureInspection,
-            unreviewedNonEmptyPages: unreviewedNonEmptyPages)
+            unreviewedNonEmptyPages: unreviewedNonEmptyPages, documentPageCount: analysis.totalPages)
         return result.isComplete && preflightErrors.isEmpty && evidenceNumberError == nil
     }
     var hasUnresolvedPreflightErrors: Bool {
@@ -130,7 +134,7 @@ final class ZakoSessionStore {
             hasSelectedIdentity: selectedIdentityID != nil,
             mandateRequirementSatisfied: mandateRequirementSatisfied,
             inputSignatureInspection: inputSignatureInspection,
-            unreviewedNonEmptyPages: unreviewedNonEmptyPages
+            unreviewedNonEmptyPages: unreviewedNonEmptyPages, documentPageCount: analysis.totalPages
         ).errors.isEmpty || evidenceNumberError != nil
     }
 
@@ -150,10 +154,12 @@ final class ZakoSessionStore {
             elementDecisions: securityElements.map {
                 SecurityReviewElement(id: $0.id, state: $0.reviewState,
                                       kind: $0.kind, pageIndex: $0.pageIndex,
-                                      boundingBox: $0.boundingBox)
+                                      boundingBox: $0.boundingBox, observation: $0.observation,
+                                      verbalDescription: $0.verbalDescription, originalLocation: $0.originalLocation,
+                                      newDocumentPageIndex: $0.newDocumentPageIndex)
             },
             detectorIdentifier: detectorIdentifier,
-            reviewedAt: reviewUpdatedAt ?? Date())
+            reviewedAt: reviewUpdatedAt ?? Date(), noElementsConfirmed: attestation.noSecurityElementsConfirmed)
     }
 
     var unreviewedNonEmptyPages: [Int] {
@@ -343,6 +349,7 @@ final class ZakoSessionStore {
     func runAnalysis() async {
         guard let document else { return }
         let analysisRecordID = currentRecordID
+        attestation.noSecurityElementsConfirmed = false
         isAnalyzing = true
         analysisProgressText = "Analyzujem stránky…"
         let doc = UncheckedSendable(document)
@@ -394,6 +401,7 @@ final class ZakoSessionStore {
             merged.append(manual)
         }
 
+        blankPagesWithConfirmedElements = []
         analysis = DocumentAnalysis(
             totalPages: baseAnalysis.totalPages,
             nonEmptyPages: baseAnalysis.nonEmptyPages,
@@ -403,6 +411,7 @@ final class ZakoSessionStore {
             suggestedTitle: baseAnalysis.suggestedTitle,
             analyzedAt: Date())
         securityElements = merged
+        reconcileBlankPagesWithConfirmedElements()
         reviewedNonEmptyPages = []
         reviewUpdatedAt = nil
         sheetMethod = .duplexEstimate
@@ -427,7 +436,7 @@ final class ZakoSessionStore {
     private func enrich(_ elements: [SecurityElement]) -> [SecurityElement] {
         elements.map { element in
             var copy = element
-            if copy.verbalDescription.isEmpty {
+            if copy.verbalDescription.isEmpty && !copy.kind.requiresHumanDescription {
                 copy.verbalDescription = copy.locationDescription(pageSizePt: .zero) + "."
             }
             return copy
@@ -504,7 +513,9 @@ final class ZakoSessionStore {
         guard analysis.pageAnalyses.contains(where: { $0.pageIndex == pageIndex && !$0.isEmpty }) else {
             return
         }
+        guard !securityElements.contains(where: { $0.pageIndex == pageIndex && $0.reviewState == .pending }) else { return }
         reviewedNonEmptyPages.insert(pageIndex)
+        recordReviewedTrainingPage(pageIndex)
         touchReview()
         recomputePreflight()
     }
@@ -529,6 +540,7 @@ final class ZakoSessionStore {
 
     func unmarkPageReviewed(_ pageIndex: Int) {
         reviewedNonEmptyPages.remove(pageIndex)
+        invalidateTrainingPage(pageIndex)
         touchReview()
         recomputePreflight()
     }
@@ -541,36 +553,129 @@ final class ZakoSessionStore {
         recordReviewDecision(securityElements[index], state: state)
     }
 
+    private func enqueueBankWork(_ operation: @escaping @Sendable () async throws -> Void) {
+        let previous = bankWork
+        bankWork = Task { [weak self] in
+            await previous?.value
+            do { try await operation() }
+            catch { self?.showBankWarningOnce(error) }
+        }
+    }
+
+    private func invalidateTrainingPage(_ pageIndex: Int) {
+        guard let documentData else { return }
+        let hash = AttestationClauseGenerator.sha256Hex(of: documentData)
+        let bank = exampleBank
+        enqueueBankWork { try await bank.invalidateReviewedPage(documentSHA256: hash, pageIndex: pageIndex) }
+    }
+
+    private func securityElementsChanged(from old: [SecurityElement]) {
+        guard !resettingSecurityReview, old != securityElements else { return }
+        attestation.noSecurityElementsConfirmed = false
+        reconcileBlankPagesWithConfirmedElements()
+        let pages = Set((old + securityElements).flatMap { [$0.pageIndex] + ($0.newDocumentPageIndex.map { [$0] } ?? []) })
+        func affects(_ element: SecurityElement, page: Int) -> Bool {
+            element.pageIndex == page || (element.observation == .physicalOriginal && element.newDocumentPageIndex == page)
+        }
+        for page in pages where old.filter({ affects($0, page: page) }) != securityElements.filter({ affects($0, page: page) }) {
+            reviewedNonEmptyPages.remove(page)
+            invalidateTrainingPage(page)
+        }
+        // Changed or deleted crops must not continue teaching their previous label or geometry.
+        let changed = old.filter { prior in !securityElements.contains(prior) }
+        let bank = exampleBank
+        if !changed.isEmpty {
+            enqueueBankWork { for element in changed { try await bank.remove(id: element.id) } }
+        }
+    }
+
+    /// A confirmed finding is content even when the low-ink scan was classified blank.
+    /// Restore the automatic result when that finding is removed or returned to review.
+    private func reconcileBlankPagesWithConfirmedElements() {
+        let confirmedPages = Set(confirmedSecurityElements.map(\.pageIndex))
+        for index in analysis.pageAnalyses.indices {
+            let page = analysis.pageAnalyses[index].pageIndex
+            if blankPagesWithConfirmedElements.remove(page) != nil { analysis.pageAnalyses[index].isEmpty = true }
+            if analysis.pageAnalyses[index].isEmpty && confirmedPages.contains(page) {
+                blankPagesWithConfirmedElements.insert(page)
+                analysis.pageAnalyses[index].isEmpty = false
+            }
+        }
+        let count = analysis.pageAnalyses.filter { !$0.isEmpty }.count
+        if count != analysis.nonEmptyPages {
+            analysis.nonEmptyPages = count
+            analysis.estimatedSheetsDuplex = max((count + 1) / 2, analysis.totalPages == 0 ? 0 : 1)
+            attestation.nonEmptyPageCount = count
+            applySheetMethodChange()
+        }
+    }
+
     private func recordReviewDecision(_ element: SecurityElement, state: SecurityElementReviewState) {
         guard settings.learnFromReviews, let document, let documentData else { return }
         let recorder = bankRecorderFactory(exampleBank, detectorIdentifier)
         let doc = UncheckedSendable(document)
-        // Writes for one element run strictly in decision order: each task waits for the
-        // previous one, so a fast confirm followed by return-to-review cannot interleave.
-        let previous = bankWriteTasks[element.id]
-        let task = Task.detached(priority: .utility) { [weak self, recorder, doc, documentData, element] in
-            _ = await previous?.value
-            do {
-                switch state {
-                case .confirmed:
-                    try await recorder.record(document: doc.value, documentData: documentData,
-                                              element: element, label: .kind(element.kind))
-                case .rejected:
-                    try await recorder.record(document: doc.value, documentData: documentData,
-                                              element: element, label: .negative)
-                case .pending:
-                    try await recorder.forget(elementID: element.id)
-                }
-            } catch {
-                await MainActor.run { self?.showBankWarningOnce(error) }
+        enqueueBankWork {
+            switch state {
+            case .confirmed:
+                try await recorder.record(document: doc.value, documentData: documentData,
+                                          element: element, label: .kind(element.kind))
+            case .rejected:
+                try await recorder.record(document: doc.value, documentData: documentData,
+                                          element: element, label: .negative)
+            case .pending:
+                try await recorder.forget(elementID: element.id)
             }
         }
-        bankWriteTasks[element.id] = task
-        Task { @MainActor [weak self] in
-            _ = await task.value
-            // Prune only if no newer write replaced this one.
-            if let self, self.bankWriteTasks[element.id] == task { self.bankWriteTasks[element.id] = nil }
+    }
+
+    private func recordReviewedTrainingPage(_ pageIndex: Int) {
+        guard settings.learnFromReviews, let document, let documentData else { return }
+        let recorder = bankRecorderFactory(exampleBank, detectorIdentifier)
+        let doc = UncheckedSendable(document)
+        // An unboxed physical observation must not become an unlabelled object in a training image.
+        guard !securityElements.contains(where: { $0.observation == .physicalOriginal && $0.reviewState != .rejected
+            && ($0.pageIndex == pageIndex || $0.newDocumentPageIndex == pageIndex) }) else {
+            invalidateTrainingPage(pageIndex)
+            return
         }
+        let elements = securityElements.filter { $0.pageIndex == pageIndex }
+        enqueueBankWork {
+            try await recorder.recordReviewedPage(document: doc.value, documentData: documentData,
+                                                   pageIndex: pageIndex, elements: elements)
+        }
+    }
+
+    var canConfirmNoSecurityElements: Bool {
+        !isAnalyzing && analysis.nonEmptyPages > 0 && unreviewedNonEmptyPages.isEmpty
+            && pendingSecurityElementCount == 0 && confirmedSecurityElements.isEmpty
+    }
+
+    func confirmNoSecurityElements() {
+        guard canConfirmNoSecurityElements else { return }
+        attestation.noSecurityElementsConfirmed = true
+        reviewUpdatedAt = Date()
+        recomputePreflight()
+    }
+
+    @discardableResult
+    func addPhysicalSecurityElement(kind: SecurityElement.Kind, pageIndex: Int,
+                                    description: String, location: String,
+                                    newDocumentPageIndex: Int?) -> UUID {
+        let element = SecurityElement(kind: kind, pageIndex: pageIndex, boundingBox: .zero,
+            confidence: 1, verbalDescription: description, detectedByAI: false, reviewState: .pending,
+            observation: .physicalOriginal, originalLocation: location, newDocumentPageIndex: newDocumentPageIndex)
+        securityElements.append(element)
+        selectedElementID = element.id
+        touchReview()
+        recomputePreflight()
+        return element.id
+    }
+
+    func updatePhysicalElement(id: UUID, location: String, newDocumentPageIndex: Int?) {
+        guard let index = securityElements.firstIndex(where: { $0.id == id }) else { return }
+        securityElements[index].originalLocation = location
+        securityElements[index].newDocumentPageIndex = newDocumentPageIndex
+        invalidateReview(for: index)
     }
 
     private func showBankWarningOnce(_ error: Error) {
@@ -579,11 +684,12 @@ final class ZakoSessionStore {
         analysisWarning = "Lokálny dataset sa nepodarilo aktualizovať (\(error.localizedDescription)). Kontrola pokračuje."
     }
 
-    /// Test hook: wait for outstanding bank writes.
+    /// Synchronizes dataset export and deletion with pending review writes.
     func waitForBankWrites() async {
-        let tasks = Array(bankWriteTasks.values)
-        for task in tasks { await task.value }
-        bankWriteTasks = [:]
+        while let work = bankWork {
+            await work.value
+            if bankWork == work { return }
+        }
     }
 
     private func invalidateReview(for index: Int) {
@@ -594,6 +700,7 @@ final class ZakoSessionStore {
     }
 
     private func touchReview() {
+        attestation.noSecurityElementsConfirmed = false
         reviewUpdatedAt = Date()
     }
 
@@ -663,7 +770,7 @@ final class ZakoSessionStore {
     /// the advocate can adjust it by hand.
     @discardableResult
     func snapPlacedElement(id: UUID, at point: NormalizedPoint) async -> Bool {
-        guard let element = securityElements.first(where: { $0.id == id }),
+        guard let element = securityElements.first(where: { $0.id == id }), element.hasScanRegion,
               await ensureSnapAssets(), let image = renderedPage(element.pageIndex) else { return false }
         let box = UncheckedSendableImage(image)
         guard let rect = try? await snapper.snap(pageImage: box.image, seed: point) else { return false }
@@ -672,7 +779,7 @@ final class ZakoSessionStore {
     }
 
     func refineElement(id: UUID) async {
-        guard let element = securityElements.first(where: { $0.id == id }),
+        guard let element = securityElements.first(where: { $0.id == id }), element.hasScanRegion,
               await ensureSnapAssets(), let image = renderedPage(element.pageIndex) else { return }
         let box = UncheckedSendableImage(image)
         guard let rect = try? await snapper.refine(pageImage: box.image, box: element.boundingBox) else { return }
@@ -704,16 +811,18 @@ final class ZakoSessionStore {
 
     func moveElement(id: UUID, center: NormalizedPoint) {
         guard let index = securityElements.firstIndex(where: { $0.id == id }) else { return }
+        let previous = securityElements[index]
         securityElements[index].boundingBox =
             ElementGeometry.moved(securityElements[index].boundingBox, center: center)
-        securityElements[index].verbalDescription = securityElements[index]
-            .locationDescription(pageSizePt: .zero) + "."
+        if previous.verbalDescription == previous.locationDescription(pageSizePt: .zero) + "." {
+            securityElements[index].verbalDescription = securityElements[index].locationDescription(pageSizePt: .zero) + "."
+        }
         invalidateReview(for: index)
     }
 
     func elementID(at point: NormalizedPoint, pageIndex: Int) -> UUID? {
         ElementGeometry.hitTest(
-            elements: securityElements.map { ($0.id, $0.pageIndex, $0.boundingBox) },
+            elements: securityElements.filter(\.hasScanRegion).map { ($0.id, $0.pageIndex, $0.boundingBox) },
             point: point,
             pageIndex: pageIndex)
     }
@@ -725,15 +834,19 @@ final class ZakoSessionStore {
 
     func updateElementPage(id: UUID, pageIndex: Int) {
         if let index = securityElements.firstIndex(where: { $0.id == id }) {
+            let previous = securityElements[index]
             securityElements[index].pageIndex = pageIndex
-            securityElements[index].verbalDescription = securityElements[index]
-                .locationDescription(pageSizePt: .zero) + "."
+            if previous.verbalDescription == previous.locationDescription(pageSizePt: .zero) + "." {
+                securityElements[index].verbalDescription = securityElements[index].locationDescription(pageSizePt: .zero) + "."
+            }
             invalidateReview(for: index)
         }
     }
 
     func updateElementKind(id: UUID, kind: SecurityElement.Kind) {
         if let index = securityElements.firstIndex(where: { $0.id == id }) {
+            let previous = securityElements[index]
+            if previous.verbalDescription == previous.locationDescription(pageSizePt: .zero) + "." { securityElements[index].verbalDescription = "" }
             securityElements[index].kind = kind
             invalidateReview(for: index)
         }
@@ -860,7 +973,7 @@ final class ZakoSessionStore {
                 || hasValidMandateOverride
                 || isCertificateTypePending,
             inputSignatureInspection: inputSignatureInspection,
-            unreviewedNonEmptyPages: unreviewedNonEmptyPages)
+            unreviewedNonEmptyPages: unreviewedNonEmptyPages, documentPageCount: analysis.totalPages)
         preflightErrors = result.errors
         validationErrors = result.errors
     }
@@ -912,7 +1025,7 @@ final class ZakoSessionStore {
             hasSelectedIdentity: selectedIdentityID != nil,
             mandateRequirementSatisfied: mandateRequirementSatisfied,
             inputSignatureInspection: inputSignatureInspection,
-            unreviewedNonEmptyPages: unreviewedNonEmptyPages)
+            unreviewedNonEmptyPages: unreviewedNonEmptyPages, documentPageCount: analysis.totalPages)
         let reviewErrors = reviewResult.errors.filter { !errors.contains($0) }
         let allErrors = errors + reviewErrors
         validationErrors = allErrors
@@ -970,7 +1083,8 @@ final class ZakoSessionStore {
             let xmlInput = AttestationClauseGenerator.Input(
                 attestation: attestation,
                 securityElements: confirmedElementsSnapshot,
-                newDocumentFingerprintSHA256Hex: fingerprint)
+                newDocumentFingerprintSHA256Hex: fingerprint,
+                originalNonEmptyPageIndices: analysis.pageAnalyses.filter { !$0.isEmpty }.map(\.pageIndex))
             let xml = try clauseGenerator.generateXML(input: xmlInput,
                                                       formPack: selectedFormPack)
 
@@ -1218,6 +1332,7 @@ final class ZakoSessionStore {
         }
         attestation = template
         attestation.originConfirmed = false
+        attestation.noSecurityElementsConfirmed = false
         attestation.evidenceNumber = nil
         evidenceNumberRequested = false
         evidenceNumberError = nil
@@ -1244,6 +1359,8 @@ final class ZakoSessionStore {
     }
 
 func resetSession(keepingProfile: Bool) {
+        resettingSecurityReview = true
+        defer { resettingSecurityReview = false }
         if sourceAccessIsActive, let sourceURL {
             sourceURL.stopAccessingSecurityScopedResource()
             sourceAccessIsActive = false
@@ -1254,6 +1371,7 @@ func resetSession(keepingProfile: Bool) {
         document = nil
         documentData = nil
         analysis = .empty()
+        blankPagesWithConfirmedElements = []
         securityElements = []
         reviewedNonEmptyPages = []
         activeTool = nil

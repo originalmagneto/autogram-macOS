@@ -160,6 +160,10 @@ enum CandidateQualityFilter {
         if textCoverage(of: candidate.box, textBoxes: page.exclusions.textBoxes) > maximumTextCoverage {
             return nil
         }
+        // An elongated cord or strip can resemble a ruled edge. Let the classifier decide.
+        let aspect = max(candidate.box.width / max(candidate.box.height, 0.0001), candidate.box.height / max(candidate.box.width, 0.0001))
+        if candidate.kindHint == nil && aspect > CandidateMerger.maxAspect { return candidate }
+        if candidate.sources.contains(.saliency) { return candidate }
         let ink = inkMeasurement(of: candidate.box, pixels: page.pixels)
         guard ink.inkPixels >= minimumInkPixelsForPerimeterRule else { return candidate }
         if ink.fraction > maximumPerimeterInkFraction { return nil }

@@ -3,7 +3,7 @@ import CoreGraphics
 import FoundationModels
 
 public enum FoundationJudgementKind: String, Sendable, CaseIterable, Codable {
-    case stamp, signature, embossedSeal, initial, other, none
+    case stamp, signature, embossedSeal, initial, bindingCord, securityTape, waxSeal, other, none
 
     public var securityKind: SecurityElement.Kind? {
         switch self {
@@ -11,6 +11,9 @@ public enum FoundationJudgementKind: String, Sendable, CaseIterable, Codable {
         case .signature: return .handwrittenSignature
         case .embossedSeal: return .embossedSeal
         case .initial: return .initial
+        case .bindingCord: return .bindingCord
+        case .securityTape: return .securityTape
+        case .waxSeal: return .waxSeal
         case .other: return .other
         case .none: return nil
         }
@@ -40,9 +43,9 @@ public protocol FoundationJudging: Sendable {
 /// Structured output type for the on-device model.
 @Generable(description: "Judgement whether a crop of a scanned legal document shows a physical security element")
 struct GeneratedJudgement {
-    @Guide(description: "true only if a stamp, handwritten signature, embossed seal or handwritten initial is physically visible in the image")
+    @Guide(description: "true only if an ink stamp, handwritten signature or initial, embossed impression, binding cord, sealing tape or sticker, or wax seal is visible in the image")
     var isSecurityElement: Bool
-    @Guide(description: "one of: stamp, signature, embossedSeal, initial, other, none")
+    @Guide(description: "one of: stamp, signature, embossedSeal, initial, bindingCord, securityTape, waxSeal, other, none")
     var kind: String
     @Guide(description: "confidence between 0 and 1", .range(0.0...1.0))
     var confidence: Double
@@ -58,7 +61,11 @@ public actor SystemFoundationJudge: FoundationJudging {
         physically visible in the image. Never infer an element from context, expected placement, \
         or surrounding text. A stamp is an inked impression (often round, blue or red, with text or \
         a coat of arms). A signature is handwritten cursive ink. An embossed seal is a colourless \
-        relief impression. An initial is a short handwritten mark. Printed text, logos, lines, tables \
+        relief impression. An initial is a short handwritten mark. Binding cord is a visible physical cord or ribbon, \
+        including tricolour cord, used to bind sheets. Security tape is a visible sealing strip or \
+        attachment sticker, including printed text on that physical sticker. A wax seal is a raised \
+        blob or seal attached to paper or cord, not colourless embossing. Do not infer secure binding, \
+        signature certification or authenticity; those require human inspection of the original. Printed text, logos, lines, tables \
         and photographs are not security elements. Printed or typed text, names, addresses, \
         numbers, table cells, form fields, ruled boxes and underlines are NOT security elements \
         even when bold. A handwritten signature shows irregular pen strokes that do not look like \

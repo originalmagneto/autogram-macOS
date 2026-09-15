@@ -9,11 +9,17 @@ public struct AttestationXMLConstants: Sendable {
 
 public enum AttestationGenerationError: LocalizedError, Equatable, Sendable {
     case invalidFingerprint
+    case incompletePhysicalSecurityElement
+    case invalidSecurityElementPage
 
     public var errorDescription: String? {
         switch self {
         case .invalidFingerprint:
             return "SHA-256 otlačok musí obsahovať presne 64 hexadecimálnych znakov."
+        case .incompletePhysicalSecurityElement:
+            return "Prvok skontrolovaný na origináli musí mať uvedené miesto na origináli a stranu v novom dokumente."
+        case .invalidSecurityElementPage:
+            return "Bezpečnostný prvok nemá platné číslo strany alebo nie je na uvedenej neprázdnej strane originálu."
         }
     }
 }
@@ -25,13 +31,18 @@ public struct AttestationClauseGenerator: Sendable {
         public var attestation: AttestationData
         public var securityElements: [SecurityElement]
         public var newDocumentFingerprintSHA256Hex: String
+        /// PDF page indices in original document order, excluding blank pages.
+        /// Nil preserves legacy page numbering for callers without analysis.
+        public var originalNonEmptyPageIndices: [Int]?
 
         public init(attestation: AttestationData,
                     securityElements: [SecurityElement],
-                    newDocumentFingerprintSHA256Hex: String) {
+                    newDocumentFingerprintSHA256Hex: String,
+                    originalNonEmptyPageIndices: [Int]? = nil) {
             self.attestation = attestation
             self.securityElements = securityElements
             self.newDocumentFingerprintSHA256Hex = newDocumentFingerprintSHA256Hex
+            self.originalNonEmptyPageIndices = originalNonEmptyPageIndices
         }
     }
 
@@ -53,6 +64,9 @@ public struct AttestationClauseGenerator: Sendable {
         guard fingerprint.count == 64,
               fingerprint.allSatisfy({ $0.isHexDigit }) else {
             throw AttestationGenerationError.invalidFingerprint
+        }
+        for element in input.securityElements {
+            _ = try Self.securityElementPages(element, originalNonEmptyPageIndices: input.originalNonEmptyPageIndices)
         }
         return renderXML(input: input, formPack: formPack)
     }
@@ -91,8 +105,11 @@ public struct AttestationClauseGenerator: Sendable {
             """
         }
 
-        let descriptions = input.securityElements.map { element -> String in
-            Self.securityElementDetails(element, sheetMethod: d.sheetCountingMethod)
+        // The nonthrowing legacy API omits incomplete details. The explicit pack
+        // API validates every element before rendering and never silently omits one.
+        let descriptions = input.securityElements.compactMap { element in
+            Self.securityElementDetails(element, sheetMethod: d.sheetCountingMethod,
+                                        originalNonEmptyPageIndices: input.originalNonEmptyPageIndices)
         }
         if !descriptions.isEmpty {
             xml += "\n" + descriptions.joined(separator: "\n")
@@ -128,23 +145,51 @@ public struct AttestationClauseGenerator: Sendable {
         return xml
     }
 
+    private static func securityElementPages(_ element: SecurityElement,
+                                             originalNonEmptyPageIndices: [Int]?) throws -> (original: Int, new: Int) {
+        let newPageIndex: Int
+        if element.observation == .physicalOriginal {
+            guard !element.originalLocation.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                  let outputPage = element.newDocumentPageIndex, outputPage >= 0 else {
+                throw AttestationGenerationError.incompletePhysicalSecurityElement
+            }
+            newPageIndex = outputPage
+        } else {
+            newPageIndex = element.pageIndex
+        }
+        guard (0..<99_999).contains(element.pageIndex), (0..<99_999).contains(newPageIndex) else {
+            throw AttestationGenerationError.invalidSecurityElementPage
+        }
+        let originalPage: Int
+        if let originalNonEmptyPageIndices {
+            guard let ordinal = originalNonEmptyPageIndices.firstIndex(of: element.pageIndex), ordinal < 99_999 else {
+                throw AttestationGenerationError.invalidSecurityElementPage
+            }
+            originalPage = ordinal + 1
+        } else {
+            originalPage = element.pageIndex + 1
+        }
+        return (originalPage, newPageIndex + 1)
+    }
+
+    /// Only this security subsection follows the verified record 1.0 schema.
+    /// The remaining legacy renderer and its form pack remain unverified.
     static func securityElementDetails(_ element: SecurityElement,
-                                       sheetMethod: SheetCountingMethod) -> String {
-        let location = element.verbalDescription.isEmpty
-            ? element.locationDescription(pageSizePt: .zero) + "."
-            : element.verbalDescription
+                                       sheetMethod: SheetCountingMethod,
+                                       originalNonEmptyPageIndices: [Int]? = nil) -> String? {
+        guard let pages = try? securityElementPages(element, originalNonEmptyPageIndices: originalNonEmptyPageIndices) else {
+            return nil
+        }
+        let location = element.observation == .physicalOriginal
+            ? element.originalLocation.trimmingCharacters(in: .whitespacesAndNewlines)
+            : element.locationCodelist11Item.skName
         return """
             <DocumentSecurityElementsDetails>
-              <OriginalDocumentSecurityElementsDescription>\(Self.codelist(
-                ZakoCodelists.securityElementDescription,
-                item: element.kind.codelist15Item))</OriginalDocumentSecurityElementsDescription>
-              <SecurityElementVerbalDescription>\(Self.escape(location))</SecurityElementVerbalDescription>
-              <OriginalDocumentSecurityElementsPage>\(element.pageIndex + 1)</OriginalDocumentSecurityElementsPage>
+              <OriginalDocumentSecurityElementsDescription>\(Self.escape(element.descriptionForRecord))</OriginalDocumentSecurityElementsDescription>
+              <OriginalDocumentSecurityElementsPage>\(pages.original)</OriginalDocumentSecurityElementsPage>
               <OriginalDocumentSecurityElementsSheet>\(element.sheetNumber(sheetMethod: sheetMethod))</OriginalDocumentSecurityElementsSheet>
-              <OriginalDocumentSecurityElementsLocation>\(Self.codelist(
-                ZakoCodelists.securityElementLocation,
-                item: element.locationCodelist11Item))</OriginalDocumentSecurityElementsLocation>
-              <NewDocumentSecurityElementsPage>\(element.pageIndex + 1)</NewDocumentSecurityElementsPage>
+              <OriginalDocumentSecurityElementsLocation>\(Self.escape(location))</OriginalDocumentSecurityElementsLocation>
+              <NewDocumentSecurityElementsPage>\(pages.new)</NewDocumentSecurityElementsPage>
             </DocumentSecurityElementsDetails>
         """
     }

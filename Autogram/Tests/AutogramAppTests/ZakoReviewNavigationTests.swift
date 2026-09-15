@@ -5,6 +5,73 @@ import AutogramKit
 
 @MainActor
 final class ZakoReviewNavigationTests: XCTestCase {
+    func testEmptyConfirmationIsExplicitAndInvalidatedByANewFinding() throws {
+        let store = try makeTwoPageStore()
+        store.confirmNoSecurityElements()
+        XCTAssertFalse(store.attestation.noSecurityElementsConfirmed)
+        store.markPageReviewed(0)
+        store.markPageReviewed(1)
+        store.confirmNoSecurityElements()
+        XCTAssertTrue(store.attestation.noSecurityElementsConfirmed)
+        store.addPhysicalSecurityElement(kind: .bindingCord, pageIndex: 0,
+            description: "Zväzok zviazaný šnúrkou", location: "Ľavý okraj", newDocumentPageIndex: 0)
+        XCTAssertFalse(store.attestation.noSecurityElementsConfirmed)
+        XCTAssertFalse(store.reviewedNonEmptyPages.contains(0))
+        XCTAssertTrue(store.reviewedNonEmptyPages.contains(1))
+        XCTAssertFalse(try XCTUnwrap(store.securityElements.last).hasScanRegion)
+    }
+
+    func testEditingConfirmedKindInvalidatesOnlyItsPage() throws {
+        let store = try makeTwoPageStore()
+        store.addSecurityElement(kind: .officialStamp, pageIndex: 0,
+            rect: .init(x: 0.1, y: 0.1, width: 0.2, height: 0.2))
+        let id = try XCTUnwrap(store.securityElements.last?.id)
+        store.confirmSecurityElement(id: id)
+        store.markPageReviewed(0)
+        store.markPageReviewed(1)
+        store.updateElementKind(id: id, kind: .waxSeal)
+        XCTAssertEqual(store.securityElements.first?.reviewState, .pending)
+        XCTAssertFalse(store.reviewedNonEmptyPages.contains(0))
+        XCTAssertTrue(store.reviewedNonEmptyPages.contains(1))
+    }
+    func testManualDetailStaysRequiredWhenElementMoves() throws {
+        let store = try makeTwoPageStore()
+        for kind in [SecurityElement.Kind.other, .permanentBinding] {
+            store.addSecurityElement(kind: kind, pageIndex: 0,
+                rect: .init(x: 0.1, y: 0.1, width: 0.2, height: 0.2))
+            let id = try XCTUnwrap(store.securityElements.last?.id)
+            store.moveElement(id: id, center: .init(x: 0.5, y: 0.5))
+            store.updateElementPage(id: id, pageIndex: 1)
+            store.confirmSecurityElement(id: id)
+            XCTAssertEqual(store.securityElements.last?.verbalDescription, "")
+            XCTAssertTrue(AttestationValidator.validate(store.attestation,
+                securityElements: store.confirmedSecurityElements, qualifiedTimestampTime: nil)
+                .contains(.securityElementDescriptionRequired))
+            store.updateElementDescription(id: id, text: "Spojené kovovým nitom")
+            store.moveElement(id: id, center: .init(x: 0.4, y: 0.4))
+            XCTAssertEqual(store.securityElements.last?.verbalDescription, "Spojené kovovým nitom")
+        }
+    }
+
+    func testConfirmedPhysicalFindingOverridesBlankDetectionUntilRejected() throws {
+        let store = try makeTwoPageStore()
+        store.analysis.pageAnalyses[1].isEmpty = true
+        store.analysis.nonEmptyPages = 1
+        store.attestation.nonEmptyPageCount = 1
+        let id = store.addPhysicalSecurityElement(kind: .watermark, pageIndex: 1,
+            description: "Vodoznak viditeľný proti svetlu", location: "Stred listu", newDocumentPageIndex: 1)
+        store.confirmSecurityElement(id: id)
+        XCTAssertFalse(store.analysis.pageAnalyses[1].isEmpty)
+        XCTAssertEqual(store.analysis.nonEmptyPages, 2)
+        XCTAssertEqual(store.attestation.nonEmptyPageCount, 2)
+        store.markPageReviewed(1)
+        XCTAssertTrue(store.reviewedNonEmptyPages.contains(1))
+        store.rejectSecurityElement(id: id)
+        XCTAssertTrue(store.analysis.pageAnalyses[1].isEmpty)
+        XCTAssertEqual(store.analysis.nonEmptyPages, 1)
+        XCTAssertEqual(store.attestation.nonEmptyPageCount, 1)
+    }
+
     private func makeTwoPageStore() throws -> ZakoSessionStore {
         let a4 = CGSize(width: 595, height: 842)
         let data = TestPDFBuilderApp.build(pages: [

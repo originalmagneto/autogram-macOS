@@ -1,0 +1,264 @@
+{
+  "OriginalDocumentPaperSize": [
+    {
+      "code": "",
+      "name": ""
+    },
+    {
+      "code": "A1",
+      "name": "Formát papiera A1"
+    },
+    {
+      "code": "A2",
+      "name": "Formát papiera A2"
+    },
+    {
+      "code": "A3",
+      "name": "Formát papiera A3"
+    },
+    {
+      "code": "A4",
+      "name": "Formát papiera A4"
+    },
+    {
+      "code": "A5",
+      "name": "Formát papiera A5"
+    },
+    {
+      "code": "A6",
+      "name": "Formát papiera A6"
+    },
+    {
+      "code": "A7",
+      "name": "Formát papiera A7"
+    },
+    {
+      "code": "B3",
+      "name": "Formát papiera B3"
+    },
+    {
+      "code": "B4",
+      "name": "Formát papiera B4"
+    },
+    {
+      "code": "B5",
+      "name": "Formát papiera B5"
+    },
+    {
+      "code": "B6",
+      "name": "Formát papiera B6"
+    },
+    {
+      "code": "B7",
+      "name": "Formát papiera B7"
+    },
+    {
+      "code": "C3",
+      "name": "Formát papiera C3"
+    },
+    {
+      "code": "C4",
+      "name": "Formát papiera C4"
+    },
+    {
+      "code": "C5",
+      "name": "Formát papiera C5"
+    },
+    {
+      "code": "C6",
+      "name": "Formát papiera C6"
+    },
+    {
+      "code": "C7",
+      "name": "Formát papiera C7"
+    },
+    {
+      "code": "Iny",
+      "name": "Iný"
+    }
+  ],
+  "Description": [
+    {
+      "code": "",
+      "name": ""
+    },
+    {
+      "code": "okrúhla pečiatka",
+      "name": "Okrúhla pečiatka"
+    },
+    {
+      "code": "okrúhla pečiatka so štátnym znakom",
+      "name": "Okrúhla pečiatka so štátnym znakom"
+    },
+    {
+      "code": "reliéfna pečiatka",
+      "name": "Reliéfna pečiatka"
+    },
+    {
+      "code": "vodotlač",
+      "name": "Vodotlač"
+    },
+    {
+      "code": "vlastnoručný podpis",
+      "name": "Vlastnoručný podpis"
+    },
+    {
+      "code": "úradne osvedčený podpis",
+      "name": "Úradne osvedčený podpis"
+    },
+    {
+      "code": "spinka",
+      "name": "Spinka"
+    },
+    {
+      "code": "lepiaci štítok",
+      "name": "Lepiaci štítok"
+    },
+    {
+      "code": "nit – kovový",
+      "name": "Nit – kovový"
+    },
+    {
+      "code": "trikolóra šnúrka",
+      "name": "Trikolóra šnúrka"
+    },
+    {
+      "code": "trvale spojenie dokumentu - iné",
+      "name": "Trvalé spojenie dokumentu - iné"
+    },
+    {
+      "code": "pečiatka",
+      "name": "Pečiatka"
+    },
+    {
+      "code": "iný manuálny vstup",
+      "name": "Iný manuálny vstup"
+    }
+  ],
+  "Location": [
+    {
+      "code": "",
+      "name": ""
+    },
+    {
+      "code": "Down",
+      "name": "Dole"
+    },
+    {
+      "code": "Up",
+      "name": "Hore"
+    },
+    {
+      "code": "Down edge",
+      "name": "Dolný okraj"
+    },
+    {
+      "code": "Up edge",
+      "name": "Horný okraj"
+    },
+    {
+      "code": "Left edge",
+      "name": "Ľavý okraj"
+    },
+    {
+      "code": "Right edge",
+      "name": "Pravý okraj"
+    },
+    {
+      "code": "Mid",
+      "name": "Uprostred"
+    },
+    {
+      "code": "Left",
+      "name": "Vľavo"
+    },
+    {
+      "code": "Left down",
+      "name": "Vľavo dole"
+    },
+    {
+      "code": "Left up",
+      "name": "Vľavo hore"
+    },
+    {
+      "code": "Right",
+      "name": "Vpravo"
+    },
+    {
+      "code": "Right down",
+      "name": "Vpravo dole"
+    },
+    {
+      "code": "Right up",
+      "name": "Vpravo hore"
+    }
+  ],
+  "FormatDokumentu": [
+    {
+      "code": "",
+      "name": ""
+    },
+    {
+      "code": "PDF",
+      "name": "PDF"
+    },
+    {
+      "code": "PDFA1",
+      "name": "PDF/A-1"
+    },
+    {
+      "code": "PDFA2",
+      "name": "PDF/A-2"
+    },
+    {
+      "code": "PNG",
+      "name": "PNG"
+    },
+    {
+      "code": "TXT",
+      "name": "TXT"
+    },
+    {
+      "code": "XMLDataContainer",
+      "name": "XMLDataContainer"
+    },
+    {
+      "code": "Iny",
+      "name": "Iný"
+    }
+  ],
+  "FunkciaEO": [
+    {
+      "code": "",
+      "name": ""
+    },
+    {
+      "code": "SHA-224",
+      "name": "SHA-224"
+    },
+    {
+      "code": "SHA-256",
+      "name": "SHA-256"
+    },
+    {
+      "code": "SHA-386",
+      "name": "SHA-386"
+    },
+    {
+      "code": "SHA-512",
+      "name": "SHA-512"
+    },
+    {
+      "code": "SHA-3",
+      "name": "SHA-3"
+    },
+    {
+      "code": "Whirlpool",
+      "name": "Whirlpool"
+    },
+    {
+      "code": "Iný",
+      "name": "Iný"
+    }
+  ]
+}

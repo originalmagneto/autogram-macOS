@@ -2,6 +2,12 @@ import XCTest
 @testable import AutogramKit
 
 final class LLMVisionParserTests: XCTestCase {
+    func testNewVisualKindsSurviveParsingWithoutLegalCertification() {
+        let payload = #"[{"kind":"bindingCord","box":[0,0,0.1,0.8]},{"kind":"securityTape","box":[0,0,0.2,0.1]},{"kind":"waxSeal","box":[0,0,0.1,0.1]},{"kind":"certifiedSignature","box":[0,0,0.1,0.1]}]"#
+        let elements = LLMVisionParser.decode(elements: Data(payload.utf8))
+        XCTAssertEqual(elements.map(\.kind), [.bindingCord, .securityTape, .waxSeal, .handwrittenSignature])
+        XCTAssertTrue(elements.allSatisfy { $0.reviewState == .pending })
+    }
     func testExtractJSONArrayFromNoisyResponse() throws {
         let noisy = """
         Tu je analýza strany:

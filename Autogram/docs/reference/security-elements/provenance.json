@@ -1,0 +1,31 @@
+{
+  "retrieved_at": "2026-09-15",
+  "sources": {
+    "dataset.html": "https://www.slovensko.sk/static/eform/dataset/50349287.ConversionRecordOfPaperToElectronicDocument.sk/",
+    "record-1.0.zip": "https://www.slovensko.sk/static/eform/dataset/50349287.ConversionRecordOfPaperToElectronicDocument.sk/1.0.zip",
+    "clause-1.3.zip": "https://www.slovensko.sk/static/eform/dataset/50349287.ConversionCertificateOfPaperToElectronicDocument.sk/1.3.zip"
+  },
+  "sha256": {
+    "dataset.html": "28d9914d1b9310faa66184961b97c183c004eb3da64404022079fce38f1f1a21",
+    "record-1.0.zip": "55fbf20ccb3d7d20c03bc0b2f1d42812144234bce9f9115b714f6fae4783e3dc",
+    "clause-1.3.zip": "5bc8c120c1970c623ddaf6d7e289a192879664586cf7a445d0d6f2a5257eb6ab",
+    "record-1.0/schema.xsd": "7b00f00c0e910dccc61f447681ba5b3e6a719650c49f400ba2b7cc8ace582e0e",
+    "clause-1.3/schema.xsd": "5c4de06e0a115943cc3ef3a01cbd1388e495acfb2c66c7e7fe4c5769f383be8e",
+    "clause-1.3/Content/form.2.html": "f5c8de276ec073ac961d417b5d6a015f2b812f0ae438f2e48b6d3524d957e816",
+    "record-1.0/Content/form103.html.xslt": "7af9e14eac4a5336bd04a604c126673d2be077fc117641f535cbe9e54d5cb4fb",
+    "record-1.0/security-elements.excerpt.xml": "e700a4d701403a43080cd42006bc06cf12308cff254e4f9818c68547f472a545",
+    "clause-1.3/security-elements.excerpt.xml": "00e3e5eec4a2836c04eb06b5ce05c4008579e089d57b2840d953b434e5843cd2",
+    "select-options.json": "75878215530376c7c332948e20e442ce3e9d497421be40ffd31688915eb3679b"
+  },
+  "derived_test_schema": {
+    "path": "record-1.0-security-fragment.xsd",
+    "sha256": "0c2384bf1217aed357d3bb94a9fd875a0215b7b96a285ac984268a5ab312cd0b",
+    "derivation": "Extract DocumentSecurityElementsDetails and referenced MandatoryStringType/IntMax5ReqType from official record 1.0 XSD. Promote detail to global test root by removing only minOccurs/maxOccurs. Keep original target namespace and internal sequence. Not a complete record schema."
+  },
+  "repository_artifacts_sha256": {
+    "clause-1.3-security-elements.excerpt.xml": "00e3e5eec4a2836c04eb06b5ce05c4008579e089d57b2840d953b434e5843cd2",
+    "record-1.0-security-elements.excerpt.xml": "a753d85029a39d49ec7a1c222c7f50d566149c94952fbff8c2c18ce1a3c9493c",
+    "record-1.0-security-fragment.xsd": "0c2384bf1217aed357d3bb94a9fd875a0215b7b96a285ac984268a5ab312cd0b",
+    "select-options.json": "75878215530376c7c332948e20e442ce3e9d497421be40ffd31688915eb3679b"
+  }
+}

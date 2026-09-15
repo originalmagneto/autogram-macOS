@@ -115,9 +115,9 @@ final class LayeredDetectionProviderTests: XCTestCase {
         let classifier = TwoStageClassifier(primary: FixedClassifier(judgement: .unsure),
                                             secondary: FixedClassifier(judgement: .unsure))
         let provider = LayeredDetectionProvider(classifier: classifier, renderTargetWidth: 380)
-        XCTAssertEqual(provider.identifier, "LayeredDetectionProvider/1 builtIn+contour+saliency kNN fm")
+        XCTAssertEqual(provider.identifier, "LayeredDetectionProvider/2 builtIn+contour+saliency kNN fm")
         let noFM = LayeredDetectionProvider(extraSources: [], classifier: TwoStageClassifier(primary: FixedClassifier(judgement: .unsure), secondary: nil), renderTargetWidth: 380)
-        XCTAssertEqual(noFM.identifier, "LayeredDetectionProvider/1 builtIn kNN")
+        XCTAssertEqual(noFM.identifier, "LayeredDetectionProvider/2 builtIn kNN")
     }
 
     func testFoundationModelBudgetCapsCallsPerPageAndIsReportedInStats() throws {

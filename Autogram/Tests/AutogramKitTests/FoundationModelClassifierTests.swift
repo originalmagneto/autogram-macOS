@@ -5,6 +5,15 @@ import FoundationModels
 @testable import AutogramKit
 
 final class FoundationModelClassifierTests: XCTestCase {
+    func testMapsVisibleCordTapeAndWaxWithoutTreatingThemAsEmbossing() {
+        let cases: [(FoundationJudgementKind, SecurityElement.Kind)] = [
+            (.bindingCord, .bindingCord), (.securityTape, .securityTape), (.waxSeal, .waxSeal)
+        ]
+        for (kind, expected) in cases {
+            let mapped = FoundationModelClassifier.map(.init(isSecurityElement: true, kind: kind, descriptionSK: "", confidence: 0.8))
+            XCTAssertEqual(mapped.kind, expected)
+        }
+    }
     private struct FakeJudge: FoundationJudging {
         let result: FoundationJudgement
         let delay: Double

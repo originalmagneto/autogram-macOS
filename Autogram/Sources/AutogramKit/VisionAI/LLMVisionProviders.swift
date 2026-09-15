@@ -61,20 +61,23 @@ public enum LLMVisionParser {
     physically visible in the image. Do not infer text, signatures, stamps, seals, or other
     elements from OCR, context, expected placement, or legal assumptions.
     Classify only these kinds:
-    - "officialStamp": a physically visible round official stamp, including a partial imprint.
+    - "officialStamp": a physically visible ink stamp impression of any shape, including a partial imprint (pečiatka). Never infer official status.
     - "handwrittenSignature": physically visible handwritten pen or ballpoint marks (vlastnoručný podpis).
     - "embossedSeal": a physically visible colorless embossed impression or relief (slepotlač).
     - "initial": a physically visible short handwritten initial or parafa.
-    - "other": another physically visible security element, such as a notarial attachment (notárska
-      pripojka), holographic note, or official sticker.
+    - "bindingCord": visible cord or ribbon binding sheets, including tricolour cord (notárska šnúrka).
+    - "securityTape": a visible sealing strip or attachment sticker, including text printed on it.
+    - "waxSeal": a visible wax or other attached physical seal, distinct from colourless embossing.
+    - "other": another visible candidate for human review. Never infer úradné osvedčenie podpisu,
+      legal authenticity, or the strength of a binding from an image.
     Rules:
     1. Report every occurrence as a separate object, including partial occurrences.
     2. Draw tight bounding boxes around the visible element only. Do not include surrounding
        whitespace or unrelated text.
     3. If uncertain, omit the element rather than guessing.
     4. Return JSON only, with no explanation or markdown:
-    [{"kind":"officialStamp","page":1,"box":[x,y,w,h],"confidence":0.9,"description_sk":"Úradná pečiatka ..."}]
-    5. kind must be one of officialStamp, handwrittenSignature, embossedSeal, initial, other.
+    [{"kind":"officialStamp","page":1,"box":[x,y,w,h],"confidence":0.9,"description_sk":"Odtlačok pečiatky ..."}]
+    5. kind must be one of officialStamp, handwrittenSignature, embossedSeal, initial, bindingCord, securityTape, waxSeal, other.
     6. box is [x,y,w,h] normalized to 0..1, origin at the top-left of the page.
     7. confidence must be in 0..1. description_sk is a short Slovak description of the
        physically visible element and its position.
@@ -90,7 +93,7 @@ public enum LLMVisionParser {
 
         Formát odpovede musí zostať JSON pole:
         [{"kind":"...","page":1,"box":[x,y,w,h],"confidence":0.9,"description_sk":"..."}]
-        kind ∈ officialStamp | handwrittenSignature | embossedSeal | initial | other,
+        kind ∈ officialStamp | handwrittenSignature | embossedSeal | initial | bindingCord | securityTape | waxSeal | other,
         box normalizované 0..1 s počiatkom v ľavom hornom rohu.
         """
     }
@@ -130,6 +133,16 @@ public enum LLMVisionParser {
             "slepotlac": .embossedSeal,
             "initial": .initial,
             "parafa": .initial,
+            "bindingcord": .bindingCord,
+            "binding_cord": .bindingCord,
+            "tricolor": .bindingCord,
+            "trikolóra": .bindingCord,
+            "securitytape": .securityTape,
+            "security_tape": .securityTape,
+            "waxseal": .waxSeal,
+            "wax_seal": .waxSeal,
+            "certifiedsignature": .handwrittenSignature,
+            "roundofficialstamp": .officialStamp,
             "other": .other
         ]
 

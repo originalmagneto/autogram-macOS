@@ -3,6 +3,36 @@ import XCTest
 @testable import AutogramKit
 
 final class AttestationValidatorTests: XCTestCase {
+    func testEmptyReviewRequiresExplicitConfirmationAndEveryPageReviewed() {
+        var data = validAttestationData()
+        data.originConfirmed = true
+        XCTAssertTrue(AttestationValidator.validate(data, securityElements: [], qualifiedTimestampTime: nil)
+            .contains(.noSecurityElementsConfirmed))
+        data.noSecurityElementsConfirmed = true
+        XCTAssertTrue(AttestationValidator.validate(data, securityElements: [], qualifiedTimestampTime: nil).isEmpty)
+        let unreviewed = AttestationPreflight.evaluate(data, securityElements: [], hasSelectedIdentity: true,
+            mandateRequirementSatisfied: true, inputSignatureInspection: .completed(signatures: []),
+            unreviewedNonEmptyPages: [0])
+        XCTAssertFalse(unreviewed.isComplete)
+    }
+
+    func testPhysicalObservationRequiresLocationAndActualOutputPage() {
+        var data = validAttestationData()
+        data.originConfirmed = true
+        var element = SecurityElement(kind: .bindingCord, pageIndex: 0, boundingBox: .zero,
+            confidence: 1, detectedByAI: false, observation: .physicalOriginal)
+        XCTAssertFalse(AttestationValidator.validate(data, securityElements: [element], qualifiedTimestampTime: nil).isEmpty)
+        element.originalLocation = "Ľavý okraj zväzku"
+        element.newDocumentPageIndex = 0
+        XCTAssertTrue(AttestationValidator.validate(data, securityElements: [element], qualifiedTimestampTime: nil).isEmpty)
+    }
+
+    func testOtherElementRequiresFactualDescription() {
+        var data = validAttestationData()
+        data.originConfirmed = true
+        let element = SecurityElement(kind: .other, pageIndex: 0, boundingBox: .zero, confidence: 1)
+        XCTAssertFalse(AttestationValidator.validate(data, securityElements: [element], qualifiedTimestampTime: nil).isEmpty)
+    }
     private let validElements = [
         SecurityElement(
             kind: .handwrittenSignature,

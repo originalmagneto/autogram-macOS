@@ -89,7 +89,7 @@ final class CallCountingClassifier: ElementClassifying, @unchecked Sendable {
 /// classifier (kNN, optionally a Foundation Model fallback) decides the
 /// final kind for each merged candidate.
 public struct LayeredDetectionProvider: SecurityElementsProviding {
-    public static let version = 1
+    public static let version = 2
 
     public let builtIn: BuiltInCandidateSource
     public let extraSources: [any CandidateSourcing]

@@ -32,7 +32,9 @@ public enum CandidateMerger {
         guard area >= minAreaRatio, area <= maxAreaRatio else { return false }
         guard c.box.width > 0, c.box.height > 0 else { return false }
         let aspect = max(c.box.width / c.box.height, c.box.height / c.box.width)
-        guard aspect <= maxAspect else { return false }
+        // Long physical binding candidates need classification, not a signature-shaped gate.
+        let structuralSource = c.sources.contains(.contour) || c.sources.contains(.saliency)
+        guard aspect <= (structuralSource ? 60 : maxAspect) else { return false }
         // Built-in candidates were already screened against OCR text by BuiltInVisionProvider.
         if c.sources == [.builtIn] { return true }
         return !exclusions.overlapsTextOrBarcode(c.box, threshold: exclusionOverlap)

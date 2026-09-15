@@ -32,6 +32,7 @@ public struct AttestationData: Codable, Hashable, Sendable {
     public var originalDocumentName: String
     public var originalDocumentTypeCode: String
     public var originalDocumentTypeLabel: String
+    public var noSecurityElementsConfirmed: Bool
     public var originConfirmed: Bool
     public var numberOfSheets: Int
     public var sheetCountingMethod: SheetCountingMethod
@@ -58,7 +59,7 @@ public struct AttestationData: Codable, Hashable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case originalDocumentOrder, originalDocumentName, originalDocumentTypeCode,
-             originalDocumentTypeLabel, originConfirmed, numberOfSheets,
+             originalDocumentTypeLabel, originConfirmed, noSecurityElementsConfirmed, numberOfSheets,
              sheetCountingMethod, nonEmptyPageCount, paperSizeBreakdown,
              newDocumentName, newDocumentFormatLabel, conversionExecutionDateTime,
              evidenceNumber, performingPerson, usedDeviceDescription
@@ -69,6 +70,7 @@ public struct AttestationData: Codable, Hashable, Sendable {
                 originalDocumentTypeCode: String = "",
                 originalDocumentTypeLabel: String = "",
                 originConfirmed: Bool = false,
+                noSecurityElementsConfirmed: Bool = false,
                 numberOfSheets: Int = 0,
                 sheetCountingMethod: SheetCountingMethod = .duplexEstimate,
                 nonEmptyPageCount: Int = 0,
@@ -83,6 +85,7 @@ public struct AttestationData: Codable, Hashable, Sendable {
         self.originalDocumentName = originalDocumentName
         self.originalDocumentTypeCode = originalDocumentTypeCode
         self.originalDocumentTypeLabel = originalDocumentTypeLabel
+        self.noSecurityElementsConfirmed = noSecurityElementsConfirmed
         self.originConfirmed = originConfirmed
         self.numberOfSheets = numberOfSheets
         self.sheetCountingMethod = sheetCountingMethod
@@ -102,6 +105,7 @@ public struct AttestationData: Codable, Hashable, Sendable {
         originalDocumentName = try container.decode(String.self, forKey: .originalDocumentName)
         originalDocumentTypeCode = try container.decode(String.self, forKey: .originalDocumentTypeCode)
         originalDocumentTypeLabel = try container.decode(String.self, forKey: .originalDocumentTypeLabel)
+        noSecurityElementsConfirmed = try container.decodeIfPresent(Bool.self, forKey: .noSecurityElementsConfirmed) ?? false
         originConfirmed = try container.decodeIfPresent(Bool.self, forKey: .originConfirmed) ?? false
         numberOfSheets = try container.decode(Int.self, forKey: .numberOfSheets)
         sheetCountingMethod = try container.decode(SheetCountingMethod.self, forKey: .sheetCountingMethod)
@@ -121,6 +125,7 @@ public struct AttestationData: Codable, Hashable, Sendable {
         try container.encode(originalDocumentName, forKey: .originalDocumentName)
         try container.encode(originalDocumentTypeCode, forKey: .originalDocumentTypeCode)
         try container.encode(originalDocumentTypeLabel, forKey: .originalDocumentTypeLabel)
+        try container.encode(noSecurityElementsConfirmed, forKey: .noSecurityElementsConfirmed)
         try container.encode(originConfirmed, forKey: .originConfirmed)
         try container.encode(numberOfSheets, forKey: .numberOfSheets)
         try container.encode(sheetCountingMethod, forKey: .sheetCountingMethod)
@@ -143,6 +148,9 @@ public enum AttestationValidationError: LocalizedError, Equatable, Sendable {
     case missingRegistrationNumber
     case invalidSheetCount
     case noSecurityElementsConfirmed
+    case securityElementDescriptionRequired
+    case physicalElementLocationRequired
+    case physicalElementOutputPageRequired
     case securityElementsNeedReview(count: Int)
     case unreviewedNonEmptyPages(pages: [Int])
     case missingEvidenceNumber
@@ -163,6 +171,12 @@ public enum AttestationValidationError: LocalizedError, Equatable, Sendable {
             return "Chýba evidenčné číslo advokáta (SAK)."
         case .invalidSheetCount:
             return "Počet listov musí byť aspoň 1."
+        case .securityElementDescriptionRequired:
+            return "Doplňte vecný opis iného bezpečnostného prvku alebo spojenia."
+        case .physicalElementLocationRequired:
+            return "Doplňte umiestnenie prvku skontrolovaného na origináli."
+        case .physicalElementOutputPageRequired:
+            return "Určite stranu zachytenia prvku v novom dokumente. Ak v PDF chýba, doplňte jeho sken."
         case .noSecurityElementsConfirmed:
             return "Potvrďte bezpečnostné prvky pôvodného dokumentu."
         case .securityElementsNeedReview(let count):
@@ -203,8 +217,15 @@ public enum AttestationValidator {
         if data.numberOfSheets < 1 {
             errors.append(.invalidSheetCount)
         }
-        if securityElements.isEmpty {
+        if securityElements.isEmpty && !data.noSecurityElementsConfirmed {
             errors.append(.noSecurityElementsConfirmed)
+        }
+        for element in securityElements {
+            if element.kind.requiresHumanDescription, element.verbalDescription.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { errors.append(.securityElementDescriptionRequired) }
+            if element.observation == .physicalOriginal {
+                if element.originalLocation.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { errors.append(.physicalElementLocationRequired) }
+                if element.newDocumentPageIndex == nil || element.newDocumentPageIndex! < 0 { errors.append(.physicalElementOutputPageRequired) }
+            }
         }
         if (data.evidenceNumber ?? "").trimmingCharacters(in: .whitespaces).isEmpty {
             errors.append(.missingEvidenceNumber)

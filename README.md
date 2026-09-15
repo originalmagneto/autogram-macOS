@@ -82,7 +82,7 @@ Natívna macOS aplikácia v SwiftUI pre kvalifikované elektronické podpisovani
 <h3>Zaručená konverzia</h3>
 <ul>
 <li>Kontrolovaný import a potvrdenie pôvodu dokumentu.</li>
-<li>AI Vision detekcia s povinnou manuálnou kontrolou podpisov, pečiatok, slepotlače a paraf.</li>
+<li>Katalóg 16 druhov bezpečnostných prvkov, AI návrhy a povinná manuálna kontrola vrátane šnúrok, pások a pečatí.</li>
 <li>PDF/A-2b, osvedčovacia doložka, XML a lokálna evidencia.</li>
 <li>Mandátny certifikát a fail-closed produkčné odoslanie do CEZZK.</li>
 </ul>
@@ -93,7 +93,7 @@ Natívna macOS aplikácia v SwiftUI pre kvalifikované elektronické podpisovani
 
 ## AI Vision: vrstvená detekcia bezpečnostných prvkov
 
-Detekcia beží výhradne na zariadení a skladá sa z troch vrstiev. Každá vrstva sa dá vypnúť alebo môže zlyhať bez toho, aby výsledok bol horší ako doteraz.
+Vstavaná detekcia beží na zariadení a skladá sa z troch vrstiev. Voliteľné externé modely sa zapínajú v nastaveniach. Rozšírenie katalógu a tréningových tried samo osebe nepotvrdzuje presnosť detekcie nových prvkov.
 
 <p align="center">
   <img src="docs/diagrams/ai-vision.svg" alt="AI Vision pipeline: strana, kandidáti, klasifikácia, kontrola a učenie" width="100%">
@@ -132,7 +132,7 @@ Detekcia beží výhradne na zariadení a skladá sa z troch vrstiev. Každá vr
 </tr>
 <tr>
 <td>Potvrdíte nález</td>
-<td>Výrez s konečným rámcom a druhom sa uloží ako pozitívny príklad spolu s jeho feature printom.</td>
+<td>Podporovaný prvok s rámcom v skene sa uloží ako pozitívny výrez s feature printom. Právne posúdenie podpisu či pečiatky sa mapuje na všeobecnú obrazovú triedu; fyzická kontrola bez rámca nevytvorí výrez.</td>
 </tr>
 <tr>
 <td>Odmietnete nález</td>
@@ -144,11 +144,11 @@ Detekcia beží výhradne na zariadení a skladá sa z troch vrstiev. Každá vr
 </tr>
 <tr>
 <td>Ďalšia konverzia</td>
-<td>kNN porovnáva s väčším datasetom, takže model rozhoduje čoraz menej prípadov.</td>
+<td>kNN porovnáva výrezy s uloženými príkladmi. Prínos nových príkladov treba overiť na samostatných skenoch.</td>
 </tr>
 <tr>
 <td>Export pre Create ML</td>
-<td>Nastavenia vytvoria priečinok s <code>annotations.json</code> a náhľadmi strán pre tréning vlastného objektového detektora (fáza C).</td>
+<td>Exportuje sa nový priečinok s <code>annotations.json</code>, obrazmi kompletne skontrolovaných strán a <code>splits.json</code> na rozdelenie podľa dokumentov. Strany s prvkom bez lokalizácie alebo bez podporovanej obrazovej triedy sa vynechajú. Export model nenatrénuje.</td>
 </tr>
 </table>
 
@@ -193,6 +193,18 @@ swift run vision-eval ~/AutogramEval [--builtin-only] [--no-fm] [--bank <dir>] [
 </details>
 
 ## Zaručená konverzia
+
+### Bezpečnostné prvky
+
+- Katalóg má 16 druhov. Rýchly výber obsahuje pečiatku, podpis, slepotlač, parafu, šnúrku a pásku/štítok; ďalšie možnosti sú zoskupené v menu.
+- Prvok možno označiť rámcom v skene alebo zaznamenať cez **Skontrolované na origináli**. Fyzická kontrola vyžaduje opis umiestnenia a pred autorizáciou aj konkrétnu stranu zachytenia v novom PDF.
+- Dokument bez bezpečnostných prvkov vyžaduje výslovné potvrdenie po kontrole neprázdnych strán. Zmena nálezu zruší príslušné potvrdenia a platnosť tréningovej anotácie.
+- Potvrdený nález opraví automatické vyhodnotenie jeho strany ako prázdnej. Úradné osvedčenie podpisu a ďalšie právne posúdenia potvrdzuje človek.
+
+Sekcia bezpečnostných prvkov XML záznamu používa overenú štruktúru record 1.0 s textovým opisom, umiestnením a číslami strán/listu. Overenie tejto sekcie nepotvrdzuje súlad celého formulára; formulárový balík zostáva pilotný.
+
+Podrobnosti: [pravidlá tréningového datasetu](Autogram/docs/security-element-training.md) a [oficiálne formulárové podklady](Autogram/docs/reference/security-elements/FINDINGS.md).
+
 
 <table>
 <tr>

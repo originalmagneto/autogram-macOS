@@ -68,15 +68,24 @@ public struct SecurityReviewElement: Codable, Hashable, Sendable {
     public let kind: SecurityElement.Kind
     public let pageIndex: Int
     public let boundingBox: NormalizedRect
+    public let observation: SecurityElement.Observation?
+    public let verbalDescription: String?
+    public let originalLocation: String?
+    public let newDocumentPageIndex: Int?
 
     public init(id: UUID, state: SecurityElementReviewState,
                 kind: SecurityElement.Kind, pageIndex: Int,
-                boundingBox: NormalizedRect) {
+                boundingBox: NormalizedRect, observation: SecurityElement.Observation? = nil,
+                verbalDescription: String? = nil, originalLocation: String? = nil, newDocumentPageIndex: Int? = nil) {
         self.id = id
         self.state = state
         self.kind = kind
         self.pageIndex = pageIndex
         self.boundingBox = boundingBox
+        self.observation = observation
+        self.verbalDescription = verbalDescription
+        self.originalLocation = originalLocation
+        self.newDocumentPageIndex = newDocumentPageIndex
     }
 }
 
@@ -87,59 +96,25 @@ public struct SecurityReviewStamp: Codable, Hashable, Sendable {
     public let elementDecisions: [SecurityReviewElement]
     public let detectorIdentifier: String
     public let reviewedAt: Date
+    public let noElementsConfirmed: Bool?
 
     public init(checkedNonEmptyPageIndices: [Int],
                 confirmedElementCount: Int,
                 rejectedElementCount: Int,
                 elementDecisions: [SecurityReviewElement] = [],
                 detectorIdentifier: String = "BuiltInVisionProvider",
-                reviewedAt: Date = Date()) {
+                reviewedAt: Date = Date(), noElementsConfirmed: Bool? = nil) {
         self.checkedNonEmptyPageIndices = checkedNonEmptyPageIndices.sorted()
         self.confirmedElementCount = confirmedElementCount
         self.rejectedElementCount = rejectedElementCount
         self.elementDecisions = elementDecisions
         self.detectorIdentifier = detectorIdentifier
         self.reviewedAt = reviewedAt
+        self.noElementsConfirmed = noElementsConfirmed
     }
 }
 
 public struct SecurityElement: Codable, Hashable, Identifiable, Sendable {
-    public enum Kind: String, Codable, CaseIterable, Identifiable, Sendable {
-        case handwrittenSignature = "Vlastnoručný podpis"
-        case officialStamp = "Úradná pečiatka"
-        case embossedSeal = "Reliéfna slepotlač"
-        case initial = "Parafa"
-        case other = "Iný prvok"
-
-        public var id: String { rawValue }
-
-        public var sfSymbol: String {
-            switch self {
-            case .handwrittenSignature: return "signature"
-            case .officialStamp: return "seal"
-            case .embossedSeal: return "circle.dashed"
-            case .initial: return "text.badge.checkmark"
-            case .other: return "questionmark.circle"
-            }
-        }
-
-        public var codelist15Item: ZakoCodelistItem {
-            switch self {
-            case .handwrittenSignature:
-                return ZakoCodelistItem(code: "vlastnoručný podpis", skName: "Vlastnoručný podpis")
-            case .officialStamp:
-                return ZakoCodelistItem(code: "okrúhla pečiatka so štátnym znakom",
-                                        skName: "Okrúhla pečiatka so štátnym znakom")
-            case .embossedSeal:
-                return ZakoCodelistItem(code: "reliéfna pečiatka", skName: "Reliéfna pečiatka")
-            case .initial:
-                return ZakoCodelistItem(code: "parafa", skName: "Parafa")
-            case .other:
-                return ZakoCodelistItem(code: "iný prvok", skName: "Iný prvok")
-            }
-        }
-    }
-
     public var id: UUID
     public var kind: Kind
     public var pageIndex: Int
@@ -151,17 +126,26 @@ public struct SecurityElement: Codable, Hashable, Identifiable, Sendable {
     /// Audit string naming the candidate sources and the deciding classifier,
     /// for example "builtIn+contour; kNN(n=12)". Nil for manual or legacy elements.
     public var detectionSource: String?
+    public var observation: Observation
+    public var originalLocation: String
+    public var newDocumentPageIndex: Int?
+
+    public enum Observation: String, Codable, Sendable { case scanRegion, physicalOriginal }
+    public var hasScanRegion: Bool { observation == .scanRegion && boundingBox.width > 0 && boundingBox.height > 0 }
+    public var trainingKind: Kind? { hasScanRegion ? kind.visualKind : nil }
 
     private enum CodingKeys: String, CodingKey {
         case id, kind, pageIndex, boundingBox, confidence, verbalDescription,
-             detectedByAI, reviewState, detectionSource
+             detectedByAI, reviewState, detectionSource, observation, originalLocation, newDocumentPageIndex
     }
 
     public init(id: UUID = UUID(), kind: Kind, pageIndex: Int,
                 boundingBox: NormalizedRect, confidence: Double,
                  verbalDescription: String = "", detectedByAI: Bool = true,
                  reviewState: SecurityElementReviewState? = nil,
-                 detectionSource: String? = nil) {
+                 detectionSource: String? = nil,
+                 observation: Observation = .scanRegion, originalLocation: String = "",
+                 newDocumentPageIndex: Int? = nil) {
         self.id = id
         self.kind = kind
         self.pageIndex = pageIndex
@@ -171,6 +155,9 @@ public struct SecurityElement: Codable, Hashable, Identifiable, Sendable {
         self.detectedByAI = detectedByAI
         self.reviewState = reviewState ?? (detectedByAI ? .pending : .confirmed)
         self.detectionSource = detectionSource
+        self.observation = observation
+        self.originalLocation = originalLocation
+        self.newDocumentPageIndex = newDocumentPageIndex
     }
 
     public init(from decoder: Decoder) throws {
@@ -187,14 +174,18 @@ public struct SecurityElement: Codable, Hashable, Identifiable, Sendable {
         self.reviewState = try container.decodeIfPresent(SecurityElementReviewState.self,
                                                          forKey: .reviewState) ?? .pending
         self.detectionSource = try container.decodeIfPresent(String.self, forKey: .detectionSource)
+        self.observation = try container.decodeIfPresent(Observation.self, forKey: .observation) ?? .scanRegion
+        self.originalLocation = try container.decodeIfPresent(String.self, forKey: .originalLocation) ?? ""
+        self.newDocumentPageIndex = try container.decodeIfPresent(Int.self, forKey: .newDocumentPageIndex)
     }
 
     public func locationDescription(pageSizePt: CGSize) -> String {
+        if observation == .physicalOriginal { return "\(kind.label), strana \(pageIndex + 1): \(originalLocation) (skontrolované na origináli)" }
         let horizontalZone = boundingBox.midX < 0.33 ? "v ľavej tretine" :
                              boundingBox.midX < 0.67 ? "v strede" : "v pravej tretine"
         let verticalZone = boundingBox.midY < 0.33 ? "v dolnej časti" :
                            boundingBox.midY < 0.67 ? "v strede výšky" : "v hornej časti"
-        return "\(kind.rawValue) na strane \(pageIndex + 1), \(verticalZone), \(horizontalZone)"
+        return "\(kind.label) na strane \(pageIndex + 1), \(verticalZone), \(horizontalZone)"
     }
 
     public var locationCodelist11Item: ZakoCodelistItem {

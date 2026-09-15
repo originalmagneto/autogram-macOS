@@ -30,13 +30,18 @@ public enum AttestationPreflight {
         hasSelectedIdentity: Bool,
         mandateRequirementSatisfied: Bool,
         inputSignatureInspection: InputSignatureInspectionResult,
-        unreviewedNonEmptyPages: [Int] = []
+        unreviewedNonEmptyPages: [Int] = [],
+        documentPageCount: Int? = nil
     ) -> Result {
         let pendingCount = securityElements.filter { $0.reviewState == .pending }.count
         var errors = AttestationValidator.validate(
             data,
             securityElements: securityElements.filter { $0.reviewState == .confirmed },
             qualifiedTimestampTime: nil)
+        if let documentPageCount, securityElements.contains(where: {
+            $0.reviewState == .confirmed && $0.observation == .physicalOriginal
+                && ($0.newDocumentPageIndex ?? -1) >= documentPageCount
+        }) { errors.append(.physicalElementOutputPageRequired) }
         if inputSignatureInspection.state != .valid {
             errors.append(.inputSignatureVerificationRequired(
                 state: inputSignatureInspection.state))
