@@ -8,7 +8,7 @@
   <a href="https://github.com/originalmagneto/autogram-macOS/releases/latest"><img src="https://img.shields.io/github/v/release/originalmagneto/autogram-macOS?display_name=tag&style=flat-square&color=eb6c36" alt="Aktuálne vydanie"></a>
   <img src="https://img.shields.io/badge/macOS-27%2B-2d3142?style=flat-square" alt="macOS 27 alebo novší">
   <img src="https://img.shields.io/badge/Swift-6-f05138?style=flat-square" alt="Swift 6">
-  <img src="https://img.shields.io/badge/AI-100%25%20on--device-2e5aa8?style=flat-square" alt="AI beží výhradne na zariadení">
+  <img src="https://img.shields.io/badge/AI-vstavan%C3%A1%20on--device-2e5aa8?style=flat-square" alt="Vstavaná AI beží na zariadení">
   <img src="https://img.shields.io/badge/z%C3%A1vislosti-0%20balíkov-4f5d75?style=flat-square" alt="0 Swift package závislostí">
 </p>
 
@@ -91,6 +91,13 @@ Natívna macOS aplikácia v SwiftUI pre kvalifikované elektronické podpisovani
 </table>
 </details>
 
+### Nové natívne rozhranie
+
+- Podpisovanie aj ZaKo zobrazujú aktuálny krok v podnadpise okna. Navigácia a voľba dokumentu sú v hornej lište.
+- Inšpektor podpisu sa dá skryť a meniť jeho šírku, aby zostalo viac miesta na dokument. Vizuálny podpis má priehľadné pozadie.
+- Počas podpisovania a autorizácie sú zablokované akcie, ktoré by vynulovali rozpracovanú operáciu.
+- Register používa natívne vyhľadávanie, nastavenia bočnú navigáciu a ovládanie podporuje klávesnicu vrátane pridania bezpečnostného prvku na aktuálnu stranu.
+
 ## AI Vision: vrstvená detekcia bezpečnostných prvkov
 
 Vstavaná detekcia beží na zariadení a skladá sa z troch vrstiev. Voliteľné externé modely sa zapínajú v nastaveniach. Rozšírenie katalógu a tréningových tried samo osebe nepotvrdzuje presnosť detekcie nových prvkov.
@@ -107,8 +114,8 @@ Vstavaná detekcia beží na zariadení a skladá sa z troch vrstiev. Voliteľn�
 </tr>
 <tr>
 <td><strong>1 · Kandidáti</strong></td>
-<td>Strana sa vykreslí raz a prejde presným OCR. Tri nezávislé zdroje navrhnú oblasti, ktoré sa zlúčia podľa prekrytia; tlačený text, linkované bunky formulárov a čiarové kódy odpadnú ešte pred klasifikáciou.</td>
-<td>vstavané HSV heuristiky · <code>RecognizeTextRequest</code> (accurate) · <code>DetectContoursRequest</code> · objectness saliency</td>
+<td>Strana sa vykreslí raz a prejde rýchlym aj presným OCR. Tri nezávislé zdroje navrhnú oblasti, ktoré sa zlúčia podľa prekrytia. Filtre pred klasifikáciou obmedzujú návrhy na tlačenom texte, linkovaných bunkách a čiarových kódoch.</td>
+<td>vstavané HSV heuristiky · <code>RecognizeTextRequest</code> (fast + accurate) · <code>DetectContoursRequest</code> · objectness saliency</td>
 </tr>
 <tr>
 <td><strong>2 · Klasifikácia</strong></td>
@@ -143,12 +150,16 @@ Vstavaná detekcia beží na zariadení a skladá sa z troch vrstiev. Voliteľn�
 <td>Príklad sa z datasetu odstráni.</td>
 </tr>
 <tr>
+<td>Dokončíte kontrolu strany</td>
+<td>Úplná anotácia strany sa uloží osobitne do <code>reviewed-pages.json</code>. Samotné potvrdenie jedného výrezu nestačí na export celej strany. Úpravy nálezov zneplatnia jej kontrolu.</td>
+</tr>
+<tr>
 <td>Ďalšia konverzia</td>
 <td>kNN porovnáva výrezy s uloženými príkladmi. Prínos nových príkladov treba overiť na samostatných skenoch.</td>
 </tr>
 <tr>
 <td>Export pre Create ML</td>
-<td>Exportuje sa nový priečinok s <code>annotations.json</code>, obrazmi kompletne skontrolovaných strán a <code>splits.json</code> na rozdelenie podľa dokumentov. Strany s prvkom bez lokalizácie alebo bez podporovanej obrazovej triedy sa vynechajú. Export model nenatrénuje.</td>
+<td>Exportuje sa nový priečinok s <code>annotations.json</code>, obrazmi kompletne skontrolovaných strán a <code>splits.json</code> na rozdelenie podľa dokumentov. Strany s prvkom bez lokalizácie alebo bez podporovanej obrazovej triedy sa vynechajú; fyzický záznam vylúči pôvodnú aj odkazovanú výstupnú stranu. Rozdelenie z <code>splits.json</code> treba pri tréningu použiť explicitne. Export model nenatrénuje.</td>
 </tr>
 </table>
 
@@ -208,11 +219,11 @@ Podrobnosti: [pravidlá tréningového datasetu](Autogram/docs/security-element-
 
 <table>
 <tr>
-<td align="center" width="20%"><strong>1 · Import</strong><br><sub>PDF alebo obrazový sken, potvrdenie pôvodu</sub></td>
-<td align="center" width="20%"><strong>2 · Analýza</strong><br><sub>formát strán, neprázdne strany, listy, názov</sub></td>
-<td align="center" width="20%"><strong>3 · Overenie</strong><br><sub>AI nálezy, klik-na-prvok, kontrola strany za stranou</sub></td>
-<td align="center" width="20%"><strong>4 · Doložka</strong><br><sub>osoba, počítadlá, poloha prvkov, XML, právny preflight</sub></td>
-<td align="center" width="20%"><strong>5 · Autorizácia</strong><br><sub>evidenčné číslo, PDF/A, podpis, evidencia</sub></td>
+<td align="center" width="20%"><strong>1 · Vstup</strong><br><sub>PDF alebo obrazový sken, potvrdenie pôvodu</sub></td>
+<td align="center" width="20%"><strong>2 · Overenie</strong><br><sub>analýza, AI nálezy, fyzická kontrola, kontrola každej strany</sub></td>
+<td align="center" width="20%"><strong>3 · Doložka</strong><br><sub>osoba, počítadlá, poloha prvkov, XML, preflight</sub></td>
+<td align="center" width="20%"><strong>4 · Autorizácia</strong><br><sub>evidenčné číslo, PDF/A, mandátny podpis</sub></td>
+<td align="center" width="20%"><strong>5 · Hotovo</strong><br><sub>výsledné súbory a lokálna evidencia</sub></td>
 </tr>
 </table>
 
@@ -318,7 +329,7 @@ Podpis bez Safari sa dá vyskúšať priamo:
 <tr>
 <td width="50%" valign="top">
 <ul>
-<li><a href="docs/diagrams/autogram-visual-guide.html">Architektúra a batch preflight</a> (interaktívne HTML)</li>
+<li><a href="docs/diagrams/autogram-visual-guide.html">AI Vision, architektúra a batch preflight</a> (HTML)</li>
 <li><a href="docs/gallery.html">Diagramová galéria</a></li>
 <li><a href="docs/diagrams/architecture.svg">Architektúra aplikácie</a></li>
 <li><a href="docs/diagrams/process-zako.svg">Proces zaručenej konverzie</a></li>
@@ -370,7 +381,7 @@ Podpis bez Safari sa dá vyskúšať priamo:
 <tr><td>Xcode 27.0 a Swift 6</td><td>Iba pre build zo zdrojov. Samotné Command Line Tools nestačia (chýba SwiftUI macro plugin).</td></tr>
 <tr><td>Apple Intelligence</td><td>Voliteľné. Zapína on-device klasifikáciu neistých nálezov.</td></tr>
 <tr><td>eID, advokátsky preukaz, PKCS#11, CryptoTokenKit alebo Keychain token</td><td>Pre reálny kvalifikovaný podpis.</td></tr>
-<tr><td>EZZK účet, callback <code>autogram://ezzk/callback</code>, sandbox</td><td>Pre produkčný režim zaručenej konverzie.</td></tr>
+<tr><td>EZZK účet, callback <code>autogram://ezzk/callback</code>, sandbox</td><td>Pre pilotné overenie integrácie ZaKo; produkčné zapojenie čaká na potvrdenie.</td></tr>
 </table>
 
 ### Stiahnutie

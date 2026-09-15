@@ -1,96 +1,55 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1160" height="460" viewBox="0 0 1160 460" role="img" aria-labelledby="proc-title proc-desc">
-  <title id="proc-title">Proces zaručenej konverzie P→E</title>
-  <desc id="proc-desc">Osemkrokový proces zaručenej konverzie: import a kontrola, automatická analýza, označenie prvkov, doložka, EZZK číslo a čas, PDF/A výstup, autorizácia a evidencia v CEZZK.</desc>
-  <defs>
-    <marker id="p-arr" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M0,0 L8,4 L0,8 z" fill="#4f5d75"/>
-    </marker>
-    <marker id="p-arr-acc" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M0,0 L8,4 L0,8 z" fill="#eb6c36"/>
-    </marker>
-  </defs>
-
-  <rect width="1160" height="460" fill="#f5f5f5"/>
-  <text x="32" y="48" font-family="Georgia, 'Times New Roman', serif" font-size="30" fill="#2d3142">Zaručená konverzia P→E - procesný tok</text>
-  <text x="32" y="72" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="10" letter-spacing="1.6" fill="#7a8399">§ 35–39 ZÁKONA Č. 305/2013 Z. Z. · VYHLÁŠKA MIRRI Č. 70/2021 Z. Z.</text>
-
-  <!-- swimlane: advokát -->
-  <line x1="32" y1="120" x2="1128" y2="120" stroke="#bfc0c0" stroke-width="1"/>
-  <text x="32" y="112" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="9" letter-spacing="1.4" fill="#7a8399">ADVOKÁT</text>
-  <!-- swimlane: autogram -->
-  <line x1="32" y1="300" x2="1128" y2="300" stroke="#bfc0c0" stroke-width="1"/>
-  <text x="32" y="292" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="9" letter-spacing="1.4" fill="#7a8399">AUTOGRAM - AUTOMATIKA</text>
-  <!-- lane: externé systémy -->
-  <line x1="32" y1="420" x2="1128" y2="420" stroke="#bfc0c0" stroke-width="1"/>
-  <text x="32" y="412" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="9" letter-spacing="1.4" fill="#7a8399">IS EZZK / CEZZK (MIRRI)</text>
-
-  <g font-family="-apple-system, 'Helvetica Neue', Arial, sans-serif">
-    <!-- step 1 -->
-    <rect x="40" y="132" width="120" height="44" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
-    <text x="52" y="150" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="9" fill="#eb6c36" font-weight="600">01</text>
-    <text x="52" y="166" font-size="11.5" font-weight="600" fill="#2d3142">Sken originálu</text>
-
-    <!-- step 2 analysis -->
-    <rect x="196" y="316" width="152" height="56" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
-    <text x="208" y="334" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="9" fill="#eb6c36" font-weight="600">02 ANALÝZA</text>
-    <text x="208" y="350" font-size="11.5" font-weight="600" fill="#2d3142">Strany · listy · formát</text>
-    <text x="208" y="364" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="8.5" fill="#7a8399">blank-detekcia · A4/A3</text>
-
-    <!-- step 3 detection -->
-    <rect x="384" y="316" width="168" height="56" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
-    <text x="396" y="334" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="9" fill="#eb6c36" font-weight="600">03 AI VISION</text>
-    <text x="396" y="350" font-size="11.5" font-weight="600" fill="#2d3142">Pečiatky · podpisy</text>
-    <text x="396" y="364" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="8.5" fill="#7a8399">boxy · istota · slovný opis</text>
-
-    <!-- step 4 confirm (advokat) -->
-    <rect x="196" y="132" width="152" height="44" rx="6" fill="rgba(45,49,66,0.05)" stroke="#7a8399" stroke-width="0.8"/>
-    <text x="208" y="150" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="9" fill="#eb6c36" font-weight="600">04</text>
-    <text x="208" y="166" font-size="11.5" font-weight="600" fill="#2d3142">Potvrdí údaje</text>
-    <text x="384" y="158" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="9" fill="#7a8399">← 1 klik namiesto 30 polí</text>
-
-    <!-- step 5 evidence number + time -->
-    <rect x="588" y="316" width="180" height="56" rx="6" fill="#ffffff" stroke="#2e5aa8" stroke-width="1"/>
-    <text x="600" y="334" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="9" fill="#eb6c36" font-weight="600">05 EZZK</text>
-    <text x="600" y="350" font-size="11.5" font-weight="600" fill="#2d3142">Evidenčné číslo + čas</text>
-    <text x="600" y="364" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="8.5" fill="#7a8399">jednorazové · serverový čas</text>
-
-    <!-- step 6 pdfa + clause -->
-    <rect x="804" y="316" width="176" height="56" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
-    <text x="816" y="334" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="9" fill="#eb6c36" font-weight="600">06 PDF/A + DOLOŽKA</text>
-    <text x="816" y="350" font-size="11.5" font-weight="600" fill="#2d3142">Konverzia · XML embed</text>
-    <text x="816" y="364" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="8.5" fill="#7a8399">pdfaid:part=2 · SHA-256</text>
-
-    <!-- step 7 authorize (focal) -->
-    <rect x="588" y="126" width="176" height="56" rx="6" fill="rgba(235,108,54,0.08)" stroke="#eb6c36" stroke-width="1.2"/>
-    <text x="600" y="144" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="9" fill="#eb6c36" font-weight="600">07 AUTORIZÁCIA</text>
-    <text x="600" y="160" font-size="11.5" font-weight="600" fill="#2d3142">KEP mandát + QTS</text>
-    <text x="600" y="174" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="8.5" fill="#4f5d75">PIN/BOK · ASiC-E výstup</text>
-
-    <!-- step 8 submit to CEZZK -->
-    <rect x="804" y="428" width="176" height="24" rx="4" fill="rgba(45,49,66,0.03)" stroke="#2e5aa8" stroke-width="1" stroke-dasharray="4,3"/>
-    <text x="892" y="444" text-anchor="middle" font-size="10.5" font-weight="600" fill="#2e5aa8">CEZZK zápis ≤ 24 h</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="1160" height="520" viewBox="0 0 1160 520" role="img" aria-labelledby="proc-title proc-desc">
+  <title id="proc-title">Zaručená konverzia: pracovný tok a stav integrácie</title>
+  <desc id="proc-desc">Päť krokov aplikácie od vstupu cez kontrolu a doložku po autorizáciu a výsledok. EZZK evidenčné číslo je podmienkou autorizácie; produkčné odoslanie do CEZZK čaká na integračné overenie.</desc>
+  <defs><marker id="proc-arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L8 4 L0 8 Z" fill="#4f5d75"/></marker></defs>
+  <rect width="1160" height="520" fill="#f5f5f5"/>
+  <text x="32" y="50" font-family="Georgia, serif" font-size="30" fill="#2d3142">Zaručená konverzia: od skenu po výsledok</text>
+  <text x="32" y="80" font-family="Arial, Helvetica, sans-serif" font-size="16" fill="#4f5d75">Aktuálny krok sa zobrazuje v podnadpise okna.</text>
+  <g fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#proc-arrow)">
+    <path d="M232 208 H252"/><path d="M456 208 H476"/>
+    <path d="M680 208 H700"/><path d="M904 208 H924"/>
+    <path d="M804 356 V292"/>
+    <path d="M1028 288 V352" stroke-dasharray="4 4"/>
   </g>
-
-  <!-- flow arrows -->
-  <g stroke="#4f5d75" stroke-width="1" fill="none">
-    <path d="M160,154 H192" marker-end="url(#p-arr)"/>
-    <path d="M272,176 V296 Q272,304 280,304 V312" marker-end="url(#p-arr)"/>
-    <path d="M348,344 H380" marker-end="url(#p-arr)"/>
-    <path d="M468,312 V194 Q468,186 476,186 H580 Q588,186 588,178" marker-end="url(#p-arr)"/>
-    <path d="M552,344 H584" marker-end="url(#p-arr)"/>
-    <path d="M768,344 H792 Q800,344 800,336 V344" marker-end="url(#p-arr)"/>
-    <path d="M892,312 V194 Q892,186 884,186 H776 Q768,186 768,178" marker-end="url(#p-arr-acc)"/>
+  <g font-family="Arial, Helvetica, sans-serif"><rect x="32" y="128" width="200" height="160" rx="8" fill="#ffffff" stroke="#b5bdc9"/>
+    <text x="50" y="160" font-size="19" font-weight="600" fill="#2d3142">1 · Vstup</text>
+    <text x="50" y="198" font-size="15" fill="#4f5d75">PDF alebo sken</text>
+    <text x="50" y="224" font-size="15" fill="#4f5d75">Potvrdenie pôvodu</text>
+    <text x="50" y="250" font-size="15" fill="#4f5d75">Analýza strán</text>
   </g>
-
-  <!-- EZZK interactions -->
-  <g stroke="#2e5aa8" stroke-width="1" fill="none" stroke-dasharray="3,3">
-    <path d="M648,372 V380 Q648,388 640,388 H224 Q216,388 216,396 V432" marker-end="url(#p-arr)"/>
-    <path d="M892,372 V424" marker-end="url(#p-arr)"/>
+  <g font-family="Arial, Helvetica, sans-serif"><rect x="256" y="128" width="200" height="160" rx="8" fill="#fff5ee" stroke="#eb6c36"/>
+    <text x="274" y="160" font-size="19" font-weight="600" fill="#2d3142">2 · Overenie</text>
+    <text x="274" y="198" font-size="15" fill="#4f5d75">AI návrhy + kontrola</text>
+    <text x="274" y="224" font-size="15" fill="#4f5d75">16 druhov prvkov</text>
+    <text x="274" y="250" font-size="15" fill="#4f5d75">Aj fyzický originál</text>
   </g>
-  <g font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="8.5" fill="#2e5aa8">
-    <rect x="260" y="376" width="224" height="12" rx="2" fill="#f5f5f5"/>
-    <text x="372" y="385" text-anchor="middle">requestEvidenceNumber() · serverTime()</text>
-    <rect x="900" y="380" width="104" height="12" rx="2" fill="#f5f5f5"/>
-    <text x="908" y="389">submit(záznam)</text>
+  <g font-family="Arial, Helvetica, sans-serif"><rect x="480" y="128" width="200" height="160" rx="8" fill="#ffffff" stroke="#b5bdc9"/>
+    <text x="498" y="160" font-size="19" font-weight="600" fill="#2d3142">3 · Doložka</text>
+    <text x="498" y="198" font-size="15" fill="#4f5d75">Profil a počítadlá</text>
+    <text x="498" y="224" font-size="15" fill="#4f5d75">Opis a poloha prvkov</text>
+    <text x="498" y="250" font-size="15" fill="#4f5d75">Kontrola údajov</text>
+  </g>
+  <g font-family="Arial, Helvetica, sans-serif"><rect x="704" y="128" width="200" height="160" rx="8" fill="#ffffff" stroke="#b5bdc9"/>
+    <text x="722" y="160" font-size="19" font-weight="600" fill="#2d3142">4 · Autorizácia</text>
+    <text x="722" y="198" font-size="15" fill="#4f5d75">PDF/A + XML</text>
+    <text x="722" y="224" font-size="15" fill="#4f5d75">Mandátny KEP + QTS</text>
+    <text x="722" y="250" font-size="15" fill="#4f5d75">Karta alebo mobil</text>
+  </g>
+  <g font-family="Arial, Helvetica, sans-serif"><rect x="928" y="128" width="200" height="160" rx="8" fill="#ffffff" stroke="#b5bdc9"/>
+    <text x="946" y="160" font-size="19" font-weight="600" fill="#2d3142">5 · Hotovo</text>
+    <text x="946" y="198" font-size="15" fill="#4f5d75">Výsledné súbory</text>
+    <text x="946" y="224" font-size="15" fill="#4f5d75">Lokálna evidencia</text>
+    <text x="946" y="250" font-size="15" fill="#4f5d75">Náhľad a Finder</text>
+  </g>
+  <g font-family="Arial, Helvetica, sans-serif">
+    <rect x="480" y="356" width="424" height="100" rx="8" fill="#eceff3" stroke="#b5bdc9"/>
+    <text x="500" y="388" font-size="18" font-weight="600" fill="#2d3142">EZZK: evidenčné číslo a čas</text>
+    <text x="500" y="414" font-size="15" fill="#4f5d75">Prihlásenie a dostupná služba sú podmienkou.</text>
+    <text x="500" y="438" font-size="15" fill="#4f5d75">Bez evidenčného čísla autorizácia nepokračuje.</text>
+    <rect x="928" y="356" width="200" height="100" rx="8" fill="#f5f5f5" stroke="#b5bdc9" stroke-dasharray="4 4"/>
+    <text x="946" y="388" font-size="18" font-weight="600" fill="#2d3142">CEZZK produkcia</text>
+    <text x="946" y="414" font-size="15" fill="#4f5d75">Odoslanie čaká na</text>
+    <text x="946" y="438" font-size="15" fill="#4f5d75">integračné overenie.</text>
+    <text x="32" y="492" font-size="14" fill="#4f5d75">Každá neprázdna strana vyžaduje ľudskú kontrolu. Formulárový balík zostáva pilotný.</text>
   </g>
 </svg>

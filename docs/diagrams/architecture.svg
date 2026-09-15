@@ -23,10 +23,10 @@
     <text x="108" y="168" text-anchor="middle">RootView</text>
     <rect x="184" y="144" width="132" height="40" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
     <text x="250" y="162" text-anchor="middle">ZakoFlowView</text>
-    <text x="250" y="177" text-anchor="middle" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="9" font-weight="400" fill="#7a8399">5-krokový stepper</text>
+    <text x="250" y="177" text-anchor="middle" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="9" font-weight="400" fill="#7a8399">postup v podnadpise</text>
     <rect x="332" y="144" width="150" height="40" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
     <text x="407" y="162" text-anchor="middle">AnalysisCanvas</text>
-    <text x="407" y="177" text-anchor="middle" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="9" font-weight="400" fill="#7a8399">PDF + bounding boxy</text>
+    <text x="407" y="177" text-anchor="middle" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="9" font-weight="400" fill="#7a8399">sken + fyzická kontrola</text>
     <rect x="498" y="144" width="146" height="40" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
     <text x="571" y="162" text-anchor="middle">AttestationForm</text>
     <text x="571" y="177" text-anchor="middle" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="9" font-weight="400" fill="#7a8399">live validácia</text>
@@ -64,12 +64,12 @@
     <text x="140" y="466" text-anchor="middle">PDFAnalysisEngine</text>
     <rect x="224" y="444" width="152" height="36" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="0.8"/>
     <text x="300" y="458" text-anchor="middle">DetectionPipeline</text>
-    <text x="300" y="472" text-anchor="middle" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="8.5" font-weight="400" fill="#7a8399">CV + LLM providery</text>
+    <text x="300" y="472" text-anchor="middle" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="8.5" font-weight="400" fill="#7a8399">OCR · kNN · Apple model</text>
     <rect x="64" y="492" width="152" height="36" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="0.8"/>
-    <text x="140" y="506" text-anchor="middle">BuiltInVision</text>
-    <text x="140" y="520" text-anchor="middle" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="8.5" font-weight="400" fill="#7a8399">pečiatky · podpisy</text>
+    <text x="140" y="506" text-anchor="middle">LayeredDetection</text>
+    <text x="140" y="520" text-anchor="middle" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="8.5" font-weight="400" fill="#7a8399">kandidáti + filtre</text>
     <rect x="224" y="492" width="152" height="36" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="0.8"/>
-    <text x="300" y="506" text-anchor="middle">Ollama / OpenAI</text>
+    <text x="300" y="506" text-anchor="middle">oMLX / Ollama / API</text>
     <text x="300" y="520" text-anchor="middle" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="8.5" font-weight="400" fill="#7a8399">voliteľný LLM vision</text>
     <rect x="64" y="540" width="312" height="36" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="0.8"/>
     <text x="220" y="554" text-anchor="middle">PaperClassifier · sheet counting · title suggestion</text>
@@ -122,7 +122,7 @@
     <text x="132" y="626">komponent</text>
     <rect x="216" y="616" width="12" height="12" rx="3" fill="rgba(45,49,66,0.05)" stroke="#4f5d75" stroke-width="0.8"/>
     <text x="236" y="626">služba / protokol</text>
-    <line x1="330" y1="622" x2="358" y2="622" stroke="#4f5d75" stroke-width="1" marker-end="url(#arr)"/>
-    <text x="366" y="626">závislosť</text>
+    <line x1="352" y1="622" x2="380" y2="622" stroke="#4f5d75" stroke-width="1" marker-end="url(#arr)"/>
+    <text x="392" y="626">závislosť</text>
   </g>
 </svg>

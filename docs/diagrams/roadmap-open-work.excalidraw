@@ -95,7 +95,7 @@
       "updated": 1788116993654,
       "link": null,
       "locked": false,
-      "text": "236 TESTOV · 3 SKIPPED · 0 FAIL · macOS 27 · EXTERNÉ KONTRAKTY ZOSTÁVAJÚ OTVORENÉ",
+      "text": "PILOT · RUNTIME OVERENIE · macOS 27 · EXTERNÉ KONTRAKTY ZOSTÁVAJÚ OTVORENÉ",
       "fontSize": 10,
       "fontFamily": 3,
       "textAlign": "left",
@@ -103,7 +103,7 @@
       "containerId": null,
       "lineHeight": 1.25,
       "baseline": 8,
-      "originalText": "236 TESTOV · 3 SKIPPED · 0 FAIL · macOS 27 · EXTERNÉ KONTRAKTY ZOSTÁVAJÚ OTVORENÉ",
+      "originalText": "PILOT · RUNTIME OVERENIE · macOS 27 · EXTERNÉ KONTRAKTY ZOSTÁVAJÚ OTVORENÉ",
       "autoResize": true
     },
     {
@@ -1064,7 +1064,7 @@
       "updated": 1788116993654,
       "link": null,
       "locked": false,
-      "text": "AppKit signature overlay",
+      "text": "Presnosť AI Vision",
       "fontSize": 12,
       "fontFamily": 2,
       "textAlign": "left",
@@ -1072,7 +1072,7 @@
       "containerId": null,
       "lineHeight": 1.25,
       "baseline": 9,
-      "originalText": "AppKit signature overlay",
+      "originalText": "Presnosť AI Vision",
       "autoResize": true
     },
     {
@@ -1101,7 +1101,7 @@
       "updated": 1788116993654,
       "link": null,
       "locked": false,
-      "text": "presné umiestnenie vizuálneho podpisu",
+      "text": "reálne skeny · tréning · held-out",
       "fontSize": 9,
       "fontFamily": 3,
       "textAlign": "left",
@@ -1109,7 +1109,7 @@
       "containerId": null,
       "lineHeight": 1.25,
       "baseline": 8,
-      "originalText": "presné umiestnenie vizuálneho podpisu",
+      "originalText": "reálne skeny · tréning · held-out",
       "autoResize": true
     },
     {
@@ -1484,7 +1484,7 @@
       "updated": 1788116993654,
       "link": null,
       "locked": false,
-      "text": "Natívny callback EZZK",
+      "text": "EZZK integračné overenie",
       "fontSize": 12,
       "fontFamily": 2,
       "textAlign": "left",
@@ -1492,7 +1492,7 @@
       "containerId": null,
       "lineHeight": 1.25,
       "baseline": 9,
-      "originalText": "Natívny callback EZZK",
+      "originalText": "EZZK integračné overenie",
       "autoResize": true
     },
     {
