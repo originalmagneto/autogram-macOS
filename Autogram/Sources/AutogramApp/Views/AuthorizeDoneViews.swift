@@ -54,6 +54,7 @@ struct AuthorizeView: View {
                     Label("Späť na doložku", systemImage: "chevron.left")
                 }
                 .controlSize(.large)
+                .disabled(store.isAuthorizing)
 
                 Spacer()
 

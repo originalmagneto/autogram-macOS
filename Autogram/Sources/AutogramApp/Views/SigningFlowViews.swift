@@ -8,22 +8,11 @@ struct SigningFlowView: View {
     @Bindable var store: SigningSessionStore
     @State private var isTargeted = false
 
-    private var steps: [(title: String, symbol: String)] {
-        [
-            ("Dokument", "doc.badge.plus"),
-            ("Nastavenie podpisu", "signature"),
-            ("Hotovo", "checkmark.seal.fill")
-        ]
-    }
-
     var body: some View {
-        VStack(spacing: 0) {
-            FlowStepBar(steps: steps, currentStepIndex: store.step.rawValue)
-
-            stepContent
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
-        .background(Color(nsColor: .windowBackgroundColor))
+        stepContent
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .safeAreaPadding(.top)
+            .background(Color(nsColor: .windowBackgroundColor))
         .overlay {
             if isTargeted { targetedOverlay }
         }
@@ -254,6 +243,7 @@ struct SigningPrepareView: View {
                     Label("Iný dokument", systemImage: "chevron.left")
                 }
                 .controlSize(.large)
+                .disabled(store.isSigning)
 
                 Spacer()
 
@@ -266,9 +256,20 @@ struct SigningPrepareView: View {
                 settingsContent
                     .padding(16)
             }
+            .safeAreaPadding(.top)
             .inspectorColumnWidth(min: 300, ideal: MacOS27Layout.inspectorIdealWidth, max: 480)
         }
         .toolbar {
+            ToolbarItem(placement: .navigation) {
+                Button {
+                    store.reset()
+                    store.step = .intake
+                } label: {
+                    Label("Iný dokument", systemImage: "chevron.left")
+                }
+                .help("Vybrať iný dokument na podpísanie")
+                .disabled(store.isSigning)
+            }
             ToolbarItem(placement: .primaryAction) {
                 Button {
                     isInspectorPresented.toggle()

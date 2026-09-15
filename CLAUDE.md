@@ -23,14 +23,14 @@ Autogram is a 100% native macOS SwiftUI application for Qualified Electronic Sig
   - `AnalysisCanvasView` review step: canvas holds only the document; the inspector has three cards (`pageReviewCard`, `findingsCard`, `addElementCard`); `ElementRow` is one line until selected; `markPageReviewedAndAdvance` and `confirmAllPendingElements(onPage:)` drive multi-page review; the detection provider menu sits in the `StickyActionBar`
 
 ## Design System & UI/UX Structure
-- **DesignSystem.swift**: Contains `.glassCard()` styling, `StickyActionBar` containers, `SmartcardHUDStatus` reader badges, `EIDASBadge` verification pills, and `FlowStepBar` subheader stepper navigation.
-- **App Shell (RootView.swift)**: Minimalist sidebar with primary sections (Podpisovanie, Zarucena konverzia, Register konverzií), bottom card reader status indicator (`SmartcardHUDStatus`), Full Keyboard Access focus rings, and signing queue management.
+- **DesignSystem.swift**: Contains `.glassCard()` styling, `StickyActionBar` containers, `SmartcardHUDStatus` reader badges, `EIDASBadge` verification pills, and the reusable `FlowStepBar` component. Signing and ZaKo show progress in the window subtitle instead of a step bar.
+- **App Shell (RootView.swift)**: Minimalist sidebar with primary sections (Podpisovanie, Zarucena konverzia, Register konverzií), bottom card reader status indicator (`SmartcardHUDStatus`), Full Keyboard Access focus rings, signing queue management, and step-aware window subtitles.
 - **Signing Suite (SigningFlowViews.swift)**:
   - `SigningIntakeView`: Clean dropzone with `DropzoneArtwork`, support chips, and `⌘O` shortcut.
-  - `SigningPrepareView`: PDF preview, collapsible/resizable inspector (`MacOS27Layout.inspectorIdealWidth`), and sticky action bar with `Podpisat KEP` (`⌘⏎`) and `VisibleAppearanceInspector`.
+  - `SigningPrepareView`: PDF preview, collapsible/resizable inspector (`MacOS27Layout.inspectorIdealWidth`), and sticky action bar with `Podpisat KEP` (`⌘⏎`) and `VisibleAppearanceInspector`. The toolbar offers document reset and inspector visibility; document reset is disabled while signing. Visible signature cards have a transparent background.
   - `SigningDoneView`: Result summary with `EIDASBadge` and Quick Look / Finder actions.
 - **ZaKo Advocate Studio (ZakoFlowViews.swift, AnalysisCanvasView.swift, AttestationFormView.swift, AuthorizeDoneViews.swift)**:
-  - `AnalysisCanvasView`: Markup tools with keyboard placement (`Pridať na aktuálnu stranu`), accessible element selection rows, and left thumbnail strip adapting to page aspect ratio.
+  - `AnalysisCanvasView`: Markup tools with keyboard placement (`Pridať na aktuálnu stranu`), accessible element selection rows, and left thumbnail strip adapting to page aspect ratio. ZaKo toolbar reset and backward navigation from authorization are disabled while authorizing.
   - `AttestationFormView`: Deduplicated advocate profile fields, live clause preview, and template menu.
   - `AuthorizeView`: Mandate certificate verification, PIN handling, and sticky authorization action bar.
   - `DoneView`: Direct access to converted PDF/A and clause files.

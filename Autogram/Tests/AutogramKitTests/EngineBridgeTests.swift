@@ -71,7 +71,7 @@ final class EngineBridgeGeometryTests: XCTestCase {
         XCTAssertGreaterThan(png.count, 200)
     }
 
-    func testRenderedCardIsOpaqueNotSemanticColors() throws {
+    func testRenderedCardKeepsTransparentBackground() throws {
         let work = FileManager.default.temporaryDirectory
             .appendingPathComponent("card-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
@@ -90,6 +90,11 @@ final class EngineBridgeGeometryTests: XCTestCase {
         let png = try Data(contentsOf: url)
         XCTAssertEqual(Array(png.prefix(4)), [0x89, 0x50, 0x4E, 0x47])
         XCTAssertGreaterThan(png.count, 4000, "Karta musí byť plná grafika, nie prázdne PNG")
+        let bitmap = try XCTUnwrap(NSBitmapImageRep(data: png))
+        // Sample the empty inner margin, inside the former white card fill.
+        let margin = Int(12 * VisibleSignatureRenderer.renderScale)
+        let background = try XCTUnwrap(bitmap.colorAt(x: margin, y: bitmap.pixelsHigh / 2))
+        XCTAssertLessThan(background.alphaComponent, 0.01, "Pozadie karty nesmie prekryť obsah dokumentu")
     }
 }
 
