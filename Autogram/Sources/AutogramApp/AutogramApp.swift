@@ -93,14 +93,18 @@ private struct AutogramCommands: Commands {
 
     var body: some Commands {
         CommandGroup(after: .newItem) {
-            Button("Otvoriť súbor…") {
+            Button {
                 actions?.openDocument()
+            } label: {
+                Label("Otvoriť súbor…", systemImage: "doc.badge.plus")
             }
             .keyboardShortcut("o", modifiers: .command)
             .disabled(actions == nil)
 
-            Button("Pridať súbory…") {
+            Button {
                 actions?.addFiles()
+            } label: {
+                Label("Pridať súbory…", systemImage: "plus.rectangle.on.folder")
             }
             .keyboardShortcut("o", modifiers: [.command, .shift])
             .disabled(actions == nil)
@@ -111,13 +115,17 @@ private struct AutogramCommands: Commands {
                     Text("Žiadne nedávne dokumenty")
                 } else {
                     ForEach(recents) { entry in
-                        Button(entry.displayName) {
+                        Button {
                             actions?.openRecent(entry)
+                        } label: {
+                            Label(entry.displayName, systemImage: "doc")
                         }
                     }
                     Divider()
-                    Button("Vymazať menu") {
+                    Button {
                         actions?.clearRecent()
+                    } label: {
+                        Label("Vymazať menu", systemImage: "trash")
                     }
                 }
             }
@@ -125,8 +133,10 @@ private struct AutogramCommands: Commands {
         }
 
         CommandGroup(after: .sidebar) {
-            Button("Zobraziť alebo skryť sidebar") {
+            Button {
                 actions?.toggleSidebar()
+            } label: {
+                Label("Zobraziť alebo skryť sidebar", systemImage: "sidebar.left")
             }
             .keyboardShortcut("s", modifiers: [.command, .control])
             .disabled(actions == nil)
@@ -134,7 +144,7 @@ private struct AutogramCommands: Commands {
 
         CommandGroup(replacing: .appSettings) {
             OpenSettingsButton {
-                Text("Nastavenia…")
+                Label("Nastavenia…", systemImage: "gearshape")
             }
             .keyboardShortcut(",", modifiers: .command)
         }

@@ -83,12 +83,16 @@ struct RootView: View {
         .accessibilityValue("\(entry.origin.label), \(entry.method.label)")
         .contextMenu {
             if isAvailable, let url = entry.url {
-                Button("Zobraziť vo Finderi") {
+                Button {
                     NSWorkspace.shared.activateFileViewerSelecting([url])
+                } label: {
+                    Label("Zobraziť vo Finderi", systemImage: "folder")
                 }
             }
-            Button("Odstrániť zo zoznamu", role: .destructive) {
+            Button(role: .destructive) {
                 signedDocumentStore.remove(id: entry.id)
+            } label: {
+                Label("Odstrániť zo zoznamu", systemImage: "xmark.circle")
             }
         }
     }
@@ -124,8 +128,10 @@ struct RootView: View {
                     } header: {
                         Text("Podpísané dokumenty")
                             .contextMenu {
-                                Button("Vymazať históriu podpisov", role: .destructive) {
+                                Button(role: .destructive) {
                                     signedDocumentStore.clear()
+                                } label: {
+                                    Label("Vymazať históriu podpisov", systemImage: "trash")
                                 }
                             }
                     }
@@ -160,16 +166,20 @@ struct RootView: View {
                             .accessibilityLabel("Nedávny dokument \(entry.displayName)")
                             .accessibilityValue(isAvailable ? "Dostupný" : "Nedostupný")
                             .contextMenu {
-                                Button("Odstrániť z nedávnych", role: .destructive) {
+                                Button(role: .destructive) {
                                     recentDocumentStore.remove(id: entry.id)
+                                } label: {
+                                    Label("Odstrániť z nedávnych", systemImage: "xmark.circle")
                                 }
                             }
                         }
                     } header: {
                         Text("Nedávne dokumenty")
                             .contextMenu {
-                                Button("Vymazať všetky nedávne dokumenty", role: .destructive) {
+                                Button(role: .destructive) {
                                     recentDocumentStore.clear()
+                                } label: {
+                                    Label("Vymazať všetky nedávne dokumenty", systemImage: "trash")
                                 }
                             }
                     }
@@ -206,19 +216,25 @@ struct RootView: View {
                                     : Color.clear
                             )
                             .contextMenu {
-                                Button("Vybrať na podpis") {
+                                Button {
                                     selection = .signing
                                     Task { await signingStore.selectQueueItem(item.id) }
+                                } label: {
+                                    Label("Vybrať na podpis", systemImage: "signature")
                                 }
                                 if let outputURL = item.signedOutputURL {
-                                    Button("Ukázať vo Finderi") {
+                                    Button {
                                         NSWorkspace.shared.activateFileViewerSelecting([outputURL])
+                                    } label: {
+                                        Label("Ukázať vo Finderi", systemImage: "folder")
                                     }
                                 }
                                 Divider()
-                                Button("Odstrániť z fronty", role: .destructive) {
+                                Button(role: .destructive) {
                                     queueItemToDelete = item.id
                                     showQueueDeleteConfirmation = true
+                                } label: {
+                                    Label("Odstrániť z fronty", systemImage: "xmark.circle")
                                 }
                                 .disabled(batchIsActive)
                             }
