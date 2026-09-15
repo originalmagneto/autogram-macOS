@@ -406,7 +406,7 @@ Aktuálny macOS build je v [GitHub Releases](https://github.com/originalmagneto/
 xattr -d com.apple.quarantine "/Applications/Autogram macOS.app"
 ```
 
-<p>Overenie stiahnutého DMG: v poznámkach k vydaniu je SHA-256 odtlačok; porovnajte ho s výstupom <code>shasum -a 256 Autogram-macOS-v0.3.1.dmg</code>.</p>
+<p>Overenie stiahnutého DMG: v poznámkach k vydaniu je SHA-256 odtlačok; porovnajte ho s výstupom <code>shasum -a 256 Autogram-macOS-v0.4.0.dmg</code>.</p>
 </details>
 
 <details>
@@ -419,7 +419,19 @@ xattr -d com.apple.quarantine "/Applications/Autogram macOS.app"
 </details>
 
 <details open>
-<summary><strong>v0.3.1 · aktuálne vydanie: podpisový engine a Finder Quick Action v DMG</strong></summary>
+<summary><strong>v0.4.0 · aktuálne vydanie: mobil, Safari, ZaKo a nové UI</strong></summary>
+<ul>
+<li>Podpis mobilom cez QR kód a NFC eID, aj z podporovaných štátnych portálov cez Safari rozšírenie.</li>
+<li>Natívne rozhranie s postupom v podnadpise okna, nastaviteľným inšpektorom a priehľadným vizuálnym podpisom.</li>
+<li>16 druhov bezpečnostných prvkov, fyzická kontrola originálu a výslovné potvrdenie dokumentu bez prvkov.</li>
+<li>Oddelené učenie z výrezov a export kompletne skontrolovaných strán s rozdelením podľa dokumentov.</li>
+<li>Opravená normalizácia PDF/A v pribalenom engine a aktualizované diagramy.</li>
+</ul>
+<p>Po nainštalovaní aplikácie možno Safari bridge zaregistrovať spustením <code>Install Safari Bridge.command</code> z DMG. Rozšírenie vyžaduje zapnuté <strong>Develop &gt; Allow Unsigned Extensions</strong> v Safari.</p>
+</details>
+
+<details>
+<summary><strong>v0.3.1 · predchádzajúce vydanie: podpisový engine a Finder Quick Action v DMG</strong></summary>
 <ul>
 <li>DMG obsahuje Java podpisový engine (DSS, PKCS#11, machine protokol v1/v2) s vlastným jlink runtime; kvalifikovaný podpis eID a advokátskym preukazom funguje bez inštalácie Javy a sidebar už nepadá do režimu DEMO.</li>
 <li>Finder Quick Action podpisuje cez zabalené helpery <code>AutogramCLI-arm64</code> a <code>AutogramQuickActionRunner-arm64</code>.</li>

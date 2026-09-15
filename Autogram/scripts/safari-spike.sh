@@ -82,15 +82,14 @@ Potom otvor https://www.slovensko.sk/ a vo web inspectore konzoly spusti:
 
      await window.autogramMacOS.status()
 
-  Očakávaný výsledok:  { ok: true, ready: false, version: "0.3.1" }
+  Očakávaný výsledok:  { ok: true, ready: true, version: "0.4.0" }
   (presne to už vracia sonda v kroku 6 bez Safari)
 
-  ready:false je správne - transport funguje, len podpisový handler ešte
-  nie je zapojený (to je ďalšia úloha, nie chyba).
+  ready:true znamená, že podpisový handler je pripravený. Samotný podpis
+  ešte vyžaduje potvrdenie používateľom a kartu alebo mobil.
 
   Ak dostaneš { ok:false, error:"Autogram macOS nebeží..." }, appex sa načítal,
-  ale mach-lookup výnimka neprešla - to je presne tá neznáma, ktorú sonda meria,
-  a znamená to prepnúť na záložný plán (interný HTTP server na 127.0.0.1
-  s tokenom) popísaný v špecifikácii.
+  ale spojenie s aplikáciou zlyhalo. Skontroluj registráciu agenta,
+  mach-lookup entitlement a výsledok XPC sondy vyššie.
 ──────────────────────────────────────────────────────────────────────────
 MANUAL
