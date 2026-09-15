@@ -1,5 +1,6 @@
 import Foundation
 import AppKit
+import PDFKit
 import AutogramKit
 import AutogramWebBridge
 import Observation
@@ -20,6 +21,8 @@ final class WebSigningCoordinator {
         let request: WebSignRequest
         let sizeDescription: String
         let kindDescription: String
+        let pdfThumbnail: NSImage?
+        let xmlExcerpt: String?
     }
 
     enum Failure: LocalizedError {
@@ -151,10 +154,23 @@ final class WebSigningCoordinator {
             throw Failure.tooLarge(bytes.count)
         }
 
+        var pdfThumb: NSImage?
+        var xmlPreview: String?
+        if request.eform != nil || request.payloadMimeType.contains("xml") {
+            if let string = String(data: bytes.prefix(8192), encoding: .utf8) {
+                let lines = string.components(separatedBy: .newlines).prefix(10)
+                xmlPreview = lines.joined(separator: "\n")
+            }
+        } else if let doc = PDFDocument(data: bytes), let page = doc.page(at: 0) {
+            pdfThumb = page.thumbnail(of: CGSize(width: 140, height: 180), for: .mediaBox)
+        }
+
         pending = Pending(id: request.requestID,
                           request: request,
                           sizeDescription: Self.describeSize(bytes.count),
-                          kindDescription: Self.describeKind(request))
+                          kindDescription: Self.describeKind(request),
+                          pdfThumbnail: pdfThumb,
+                          xmlExcerpt: xmlPreview)
         pin = ""
         errorText = nil
         prompt.show(coordinator: self)

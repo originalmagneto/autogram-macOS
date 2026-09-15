@@ -46,7 +46,6 @@ struct ZakoFlowView: View {
                 }
             }
         }
-        .toolbarBackgroundVisibility(.visible, for: .windowToolbar)
     }
 
     private var targetedOverlay: some View {

@@ -92,6 +92,7 @@ struct EvidenceDashboardView: View {
                 }
             }
         }
+        .searchable(text: $filterText, prompt: "Hľadať podľa názvu alebo čísla")
         .onAppear {
             reload()
             startClock()
@@ -205,17 +206,6 @@ struct EvidenceDashboardView: View {
 
     private var filterBar: some View {
         HStack(spacing: 12) {
-            HStack(spacing: 6) {
-                Image(systemName: "magnifyingglass")
-                    .foregroundStyle(.secondary)
-                TextField("Hľadať podľa názvu alebo čísla", text: $filterText)
-                    .textFieldStyle(.plain)
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 8))
-            .frame(minWidth: 180, idealWidth: 260, maxWidth: 320)
-
             Picker("Filtrovať podľa stavu", selection: $statusFilter) {
                 Text("Všetky stavy").tag(EvidenceRecord.Status?.none)
                 ForEach(EvidenceRecord.Status.allCases, id: \.self) { status in
@@ -226,6 +216,7 @@ struct EvidenceDashboardView: View {
             .frame(minWidth: 150, idealWidth: 180, maxWidth: 220)
 
             Spacer(minLength: 8)
+
             Button {
                 showDetail = true
             } label: {
@@ -234,6 +225,7 @@ struct EvidenceDashboardView: View {
             .buttonStyle(.bordered)
             .disabled(selectedRecordID == nil)
             .keyboardShortcut(.defaultAction)
+
             Button {
                 submitPending()
             } label: {
@@ -249,19 +241,21 @@ struct EvidenceDashboardView: View {
             .buttonStyle(.borderedProminent)
             .disabled(isSubmitting || !records.contains(where: \.isSubmissionPending))
 
-
             Button {
                 exportCSV()
             } label: {
                 Label("Export CSV", systemImage: "square.and.arrow.up.on.square")
             }
             .buttonStyle(.bordered)
+
             if let exportError {
-                Text(exportError)
-                    .font(.caption)
-                    .foregroundStyle(.red)
-                Button("Skúsiť znova", action: exportCSV)
-                    .buttonStyle(.bordered)
+                HStack(spacing: 4) {
+                    Text(exportError)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                    Button("Skúsiť znova", action: exportCSV)
+                        .buttonStyle(.link)
+                }
             }
         }
         .padding(.horizontal, 18)

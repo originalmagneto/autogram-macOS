@@ -36,7 +36,7 @@ struct WebSigningSheet: View {
             actions
         }
         .padding(24)
-        .frame(width: 480)
+        .frame(minWidth: 480, idealWidth: 540, maxWidth: 620)
         .sheet(isPresented: Bindable(coordinator.mobileSigning).isPresented) {
             if let session = coordinator.mobileSigning.session {
                 MobileSigningSheet(session: session) {
@@ -54,28 +54,70 @@ struct WebSigningSheet: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Podpísať dokument zo stránky")
                     .font(.headline)
-                Text("Požiadavku poslalo rozšírenie v prehliadači.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                HStack(spacing: 4) {
+                    Image(systemName: "safari")
+                    Text("Pôvod: Webový portál cez rozšírenie Safari")
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
         }
     }
 
     private func documentCard(_ pending: WebSigningCoordinator.Pending) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(pending.request.filename)
-                .font(.callout.weight(.medium))
-                .lineLimit(1)
-                .truncationMode(.middle)
-            HStack(spacing: 8) {
-                Text(pending.kindDescription)
-                Text("·")
-                Text(pending.sizeDescription)
-                Text("·")
-                Text(pending.request.signatureLevel.replacingOccurrences(of: "_", with: " "))
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 12) {
+                if let thumb = pending.pdfThumbnail {
+                    VStack(spacing: 4) {
+                        Image(nsImage: thumb)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 60, height: 78)
+                            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                    .strokeBorder(Color.primary.opacity(0.12), lineWidth: 1)
+                            )
+                            .shadow(color: .black.opacity(0.08), radius: 4, y: 2)
+                        Text("1. strana")
+                            .font(.system(size: 9))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(pending.request.filename)
+                        .font(.callout.weight(.medium))
+                        .lineLimit(2)
+                        .truncationMode(.middle)
+                    Text(pending.kindDescription)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    HStack(spacing: 8) {
+                        Text(pending.sizeDescription)
+                        Text("·")
+                        Text(pending.request.signatureLevel.replacingOccurrences(of: "_", with: " "))
+                    }
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                }
             }
-            .font(.caption)
-            .foregroundStyle(.secondary)
+
+            if let excerpt = pending.xmlExcerpt {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Ukážka obsahu formulára (čiastočný náhľad):")
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(.secondary)
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        Text(excerpt)
+                            .font(.system(size: 10, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                            .padding(6)
+                    }
+                    .frame(maxHeight: 70)
+                    .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 6))
+                }
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)

@@ -139,6 +139,11 @@ struct AnalysisCanvasView: View {
                 ForEach(0..<store.analysis.totalPages, id: \.self) { pageIndex in
                     let isSelected = store.previewPageIndex == pageIndex
                     let countOnPage = store.securityElements.filter { $0.pageIndex == pageIndex }.count
+                    let page = store.document?.page(at: pageIndex)
+                    let bounds = page?.bounds(for: .mediaBox) ?? CGRect(x: 0, y: 0, width: 595, height: 842)
+                    let aspect = bounds.width > 0 && bounds.height > 0 ? (bounds.width / bounds.height) : (54.0 / 72.0)
+                    let thumbWidth: CGFloat = aspect >= 1.0 ? 64 : 54
+                    let thumbHeight: CGFloat = max(thumbWidth / aspect, 40)
 
                     Button {
                         store.previewPageIndex = pageIndex
@@ -146,15 +151,15 @@ struct AnalysisCanvasView: View {
                         ZStack(alignment: .topTrailing) {
                             RoundedRectangle(cornerRadius: 6, style: .continuous)
                                 .fill(Color.white)
-                                .frame(width: 54, height: 72)
+                                .frame(width: thumbWidth, height: thumbHeight)
                                 .overlay {
-                                    if let page = store.document?.page(at: pageIndex) {
+                                    if let page {
                                         Image(nsImage: page.thumbnail(
-                                            of: CGSize(width: 108, height: 144),
+                                            of: CGSize(width: thumbWidth * 2, height: thumbHeight * 2),
                                             for: .mediaBox))
                                             .resizable()
                                             .scaledToFit()
-                                            .frame(width: 52, height: 70)
+                                            .frame(width: max(thumbWidth - 2, 10), height: max(thumbHeight - 2, 10))
                                             .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
                                     }
                                 }
@@ -174,7 +179,7 @@ struct AnalysisCanvasView: View {
                                 Image(systemName: "checkmark.circle.fill")
                                     .font(.system(size: 12))
                                     .foregroundStyle(.white, .green)
-                                    .frame(width: 54, height: 72, alignment: .bottomTrailing)
+                                    .frame(width: thumbWidth, height: thumbHeight, alignment: .bottomTrailing)
                                     .offset(x: 3, y: 3)
                             }
                             if countOnPage > 0 {
@@ -213,6 +218,21 @@ struct AnalysisCanvasView: View {
                     toolButton(kind: .initial, title: "Parafa", icon: "text.badge.checkmark")
                 }
             }
+
+            Button {
+                let kind = store.activeTool ?? .officialStamp
+                let defaultPoint = NormalizedPoint(x: 0.5, y: 0.5)
+                let id = store.placeElement(kind: kind, at: defaultPoint)
+                store.selectedElementID = id
+                showPrecisePlacement = true
+            } label: {
+                Label("Pridať na aktuálnu stranu", systemImage: "plus.viewfinder")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .help("Vloží nový rámec do stredu aktuálnej strany a označí ho na číselné alebo klávesové úpravy")
+
             if let progress = store.snapAssetProgress {
                 HStack(spacing: 6) {
                     ProgressView(value: progress).frame(width: 80)
@@ -629,16 +649,16 @@ struct AnalysisCanvasView: View {
                 HStack(spacing: 6) {
                     Text("Posun")
                         .font(.caption2.weight(.semibold))
-                    placementButton("doľava", icon: "arrow.left", shortcut: .leftArrow) {
+                    placementButton("doľava", icon: "arrow.left", shortcut: .leftArrow, modifiers: [.option]) {
                         adjustSelectedElement(dx: -0.01, dy: 0)
                     }
-                    placementButton("doprava", icon: "arrow.right", shortcut: .rightArrow) {
+                    placementButton("doprava", icon: "arrow.right", shortcut: .rightArrow, modifiers: [.option]) {
                         adjustSelectedElement(dx: 0.01, dy: 0)
                     }
-                    placementButton("hore", icon: "arrow.up", shortcut: .upArrow) {
+                    placementButton("hore", icon: "arrow.up", shortcut: .upArrow, modifiers: [.option]) {
                         adjustSelectedElement(dx: 0, dy: 0.01)
                     }
-                    placementButton("dole", icon: "arrow.down", shortcut: .downArrow) {
+                    placementButton("dole", icon: "arrow.down", shortcut: .downArrow, modifiers: [.option]) {
                         adjustSelectedElement(dx: 0, dy: -0.01)
                     }
                 }
@@ -646,16 +666,16 @@ struct AnalysisCanvasView: View {
                 HStack(spacing: 6) {
                     Text("Veľkosť")
                         .font(.caption2.weight(.semibold))
-                    placementButton("zmenšiť šírku", icon: "arrow.left.and.right", shortcut: .leftArrow, modifiers: [.shift]) {
+                    placementButton("zmenšiť šírku", icon: "arrow.left.and.right", shortcut: .leftArrow, modifiers: [.shift, .option]) {
                         adjustSelectedElement(dx: 0, dy: 0, dw: -0.01, dh: 0)
                     }
-                    placementButton("zväčšiť šírku", icon: "arrow.left.and.right", shortcut: .rightArrow, modifiers: [.shift]) {
+                    placementButton("zväčšiť šírku", icon: "arrow.left.and.right", shortcut: .rightArrow, modifiers: [.shift, .option]) {
                         adjustSelectedElement(dx: 0, dy: 0, dw: 0.01, dh: 0)
                     }
-                    placementButton("zmenšiť výšku", icon: "arrow.up.and.down", shortcut: .downArrow, modifiers: [.shift]) {
+                    placementButton("zmenšiť výšku", icon: "arrow.up.and.down", shortcut: .downArrow, modifiers: [.shift, .option]) {
                         adjustSelectedElement(dx: 0, dy: 0, dw: 0, dh: -0.01)
                     }
-                    placementButton("zväčšiť výšku", icon: "arrow.up.and.down", shortcut: .upArrow, modifiers: [.shift]) {
+                    placementButton("zväčšiť výšku", icon: "arrow.up.and.down", shortcut: .upArrow, modifiers: [.shift, .option]) {
                         adjustSelectedElement(dx: 0, dy: 0, dw: 0, dh: 0.01)
                     }
                 }
@@ -943,7 +963,17 @@ struct ElementRow: View {
             .accessibilityElement(children: .combine)
             .accessibilityLabel("\(element.kind.rawValue), stav: \(element.reviewState.label), \(UXLabels.provenanceLabel(detectedByAI: element.detectedByAI))")
             .accessibilityValue("\(UXLabels.confidenceLabel(for: element.confidence)); \(isSelected ? "Vybraný" : "Nevybraný")")
-            .accessibilityAddTraits(isSelected ? .isSelected : [])
+            .accessibilityAddTraits(isSelected ? [.isSelected, .isButton] : [.isButton])
+            .accessibilityAction(named: "Vybrať prvok", onSelect)
+            .focusable()
+            .onKeyPress(.space) {
+                onSelect()
+                return .handled
+            }
+            .onKeyPress(.return) {
+                onSelect()
+                return .handled
+            }
 
             if isExpanded {
                 TextField("Popis prvku", text: Binding(

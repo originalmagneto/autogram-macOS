@@ -1,6 +1,18 @@
 import AppKit
 import SwiftUI
 
+private final class WebSigningPanelDelegate: NSObject, NSWindowDelegate {
+    private weak var coordinator: WebSigningCoordinator?
+
+    init(coordinator: WebSigningCoordinator) {
+        self.coordinator = coordinator
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        coordinator?.cancel()
+    }
+}
+
 /// Shows the browser signing prompt in a floating panel instead of a sheet.
 ///
 /// A sheet lives on the app's own window, and since macOS Sonoma an app in the
@@ -14,6 +26,7 @@ import SwiftUI
 @MainActor
 final class WebSigningPrompt {
     private var panel: NSPanel?
+    private var delegate: WebSigningPanelDelegate?
 
     func show(coordinator: WebSigningCoordinator) {
         if let panel {
@@ -26,8 +39,8 @@ final class WebSigningPrompt {
         let size = hosting.fittingSize
 
         let panel = NSPanel(
-            contentRect: NSRect(origin: .zero, size: size),
-            styleMask: [.titled, .closable, .utilityWindow],
+            contentRect: NSRect(origin: .zero, size: NSSize(width: max(size.width, 520), height: max(size.height, 460))),
+            styleMask: [.titled, .closable, .utilityWindow, .resizable],
             backing: .buffered,
             defer: false)
         panel.title = "Podpísať dokument zo stránky"
@@ -37,9 +50,14 @@ final class WebSigningPrompt {
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.hidesOnDeactivate = false
         panel.isReleasedWhenClosed = false
+        panel.minSize = NSSize(width: 480, height: 420)
         panel.center()
 
+        let delegate = WebSigningPanelDelegate(coordinator: coordinator)
+        panel.delegate = delegate
+        self.delegate = delegate
         self.panel = panel
+
         panel.orderFrontRegardless()
         // Bounces the Dock icon. Activation itself is the system's call, but a
         // request for attention is always honoured.
@@ -47,7 +65,10 @@ final class WebSigningPrompt {
     }
 
     func hide() {
+        panel?.delegate = nil
         panel?.close()
         panel = nil
+        delegate = nil
     }
 }
+

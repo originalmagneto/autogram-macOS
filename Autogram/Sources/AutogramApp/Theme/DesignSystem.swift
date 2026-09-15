@@ -11,21 +11,6 @@ public extension View {
                     .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
             )
     }
-
-    func liquidGlass(cornerRadius: CGFloat = 18, padding: CGFloat = 16) -> some View {
-        self
-            .padding(padding)
-            .glassEffect(.regular, in: .rect(cornerRadius: cornerRadius))
-    }
-
-    func floatingGlass(cornerRadius: CGFloat = 24) -> some View {
-        self.background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-            .shadow(color: .black.opacity(0.12), radius: 16, y: 6)
-            .overlay(
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
-            )
-    }
 }
 
 // MARK: - Sticky Bottom Action Bar
@@ -60,7 +45,6 @@ struct SmartcardHUDStatus: View {
                 Circle()
                     .fill(isConnected ? Color.green : Color.secondary)
                     .frame(width: 8, height: 8)
-                    .shadow(color: isConnected ? Color.green.opacity(0.7) : Color.clear, radius: 4)
             }
             VStack(alignment: .leading, spacing: 1) {
                 Text(label)
@@ -200,11 +184,11 @@ struct FlowStepBar: View {
 
     private func stepFill(isComplete: Bool, isActive: Bool) -> AnyShapeStyle {
         if isComplete {
-            return AnyShapeStyle(Color.green.gradient)
+            return AnyShapeStyle(Color.green)
         } else if isActive {
-            return AnyShapeStyle(Color.accentColor.gradient)
+            return AnyShapeStyle(Color.accentColor)
         } else {
-            return AnyShapeStyle(Color.secondary.opacity(0.2))
+            return AnyShapeStyle(Color.secondary.opacity(0.18))
         }
     }
 }
@@ -216,38 +200,31 @@ struct DropzoneArtwork: View {
 
     var body: some View {
         ZStack {
-            // Ambient glow
-            Circle()
-                .fill(tint.opacity(0.07))
-                .frame(width: 160, height: 160)
-                .blur(radius: 20)
-
             // Outer ring
             Circle()
                 .strokeBorder(
                     LinearGradient(
-                        colors: [tint.opacity(0.35), tint.opacity(0.06)],
+                        colors: [tint.opacity(0.3), tint.opacity(0.08)],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     ),
                     lineWidth: 1.5
                 )
-                .frame(width: 140, height: 140)
+                .frame(width: 130, height: 130)
 
-            // Inner glass bubble
+            // Inner material circle
             Circle()
                 .fill(.ultraThinMaterial)
-                .frame(width: 110, height: 110)
+                .frame(width: 104, height: 104)
                 .overlay(
                     Circle()
-                        .strokeBorder(Color.white.opacity(0.22), lineWidth: 1)
+                        .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
                 )
-                .shadow(color: tint.opacity(0.12), radius: 10, y: 5)
 
             // Center Symbol
             Image(systemName: icon)
-                .font(.system(size: 44, weight: .light))
-                .foregroundStyle(tint.gradient)
+                .font(.system(size: 42, weight: .light))
+                .foregroundStyle(tint)
         }
     }
 }

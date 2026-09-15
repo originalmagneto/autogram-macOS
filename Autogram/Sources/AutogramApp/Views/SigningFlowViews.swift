@@ -239,37 +239,43 @@ struct SigningPrepareView: View {
     @State private var visualState: SignaturePlacementState?
     @FocusState private var signingPINFocused: Bool
     @State private var bridgePlacement: VisibleSignaturePlacement?
+    @State private var isInspectorPresented = true
 
     var body: some View {
-        HStack(alignment: .top, spacing: 0) {
+        VStack(spacing: 0) {
             previewColumn
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            VStack(spacing: 0) {
-                ScrollView {
-                    settingsContent
-                        .padding(16)
+            StickyActionBar {
+                Button {
+                    store.reset()
+                    store.step = .intake
+                } label: {
+                    Label("Iný dokument", systemImage: "chevron.left")
                 }
+                .controlSize(.large)
 
-                StickyActionBar {
-                    Button {
-                        store.reset()
-                        store.step = .intake
-                    } label: {
-                        Label("Iný dokument", systemImage: "chevron.left")
-                    }
-                    .controlSize(.large)
+                Spacer()
 
-                    Spacer()
-
-                    mobileSignButton
-                    signButton
-                }
+                mobileSignButton
+                signButton
             }
-            .frame(width: 380)
-            .background(.bar)
-            .overlay(alignment: .leading) {
-                Rectangle().fill(Color.primary.opacity(0.08)).frame(width: 1)
+        }
+        .inspector(isPresented: $isInspectorPresented) {
+            ScrollView {
+                settingsContent
+                    .padding(16)
+            }
+            .inspectorColumnWidth(min: 300, ideal: MacOS27Layout.inspectorIdealWidth, max: 480)
+        }
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    isInspectorPresented.toggle()
+                } label: {
+                    Label("Nastavenia podpisu", systemImage: "sidebar.trailing")
+                }
+                .help("Zobraziť alebo skryť nastavenia podpisu")
             }
         }
         .sheet(isPresented: Bindable(store.mobileSigning).isPresented) {

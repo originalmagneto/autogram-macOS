@@ -196,7 +196,6 @@ struct RootView: View {
                                 }
                             }
                             .buttonStyle(.plain)
-                            .focusEffectDisabled()
                             .accessibilityLabel("Dokument \(item.displayName)")
                             .accessibilityValue("\(queueStatusLabel(item.status)); \(isSelected ? "Vybraný" : "Nevybraný")")
                             .accessibilityAddTraits(isSelected ? .isSelected : [])
@@ -309,7 +308,8 @@ struct RootView: View {
 
             HStack {
                 OpenSettingsButton {
-                    Image(systemName: "gearshape")
+                    Label("Nastavenia", systemImage: "gearshape")
+                        .font(.caption)
                 }
                 .buttonStyle(.borderless)
                 .accessibilityLabel("Nastavenia")
