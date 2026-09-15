@@ -333,7 +333,18 @@ struct RootView: View {
                 return "podpísané · \(mode)"
             }
         case .zako:
-            return ""
+            switch zakoStore.step {
+            case .intake:
+                return "vstupný dokument"
+            case .analysis:
+                return "krok 2 z 5: overenie originálu"
+            case .attestation:
+                return "krok 3 z 5: osvedčovacia doložka"
+            case .authorize:
+                return "krok 4 z 5: autorizácia KEP"
+            case .done:
+                return "krok 5 z 5: hotovo"
+            }
         case .evidence:
             return "register konverzií a CEZZK"
         }

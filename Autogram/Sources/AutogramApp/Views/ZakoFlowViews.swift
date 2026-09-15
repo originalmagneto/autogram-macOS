@@ -9,33 +9,30 @@ struct ZakoFlowView: View {
     @State private var showOpenPanel = false
     @State private var isTargeted = false
 
-    private var steps: [(title: String, symbol: String)] {
-        [
-            ("Vstupný dokument", "doc.badge.plus"),
-            ("Overenie originálu", "shield.checkerboard"),
-            ("Osvedčovacia doložka", "building.columns.fill"),
-            ("Autorizácia KEP", "signature.badge.checkmark"),
-            ("Hotovo", "checkmark.seal.fill")
-        ]
-    }
-
     var body: some View {
-        VStack(spacing: 0) {
-            FlowStepBar(steps: steps, currentStepIndex: store.step.rawValue)
-
-            stepContent
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
-        .safeAreaPadding(.top)
-        .background(Color(nsColor: .windowBackgroundColor))
-        .overlay {
-            if isTargeted { targetedOverlay }
-        }
-        .onDrop(of: [UTType.pdf, .jpeg, .png, .tiff], isTargeted: $isTargeted) { providers in
-            handleDrop(providers)
-        }
-        .toolbar {
-            ToolbarItemGroup(placement: .primaryAction) {
+        stepContent
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .safeAreaPadding(.top)
+            .background(Color(nsColor: .windowBackgroundColor))
+            .overlay {
+                if isTargeted { targetedOverlay }
+            }
+            .onDrop(of: [UTType.pdf, .jpeg, .png, .tiff], isTargeted: $isTargeted) { providers in
+                handleDrop(providers)
+            }
+            .toolbar {
+                if store.step != .intake {
+                    ToolbarItem(placement: .navigation) {
+                        Button {
+                            store.resetSession(keepingProfile: true)
+                            store.step = .intake
+                        } label: {
+                            Label("Iný dokument", systemImage: "chevron.left")
+                        }
+                        .help("Vybrať iný dokument na konverziu")
+                    }
+                }
+                ToolbarItemGroup(placement: .primaryAction) {
                 if store.isAnalyzing {
                     HStack(spacing: 6) {
                         ProgressView().controlSize(.small)
