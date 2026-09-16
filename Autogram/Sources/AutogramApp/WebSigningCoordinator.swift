@@ -353,6 +353,7 @@ final class WebSigningCoordinator {
                                        signatureLevel: requested,
                                        signedBy: AVMResultMapper.signatureLabel(signers: signers),
                                        url: saved)
+            signedDocumentStore.purgeBrowserCopies(olderThanDays: settingsStore.settings.webSigningRetentionDays)
             finish(.success(WebSignResponse(
                 requestID: pending.request.requestID,
                 content: content.base64EncodedString(),
@@ -417,6 +418,7 @@ final class WebSigningCoordinator {
                                        signatureLevel: level,
                                        signedBy: signed.signatureLabel,
                                        url: saved)
+            signedDocumentStore.purgeBrowserCopies(olderThanDays: settingsStore.settings.webSigningRetentionDays)
             finish(.success(WebSignResponse(
                 requestID: pending.request.requestID,
                 content: payload.base64EncodedString(),

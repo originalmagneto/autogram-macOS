@@ -24,6 +24,14 @@ struct RootView: View {
     @State private var selection: SidebarSection = .signing
     @State private var queueItemToDelete: UUID?
     @State private var showQueueDeleteConfirmation = false
+    @AppStorage("sidebar.signedDocumentsExpanded") private var signedDocumentsExpanded = true
+    @AppStorage("sidebar.recentDocumentsExpanded") private var recentDocumentsExpanded = true
+    @State private var showAllSignedDocuments = false
+    @State private var showAllRecentDocuments = false
+    @State private var showSignedClearDialog = false
+
+    /// Rows shown per history section before "Zobraziť všetky".
+    private static let sidebarPreviewCount = 5
 
     init(model: AutogramAppModel) {
         self._model = Bindable(wrappedValue: model)
@@ -89,12 +97,49 @@ struct RootView: View {
                     Label("Zobraziť vo Finderi", systemImage: "folder")
                 }
             }
-            Button(role: .destructive) {
-                signedDocumentStore.remove(id: entry.id)
+            Button {
+                signedDocumentStore.remove(id: entry.id, trashingFile: false)
             } label: {
                 Label("Odstrániť zo zoznamu", systemImage: "xmark.circle")
             }
+            if isAvailable {
+                Button(role: .destructive) {
+                    signedDocumentStore.remove(id: entry.id, trashingFile: true)
+                } label: {
+                    Label("Odstrániť aj súbor (do Koša)", systemImage: "trash")
+                }
+            }
         }
+    }
+
+    /// Header of a collapsible history section with its own actions menu, so the
+    /// clean-up is found without knowing about the header's context menu.
+    private func historyHeader(_ title: String, @ViewBuilder actions: () -> some View) -> some View {
+        HStack(spacing: 4) {
+            Text(title)
+            Spacer(minLength: 0)
+            Menu {
+                actions()
+            } label: {
+                Image(systemName: "ellipsis.circle")
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .accessibilityLabel("Akcie pre \(title)")
+        }
+    }
+
+    private func showMoreButton(total: Int, isShowingAll: Binding<Bool>) -> some View {
+        Button {
+            isShowingAll.wrappedValue.toggle()
+        } label: {
+            Text(isShowingAll.wrappedValue ? "Zobraziť menej" : "Zobraziť všetky (\(total))")
+                .font(.caption.weight(.medium))
+                .foregroundStyle(Color.accentColor)
+        }
+        .buttonStyle(.plain)
+        .padding(.leading, 24)
     }
 
     private var signingStore: SigningSessionStore { model.signingStore }
@@ -121,25 +166,27 @@ struct RootView: View {
                 }
 
                 if !signedDocumentStore.entries.isEmpty {
-                    Section {
-                        ForEach(signedDocumentStore.entries) { entry in
+                    let signed = signedDocumentStore.entries
+                    Section(isExpanded: $signedDocumentsExpanded) {
+                        ForEach(showAllSignedDocuments ? signed : Array(signed.prefix(Self.sidebarPreviewCount))) { entry in
                             signedDocumentRow(entry)
                         }
+                        if signed.count > Self.sidebarPreviewCount {
+                            showMoreButton(total: signed.count, isShowingAll: $showAllSignedDocuments)
+                        }
                     } header: {
-                        Text("Podpísané dokumenty")
-                            .contextMenu {
-                                Button(role: .destructive) {
-                                    signedDocumentStore.clear()
-                                } label: {
-                                    Label("Vymazať históriu podpisov", systemImage: "trash")
-                                }
+                        historyHeader("Podpísané dokumenty") {
+                            Button("Vyčistiť…", systemImage: "trash") {
+                                showSignedClearDialog = true
                             }
+                        }
                     }
                 }
 
                 if recentDocumentStore.isEnabled && !recentDocumentStore.entries.isEmpty {
-                    Section {
-                        ForEach(recentDocumentStore.entries) { entry in
+                    let recent = recentDocumentStore.entries
+                    Section(isExpanded: $recentDocumentsExpanded) {
+                        ForEach(showAllRecentDocuments ? recent : Array(recent.prefix(Self.sidebarPreviewCount))) { entry in
                             let isAvailable = recentDocumentStore.isAvailable(entry)
                             Button {
                                 guard isAvailable else { return }
@@ -173,15 +220,15 @@ struct RootView: View {
                                 }
                             }
                         }
+                        if recent.count > Self.sidebarPreviewCount {
+                            showMoreButton(total: recent.count, isShowingAll: $showAllRecentDocuments)
+                        }
                     } header: {
-                        Text("Nedávne dokumenty")
-                            .contextMenu {
-                                Button(role: .destructive) {
-                                    recentDocumentStore.clear()
-                                } label: {
-                                    Label("Vymazať všetky nedávne dokumenty", systemImage: "trash")
-                                }
+                        historyHeader("Nedávne dokumenty") {
+                            Button("Vymazať zoznam", systemImage: "trash", role: .destructive) {
+                                recentDocumentStore.clear()
                             }
+                        }
                     }
                 }
 
@@ -269,7 +316,13 @@ struct RootView: View {
             .navigationTitle("Autogram")
             .navigationSplitViewColumnWidth(min: 220, ideal: 250, max: 320)
             .safeAreaInset(edge: .bottom) {
+                // An opaque bar: without it the list scrolled underneath and the
+                // document names ran through the reader status.
                 sidebarBottomBar
+                    .background(.bar)
+            }
+            .task(id: settingsStore.settings.webSigningRetentionDays) {
+                signedDocumentStore.purgeBrowserCopies(olderThanDays: settingsStore.settings.webSigningRetentionDays)
             }
         } detail: {
             detailView
@@ -296,6 +349,21 @@ struct RootView: View {
         } message: {
             Text("Dokument zostane v pôvodnom umiestnení; odstráni sa iba z fronty podpisovania.")
         }
+        .confirmationDialog(
+            "Vyčistiť podpísané dokumenty?",
+            isPresented: $showSignedClearDialog,
+            titleVisibility: .visible
+        ) {
+            Button("Vyčistiť iba zoznam") {
+                signedDocumentStore.clear(trashingFiles: false)
+            }
+            Button("Vyčistiť a presunúť súbory do Koša", role: .destructive) {
+                signedDocumentStore.clear(trashingFiles: true)
+            }
+            Button("Zrušiť", role: .cancel) {}
+        } message: {
+            Text("Súbory presunuté do Koša sa dajú obnoviť, kým Kôš nevysypete.")
+        }
     }
 
     private var sidebarBottomBar: some View {
@@ -303,8 +371,11 @@ struct RootView: View {
             Divider()
 
             let isCardConnected = !signingStore.identities.isEmpty
-            let cardLabel = signingStore.identities.first?.label ?? (settingsStore.signingProvider is DemoSigningProvider ? "DEMO režim" : "Karta nepripojená")
-            let cardDetail = isCardConnected ? "Čítačka je pripravená" : "Vložte eID alebo SAK kartu"
+            let identity = signingStore.identities.first
+            let cardLabel = identity?.label ?? (settingsStore.signingProvider is DemoSigningProvider ? "DEMO režim" : "Karta nepripojená")
+            let cardDetail = isCardConnected
+                ? [identity?.cardKindLabel, "čítačka je pripravená"].compactMap { $0 }.joined(separator: " · ")
+                : "Vložte eID alebo SAK kartu"
 
             SmartcardHUDStatus(
                 isConnected: isCardConnected,

@@ -169,6 +169,20 @@ final class EngineBridgeSelectionTests: XCTestCase {
         XCTAssertEqual(EngineBridgeSigningProvider.pdfSourceName(for: request(.embeddedPAdES, "zmluva.pdf")), "document.pdf")
     }
 
+    func testCardKindNamesTheEIDAndICACards() {
+        XCTAssertEqual(EngineBridgeSigningProvider.syntheticIdentity(driverNames: ["Občiansky preukaz (eID klient)"],
+                                                                    driverID: "eid").cardKindLabel,
+                       "Občiansky preukaz (eID)")
+        XCTAssertEqual(EngineBridgeSigningProvider.syntheticIdentity(driverNames: ["I.CA SecureStore"],
+                                                                    driverID: "secure_store").cardKindLabel,
+                       "Karta I.CA")
+        let ica = SigningIdentityInfo(id: "engine-cert:1", label: "Marián Čuprík OPRÁVNENIE 1042",
+                                      issuerSummary: "I.CA EU Qualified CA-SK/RSA 10/2022", requiresPIN: true)
+        XCTAssertEqual(ica.cardKindLabel, "Karta I.CA")
+        let unknown = SigningIdentityInfo(id: "x", label: "Test", issuerSummary: "Neznáma CA")
+        XCTAssertNil(unknown.cardKindLabel)
+    }
+
     func testEnginePINUsesThePlaceholderOnlyForAnEmptyEIDEntry() {
         let placeholder = EngineBridgeSigningProvider.protectedAuthenticationPathPIN
         XCTAssertEqual(EngineBridgeSigningProvider.enginePIN(entered: "", driverID: "eid"), placeholder)

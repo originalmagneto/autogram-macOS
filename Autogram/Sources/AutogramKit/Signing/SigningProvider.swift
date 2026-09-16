@@ -38,6 +38,17 @@ public struct SigningIdentityInfo: Identifiable, Hashable, Sendable {
     }
 }
 
+extension SigningIdentityInfo {
+    /// Which kind of card holds the certificate, for the reader status.
+    public var cardKindLabel: String? {
+        if usesProtectedAuthenticationPath { return "Občiansky preukaz (eID)" }
+        let text = "\(label) \(issuerSummary)"
+        if text.contains("I.CA") { return "Karta I.CA" }
+        if text.localizedCaseInsensitiveContains("eID") { return "Občiansky preukaz (eID)" }
+        return nil
+    }
+}
+
 public struct RawSigner: @unchecked Sendable {
     public var signatureMethodURI: String
     public var isRSA: Bool

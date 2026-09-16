@@ -95,6 +95,8 @@ public struct AppSettings: Codable, Sendable {
     public var webSigningSavesLocally: Bool
     /// Folder for those copies. Empty means the app's own output folder.
     public var webSigningOutputPath: String
+    /// Days after which those copies move to the Trash. Zero keeps them.
+    public var webSigningRetentionDays: Int
 
     public var avmBaseURLValue: URL {
         let trimmed = avmBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -116,7 +118,7 @@ public struct AppSettings: Codable, Sendable {
         case retainRecentDocuments
         case useFoundationModelClassifier, learnFromReviews
         case mobileSigningEnabled, avmBaseURL
-        case webSigningSavesLocally, webSigningOutputPath
+        case webSigningSavesLocally, webSigningOutputPath, webSigningRetentionDays
     }
 
     public init(aiMode: AIMode = .builtInOnDevice,
@@ -142,7 +144,8 @@ public struct AppSettings: Codable, Sendable {
                 mobileSigningEnabled: Bool = true,
                 avmBaseURL: String = AVMClient.publicBaseURL.absoluteString,
                 webSigningSavesLocally: Bool = true,
-                webSigningOutputPath: String = "") {
+                webSigningOutputPath: String = "",
+                webSigningRetentionDays: Int = 0) {
         self.aiMode = aiMode
         self.aiPrompt = aiPrompt
         self.omlxURL = omlxURL
@@ -167,6 +170,7 @@ public struct AppSettings: Codable, Sendable {
         self.avmBaseURL = avmBaseURL
         self.webSigningSavesLocally = webSigningSavesLocally
         self.webSigningOutputPath = webSigningOutputPath
+        self.webSigningRetentionDays = webSigningRetentionDays
     }
 
     public init(from decoder: Decoder) throws {
@@ -214,6 +218,7 @@ public struct AppSettings: Codable, Sendable {
         self.avmBaseURL = try container.decodeIfPresent(String.self, forKey: .avmBaseURL) ?? AVMClient.publicBaseURL.absoluteString
         self.webSigningSavesLocally = try container.decodeIfPresent(Bool.self, forKey: .webSigningSavesLocally) ?? true
         self.webSigningOutputPath = try container.decodeIfPresent(String.self, forKey: .webSigningOutputPath) ?? ""
+        self.webSigningRetentionDays = try container.decodeIfPresent(Int.self, forKey: .webSigningRetentionDays) ?? 0
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -242,6 +247,7 @@ public struct AppSettings: Codable, Sendable {
         try container.encode(avmBaseURL, forKey: .avmBaseURL)
         try container.encode(webSigningSavesLocally, forKey: .webSigningSavesLocally)
         try container.encode(webSigningOutputPath, forKey: .webSigningOutputPath)
+        try container.encode(webSigningRetentionDays, forKey: .webSigningRetentionDays)
     }
 
     public var availableTSAServers: [TimestampAuthority] {

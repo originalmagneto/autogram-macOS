@@ -1271,6 +1271,17 @@ struct WebSigningStorageCard: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .textSelection(.enabled)
+
+            Picker("Automaticky presunúť kópie do Koša", selection: $settingsStore.settings.webSigningRetentionDays) {
+                Text("Nikdy").tag(0)
+                Text("Po 7 dňoch").tag(7)
+                Text("Po 30 dňoch").tag(30)
+                Text("Po 90 dňoch").tag(90)
+            }
+            .disabled(!settingsStore.settings.webSigningSavesLocally)
+            Text("Týka sa iba kópií podpisov z prehliadača. Dokumenty podpísané v aplikácii zostávajú, kde ste ich uložili.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
         .glassCard(cornerRadius: 12, padding: 12)
     }
