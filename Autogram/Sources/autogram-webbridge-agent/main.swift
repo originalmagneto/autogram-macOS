@@ -11,7 +11,8 @@ import AutogramWebBridge
 
 final class Rendezvous: NSObject, NSXPCListenerDelegate, WebBridgeRendezvousProtocol, @unchecked Sendable {
     private let lock = NSLock()
-    private var endpoint: NSXPCListenerEndpoint?
+    private let registry = WebBridgeEndpointRegistry()
+    private var registrationCount = 0
 
     func listener(_ listener: NSXPCListener, shouldAcceptNewConnection connection: NSXPCConnection) -> Bool {
         connection.exportedInterface = NSXPCInterface(with: WebBridgeRendezvousProtocol.self)
@@ -22,18 +23,26 @@ final class Rendezvous: NSObject, NSXPCListenerDelegate, WebBridgeRendezvousProt
 
     func registerApp(endpoint: NSXPCListenerEndpoint) {
         lock.lock()
-        defer { lock.unlock() }
-        self.endpoint = endpoint
+        registrationCount += 1
+        let registration = registrationCount
+        lock.unlock()
+        registry.register(endpoint, registration: registration)
+        // The app keeps this connection open while it runs. When it quits the
+        // connection ends and its endpoint is forgotten; a remembered endpoint
+        // of a quit app made every later request fail instead of launching it.
+        if let connection = NSXPCConnection.current() {
+            let registry = self.registry
+            connection.invalidationHandler = { registry.connectionEnded(registration: registration) }
+            connection.interruptionHandler = { registry.connectionEnded(registration: registration) }
+        }
     }
 
     func appEndpoint(reply: @escaping (NSXPCListenerEndpoint?) -> Void) {
-        lock.lock()
-        let current = endpoint
-        lock.unlock()
-        if let current {
+        if let current = registry.current, Self.appIsRunning() {
             reply(current)
             return
         }
+        registry.forget()
         // Nobody has registered, so Autogram is not running. Start it and wait:
         // otherwise every signature would need the person to launch the app
         // first, and the page would only ever hear that nothing is available.
@@ -73,13 +82,15 @@ final class Rendezvous: NSObject, NSXPCListenerDelegate, WebBridgeRendezvousProt
         return NSWorkspace.shared.urlForApplication(withBundleIdentifier: "sk.autogram.Autogram")
     }
 
+    private static func appIsRunning() -> Bool {
+        !NSRunningApplication.runningApplications(withBundleIdentifier: "sk.autogram.Autogram").isEmpty
+    }
+
     private func waitForRegistration(reply: @escaping (NSXPCListenerEndpoint?) -> Void) {
         let deadline = Date().addingTimeInterval(20)
+        let registry = self.registry
         func poll() {
-            lock.lock()
-            let current = endpoint
-            lock.unlock()
-            if let current {
+            if let current = registry.current {
                 reply(current)
                 return
             }
