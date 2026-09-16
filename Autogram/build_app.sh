@@ -324,5 +324,24 @@ if [[ "$INSTALL" == true ]]; then
     INSTALL_DIR="/Applications/Autogram macOS.app"
     rm -rf "$INSTALL_DIR"
     ditto --rsrc --extattr --acl "$APP_DIR" "$INSTALL_DIR"
+
+    # Safari lists the web extension only once the system knows the appex. A copied
+    # bundle is registered only when the app first runs, so register it here, and
+    # drop the build product so Safari does not show a second, stale entry for it.
+    LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
+    "$LSREGISTER" -u "$APP_DIR" >/dev/null 2>&1 || true
+    "$LSREGISTER" -f "$INSTALL_DIR" >/dev/null 2>&1 || true
+    INSTALLED_APPEX="$INSTALL_DIR/Contents/PlugIns/AutogramWebExtension.appex"
+    if [[ -d "$INSTALLED_APPEX" ]]; then
+        # pluginkit accepts the appex right after lsregister but may not list it yet.
+        for _ in 1 2 3 4 5; do
+            pluginkit -a "$INSTALLED_APPEX" >/dev/null 2>&1 || true
+            if pluginkit -m -i sk.autogram.Autogram.WebExtension 2>/dev/null | grep -q WebExtension; then
+                echo "▸ Safari rozšírenie zaregistrované"
+                break
+            fi
+            sleep 1
+        done
+    fi
     echo "✔ Nainštalované: $INSTALL_DIR"
 fi
