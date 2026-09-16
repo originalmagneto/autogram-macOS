@@ -139,11 +139,16 @@ struct WebSigningSheet: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Pridať kvalifikovanú časovú pečiatku")
                     .font(.callout)
-                Text(coordinator.addsQualifiedTimestamp
-                     ? "Podpíše sa ako osvedčený podpis (\(coordinator.effectiveLevelDescription)). Portál môže takýto podpis odmietnuť, ak si ho nevyžiadal."
-                     : "Podpíše sa presne tak, ako pýta stránka (\(coordinator.effectiveLevelDescription)). Autogram v mobile to ponúkne ako vlastnoručný podpis.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                if coordinator.addsUnrequestedTimestamp {
+                    Label("Podpíše sa ako osvedčený podpis (\(coordinator.effectiveLevelDescription)), o aký stránka nežiadala. nove.slovensko.sk takýto podpis odmietne.",
+                          systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                } else {
+                    Text("Podpíše sa presne tak, ako pýta stránka (\(coordinator.effectiveLevelDescription)). Autogram v mobile to ponúkne ako vlastnoručný podpis.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
         .toggleStyle(.switch)

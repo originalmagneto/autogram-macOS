@@ -77,18 +77,15 @@ final class WebSigningCoordinator {
 
     private let log = Logger(subsystem: "sk.autogram.Autogram", category: "web-signing")
 
-    private static let timestampPreferenceKey = "webSigningAddsQualifiedTimestamp"
-
     /// Portals ask for Baseline B, which carries no timestamp, and the phone
     /// then offers only the handwritten-equivalent signature. Turning this on
     /// upgrades to Baseline T and adds a qualified timestamp.
     ///
-    /// Off by default: slovensko.sk rejected a submission whose signature
-    /// carried a timestamp it had not asked for. The portal decides what it
-    /// accepts, so the safe default is to send exactly what it requested.
-    var addsQualifiedTimestamp: Bool {
-        didSet { UserDefaults.standard.set(addsQualifiedTimestamp, forKey: Self.timestampPreferenceKey) }
-    }
+    /// Off for every new request and never remembered: nove.slovensko.sk
+    /// rejects a signature with a timestamp it did not ask for (detach 500,
+    /// Asic join 422), and a switch left on from an earlier request broke every
+    /// card signature there until it was noticed.
+    var addsQualifiedTimestamp = false
 
     /// The level actually used, after the timestamp preference is applied.
     private func effectiveLevel(for request: WebSignRequest) -> String {
@@ -97,6 +94,11 @@ final class WebSigningCoordinator {
         }
         // Only the trailing marker, never the "_B" inside "_BASELINE".
         return request.signatureLevel.dropLast(2) + "_T"
+    }
+
+    /// True when the switch adds a timestamp the page did not ask for.
+    var addsUnrequestedTimestamp: Bool {
+        addsQualifiedTimestamp && (pending?.request.signatureLevel.hasSuffix("_B") ?? false)
     }
 
     /// Shown in the sheet so the consequence of the toggle is visible before signing.
@@ -112,8 +114,6 @@ final class WebSigningCoordinator {
     let mobileSigning: MobileSigningCoordinator
 
     init(settingsStore: AppSettingsStore, signedDocumentStore: SignedDocumentStore) {
-        let defaults = UserDefaults.standard
-        self.addsQualifiedTimestamp = defaults.object(forKey: Self.timestampPreferenceKey) as? Bool ?? false
         self.settingsStore = settingsStore
         self.signedDocumentStore = signedDocumentStore
         self.mobileSigning = MobileSigningCoordinator(settingsStore: settingsStore)
@@ -192,6 +192,7 @@ final class WebSigningCoordinator {
                           xmlExcerpt: xmlPreview)
         pin = ""
         errorText = nil
+        addsQualifiedTimestamp = false
         prompt.show(coordinator: self)
         startCardWatch()
 
