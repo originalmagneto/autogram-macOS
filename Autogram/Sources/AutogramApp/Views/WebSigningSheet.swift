@@ -17,7 +17,15 @@ struct WebSigningSheet: View {
                 documentCard(pending)
             }
 
-            timestampToggle
+            if coordinator.timestampSwitchAvailable {
+                timestampToggle
+            } else {
+                Label("slovensko.sk prijíma iba podpis bez časovej pečiatky, podpíše sa presne tak, ako pýta stránka (\(coordinator.effectiveLevelDescription)).",
+                      systemImage: "clock.badge.xmark")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
             if coordinator.mobileSigningAvailable {
                 mobileOption
@@ -64,7 +72,7 @@ struct WebSigningSheet: View {
                     .font(.headline)
                 HStack(spacing: 4) {
                     Image(systemName: "safari")
-                    Text("Pôvod: Webový portál cez rozšírenie Safari")
+                    Text("Pôvod: \(coordinator.pending?.request.pageHost ?? "webový portál") cez rozšírenie Safari")
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)

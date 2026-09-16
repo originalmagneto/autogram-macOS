@@ -93,7 +93,7 @@ final class WebSigningCoordinator {
 
     /// The level actually used, after the timestamp preference is applied.
     private func effectiveLevel(for request: WebSignRequest) -> String {
-        guard addsQualifiedTimestamp, request.signatureLevel.hasSuffix("_B") else {
+        guard addsQualifiedTimestamp, request.allowsAddedTimestamp, request.signatureLevel.hasSuffix("_B") else {
             return request.signatureLevel
         }
         // Only the trailing marker, never the "_B" inside "_BASELINE".
@@ -103,6 +103,11 @@ final class WebSigningCoordinator {
     /// True when the switch adds a timestamp the page did not ask for.
     var addsUnrequestedTimestamp: Bool {
         addsQualifiedTimestamp && (pending?.request.signatureLevel.hasSuffix("_B") ?? false)
+    }
+
+    /// False on slovensko.sk, which accepts only the level it asked for.
+    var timestampSwitchAvailable: Bool {
+        pending?.request.allowsAddedTimestamp ?? true
     }
 
     /// Shown in the sheet so the consequence of the toggle is visible before signing.

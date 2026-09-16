@@ -131,10 +131,13 @@ public struct WebSignRequest: Codable, Sendable, Equatable {
     public let signatureLevel: String
     public let container: String?
     public let eform: EFormSigningAttributes?
+    /// Host of the page that asked, set by the extension's content script from its
+    /// own `location`, which the page cannot overwrite.
+    public let pageHost: String?
 
     public init(requestID: String, filename: String, content: String, payloadMimeType: String,
                 signatureLevel: String, container: String? = nil,
-                eform: EFormSigningAttributes? = nil) {
+                eform: EFormSigningAttributes? = nil, pageHost: String? = nil) {
         self.requestID = requestID
         self.filename = filename
         self.content = content
@@ -142,6 +145,7 @@ public struct WebSignRequest: Codable, Sendable, Equatable {
         self.signatureLevel = signatureLevel
         self.container = container
         self.eform = eform
+        self.pageHost = pageHost
     }
 
     /// True when the payload mime type carries the `;base64` marker the AVM and
@@ -153,6 +157,14 @@ public struct WebSignRequest: Codable, Sendable, Equatable {
     /// True when the page expects a XAdES ASiC-E container back rather than a
     /// PAdES PDF: every eForm, an explicit ASiC container, and any XAdES level,
     /// because a PDF has no XAdES form here other than inside ASiC-E.
+    /// Whether the person may add a timestamp the page did not ask for. slovensko.sk
+    /// rejects such a signature (nove.slovensko.sk: detach 500, Asic join 422), so
+    /// there the page's level is final; other portals keep the choice.
+    public var allowsAddedTimestamp: Bool {
+        guard let host = pageHost?.lowercased() else { return true }
+        return host != "slovensko.sk" && !host.hasSuffix(".slovensko.sk")
+    }
+
     public var wantsASiCContainer: Bool {
         eform != nil
             || container?.uppercased().hasPrefix("ASIC") == true

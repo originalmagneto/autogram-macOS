@@ -150,6 +150,38 @@ final class WebSignRequestWireFormatTests: XCTestCase {
         XCTAssertTrue(request.wantsASiCContainer)
     }
 
+    /// The content script adds the page host; the page itself cannot set it.
+    func testDecodesThePageHostTheContentScriptAdds() throws {
+        let request = try decode("""
+        {
+          "requestID": "r",
+          "filename": "dokument.pdf",
+          "content": "JVBERi0xLjQ=",
+          "payloadMimeType": "application/pdf;base64",
+          "signatureLevel": "XAdES_BASELINE_B",
+          "container": "ASiC_E",
+          "pageHost": "message-constructor-web.slovensko.sk"
+        }
+        """)
+
+        XCTAssertEqual(request.pageHost, "message-constructor-web.slovensko.sk")
+        XCTAssertFalse(request.allowsAddedTimestamp)
+    }
+
+    /// nove.slovensko.sk rejects a signature with a timestamp it did not ask for.
+    func testSlovenskoSkNeverGetsAnAddedTimestamp() {
+        func request(_ host: String?) -> WebSignRequest {
+            WebSignRequest(requestID: "r", filename: "f.pdf", content: "", payloadMimeType: "application/pdf;base64",
+                           signatureLevel: "XAdES_BASELINE_B", pageHost: host)
+        }
+        XCTAssertFalse(request("slovensko.sk").allowsAddedTimestamp)
+        XCTAssertFalse(request("schranka.slovensko.sk").allowsAddedTimestamp)
+        XCTAssertFalse(request("MESSAGE-CONSTRUCTOR-WEB.SLOVENSKO.SK").allowsAddedTimestamp)
+        XCTAssertTrue(request("pfseform.financnasprava.sk").allowsAddedTimestamp)
+        XCTAssertTrue(request("notslovensko.sk").allowsAddedTimestamp)
+        XCTAssertTrue(request(nil).allowsAddedTimestamp)
+    }
+
     func testResponseEncodesTheShapeTheExtensionReads() throws {
         let response = WebSignResponse(requestID: "r", content: "AAA",
                                        signedBy: "CN=Test", issuedBy: "CN=CA")

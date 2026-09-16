@@ -47,11 +47,23 @@ window.addEventListener(CHANNEL_REQUEST, async (event) => {
   const detail = event.detail || {};
   // Safari may have ended the background worker, which rejects the message or
   // answers undefined. The page always gets an answer so it can retry.
+  // The page builds the request, so it could claim any origin. The host is set
+  // here from the content script's own location, overwriting whatever it sent.
+  let request = detail.request;
+  if ((detail.kind === "sign" || detail.kind === "sign-begin") && typeof request === "string") {
+    try {
+      const parsed = JSON.parse(request);
+      parsed.pageHost = location.hostname;
+      request = JSON.stringify(parsed);
+    } catch (error) {
+      console.warn("[Autogram macOS] požiadavku na podpis sa nepodarilo doplniť o adresu stránky", error);
+    }
+  }
   let reply;
   try {
     reply = await browser.runtime.sendMessage({
       kind: detail.kind,
-      request: detail.request
+      request: request
     });
   } catch (error) {
     console.warn("[Autogram macOS] správa pre pozadie rozšírenia zlyhala", error);
