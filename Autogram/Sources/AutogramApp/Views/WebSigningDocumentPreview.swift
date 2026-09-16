@@ -24,7 +24,7 @@ struct WebSigningDocumentPreview: View {
                 Button {
                     WebSigningQuickLook.shared.show(document: document, filename: filename)
                 } label: {
-                    Label("Otvoriť v Quick Look", systemImage: "eye")
+                    Label("Otvoriť náhľad", systemImage: "eye")
                 }
                 .controlSize(.small)
             }
