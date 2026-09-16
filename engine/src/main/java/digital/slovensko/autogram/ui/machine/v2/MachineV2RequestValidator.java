@@ -32,7 +32,7 @@ public final class MachineV2RequestValidator {
         }
         var signatureLevel = payload.get("signatureLevel").getAsString();
         validateTimestamp(payload.getAsJsonObject("timestamp"), signatureLevel,
-                payload.has("eform") || ("XAdES_BASELINE_B".equals(signatureLevel) && isAsicEnvelope(payload)));
+                payload.has("eform") || "XAdES_BASELINE_B".equals(signatureLevel));
         var files = new ArrayList<ValidatedSignFile>();
         for (var value : payload.getAsJsonArray("files")) {
             if (!value.isJsonObject()) {
@@ -137,28 +137,13 @@ public final class MachineV2RequestValidator {
         return new Timestamp(List.copyOf(servers), authentication(value));
     }
 
-    /** True when every source is an ASiC-E container, the form a portal PDF envelope arrives in. */
-    private static boolean isAsicEnvelope(JsonObject payload) {
-        var files = payload.getAsJsonArray("files");
-        if (files.isEmpty()) {
-            return false;
-        }
-        for (var value : files) {
-            if (!value.isJsonObject() || !string(value.getAsJsonObject(), "source") || !value.getAsJsonObject()
-                    .get("source").getAsString().toLowerCase(java.util.Locale.ROOT).endsWith(".asice")) {
-                return false;
-            }
-        }
-        return true;
-    }
-
     private static void validateTimestamp(JsonObject value, String signatureLevel, boolean allowsBaselineB) {
         if ((value.size() != 2 && value.size() != 3) || !value.has("required") || !value.get("required").isJsonPrimitive()
                 || !value.has("servers") || !value.get("servers").isJsonArray()) {
             throw invalid();
         }
         // Baseline B carries no timestamp and is only accepted where a portal asks
-        // for it: eForms and XAdES around a PDF in an ASiC-E envelope.
+        // for it: eForms and XAdES around a PDF, which becomes an ASiC-E.
         if (!signatureLevel.endsWith("_T")) {
             if (!allowsBaselineB || value.get("required").getAsBoolean()
                     || !value.getAsJsonArray("servers").isEmpty()) {

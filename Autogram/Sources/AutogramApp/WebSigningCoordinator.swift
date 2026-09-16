@@ -363,11 +363,9 @@ final class WebSigningCoordinator {
             let level = effectiveLevel(for: pending.request)
             let wantsTimestamp = level.hasSuffix("_T")
             let wantsContainer = pending.request.wantsASiCContainer
-            // A plain PDF for a XAdES container goes in as an unsigned ASiC-E, the
-            // same way the app's own ASiC-E output does; an eForm is built by the engine.
-            let containerEntries = wantsContainer && pending.request.eform == nil
-                ? [ASiCEPackager.Entry(path: pending.request.filename, data: bytes)]
-                : []
+            // The PDF goes to the engine as it is: XAdES on a PDF makes the engine
+            // build the ASiC-E around it. A container packaged here first ended up
+            // nested inside the signed one, which the portal could neither open nor join.
             let signingRequest = SigningRequest(
                 pdfData: bytes,
                 identityID: identityID,
@@ -375,7 +373,6 @@ final class WebSigningCoordinator {
                 tsaURL: wantsTimestamp ? settingsStore.settings.activeTSA.url : nil,
                 outputFormat: wantsContainer ? .attachedASIC : .embeddedPAdES,
                 pin: pin.isEmpty ? nil : pin,
-                extraFiles: containerEntries,
                 eform: pending.request.eform,
                 signatureLevelOverride: level,
                 filename: pending.request.filename)

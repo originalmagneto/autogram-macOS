@@ -16,19 +16,16 @@ class MachineV2RequestValidatorTest {
     Path temporaryDirectory;
 
     @Test
-    void acceptsXadesBaselineBWithoutTimestampForAnAsicEnvelope() throws Exception {
-        var envelope = Files.write(temporaryDirectory.resolve("kontajner.asice"), new byte[] { 'P', 'K', 3, 4 })
-                .toRealPath();
+    void acceptsXadesBaselineBWithoutTimestampForAPdf() throws Exception {
+        var pdf = Files.writeString(temporaryDirectory.resolve("source.pdf"), "%PDF-1.7\n%%EOF").toRealPath();
 
-        assertDoesNotThrow(() -> MachineV2RequestValidator.validateSign(signPayload("XAdES_BASELINE_B", envelope)));
+        assertDoesNotThrow(() -> MachineV2RequestValidator.validateSign(signPayload("XAdES_BASELINE_B", pdf)));
     }
 
     @Test
-    void keepsRejectingBaselineBForAPlainPdf() throws Exception {
+    void keepsRejectingPadesBaselineBForAPlainPdf() throws Exception {
         var pdf = Files.writeString(temporaryDirectory.resolve("source.pdf"), "%PDF-1.7\n%%EOF").toRealPath();
 
-        assertThrows(MachineProtocolException.class,
-                () -> MachineV2RequestValidator.validateSign(signPayload("XAdES_BASELINE_B", pdf)));
         assertThrows(MachineProtocolException.class,
                 () -> MachineV2RequestValidator.validateSign(signPayload("PAdES_BASELINE_B", pdf)));
     }

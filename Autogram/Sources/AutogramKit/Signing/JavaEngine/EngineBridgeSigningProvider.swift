@@ -243,6 +243,19 @@ public final class EngineBridgeSigningProvider: QualifiedSigningProviding, @unch
         return ids.contains(driverID) ? driverID : ids.first
     }
 
+    /// Name of the PDF handed to the engine. For an ASiC-E the engine keeps this
+    /// name inside the container, where a portal looks for the original document,
+    /// so the browser path's real filename is used; a PAdES output is unaffected.
+    static func pdfSourceName(for request: SigningRequest) -> String {
+        guard request.outputFormat != .embeddedPAdES,
+              let filename = request.filename.map({ ($0 as NSString).lastPathComponent }),
+              (filename as NSString).pathExtension.lowercased() == "pdf",
+              filename.count > 4 else {
+            return "document.pdf"
+        }
+        return filename
+    }
+
     /// Whether the app has to collect the PIN for a card on this driver.
     public static func requiresPIN(driverID: String) -> Bool {
         driverID != Self.driverID
@@ -327,7 +340,7 @@ public final class EngineBridgeSigningProvider: QualifiedSigningProviding, @unch
             try Self.packageContainer(entries: request.extraFiles)
                 .write(to: sourceURL, options: [.atomic])
         } else {
-            sourceURL = workDirectory.appendingPathComponent("document.pdf")
+            sourceURL = workDirectory.appendingPathComponent(Self.pdfSourceName(for: request))
             try request.pdfData.write(to: sourceURL, options: [.atomic])
         }
 

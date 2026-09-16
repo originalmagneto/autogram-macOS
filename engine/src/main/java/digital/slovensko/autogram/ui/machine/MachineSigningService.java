@@ -636,9 +636,15 @@ public final class MachineSigningService {
                 }
                 throw new IOException("Unsupported ASiC signature format");
             }
-            if (settings.getSignatureLevel() == SignatureLevel.XAdES_BASELINE_T) {
+            var level = settings.getSignatureLevel();
+            if (level == SignatureLevel.XAdES_BASELINE_T) {
                 return SigningParameters.buildForASiCWithXAdES(document, false, false,
                         settings.getTspSource(), true);
+            }
+            if (level == SignatureLevel.XAdES_BASELINE_B) {
+                // A portal's ASiC-E envelope around a PDF: the same container as
+                // Baseline T, only without the timestamp the portal did not ask for.
+                return SigningParameters.buildForASiCWithXAdES(document, false, false, null, true);
             }
             return SigningParameters.buildForPDF(document, false, false, settings.getTspSource());
         }

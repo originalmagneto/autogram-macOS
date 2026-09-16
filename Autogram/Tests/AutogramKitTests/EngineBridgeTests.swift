@@ -154,6 +154,21 @@ final class EngineBridgeSelectionTests: XCTestCase {
             .usesProtectedAuthenticationPath)
     }
 
+    /// A portal looks for the original PDF by name inside the ASiC-E it gets back.
+    func testAsicSourceKeepsThePortalFilename() {
+        func request(_ format: SigningOutputFormat, _ filename: String?) -> SigningRequest {
+            SigningRequest(pdfData: Data(), identityID: "x", includeTimestamp: false,
+                           outputFormat: format, filename: filename)
+        }
+        XCTAssertEqual(EngineBridgeSigningProvider.pdfSourceName(for: request(.attachedASIC, "122085-Navrhasuhlas.pdf")),
+                       "122085-Navrhasuhlas.pdf")
+        XCTAssertEqual(EngineBridgeSigningProvider.pdfSourceName(for: request(.attachedASIC, "../../etc/zmluva.pdf")),
+                       "zmluva.pdf")
+        XCTAssertEqual(EngineBridgeSigningProvider.pdfSourceName(for: request(.attachedASIC, "formular.xml")), "document.pdf")
+        XCTAssertEqual(EngineBridgeSigningProvider.pdfSourceName(for: request(.attachedASIC, nil)), "document.pdf")
+        XCTAssertEqual(EngineBridgeSigningProvider.pdfSourceName(for: request(.embeddedPAdES, "zmluva.pdf")), "document.pdf")
+    }
+
     func testEnginePINUsesThePlaceholderOnlyForAnEmptyEIDEntry() {
         let placeholder = EngineBridgeSigningProvider.protectedAuthenticationPathPIN
         XCTAssertEqual(EngineBridgeSigningProvider.enginePIN(entered: "", driverID: "eid"), placeholder)

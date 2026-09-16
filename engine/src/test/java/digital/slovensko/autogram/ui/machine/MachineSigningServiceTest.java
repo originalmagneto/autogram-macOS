@@ -729,6 +729,24 @@ class MachineSigningServiceTest {
         assertEquals(ASiCContainerType.ASiC_E, job.getParameters().getContainer());
     }
 
+    /// nove.slovensko.sk asks for XAdES Baseline B around a PDF. It must become an
+    /// ASiC-E with the PDF inside, not a PAdES signature and not a nested container.
+    @Test
+    void signingJobWrapsPdfInAsicEWithXadesBaselineBWhenAPortalAsksForIt() throws Exception {
+        var source = Path.of(MachineSigningServiceTest.class
+                .getResource("/digital/slovensko/autogram/sample.pdf").getFile());
+        var responder = new MachineFileResponder(new MemoryRetainedFile(), () -> { });
+        var settings = new MachineSettings(true);
+        settings.setSignatureLevel(SignatureLevel.XAdES_BASELINE_B);
+
+        var job = MachineSigningService.DefaultSigningSession.signingJob(Files.readAllBytes(source), source.toString(),
+                responder, settings);
+
+        assertEquals(SignatureLevel.XAdES_BASELINE_B, job.getParameters().getLevel());
+        assertEquals(SignatureForm.XAdES, job.getParameters().getSignatureType());
+        assertEquals(ASiCContainerType.ASiC_E, job.getParameters().getContainer());
+    }
+
     @Test
     void signingJobUsesTheExistingAsicXadesFormatAndQualifiedTimestampPolicy() throws Exception {
         var source = Path.of(MachineSigningServiceTest.class

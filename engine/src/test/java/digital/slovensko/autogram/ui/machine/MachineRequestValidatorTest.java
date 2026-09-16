@@ -27,8 +27,8 @@ class MachineRequestValidatorTest {
     }
 
     @Test
-    void acceptsBaselineBOnlyForEFormRequests() throws Exception {
-        var plain = signRequest("XAdES_BASELINE_B", files(pdf("source.pdf"), target("signed.asice")));
+    void acceptsPadesBaselineBOnlyForEFormRequests() throws Exception {
+        var plain = signRequest("PAdES_BASELINE_B", files(pdf("source.pdf"), target("signed.asice")));
         assertEquals("SIGNATURE_LEVEL_REQUIRED",
                 assertThrows(MachineProtocolException.class,
                         () -> MachineRequestValidator.validateSign(plain)).getMessage());
@@ -42,25 +42,14 @@ class MachineRequestValidatorTest {
         assertDoesNotThrow(() -> MachineRequestValidator.validateSign(eform));
     }
 
-    /// nove.slovensko.sk asks for XAdES Baseline B on a PDF wrapped in ASiC-E
-    /// (getSignatureWithASiCEnvelopeBase64). The app hands that over as an unsigned
-    /// container, which is the one non-eForm case where Baseline B is accepted.
+    /// nove.slovensko.sk asks for XAdES Baseline B around a PDF
+    /// (getSignatureWithASiCEnvelopeBase64). XAdES on a PDF always becomes an
+    /// ASiC-E, and the app's own flows only ever ask for Baseline T.
     @Test
-    void acceptsXadesBaselineBForAPortalAsicEnvelope() throws Exception {
-        var envelope = Files.write(temporaryDirectory.resolve("kontajner.asice"), new byte[] { 'P', 'K', 3, 4 })
-                .toRealPath();
-        var request = signRequest("XAdES_BASELINE_B", files(envelope, target("signed.asice")));
+    void acceptsXadesBaselineBForAPdfAPortalWrapsInAsic() throws Exception {
+        var request = signRequest("XAdES_BASELINE_B", files(pdf("source.pdf"), target("signed.asice")));
 
         assertDoesNotThrow(() -> MachineRequestValidator.validateSign(request));
-    }
-
-    @Test
-    void keepsRejectingPadesBaselineBForAnAsicEnvelope() throws Exception {
-        var envelope = Files.write(temporaryDirectory.resolve("kontajner.asice"), new byte[] { 'P', 'K', 3, 4 })
-                .toRealPath();
-        var request = signRequest("PAdES_BASELINE_B", files(envelope, target("signed.asice")));
-
-        assertEquals("SIGNATURE_LEVEL_REQUIRED", failureCode(request));
     }
 
     @Test
