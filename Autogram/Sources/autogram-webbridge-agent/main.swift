@@ -49,6 +49,9 @@ final class Rendezvous: NSObject, NSXPCListenerDelegate, WebBridgeRendezvousProt
         if let url = appBundleURL() {
             let configuration = NSWorkspace.OpenConfiguration()
             configuration.activates = false
+            // Tells the app it was started for a portal request, so it shows only
+            // the signing panel: no main window, no Dock icon.
+            configuration.arguments = ["--web-signing"]
             workspace.openApplication(at: url, configuration: configuration)
         } else {
             FileHandle.standardError.write(Data("Autogram bundle not found\n".utf8))
