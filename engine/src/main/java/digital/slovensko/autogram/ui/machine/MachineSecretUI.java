@@ -20,6 +20,15 @@ import java.util.List;
 import java.util.function.Consumer;
 
 public final class MachineSecretUI implements UI, AutoCloseable {
+    /**
+     * What the app sends for an eID, whose BOK the eID client asks for in its own
+     * window (CKF_PROTECTED_AUTHENTICATION_PATH). It is never a card secret, so it
+     * is never handed out: a login that does ask for a password gets none and
+     * fails without spending a PIN or BOK attempt. Must match
+     * EngineBridgeSigningProvider.protectedAuthenticationPathPIN in the app.
+     */
+    public static final String PROTECTED_AUTHENTICATION_PATH_PLACEHOLDER = "protected-authentication-path";
+
     private final char[] secret;
     private final List<char[]> issuedSecrets = new ArrayList<>();
     private boolean closed;
@@ -47,6 +56,9 @@ public final class MachineSecretUI implements UI, AutoCloseable {
     }
 
     private char[] issueSecret() {
+        if (java.util.Arrays.equals(secret, PROTECTED_AUTHENTICATION_PATH_PLACEHOLDER.toCharArray())) {
+            return null;
+        }
         var issuedSecret = secret.clone();
         issuedSecrets.add(issuedSecret);
         return issuedSecret;
