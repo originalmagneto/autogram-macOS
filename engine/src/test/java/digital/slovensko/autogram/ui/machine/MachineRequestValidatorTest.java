@@ -42,6 +42,27 @@ class MachineRequestValidatorTest {
         assertDoesNotThrow(() -> MachineRequestValidator.validateSign(eform));
     }
 
+    /// nove.slovensko.sk asks for XAdES Baseline B on a PDF wrapped in ASiC-E
+    /// (getSignatureWithASiCEnvelopeBase64). The app hands that over as an unsigned
+    /// container, which is the one non-eForm case where Baseline B is accepted.
+    @Test
+    void acceptsXadesBaselineBForAPortalAsicEnvelope() throws Exception {
+        var envelope = Files.write(temporaryDirectory.resolve("kontajner.asice"), new byte[] { 'P', 'K', 3, 4 })
+                .toRealPath();
+        var request = signRequest("XAdES_BASELINE_B", files(envelope, target("signed.asice")));
+
+        assertDoesNotThrow(() -> MachineRequestValidator.validateSign(request));
+    }
+
+    @Test
+    void keepsRejectingPadesBaselineBForAnAsicEnvelope() throws Exception {
+        var envelope = Files.write(temporaryDirectory.resolve("kontajner.asice"), new byte[] { 'P', 'K', 3, 4 })
+                .toRealPath();
+        var request = signRequest("PAdES_BASELINE_B", files(envelope, target("signed.asice")));
+
+        assertEquals("SIGNATURE_LEVEL_REQUIRED", failureCode(request));
+    }
+
     @Test
     void acceptsOnlyCanonicalAbsolutePdfSourceAndNewExplicitTarget() throws Exception {
         var request = signRequest("PAdES_BASELINE_T", files(pdf("source.pdf"), target("signed.pdf")));

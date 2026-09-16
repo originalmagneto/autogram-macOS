@@ -51,9 +51,12 @@ public final class MachineRequestValidator {
             throw invalidRequest();
         }
         // Baseline B produces a signature with no timestamp, which this app must
-        // never emit for ordinary file signing. State portals do ask for it on
-        // eForms, so it is accepted only there.
-        var allowedLevels = request.eform() == null ? TIMESTAMPED_SIGNATURE_LEVELS : SUPPORTED_SIGNATURE_LEVELS;
+        // never emit for ordinary file signing. State portals do ask for it: on
+        // eForms, and as XAdES around a PDF they send inside an ASiC-E envelope.
+        var portalEnvelope = "XAdES_BASELINE_B".equals(request.signatureLevel()) && isAsicEnvelope(request.files());
+        var allowedLevels = request.eform() != null || portalEnvelope
+                ? SUPPORTED_SIGNATURE_LEVELS
+                : TIMESTAMPED_SIGNATURE_LEVELS;
         if (!allowedLevels.contains(request.signatureLevel())) {
             throw new MachineProtocolException("SIGNATURE_LEVEL_REQUIRED");
         }
@@ -61,6 +64,12 @@ public final class MachineRequestValidator {
             validateTimestamp(request.timestamp());
         }
         return new ValidatedSignRequest(request, validateFiles(request.files()));
+    }
+
+    /** True when every source is an ASiC-E container, the form a portal PDF envelope arrives in. */
+    static boolean isAsicEnvelope(List<MachineFile> files) {
+        return files != null && !files.isEmpty() && files.stream().allMatch(file -> file != null
+                && file.source() != null && file.source().toLowerCase(java.util.Locale.ROOT).endsWith(".asice"));
     }
 
     private static void validateTimestamp(QualifiedTimestampRequest timestamp) {
