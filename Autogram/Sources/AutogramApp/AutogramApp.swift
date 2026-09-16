@@ -72,6 +72,10 @@ struct AutogramApp: App {
         }
         .windowStyle(.automatic)
         .defaultSize(width: 1320, height: 860)
+        // A portal request started the app: only the signing panel, no main window.
+        .defaultLaunchBehavior(AppLaunchMode.current == .webSigning ? .suppressed : .automatic)
+        // Window restoration would reopen the last main window despite the suppression.
+        .restorationBehavior(AppLaunchMode.current == .webSigning ? .disabled : .automatic)
         .commands {
             AutogramCommands()
         }
@@ -152,10 +156,60 @@ private struct AutogramCommands: Commands {
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    func applicationDidFinishLaunching(_ notification: Notification) {
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        // A portal request started the app: no Dock icon and no menu bar until the
+        // person opens Autogram themselves.
+        if AppLaunchMode.current == .webSigning {
+            NSApp.setActivationPolicy(.accessory)
+        }
+    }
 
+    func applicationDidFinishLaunching(_ notification: Notification) {
         FinderQuickActionService.installQuickAction()
         WebBridgeListener.shared.start()
+    }
+
+    /// The launch open event asks for an untitled main window; a web-signing launch
+    /// shows only the signing panel.
+    func applicationShouldOpenUntitledFile(_ sender: NSApplication) -> Bool {
+        AppLaunchMode.current != .webSigning || NSApp.activationPolicy() == .regular
+    }
+
+    /// Dock, Finder or Spotlight while the app already runs: become a regular app,
+    /// and let SwiftUI open the main window when none is visible.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        Self.becomeRegularApp()
+        Self.openMainWindowIfNeeded()
+        return true
+    }
+
+    /// The main window scene is suppressed after a web-signing launch, so reopening
+    /// does not bring one back by itself. The File > New Window command (⌘N) does.
+    @MainActor
+    static func openMainWindowIfNeeded() {
+        let hasMainWindow = NSApp.windows.contains { $0.isVisible && $0.canBecomeMain && !($0 is NSPanel) }
+        guard !hasMainWindow, let item = newWindowMenuItem(in: NSApp.mainMenu), let action = item.action else { return }
+        NSApp.sendAction(action, to: item.target, from: item)
+    }
+
+    @MainActor
+    private static func newWindowMenuItem(in menu: NSMenu?) -> NSMenuItem? {
+        for item in menu?.items ?? [] {
+            if item.keyEquivalent == "n", item.keyEquivalentModifierMask == .command, item.action != nil {
+                return item
+            }
+            if let found = newWindowMenuItem(in: item.submenu) {
+                return found
+            }
+        }
+        return nil
+    }
+
+    @MainActor
+    static func becomeRegularApp() {
+        guard NSApp.activationPolicy() != .regular else { return }
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate()
     }
 }
 
@@ -171,6 +225,7 @@ struct OpenSettingsButton<Label: View>: View {
 
     var body: some View {
         Button {
+            AppDelegate.becomeRegularApp()
             openWindow(id: SettingsWindow.id)
         } label: {
             label()
