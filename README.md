@@ -196,7 +196,7 @@ Vstavaná detekcia beží na zariadení a skladá sa z troch vrstiev. Voliteľn�
 
 ```bash
 cd Autogram
-DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
 swift run vision-eval ~/AutogramEval [--builtin-only] [--no-fm] [--bank <dir>] [--iou 0.4] [--json]
 ```
 
@@ -308,7 +308,7 @@ Rozšírenie do Safari podpisuje priamo na slovensko.sk, financnasprava.sk, sluz
 <summary><strong>Inštalácia rozšírenia</strong></summary>
 
 ```bash
-DEVELOPER_DIR="/Applications/Xcode-beta.app/Contents/Developer" ./build_app.sh --release install
+DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" ./build_app.sh --release install
 ./scripts/install-webbridge-agent.sh
 ./scripts/safari-spike.sh
 ```
@@ -458,7 +458,7 @@ Podpisový engine (Java fork Autogramu s DSS, machine protokol v1/v2, Finder Qui
 ```bash
 cd Autogram
 scripts/build-engine.sh
-DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer ./build_app.sh --release install
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./build_app.sh --release install
 ```
 
 `build-engine.sh` zostaví `autogram.jar` a závislosti cez Maven, vytvorí jlink runtime, skompiluje launcher `AutogramCLI-arm64` a runner `AutogramQuickActionRunner-arm64` a overí engine cez `CAPABILITIES`. `build_app.sh` potom všetko zabalí do `Contents/{Helpers,app,runtime}`; bez enginu aplikácia beží, ale podpis padá na Keychain alebo DEMO a Finder Quick Action nepodpisuje.
@@ -469,7 +469,7 @@ Aplikácia sa nainštaluje do `/Applications/Autogram macOS.app`.
 
 ```bash
 cd Autogram
-DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift test
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test
 ```
 
 <details>
@@ -479,14 +479,14 @@ DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift test
 
 ```bash
 AUTOGRAM_ENGINE_LIVE_TEST=1 \
-DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
 swift test --filter JavaEngineLiveProcessTests
 ```
 
 <p>On-device Foundation Model (beží automaticky, ak je model dostupný, inak sa preskočí):</p>
 
 ```bash
-DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
 swift test --filter FoundationModelClassifierTests
 ```
 </details>

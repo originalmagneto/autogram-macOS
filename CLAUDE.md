@@ -4,7 +4,7 @@
 Autogram is a 100% native macOS SwiftUI application for Qualified Electronic Signatures (KEP / eIDAS) and Guaranteed Conversion of legal documents (Zarucena konverzia according to Slovak Law No. 305/2013 Z. z. and Decree No. 70/2021 Z. z.).
 
 ## Architecture & Tech Stack
-- Swift 6.0+ / Xcode 27.0 toolchain (`/Applications/Xcode-beta.app`)
+- Swift 6.0+ / Xcode 27.0 toolchain (`/Applications/Xcode.app`)
 - Native macOS SwiftUI (`NavigationSplitView`, `.regularMaterial`, `.ultraThinMaterial`, Liquid Glass design)
 - Core Data / SQLite for Evidence and Conversion registers (CEZZK integration)
 - PKCS#11 bridge for Slovak eID cards, SAK advocate cards, and Disig smartcards
@@ -42,8 +42,8 @@ Autogram is a 100% native macOS SwiftUI application for Qualified Electronic Sig
 
 ## Build & Test Instructions
 - Build the signing engine first (once, or after changes in `engine/`): `scripts/build-engine.sh` (needs an arm64 JDK 25 with JavaFX jmods, Azul Zulu FX 25, under `~/Library/Java` or `AUTOGRAM_JAVA_HOME`; output `.build/engine/Contents`)
-- Run build script: `DEVELOPER_DIR="/Applications/Xcode-beta.app/Contents/Developer" ./build_app.sh [--release] [install]` (bundles `.build/engine/Contents` into `Contents/{Helpers,app,runtime}`; without it signing falls back to Keychain/DEMO and the Quick Action cannot sign)
-- Run test suite: `DEVELOPER_DIR="/Applications/Xcode-beta.app/Contents/Developer" swift test`
+- Run build script: `DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" ./build_app.sh [--release] [install]` (bundles `.build/engine/Contents` into `Contents/{Helpers,app,runtime}`; without it signing falls back to Keychain/DEMO and the Quick Action cannot sign)
+- Run test suite: `DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" swift test`
 - Probe the AVM server end to end: `swift run avm-probe <file.pdf|file.asice> [--level PAdES_BASELINE_T] [--container ASiC-E] [--out <dir>] [--timeout <s>]` (prints the QR link, opens the QR PNG, waits for the phone, prints signers)
 - Run detection eval harness: `swift run vision-eval <dataset> [--builtin-only] [--no-fm] [--bank <dir>] [--iou 0.4] [--json]` (dataset export kept outside the repo; `--bank <dir>` picks the example bank, default is a fresh empty temporary directory)
 - Binary output: `$(swift build --show-bin-path)/Autogram.app` (Xcode 27: `.build/out/Products/Debug/Autogram.app`)

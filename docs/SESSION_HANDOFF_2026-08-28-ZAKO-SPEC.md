@@ -57,8 +57,8 @@ The documentation changes were checked for expected files, links, absence of em 
 
 ```bash
 cd "/Users/Magneto/PROJECTS/AUTOGRAM macOS UI/Autogram"
-DEVELOPER_DIR=/Applications/Xcode-26.5.app/Contents/Developer swift test
-DEVELOPER_DIR=/Applications/Xcode-26.5.app/Contents/Developer ./build_app.sh
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./build_app.sh
 ```
 
 Expected baseline from the prior session: 107 tests executed, 3 live engine tests skipped, 0 failures, packaged build passed. A fresh full-suite attempt in this continuation started normally and showed passing suites, but stopped during `PDFAConverterTests` without an exit marker, so the current full-suite result is inconclusive. The focused detector suite completed successfully: `swift test --filter SecurityElementsDetectorTests` -> 5 tests, 0 failures. This continuation did not alter runtime code.

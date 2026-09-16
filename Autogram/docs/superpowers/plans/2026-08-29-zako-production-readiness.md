@@ -1208,8 +1208,8 @@ public struct EvidencePackageEntry: Codable, Sendable, Equatable {
 **Commands:**
 ```bash
 cd "/Users/Magneto/PROJECTS/AUTOGRAM macOS UI/Autogram"
-DEVELOPER_DIR="/Applications/Xcode-26.5.app/Contents/Developer" swift test
-DEVELOPER_DIR="/Applications/Xcode-26.5.app/Contents/Developer" ./build_app.sh
+DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" swift test
+DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" ./build_app.sh
 ```
 
 - [ ] Run each task's focused behavioral tests, including negative fail-closed cases.

@@ -21,7 +21,7 @@ The exact `.tabViewStyle(.sidebar)` example fails type checking with:
 error: type 'TabViewStyle' has no member 'sidebar'
 ```
 
-Replacing it with `.tabViewStyle(.sidebarAdaptable)` type-checks in the installed Xcode-beta SDK. Apple documents that this style always presents a sidebar on macOS. See [SidebarAdaptableTabViewStyle](https://developer.apple.com/documentation/swiftui/sidebaradaptabletabviewstyle).
+Replacing it with `.tabViewStyle(.sidebarAdaptable)` type-checks in the installed Xcode 27 SDK. Apple documents that this style always presents a sidebar on macOS. See [SidebarAdaptableTabViewStyle](https://developer.apple.com/documentation/swiftui/sidebaradaptabletabviewstyle).
 
 A `NavigationSplitView` with a category selection is another viable approach if explicit sidebar behavior is needed. Neither is required merely because Settings has five categories. Current tabs are a valid native control; the stronger issue is the density and repeated framing within each tab.
 

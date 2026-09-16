@@ -24,7 +24,7 @@ step "1. Je appex v nainštalovanej aplikácii?"
 if [[ -d "$APPEX" ]]; then
     ok "$APPEX"
 else
-    bad "appex chýba - spusti najprv: DEVELOPER_DIR=\"/Applications/Xcode-beta.app/Contents/Developer\" ./build_app.sh --release install"
+    bad "appex chýba - spusti najprv: DEVELOPER_DIR=\"/Applications/Xcode.app/Contents/Developer\" ./build_app.sh --release install"
     exit 1
 fi
 

@@ -241,8 +241,8 @@ Každý test musí rozlišovať:
 
 ```bash
 cd "/Users/Magneto/PROJECTS/AUTOGRAM macOS UI/Autogram"
-DEVELOPER_DIR=/Applications/Xcode-26.5.app/Contents/Developer swift test
-DEVELOPER_DIR=/Applications/Xcode-26.5.app/Contents/Developer ./build_app.sh
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./build_app.sh
 ```
 
 Okrem testov musí byť priložený externý PDF/A report, XML/XSD report, signature/QTS report a EZZK sandbox response. Zelený lokálny test sám osebe neznamená produkčnú konformitu.

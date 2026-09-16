@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- Build and test only with `DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer` (Xcode 27.0). Command Line Tools alone fail on SwiftUI macros.
+- Build and test only with `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer` (Xcode 27.0). Command Line Tools alone fail on SwiftUI macros.
 - All commands run from `/Users/magneto/Projects/Autogram-macOS/Autogram` (the SwiftPM root). Commit from the repo root `/Users/magneto/Projects/Autogram-macOS`.
 - Platform floor stays `.macOS("27.0")` in `Package.swift`.
 - Do not edit the internals of `Sources/AutogramKit/VisionAI/BuiltInVisionProvider.swift`. Wrapping it and calling its existing internal helpers (`render(page:targetWidth:)`, `visionExclusionBoxes(cgImage:)`, `VisionExclusions`) is allowed.
@@ -75,10 +75,10 @@ Modify:
 In `build_app.sh` line 25 replace the default:
 
 ```bash
-export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode-beta.app/Contents/Developer}"
+export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
 ```
 
-In both `AGENTS.md` and `CLAUDE.md`, line 7 becomes `- Swift 6.0+ / Xcode 27.0 toolchain (`/Applications/Xcode-beta.app`)` and lines 31-32 use `DEVELOPER_DIR="/Applications/Xcode-beta.app/Contents/Developer"`. Verify with `diff AGENTS.md CLAUDE.md` (no output).
+In both `AGENTS.md` and `CLAUDE.md`, line 7 becomes `- Swift 6.0+ / Xcode 27.0 toolchain (`/Applications/Xcode.app`)` and lines 31-32 use `DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer"`. Verify with `diff AGENTS.md CLAUDE.md` (no output).
 
 - [ ] **Step 2: Write the failing back-compat test**
 
@@ -110,7 +110,7 @@ final class SecurityElementDetectionSourceTests: XCTestCase {
 
 - [ ] **Step 3: Run to verify failure**
 
-Run: `DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift test --filter SecurityElementDetectionSourceTests`
+Run: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --filter SecurityElementDetectionSourceTests`
 Expected: compile error, `extra argument 'detectionSource'`.
 
 - [ ] **Step 4: Add the field**
@@ -146,7 +146,7 @@ In `init(from decoder:)` add after `reviewState`:
 
 - [ ] **Step 5: Run the test and the whole suite**
 
-Run: `DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift test`
+Run: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test`
 Expected: all pass (the new file adds 2).
 
 - [ ] **Step 6: Commit**
@@ -287,7 +287,7 @@ final class PageCropTests: XCTestCase {
 
 - [ ] **Step 2: Run to verify failure**
 
-Run: `DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift test --filter "CandidateMergerTests|PageCropTests"`
+Run: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --filter "CandidateMergerTests|PageCropTests"`
 Expected: compile errors for missing types.
 
 - [ ] **Step 3: Implement**
@@ -425,7 +425,7 @@ public enum CandidateMerger {
 
 - [ ] **Step 4: Run tests**
 
-Run: `DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift test --filter "CandidateMergerTests|PageCropTests"`
+Run: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --filter "CandidateMergerTests|PageCropTests"`
 Expected: 9 tests pass.
 
 - [ ] **Step 5: Commit**
@@ -523,7 +523,7 @@ Check `Tests/AutogramKitTests/TestSendableBox.swift` for the box type's actual n
 
 - [ ] **Step 2: Run to verify failure**
 
-Run: `DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift test --filter CandidateSourceTests`
+Run: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --filter CandidateSourceTests`
 Expected: compile errors for missing types.
 
 - [ ] **Step 3: Implement**
@@ -634,7 +634,7 @@ If `CoordinateOrigin` has no `.upperLeft` case (check with `grep -n -A4 "public 
 
 - [ ] **Step 4: Run tests**
 
-Run: `DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift test --filter CandidateSourceTests`
+Run: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --filter CandidateSourceTests`
 Expected: 3 pass. If the contour test fails because the ring is not a top-level contour, lower `contrastAdjustment` to 1.5 and re-run; record the final value in the file's doc comment.
 
 - [ ] **Step 5: Commit**
@@ -769,7 +769,7 @@ final class FeaturePrintClassifierTests: XCTestCase {
 
 - [ ] **Step 2: Run to verify failure**
 
-Run: `DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift test --filter "ExampleBankTests|FeaturePrintClassifierTests"`
+Run: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --filter "ExampleBankTests|FeaturePrintClassifierTests"`
 Expected: compile errors.
 
 - [ ] **Step 3: Implement**
@@ -1038,7 +1038,7 @@ public struct FeaturePrintClassifier: ElementClassifying {
 
 - [ ] **Step 4: Run tests**
 
-Run: `DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift test --filter "ExampleBankTests|FeaturePrintClassifierTests"`
+Run: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --filter "ExampleBankTests|FeaturePrintClassifierTests"`
 Expected: 7 pass.
 
 - [ ] **Step 5: Commit**
@@ -1139,7 +1139,7 @@ Add `import PDFKit` at the top of the test file.
 
 - [ ] **Step 2: Run to verify failure**
 
-Run: `DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift test --filter FoundationModelClassifierTests`
+Run: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --filter FoundationModelClassifierTests`
 Expected: compile errors.
 
 - [ ] **Step 3: Implement**
@@ -1270,7 +1270,7 @@ If `@Generable` refuses `.anyOf` on a `String` property alongside a `description
 
 - [ ] **Step 4: Run tests**
 
-Run: `DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift test --filter FoundationModelClassifierTests`
+Run: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --filter FoundationModelClassifierTests`
 Expected: 3 pass, the live test passes or is skipped. If the live test fails on the text crop being judged as an element, tighten the instructions sentence about printed text and re-run once; if it still fails, mark the live test `XCTExpectFailure("model calibration")` and note it in the commit body.
 
 - [ ] **Step 5: Commit**
@@ -1368,7 +1368,7 @@ final class TwoStageClassifierTests: XCTestCase {
 
 - [ ] **Step 2: Run to verify failure**
 
-Run: `DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift test --filter TwoStageClassifierTests`
+Run: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --filter TwoStageClassifierTests`
 Expected: compile errors.
 
 - [ ] **Step 3: Implement**
@@ -1433,7 +1433,7 @@ public struct TwoStageClassifier: Sendable {
 
 - [ ] **Step 4: Run tests**
 
-Run: `DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift test --filter TwoStageClassifierTests`
+Run: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --filter TwoStageClassifierTests`
 Expected: 7 pass.
 
 - [ ] **Step 5: Commit**
@@ -1558,7 +1558,7 @@ final class LayeredDetectionProviderTests: XCTestCase {
 
 - [ ] **Step 2: Run to verify failure**
 
-Run: `DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift test --filter LayeredDetectionProviderTests`
+Run: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --filter LayeredDetectionProviderTests`
 Expected: compile errors.
 
 - [ ] **Step 3: Implement the provider**
@@ -1705,7 +1705,7 @@ Then run `grep -rn "pipeline.builtin\|\.builtin\b" Sources Tests` and fix any ca
 
 - [ ] **Step 5: Run tests**
 
-Run: `DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift test --filter "LayeredDetectionProviderTests|SecurityElementsDetectorTests|LLMVisionParserTests"`
+Run: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --filter "LayeredDetectionProviderTests|SecurityElementsDetectorTests|LLMVisionParserTests"`
 Expected: all pass.
 
 - [ ] **Step 6: Commit**
@@ -1839,7 +1839,7 @@ final class CreateMLExporterTests: XCTestCase {
 
 - [ ] **Step 2: Run to verify failure**
 
-Run: `DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift test --filter "ExampleBankRecorderTests|CreateMLExporterTests"`
+Run: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --filter "ExampleBankRecorderTests|CreateMLExporterTests"`
 Expected: compile errors.
 
 - [ ] **Step 3: Implement the recorder**
@@ -1982,7 +1982,7 @@ public enum CreateMLExporter {
 
 - [ ] **Step 5: Run tests**
 
-Run: `DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift test --filter "ExampleBankRecorderTests|CreateMLExporterTests"`
+Run: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --filter "ExampleBankRecorderTests|CreateMLExporterTests"`
 Expected: 5 pass.
 
 - [ ] **Step 6: Commit**
@@ -2116,7 +2116,7 @@ final class ZakoBankRecordingTests: XCTestCase {
 
 - [ ] **Step 2: Run to verify failure**
 
-Run: `DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift test --filter "AppSettingsLearningTests|ZakoBankRecordingTests"`
+Run: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --filter "AppSettingsLearningTests|ZakoBankRecordingTests"`
 Expected: compile errors.
 
 - [ ] **Step 3: Add the settings fields**
@@ -2244,7 +2244,7 @@ private struct NoOpClassifier: ElementClassifying {
 
 - [ ] **Step 5: Run tests**
 
-Run: `DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift test`
+Run: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test`
 Expected: whole suite passes.
 
 - [ ] **Step 6: Commit**
@@ -2292,7 +2292,7 @@ final class SettingsLearningCardTests: XCTestCase {
 
 - [ ] **Step 2: Run to verify failure**
 
-Run: `DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift test --filter SettingsLearningCardTests`
+Run: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --filter SettingsLearningCardTests`
 Expected: compile error.
 
 - [ ] **Step 3: Implement**
@@ -2385,7 +2385,7 @@ Add `import FoundationModels` and `import AppKit` at the top of `SettingsView.sw
 
 - [ ] **Step 4: Build, run tests, and check the card visually**
 
-Run: `DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift test --filter SettingsLearningCardTests` (expected 2 pass), then `DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer ./build_app.sh` and open `.build/arm64-apple-macosx/debug/Autogram.app`, Settings, AI section: the card shows both toggles, the counter line, both buttons.
+Run: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --filter SettingsLearningCardTests` (expected 2 pass), then `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./build_app.sh` and open `.build/arm64-apple-macosx/debug/Autogram.app`, Settings, AI section: the card shows both toggles, the counter line, both buttons.
 
 - [ ] **Step 5: Commit**
 
@@ -2455,7 +2455,7 @@ final class SegmentationSnapperTests: XCTestCase {
 
 - [ ] **Step 2: Run to verify failure**
 
-Run: `DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift test --filter SegmentationSnapperTests`
+Run: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --filter SegmentationSnapperTests`
 Expected: compile errors.
 
 - [ ] **Step 3: Implement the snapper**
@@ -2555,7 +2555,7 @@ public struct SegmentationSnapper: SegmentationSnapping {
 }
 ```
 
-The exact `CVReadOnlyPixelBuffer` accessor names (`width`, `height`, `bytesPerRow`, `pixelFormat`, `withUnsafeBuffer`) must be verified against the SDK: `grep -n "struct CVReadOnlyPixelBuffer" -A40 /Applications/Xcode-beta.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/CoreVideo.framework/Modules/CoreVideo.swiftmodule/arm64e-apple-macos.swiftinterface`. If the type exposes only the C-style `CVPixelBuffer`, use `CVPixelBufferLockBaseAddress` / `CVPixelBufferGetBaseAddress` / `CVPixelBufferGetBytesPerRow` / `CVPixelBufferGetPixelFormatType` instead. Alternatively use `observation.cgImage` and read pixels through `PixelMap(cgImage:)` with `luminance(x:y:) > 0.5`; that path is already in the code base and needs no new CoreVideo calls. Prefer the `PixelMap` path if any doubt.
+The exact `CVReadOnlyPixelBuffer` accessor names (`width`, `height`, `bytesPerRow`, `pixelFormat`, `withUnsafeBuffer`) must be verified against the SDK: `grep -n "struct CVReadOnlyPixelBuffer" -A40 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/CoreVideo.framework/Modules/CoreVideo.swiftmodule/arm64e-apple-macos.swiftinterface`. If the type exposes only the C-style `CVPixelBuffer`, use `CVPixelBufferLockBaseAddress` / `CVPixelBufferGetBaseAddress` / `CVPixelBufferGetBytesPerRow` / `CVPixelBufferGetPixelFormatType` instead. Alternatively use `observation.cgImage` and read pixels through `PixelMap(cgImage:)` with `luminance(x:y:) > 0.5`; that path is already in the code base and needs no new CoreVideo calls. Prefer the `PixelMap` path if any doubt.
 
 - [ ] **Step 4: Session store additions**
 
@@ -2661,7 +2661,7 @@ Below the markup toolbar in `AnalysisCanvasView` add:
 
 - [ ] **Step 6: Run tests and verify manually**
 
-Run: `DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift test` (all pass), then `./build_app.sh`, open a PDF in ZaKo, pick Pečiatka, click once on a stamp: a box appears around it after the one-time download; "Spresniť rámec" tightens a hand-drawn box.
+Run: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test` (all pass), then `./build_app.sh`, open a PDF in ZaKo, pick Pečiatka, click once on a stamp: a box appears around it after the one-time download; "Spresniť rámec" tightens a hand-drawn box.
 
 - [ ] **Step 7: Commit**
 
@@ -2722,7 +2722,7 @@ final class DetectionEvaluatorTests: XCTestCase {
 
 - [ ] **Step 2: Run to verify failure**
 
-Run: `DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift test --filter DetectionEvaluatorTests`
+Run: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --filter DetectionEvaluatorTests`
 Expected: compile errors.
 
 - [ ] **Step 3: Implement evaluator**
@@ -2872,7 +2872,7 @@ if json {
 
 - [ ] **Step 5: Run tests and smoke the CLI**
 
-Run: `DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift test --filter DetectionEvaluatorTests` (2 pass). Then create a smoke dataset: in the app, confirm two elements on any document, export the dataset from Settings to `~/AutogramEval`, and run `DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift run vision-eval ~/AutogramEval` and `... --builtin-only`. Both must print a table.
+Run: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --filter DetectionEvaluatorTests` (2 pass). Then create a smoke dataset: in the app, confirm two elements on any document, export the dataset from Settings to `~/AutogramEval`, and run `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift run vision-eval ~/AutogramEval` and `... --builtin-only`. Both must print a table.
 
 - [ ] **Step 6: Commit**
 

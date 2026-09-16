@@ -10,7 +10,7 @@ Written compactly rather than through the full writing-plans ceremony: the user 
 
 ## Global constraints
 
-- Toolchain Xcode 27 beta; every build and test needs `DEVELOPER_DIR="/Applications/Xcode-beta.app/Contents/Developer"`.
+- Toolchain Xcode 27; every build and test needs `DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer"`.
 - Code, comments and docs in English; end-user strings in Slovak.
 - No em dashes anywhere.
 - Keep `AGENTS.md` and `CLAUDE.md` in sync.

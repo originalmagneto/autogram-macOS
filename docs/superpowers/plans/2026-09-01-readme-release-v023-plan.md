@@ -6,7 +6,7 @@
 
 **Architecture:** Keep the existing Slovak README, SVG diagram gallery, Swift package, and shell-based app assembly. Add documentation presentation only in README.md and preserve the current release packaging flow, including the bundled Java helper patch applied by build_app.sh.
 
-**Tech Stack:** Markdown, GitHub HTML/ Mermaid, Swift 6, SwiftPM, macOS 27, Xcode 26.5, shell, create-dmg, GitHub CLI.
+**Tech Stack:** Markdown, GitHub HTML/ Mermaid, Swift 6, SwiftPM, macOS 27, Xcode 27, shell, create-dmg, GitHub CLI.
 
 **Spec:** Approved chat scope: README enrichment, existing diagram presentation, I.CA feature documentation, v0.2.3 patch release.
 
@@ -59,7 +59,7 @@
 
 - [ ] Commit README and any required release metadata with the existing source fixes.
 - [ ] Run `swift test`.
-- [ ] Build the release app with Xcode 26.5.
+- [ ] Build the release app with Xcode 27.
 - [ ] Verify bundle contents, code signature, version, and helper patch entry.
 - [ ] Create a DMG using the available project release tooling.
 

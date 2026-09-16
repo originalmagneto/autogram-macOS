@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- Target macOS 27.0 and build with `/Applications/Xcode-26.5.app/Contents/Developer`.
+- Target macOS 27.0 and build with `/Applications/Xcode.app/Contents/Developer`.
 - Keep zero Swift package dependencies.
 - Use native SwiftUI controls and existing `glassCard` design helpers.
 - Keep legal signing primitives and EZZK protocol unchanged.
@@ -244,8 +244,8 @@
 **Steps:**
 
 - [ ] Run focused tests for recent documents, Vision prompt parsing, signing format mapping, and batch behavior.
-- [ ] Run `DEVELOPER_DIR="/Applications/Xcode-26.5.app/Contents/Developer" swift test` and require zero failures.
-- [ ] Run `DEVELOPER_DIR="/Applications/Xcode-26.5.app/Contents/Developer" ./build_app.sh`.
+- [ ] Run `DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" swift test` and require zero failures.
+- [ ] Run `DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" ./build_app.sh`.
 - [ ] Smoke test the installed macOS app: sidebar navigation after focus changes, gear Settings access, optional recent documents, AI provider applicability, prompt preset switching, segmented signing format, one-file signing, multi-file review, failure decision, cancellation, and final summary.
 - [ ] Verify Finder one-file and multi-file paths separately without signing real documents unless explicitly authorized.
 - [ ] Update README only with observed test totals and current behavior. Do not claim EZZK production interoperability until external callback registration is confirmed.

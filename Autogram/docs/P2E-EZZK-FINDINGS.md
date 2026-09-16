@@ -194,13 +194,13 @@ The existing legacy Swift form renderer and `FormPackRepository.currentLegacyUnv
 The implementation was completed on branch `codex/ezzk-oauth-rest-ui` and merged locally into `main`.
 
 ```text
-DEVELOPER_DIR="/Applications/Xcode-26.5.app/Contents/Developer" swift test
+DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" swift test
 ```
 
 Result on the merged `main`: 187 tests executed, 3 skipped, 0 failures.
 
 ```text
-DEVELOPER_DIR="/Applications/Xcode-26.5.app/Contents/Developer" ./build_app.sh
+DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" ./build_app.sh
 ```
 
 Result on the merged `main`: successful debug build at `Autogram/.build/arm64-apple-macosx/debug/Autogram.app`.
@@ -250,19 +250,19 @@ No EZZK evidence numbers were generated and no conversion was submitted. No inst
 ### Exact verification
 
 ```text
-DEVELOPER_DIR="/Applications/Xcode-26.5.app/Contents/Developer" swift test --filter EZZKHTTPClientTests
+DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" swift test --filter EZZKHTTPClientTests
 ```
 
 Result: 21 tests passed, 0 failures.
 
 ```text
-DEVELOPER_DIR="/Applications/Xcode-26.5.app/Contents/Developer" swift test
+DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" swift test
 ```
 
 Result: 187 tests executed, 3 skipped, 0 failures.
 
 ```text
-DEVELOPER_DIR="/Applications/Xcode-26.5.app/Contents/Developer" ./build_app.sh
+DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" ./build_app.sh
 ```
 
 Result: successful debug build at `/Users/Magneto/PROJECTS/AUTOGRAM macOS UI/Autogram/.build/arm64-apple-macosx/debug/Autogram.app`. Existing warnings remain in unrelated app and signing support code.

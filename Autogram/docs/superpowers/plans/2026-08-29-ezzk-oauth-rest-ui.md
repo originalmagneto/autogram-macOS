@@ -111,7 +111,7 @@ Assert exact sandbox and production portal URLs, API URLs, authority IDs, and th
 Run:
 
 ```bash
-DEVELOPER_DIR="/Applications/Xcode-26.5.app/Contents/Developer" swift test --filter EZZKEnvironmentTests
+DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" swift test --filter EZZKEnvironmentTests
 ```
 
 Expected: compile failure because the new types do not exist.
@@ -133,8 +133,8 @@ Use a service identifier distinct from `KeychainStore.service`. Store one Codabl
 Run:
 
 ```bash
-DEVELOPER_DIR="/Applications/Xcode-26.5.app/Contents/Developer" swift test --filter EZZKEnvironmentTests
-DEVELOPER_DIR="/Applications/Xcode-26.5.app/Contents/Developer" swift test --filter EZZKTokenStoreTests
+DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" swift test --filter EZZKEnvironmentTests
+DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" swift test --filter EZZKTokenStoreTests
 ```
 
 Expected: all focused tests pass. Commit:
@@ -177,7 +177,7 @@ Test that the verifier and state are non-empty, repeated challenges differ, the 
 Run:
 
 ```bash
-DEVELOPER_DIR="/Applications/Xcode-26.5.app/Contents/Developer" swift test --filter EZZKEnvironmentTests
+DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" swift test --filter EZZKEnvironmentTests
 ```
 
 Expected: failure for missing PKCE and callback helpers.
@@ -199,7 +199,7 @@ Load OpenID Connect discovery metadata from the configured issuer or use an oper
 Run:
 
 ```bash
-DEVELOPER_DIR="/Applications/Xcode-26.5.app/Contents/Developer" swift test --filter EZZKEnvironmentTests
+DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" swift test --filter EZZKEnvironmentTests
 ```
 
 Expected: all pure authentication tests pass. The live browser flow remains disabled until native redirect configuration is supplied. Commit:
@@ -271,7 +271,7 @@ Use an injected fake transport. Assert exact sandbox URL construction, Bearer he
 Run:
 
 ```bash
-DEVELOPER_DIR="/Applications/Xcode-26.5.app/Contents/Developer" swift test --filter EZZKHTTPClientTests
+DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" swift test --filter EZZKHTTPClientTests
 ```
 
 Expected: compile failure for missing client and models.
@@ -295,8 +295,8 @@ Keep `MockEZZKService` unchanged for demo behavior. Add a new OAuth-backed servi
 Run:
 
 ```bash
-DEVELOPER_DIR="/Applications/Xcode-26.5.app/Contents/Developer" swift test --filter EZZKAPIModelsTests
-DEVELOPER_DIR="/Applications/Xcode-26.5.app/Contents/Developer" swift test --filter EZZKHTTPClientTests
+DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" swift test --filter EZZKAPIModelsTests
+DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" swift test --filter EZZKHTTPClientTests
 ```
 
 Expected: all focused tests pass. Commit:
@@ -361,8 +361,8 @@ Create the controller once in `AutogramAppModel`, pass it to `SettingsView`, and
 Run:
 
 ```bash
-DEVELOPER_DIR="/Applications/Xcode-26.5.app/Contents/Developer" swift test --filter EZZKHTTPClientTests
-DEVELOPER_DIR="/Applications/Xcode-26.5.app/Contents/Developer" ./build_app.sh
+DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" swift test --filter EZZKHTTPClientTests
+DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" ./build_app.sh
 ```
 
 Expected: focused tests pass and the app builds. Commit:
@@ -434,8 +434,8 @@ Record implemented components, exact test results, the native redirect blocker, 
 Run:
 
 ```bash
-DEVELOPER_DIR="/Applications/Xcode-26.5.app/Contents/Developer" swift test
-DEVELOPER_DIR="/Applications/Xcode-26.5.app/Contents/Developer" ./build_app.sh
+DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" swift test
+DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" ./build_app.sh
 ```
 
 Expected: zero test failures and successful app build. Any existing unrelated warning must be recorded without suppressing it.

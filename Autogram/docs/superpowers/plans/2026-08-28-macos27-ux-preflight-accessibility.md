@@ -59,7 +59,7 @@ The first test must fail against the current `.macOS("26.0")` declaration. Keep 
 Run:
 
 ```bash
-DEVELOPER_DIR=/Applications/Xcode-26.5.app/Contents/Developer swift test --filter MacOS27UXContractTests
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --filter MacOS27UXContractTests
 ```
 
 Expected: the deployment contract fails because the package still declares macOS 26.0.
@@ -103,7 +103,7 @@ Use text labels for all commands because macOS 27 hides many menu item images by
 Test the pure layout constants or helper values that replace the current fixed-width assumptions. The test must assert that the inspector can collapse and that the root minimum is not a sum of all preferred columns. Run:
 
 ```bash
-DEVELOPER_DIR=/Applications/Xcode-26.5.app/Contents/Developer swift test --filter MacOS27UXContractTests
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --filter MacOS27UXContractTests
 ```
 
 Expected: PASS.
@@ -113,7 +113,7 @@ Expected: PASS.
 Run:
 
 ```bash
-DEVELOPER_DIR=/Applications/Xcode-26.5.app/Contents/Developer ./build_app.sh
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./build_app.sh
 ```
 
 Expected: `Autogram.app` is created with a macOS 27 minimum version.
@@ -170,7 +170,7 @@ The first test must fail before the new model field and validator rule exist.
 Run:
 
 ```bash
-DEVELOPER_DIR=/Applications/Xcode-26.5.app/Contents/Developer swift test --filter AttestationValidatorTests
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --filter AttestationValidatorTests
 ```
 
 Expected: the new origin-confirmation test fails for the missing validator rule.
@@ -249,7 +249,7 @@ Add a focused test for `AttestationPreflight.evaluate` with an invalid attestati
 Run:
 
 ```bash
-DEVELOPER_DIR=/Applications/Xcode-26.5.app/Contents/Developer swift test --filter AttestationValidatorTests
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --filter AttestationValidatorTests
 ```
 
 Expected before the implementation change: the origin gate test fails and the pure preflight result is not complete.
@@ -301,8 +301,8 @@ The checklist must include origin confirmation, evidence number, selected identi
 When CEZZK submission fails, keep the signed-file result but show a queued state with deadline and retry action. Do not use the unconditional success headline. Add tests for submitted and queued outcome labels in `AccessibilityContractTests`. Run:
 
 ```bash
-DEVELOPER_DIR=/Applications/Xcode-26.5.app/Contents/Developer swift test --filter AttestationValidatorTests
-DEVELOPER_DIR=/Applications/Xcode-26.5.app/Contents/Developer swift test --filter AccessibilityContractTests
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --filter AttestationValidatorTests
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --filter AccessibilityContractTests
 ```
 
 Expected: PASS with local preflight before server time, visible evidence-number errors, re-entry protection, and truthful queued completion state.
@@ -354,7 +354,7 @@ For view-only labels, use pure helper methods rather than snapshot tests. The te
 Run:
 
 ```bash
-DEVELOPER_DIR=/Applications/Xcode-26.5.app/Contents/Developer swift test --filter AccessibilityContractTests
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --filter AccessibilityContractTests
 ```
 
 Expected: the new helper assertions fail because the current components expose only visual color or tooltip state.
@@ -407,9 +407,9 @@ Build the app and manually verify on macOS 27:
 Run:
 
 ```bash
-DEVELOPER_DIR=/Applications/Xcode-26.5.app/Contents/Developer swift test --filter AccessibilityContractTests
-DEVELOPER_DIR=/Applications/Xcode-26.5.app/Contents/Developer swift test --filter SecurityElementsDetectorTests
-DEVELOPER_DIR=/Applications/Xcode-26.5.app/Contents/Developer ./build_app.sh
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --filter AccessibilityContractTests
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --filter SecurityElementsDetectorTests
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./build_app.sh
 ```
 
 Expected: focused tests pass and the packaged macOS 27 app is created.

@@ -23,7 +23,7 @@ Complete for the defensible scope. The branch is not production ready and no pro
 Focused receipt tests:
 
 ```text
-DEVELOPER_DIR="/Applications/Xcode-26.5.app/Contents/Developer" swift test --filter EZZKHTTPClientTests
+DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" swift test --filter EZZKHTTPClientTests
 ```
 
 PASS: 21 tests, 0 failures.
@@ -31,7 +31,7 @@ PASS: 21 tests, 0 failures.
 Complete package tests:
 
 ```text
-DEVELOPER_DIR="/Applications/Xcode-26.5.app/Contents/Developer" swift test
+DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" swift test
 ```
 
 PASS: 187 tests executed, 3 skipped, 0 failures.
@@ -39,7 +39,7 @@ PASS: 187 tests executed, 3 skipped, 0 failures.
 Application build:
 
 ```text
-DEVELOPER_DIR="/Applications/Xcode-26.5.app/Contents/Developer" ./build_app.sh
+DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" ./build_app.sh
 ```
 
 PASS: `.build/arm64-apple-macosx/debug/Autogram.app`.

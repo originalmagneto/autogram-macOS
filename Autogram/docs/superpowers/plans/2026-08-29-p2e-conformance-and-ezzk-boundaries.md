@@ -87,7 +87,7 @@ Sort and deduplicate issue strings. Never throw for malformed user input. Return
 
 - [ ] **Step 7: Run focused tests**
 
-Run `DEVELOPER_DIR="/Applications/Xcode-26.5.app/Contents/Developer" swift test --filter P2EConformanceTests` and expect all focused tests to pass.
+Run `DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" swift test --filter P2EConformanceTests` and expect all focused tests to pass.
 
 ---
 
@@ -122,11 +122,11 @@ Run the focused evidence tests and confirm sequential mock numbers and submitted
 
 - [ ] **Step 1: Run complete test suite**
 
-Run `DEVELOPER_DIR="/Applications/Xcode-26.5.app/Contents/Developer" swift test` and require zero failures.
+Run `DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" swift test` and require zero failures.
 
 - [ ] **Step 2: Run application build**
 
-Run `DEVELOPER_DIR="/Applications/Xcode-26.5.app/Contents/Developer" ./build_app.sh` and require a successful app build.
+Run `DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" ./build_app.sh` and require a successful app build.
 
 - [ ] **Step 3: Review the diff for scope**
 

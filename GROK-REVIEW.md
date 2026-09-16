@@ -171,7 +171,7 @@ Read the Swift call paths, Java v1/v2 implementations, Safari extension scripts,
 Ran from the Autogram package directory:
 
 ```sh
-DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift test --filter 'EngineBridgeTests|AVMResultMapperTests|AVMClientTests|WebSignRequestWireFormatTests|TwoStageClassifierTests|FoundationModelClassifierTests|PDFAnalysisEngineTests|PDFAConverterTests'
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --filter 'EngineBridgeTests|AVMResultMapperTests|AVMClientTests|WebSignRequestWireFormatTests|TwoStageClassifierTests|FoundationModelClassifierTests|PDFAnalysisEngineTests|PDFAConverterTests'
 ```
 
 Result: **53 tests passed, 0 failures**. Test log: `/tmp/autogram-grok-review-tests.log`.

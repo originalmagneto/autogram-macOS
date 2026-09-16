@@ -17,7 +17,7 @@
 
 ## Validation
 
-Use failing regression tests for false stamp specificity, physical-only learning, absent-versus-unreviewed state, incomplete dataset pages and legacy decode. Run `DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer swift test` from Autogram. Verify UI compilation and manually inspect the changed review flow if a runnable local app is available.
+Use failing regression tests for false stamp specificity, physical-only learning, absent-versus-unreviewed state, incomplete dataset pages and legacy decode. Run `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test` from Autogram. Verify UI compilation and manually inspect the changed review flow if a runnable local app is available.
 
 ## Implementation status
 

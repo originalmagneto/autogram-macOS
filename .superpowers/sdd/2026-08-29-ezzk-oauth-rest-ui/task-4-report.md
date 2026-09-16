@@ -23,9 +23,9 @@ No new app-target test target exists in this package, so controller state and lo
 
 ## Verification
 
-- `DEVELOPER_DIR="/Applications/Xcode-26.5.app/Contents/Developer" swift test --build-path /tmp/ezzk-task4-final-tests --filter EZZKHTTPClientTests`
+- `DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" swift test --build-path /tmp/ezzk-task4-final-tests --filter EZZKHTTPClientTests`
   - PASS, 16 tests, 0 failures.
-- `DEVELOPER_DIR="/Applications/Xcode-26.5.app/Contents/Developer" swift build --product Autogram --build-path /tmp/ezzk-task4-guard-build`
+- `DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" swift build --product Autogram --build-path /tmp/ezzk-task4-guard-build`
   - PASS, Autogram product built successfully.
 
 Only focused tests and app builds were run. Existing project warnings remain outside this task.

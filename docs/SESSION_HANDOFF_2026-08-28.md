@@ -331,8 +331,8 @@ Fresh verification was run after the local merge:
 
 ```bash
 cd "/Users/Magneto/PROJECTS/AUTOGRAM macOS UI/Autogram"
-DEVELOPER_DIR=/Applications/Xcode-26.5.app/Contents/Developer swift test
-DEVELOPER_DIR=/Applications/Xcode-26.5.app/Contents/Developer ./build_app.sh
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./build_app.sh
 plutil -extract LSMinimumSystemVersion raw -o - ".build/arm64-apple-macosx/debug/Autogram.app/Contents/Info.plist"
 ditto --rsrc --extattr --acl \
   ".build/arm64-apple-macosx/debug/Autogram.app" \

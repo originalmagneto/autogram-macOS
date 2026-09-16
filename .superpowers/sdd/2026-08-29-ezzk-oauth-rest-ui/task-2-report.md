@@ -26,13 +26,13 @@ Implementation commit: `65042adb` (`feat: add EZZK OAuth PKCE broker`)
 ## Focused verification
 
 ```text
-DEVELOPER_DIR="/Applications/Xcode-26.5.app/Contents/Developer" xcrun swift test --build-path /tmp/ezzk-oauth-matching-build --filter EZZKEnvironmentTests
+DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" xcrun swift test --build-path /tmp/ezzk-oauth-matching-build --filter EZZKEnvironmentTests
 ```
 
 Result: PASS, 11 tests, 0 failures.
 
 ```text
-DEVELOPER_DIR="/Applications/Xcode-26.5.app/Contents/Developer" xcrun swift build --build-path /tmp/ezzk-oauth-app-build --product Autogram
+DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" xcrun swift build --build-path /tmp/ezzk-oauth-app-build --product Autogram
 ```
 
 Result: PASS, Autogram product built successfully. Existing project warnings were emitted; no formatter, linter, or full project suite was run.
@@ -53,13 +53,13 @@ Review-fix commit: `803c4d5e` (`fix: harden EZZK OAuth broker`)
 Review-fix verification:
 
 ```text
-DEVELOPER_DIR="/Applications/Xcode-26.5.app/Contents/Developer" xcrun swift test --build-path /tmp/ezzk-oauth-fix-tests --filter EZZKEnvironmentTests
+DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" xcrun swift test --build-path /tmp/ezzk-oauth-fix-tests --filter EZZKEnvironmentTests
 ```
 
 Result: PASS, 11 tests, 0 failures.
 
 ```text
-DEVELOPER_DIR="/Applications/Xcode-26.5.app/Contents/Developer" xcrun swift build --build-path /tmp/ezzk-oauth-fix-build --product Autogram
+DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" xcrun swift build --build-path /tmp/ezzk-oauth-fix-build --product Autogram
 ```
 
 Result: PASS, Autogram product built successfully. Existing project warnings remain.

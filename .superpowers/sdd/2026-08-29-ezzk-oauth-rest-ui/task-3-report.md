@@ -23,8 +23,8 @@
 
 ## Tests
 
-- `DEVELOPER_DIR="/Applications/Xcode-26.5.app/Contents/Developer" swift test --filter EZZKAPIModelsTests` passed: 4 tests.
-- `DEVELOPER_DIR="/Applications/Xcode-26.5.app/Contents/Developer" swift test --filter EZZKHTTPClientTests` passed: 15 tests.
+- `DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" swift test --filter EZZKAPIModelsTests` passed: 4 tests.
+- `DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" swift test --filter EZZKHTTPClientTests` passed: 15 tests.
 - The redirect regression test was observed failing before the fix and passing afterward.
 
 ## Concerns

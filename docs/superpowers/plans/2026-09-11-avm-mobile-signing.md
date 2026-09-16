@@ -12,8 +12,8 @@
 
 ## Global Constraints
 
-- Toolchain: Xcode 27 beta. Every build and test command needs `DEVELOPER_DIR="/Applications/Xcode-beta.app/Contents/Developer"`.
-- Run tests with `DEVELOPER_DIR="/Applications/Xcode-beta.app/Contents/Developer" swift test --filter <TestClass>` from `Autogram/`.
+- Toolchain: Xcode 27. Every build and test command needs `DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer"`.
+- Run tests with `DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" swift test --filter <TestClass>` from `Autogram/`.
 - Code, comments and this plan in English. End-user strings in Slovak.
 - Never use em dashes in any text (code, docs, UI strings). Use hyphens, colons or parentheses.
 - Keep `AGENTS.md` and `CLAUDE.md` in the project root in complete sync.
@@ -101,7 +101,7 @@ final class AVMDocumentKeyTests: XCTestCase {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd Autogram && DEVELOPER_DIR="/Applications/Xcode-beta.app/Contents/Developer" swift test --filter AVMDocumentKeyTests`
+Run: `cd Autogram && DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" swift test --filter AVMDocumentKeyTests`
 Expected: compile error, `AVMDocumentKey` not found.
 
 - [ ] **Step 3: Write minimal implementation**
@@ -151,7 +151,7 @@ public struct AVMDocumentKey: Sendable, Equatable {
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `cd Autogram && DEVELOPER_DIR="/Applications/Xcode-beta.app/Contents/Developer" swift test --filter AVMDocumentKeyTests`
+Run: `cd Autogram && DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" swift test --filter AVMDocumentKeyTests`
 Expected: 4 tests pass.
 
 - [ ] **Step 5: Commit**
@@ -215,7 +215,7 @@ final class AVMClientTests: XCTestCase {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd Autogram && DEVELOPER_DIR="/Applications/Xcode-beta.app/Contents/Developer" swift test --filter AVMClientTests`
+Run: `cd Autogram && DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" swift test --filter AVMClientTests`
 Expected: compile error, `AVMUploadRequest` not found.
 
 - [ ] **Step 3: Write minimal implementation**
@@ -351,7 +351,7 @@ public enum AVMError: Error, Equatable, LocalizedError {
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `cd Autogram && DEVELOPER_DIR="/Applications/Xcode-beta.app/Contents/Developer" swift test --filter AVMClientTests`
+Run: `cd Autogram && DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" swift test --filter AVMClientTests`
 Expected: 2 tests pass.
 
 - [ ] **Step 5: Commit**
@@ -522,7 +522,7 @@ Note: the earlier closing brace of the class must be removed so these methods si
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `cd Autogram && DEVELOPER_DIR="/Applications/Xcode-beta.app/Contents/Developer" swift test --filter AVMClientTests`
+Run: `cd Autogram && DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" swift test --filter AVMClientTests`
 Expected: compile error, `AVMClient` and `AVMHTTPTransport` not found.
 
 - [ ] **Step 3: Write minimal implementation**
@@ -651,7 +651,7 @@ public struct AVMClient: Sendable {
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `cd Autogram && DEVELOPER_DIR="/Applications/Xcode-beta.app/Contents/Developer" swift test --filter AVMClientTests`
+Run: `cd Autogram && DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" swift test --filter AVMClientTests`
 Expected: 10 tests pass.
 
 - [ ] **Step 5: Commit**
@@ -695,7 +695,7 @@ final class QRCodeRendererTests: XCTestCase {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd Autogram && DEVELOPER_DIR="/Applications/Xcode-beta.app/Contents/Developer" swift test --filter QRCodeRendererTests`
+Run: `cd Autogram && DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" swift test --filter QRCodeRendererTests`
 Expected: compile error, `QRCodeRenderer` not found.
 
 - [ ] **Step 3: Write minimal implementation**
@@ -728,7 +728,7 @@ public enum QRCodeRenderer {
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `cd Autogram && DEVELOPER_DIR="/Applications/Xcode-beta.app/Contents/Developer" swift test --filter QRCodeRendererTests`
+Run: `cd Autogram && DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" swift test --filter QRCodeRendererTests`
 Expected: 2 tests pass. If the width differs by rounding, round `scale` up with `ceil` and crop with `target`; the `createCGImage(_:from:)` call already crops to `target`.
 
 - [ ] **Step 5: Commit**
@@ -807,7 +807,7 @@ final class AVMResultMapperTests: XCTestCase {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd Autogram && DEVELOPER_DIR="/Applications/Xcode-beta.app/Contents/Developer" swift test --filter AVMResultMapperTests`
+Run: `cd Autogram && DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" swift test --filter AVMResultMapperTests`
 Expected: compile error, `AVMResultMapper` not found.
 
 - [ ] **Step 3: Write minimal implementation**
@@ -864,7 +864,7 @@ If `isMandateCertificate` does not recognise the sample `mandate` signer strings
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `cd Autogram && DEVELOPER_DIR="/Applications/Xcode-beta.app/Contents/Developer" swift test --filter AVMResultMapperTests`
+Run: `cd Autogram && DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" swift test --filter AVMResultMapperTests`
 Expected: 5 tests pass.
 
 - [ ] **Step 5: Commit**
@@ -1053,7 +1053,7 @@ private final class ScriptedAVMTransport: AVMHTTPTransport, @unchecked Sendable 
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `cd Autogram && DEVELOPER_DIR="/Applications/Xcode-beta.app/Contents/Developer" swift test --filter AVMSigningSessionTests`
+Run: `cd Autogram && DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" swift test --filter AVMSigningSessionTests`
 Expected: compile error, `AVMSigningSession` not found.
 
 - [ ] **Step 3: Write minimal implementation**
@@ -1187,7 +1187,7 @@ public final class AVMSigningSession {
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `cd Autogram && DEVELOPER_DIR="/Applications/Xcode-beta.app/Contents/Developer" swift test --filter AVMSigningSessionTests`
+Run: `cd Autogram && DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" swift test --filter AVMSigningSessionTests`
 Expected: 5 tests pass. If `testCancelDeletesDocumentAndThrowsCancelled` sees `.failed` instead of `.cancelled`, the cancellation surfaced as `AVMError.transport` from the transport layer: in `AVMClient.send` add `catch is CancellationError { throw CancellationError() }` before the generic catch, and in `URLSessionAVMTransport` let `URLError.cancelled` map to `CancellationError()`.
 
 - [ ] **Step 5: Commit**
@@ -1313,7 +1313,7 @@ semaphore.wait()
 
 - [ ] **Step 3: Build**
 
-Run: `cd Autogram && DEVELOPER_DIR="/Applications/Xcode-beta.app/Contents/Developer" swift build --product avm-probe`
+Run: `cd Autogram && DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" swift build --product avm-probe`
 Expected: builds without errors.
 
 - [ ] **Step 4: Commit**
@@ -1328,17 +1328,17 @@ git commit -m "feat(avm): avm-probe CLI for end-to-end checks against the AVM se
 Run each and record the outcome in `docs/superpowers/specs/2026-09-11-avm-mobile-signing-design.md` under a new "Overené na serveri" section:
 
 ```bash
-cd Autogram && DEVELOPER_DIR="/Applications/Xcode-beta.app/Contents/Developer" swift run avm-probe ~/Desktop/test.pdf --level PAdES_BASELINE_T --out /tmp
+cd Autogram && DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" swift run avm-probe ~/Desktop/test.pdf --level PAdES_BASELINE_T --out /tmp
 ```
 Check: the phone opens the document, signs, the probe saves a PDF. Open the PDF in Autogram macOS and confirm the signature panel shows a qualified timestamp.
 
 ```bash
-cd Autogram && DEVELOPER_DIR="/Applications/Xcode-beta.app/Contents/Developer" swift run avm-probe ~/Desktop/test.pdf --level XAdES_BASELINE_B --container ASiC-E --out /tmp
+cd Autogram && DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" swift run avm-probe ~/Desktop/test.pdf --level XAdES_BASELINE_B --container ASiC-E --out /tmp
 ```
 Check: the result is an `.asice` and `ASiCEContainerVerifier` accepts it (drop it on the Signing intake).
 
 ```bash
-cd Autogram && DEVELOPER_DIR="/Applications/Xcode-beta.app/Contents/Developer" swift run avm-probe /tmp/unsigned-zako.asice --level XAdES_BASELINE_B --out /tmp
+cd Autogram && DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" swift run avm-probe /tmp/unsigned-zako.asice --level XAdES_BASELINE_B --out /tmp
 ```
 Build `/tmp/unsigned-zako.asice` once with a throwaway test in `AVMResultMapperTests` or a scratch script calling `ASiCEPackager().package(files: ASiCEPackager().zakoContainer(...))`. Check: both files (PDF and XML) are covered by the signature. If the server rejects unsigned containers or signs only one file, note it: Task 10 then uploads the PDF with `container: .asicE` and the ZaKo branch is marked unsupported until a follow-up.
 
@@ -1385,7 +1385,7 @@ Append to `AppSettingsLearningTests.swift`:
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd Autogram && DEVELOPER_DIR="/Applications/Xcode-beta.app/Contents/Developer" swift test --filter AppSettingsLearningTests`
+Run: `cd Autogram && DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" swift test --filter AppSettingsLearningTests`
 Expected: compile error, `mobileSigningEnabled` not found.
 
 - [ ] **Step 3: Implement the settings fields**
@@ -1447,7 +1447,7 @@ Insert `MobileSigningCard(settingsStore: settingsStore)` directly after the clos
 
 - [ ] **Step 5: Run tests and build the app**
 
-Run: `cd Autogram && DEVELOPER_DIR="/Applications/Xcode-beta.app/Contents/Developer" swift test --filter AppSettingsLearningTests && DEVELOPER_DIR="/Applications/Xcode-beta.app/Contents/Developer" swift build`
+Run: `cd Autogram && DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" swift test --filter AppSettingsLearningTests && DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" swift build`
 Expected: test passes, app builds.
 
 - [ ] **Step 6: Commit**
@@ -1537,7 +1537,7 @@ private final class OneShotAVMTransport: AVMHTTPTransport, @unchecked Sendable {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd Autogram && DEVELOPER_DIR="/Applications/Xcode-beta.app/Contents/Developer" swift test --filter MobileSigningCoordinatorTests`
+Run: `cd Autogram && DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" swift test --filter MobileSigningCoordinatorTests`
 Expected: compile error, `MobileSigningCoordinator` not found.
 
 - [ ] **Step 3: Implement the coordinator**
@@ -1672,7 +1672,7 @@ struct MobileSigningSheet: View {
 
 - [ ] **Step 5: Run tests and build**
 
-Run: `cd Autogram && DEVELOPER_DIR="/Applications/Xcode-beta.app/Contents/Developer" swift test --filter MobileSigningCoordinatorTests && DEVELOPER_DIR="/Applications/Xcode-beta.app/Contents/Developer" swift build`
+Run: `cd Autogram && DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" swift test --filter MobileSigningCoordinatorTests && DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" swift build`
 Expected: 2 tests pass, app builds.
 
 - [ ] **Step 6: Commit**
@@ -1847,12 +1847,12 @@ Add the sheet to the outer `HStack` of `SigningPrepareView.body` (after the exis
 
 - [ ] **Step 4: Build and run existing store tests**
 
-Run: `cd Autogram && DEVELOPER_DIR="/Applications/Xcode-beta.app/Contents/Developer" swift build && DEVELOPER_DIR="/Applications/Xcode-beta.app/Contents/Developer" swift test --filter AutogramAppTests`
+Run: `cd Autogram && DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" swift build && DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" swift test --filter AutogramAppTests`
 Expected: builds; existing app tests still pass.
 
 - [ ] **Step 5: Manual check**
 
-Run: `DEVELOPER_DIR="/Applications/Xcode-beta.app/Contents/Developer" ./build_app.sh` then open the app, drop a PDF, choose "PAdES podpis v PDF", click "Podpísať mobilom", scan with the iPhone, sign. Expected: the sheet closes on its own, `SigningDoneView` shows the signed file, the file opens in Preview with a valid signature.
+Run: `DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" ./build_app.sh` then open the app, drop a PDF, choose "PAdES podpis v PDF", click "Podpísať mobilom", scan with the iPhone, sign. Expected: the sheet closes on its own, `SigningDoneView` shows the signed file, the file opens in Preview with a valid signature.
 
 - [ ] **Step 6: Commit**
 
@@ -1978,7 +1978,7 @@ Attach the sheet to the root `VStack` of `AuthorizeView.body`:
 
 - [ ] **Step 4: Build and test**
 
-Run: `cd Autogram && DEVELOPER_DIR="/Applications/Xcode-beta.app/Contents/Developer" swift build && DEVELOPER_DIR="/Applications/Xcode-beta.app/Contents/Developer" swift test --filter "AVM|MobileSigning"`
+Run: `cd Autogram && DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" swift build && DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" swift test --filter "AVM|MobileSigning"`
 Expected: builds, all AVM tests pass.
 
 - [ ] **Step 5: Manual check**

@@ -162,7 +162,7 @@ Run:
 
 ```bash
 cd Autogram
-DEVELOPER_DIR="/Applications/Xcode-26.5.app/Contents/Developer" swift test --filter InputSignatureVerificationTests
+DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" swift test --filter InputSignatureVerificationTests
 ```
 
 Expected: compilation or test failures because the new result model, provider method, and preflight parameter do not exist yet. Do not proceed on a passing result.
@@ -209,8 +209,8 @@ Run the implemented result and service tests individually so the not-yet-integra
 
 ```bash
 cd Autogram
-DEVELOPER_DIR="/Applications/Xcode-26.5.app/Contents/Developer" swift test --filter InputSignatureVerificationTests/testCompletedInspectionWithNoSignaturesIsValid
-DEVELOPER_DIR="/Applications/Xcode-26.5.app/Contents/Developer" swift test --filter InputSignatureVerificationTests/testUnavailableProviderReturnsUnavailable
+DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" swift test --filter InputSignatureVerificationTests/testCompletedInspectionWithNoSignaturesIsValid
+DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" swift test --filter InputSignatureVerificationTests/testUnavailableProviderReturnsUnavailable
 ```
 
 Expected: the aggregation and default-provider tests pass. The preflight test remains intentionally red until Task 4.
@@ -240,7 +240,7 @@ Run:
 
 ```bash
 cd Autogram
-DEVELOPER_DIR="/Applications/Xcode-26.5.app/Contents/Developer" swift test --filter SigningProviderDispatchTests
+DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" swift test --filter SigningProviderDispatchTests
 ```
 
 Expected: PASS, with no live engine requirement. The explicit state aggregation is covered by `InputSignatureVerificationTests`; the real engine adapter is covered by the complete build and review because the production helper process is environment-gated.
@@ -297,7 +297,7 @@ Run:
 
 ```bash
 cd Autogram
-DEVELOPER_DIR="/Applications/Xcode-26.5.app/Contents/Developer" swift test --filter 'AttestationValidatorTests|InputSignatureVerificationTests'
+DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" swift test --filter 'AttestationValidatorTests|InputSignatureVerificationTests'
 ```
 
 Expected: PASS.
@@ -348,7 +348,7 @@ Run:
 
 ```bash
 cd Autogram
-DEVELOPER_DIR="/Applications/Xcode-26.5.app/Contents/Developer" swift test
+DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" swift test
 ```
 
 Expected: all existing and new tests pass, with only pre-existing environment-gated skips.
@@ -358,7 +358,7 @@ Expected: all existing and new tests pass, with only pre-existing environment-ga
 Run:
 
 ```bash
-DEVELOPER_DIR="/Applications/Xcode-26.5.app/Contents/Developer" ./build_app.sh
+DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" ./build_app.sh
 ```
 
 Expected: successful app build.
