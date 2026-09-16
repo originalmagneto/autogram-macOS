@@ -22,6 +22,8 @@ final class WebSigningCoordinator {
         let sizeDescription: String
         let kindDescription: String
         let pdfThumbnail: NSImage?
+        /// The whole PDF, for the page preview and Quick Look.
+        let pdfDocument: PDFDocument?
         let xmlExcerpt: String?
     }
 
@@ -61,10 +63,6 @@ final class WebSigningCoordinator {
     /// Bumped whenever the PIN field should take the keyboard.
     private(set) var pinFocusRequest = 0
     private var cardPresent = false
-    /// An eID was inserted while the prompt sat over the browser. The BOK window
-    /// can only take the keyboard once this app is active, so the certificates are
-    /// read when the person clicks the prompt, not at once.
-    private(set) var certificatesWaitForClick = false
     private var cardWatch: Task<Void, Never>?
 
     /// An eID takes its BOK in the eID client's own window; every other card
@@ -183,6 +181,7 @@ final class WebSigningCoordinator {
         }
 
         var pdfThumb: NSImage?
+        var pdfDocument: PDFDocument?
         var xmlPreview: String?
         if request.eform != nil || request.payloadMimeType.contains("xml") {
             if let string = String(data: bytes.prefix(8192), encoding: .utf8) {
@@ -191,6 +190,7 @@ final class WebSigningCoordinator {
             }
         } else if let doc = PDFDocument(data: bytes), let page = doc.page(at: 0) {
             pdfThumb = page.thumbnail(of: CGSize(width: 140, height: 180), for: .mediaBox)
+            pdfDocument = doc
         }
 
         pending = Pending(id: request.requestID,
@@ -198,6 +198,7 @@ final class WebSigningCoordinator {
                           sizeDescription: Self.describeSize(bytes.count),
                           kindDescription: Self.describeKind(request),
                           pdfThumbnail: pdfThumb,
+                          pdfDocument: pdfDocument,
                           xmlExcerpt: xmlPreview)
         pin = ""
         errorText = nil
@@ -232,7 +233,6 @@ final class WebSigningCoordinator {
         let wasPresent = cardPresent
         cardPresent = !discovered.isEmpty
         guard cardPresent else {
-            certificatesWaitForClick = false
             if wasPresent {
                 pin = ""
                 errorText = nil
@@ -245,12 +245,11 @@ final class WebSigningCoordinator {
         if selectedIdentityID == nil || !discovered.contains(where: { $0.id == selectedIdentityID }) {
             selectedIdentityID = Self.preferredIdentity(in: discovered)
         }
-        if !wasPresent {
-            if !selectedIdentityRequiresPIN && !NSApp.isActive {
-                certificatesWaitForClick = true
-            } else {
-                await readCertificates()
-            }
+        // An eID signs without reading its certificates first: every read opens the
+        // eID client's BOK window, and the engine picks the card's signing key itself.
+        // Other cards need the PIN typed here, so the keyboard goes to the PIN field.
+        if !wasPresent && selectedIdentityRequiresPIN {
+            await readCertificates()
         }
     }
 
@@ -280,13 +279,6 @@ final class WebSigningCoordinator {
                 ?? "Certifikáty z karty sa nepodarilo načítať."
             if needsPIN { requestPINFocus() }
         }
-    }
-
-    /// Called when the prompt becomes the key window, which means this app is active.
-    func promptBecameKey() {
-        guard certificatesWaitForClick else { return }
-        certificatesWaitForClick = false
-        Task { await readCertificates() }
     }
 
     /// Return in the PIN field reads the certificates first and signs once they are known.
@@ -438,7 +430,6 @@ final class WebSigningCoordinator {
         cardWatch?.cancel()
         cardWatch = nil
         cardPresent = false
-        certificatesWaitForClick = false
         pending = nil
         pin = ""
         prompt.hide()

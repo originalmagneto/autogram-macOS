@@ -13,11 +13,6 @@ private final class WebSigningPanelDelegate: NSObject, NSWindowDelegate {
         coordinator?.cancel()
     }
 
-    func windowDidBecomeKey(_ notification: Notification) {
-        MainActor.assumeIsolated {
-            coordinator?.promptBecameKey()
-        }
-    }
 }
 
 /// Shows the browser signing prompt in a floating panel instead of a sheet.
@@ -52,7 +47,7 @@ final class WebSigningPrompt {
         let size = hosting.fittingSize
 
         let panel = NSPanel(
-            contentRect: NSRect(origin: .zero, size: NSSize(width: max(size.width, 520), height: max(size.height, 460))),
+            contentRect: NSRect(origin: .zero, size: NSSize(width: max(size.width, 900), height: max(size.height, 600))),
             styleMask: [.titled, .closable, .utilityWindow, .resizable],
             backing: .buffered,
             defer: false)
@@ -63,7 +58,7 @@ final class WebSigningPrompt {
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.hidesOnDeactivate = false
         panel.isReleasedWhenClosed = false
-        panel.minSize = NSSize(width: 480, height: 420)
+        panel.minSize = NSSize(width: 860, height: 560)
         place(panel)
 
         let delegate = WebSigningPanelDelegate(coordinator: coordinator)
@@ -129,7 +124,7 @@ final class WebSigningPrompt {
         panel?.level = .normal
         keyboardHandoff?.cancel()
         log.notice("BOK handoff started, app active: \(NSApp.isActive, privacy: .public)")
-        keyboardHandoff = Task { @MainActor [log] in
+        keyboardHandoff = Task { @MainActor [log, weak self] in
             var activated = Set<pid_t>()
             var reported = Set<pid_t>()
             while !Task.isCancelled {
@@ -144,7 +139,13 @@ final class WebSigningPrompt {
                             policy=\(app.activationPolicy.rawValue, privacy: .public) active=\(app.isActive, privacy: .public)
                             """)
                     }
-                    guard Self.isEIDKeyboard(app), !activated.contains(app.processIdentifier) else { continue }
+                    guard Self.isEIDKeyboard(app) else { continue }
+                    // Keep the prompt visible just beneath the BOK window rather than
+                    // letting it drop behind the browser while the eID client is active.
+                    if let panel = self?.panel, let bokWindow = Self.frontWindowNumber(of: app.processIdentifier) {
+                        panel.order(.below, relativeTo: bokWindow)
+                    }
+                    guard !activated.contains(app.processIdentifier) else { continue }
                     activated.insert(app.processIdentifier)
                     NSApp.yieldActivation(to: app)
                     let accepted = app.activate(from: .current, options: [])
@@ -175,12 +176,20 @@ final class WebSigningPrompt {
         }
     }
 
+    /// Number of the process's front on-screen window, from the window list.
+    private static func frontWindowNumber(of pid: pid_t) -> Int? {
+        guard let windows = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements],
+                                                       kCGNullWindowID) as? [[String: Any]] else { return nil }
+        return windows.first { ($0[kCGWindowOwnerPID as String] as? pid_t) == pid }?[kCGWindowNumber as String] as? Int
+    }
+
     private static func isEIDKeyboard(_ app: NSRunningApplication) -> Bool {
         guard let executable = app.executableURL else { return false }
         return executable.lastPathComponent == "VirtualKeyboard" && executable.path.contains("eID")
     }
 
     func hide() {
+        WebSigningQuickLook.shared.close()
         keyboardHandoff?.cancel()
         keyboardHandoff = nil
         middlewareInputDepth = 0

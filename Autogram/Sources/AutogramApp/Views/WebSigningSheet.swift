@@ -13,6 +13,31 @@ struct WebSigningSheet: View {
         VStack(alignment: .leading, spacing: 18) {
             header
 
+            HStack(alignment: .top, spacing: 24) {
+                if let pending = coordinator.pending, let document = pending.pdfDocument {
+                    WebSigningDocumentPreview(document: document, filename: pending.request.filename)
+                        .frame(width: 360)
+                        .frame(minHeight: 460)
+                }
+                controls
+            }
+        }
+        .padding(24)
+        .frame(minWidth: 860, idealWidth: 920, maxWidth: 1100)
+        .onChange(of: coordinator.pinFocusRequest) {
+            pinFocused = true
+        }
+        .sheet(isPresented: Bindable(coordinator.mobileSigning).isPresented) {
+            if let session = coordinator.mobileSigning.session {
+                MobileSigningSheet(session: session) {
+                    coordinator.mobileSigning.cancel()
+                }
+            }
+        }
+    }
+
+    private var controls: some View {
+        VStack(alignment: .leading, spacing: 18) {
             if let pending = coordinator.pending {
                 documentCard(pending)
             }
@@ -46,20 +71,10 @@ struct WebSigningSheet: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
+            Spacer(minLength: 0)
             actions
         }
-        .padding(24)
-        .frame(minWidth: 480, idealWidth: 540, maxWidth: 620)
-        .onChange(of: coordinator.pinFocusRequest) {
-            pinFocused = true
-        }
-        .sheet(isPresented: Bindable(coordinator.mobileSigning).isPresented) {
-            if let session = coordinator.mobileSigning.session {
-                MobileSigningSheet(session: session) {
-                    coordinator.mobileSigning.cancel()
-                }
-            }
-        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var header: some View {
@@ -83,7 +98,7 @@ struct WebSigningSheet: View {
     private func documentCard(_ pending: WebSigningCoordinator.Pending) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top, spacing: 12) {
-                if let thumb = pending.pdfThumbnail {
+                if pending.pdfDocument == nil, let thumb = pending.pdfThumbnail {
                     VStack(spacing: 4) {
                         Image(nsImage: thumb)
                             .resizable()
@@ -203,17 +218,10 @@ struct WebSigningSheet: View {
                     }
                     .buttonStyle(.link)
                 }
-            } else if !coordinator.certificatesResolved && !coordinator.isReadingCertificates
-                        && !coordinator.selectedIdentityRequiresPIN {
-                HStack(spacing: 8) {
-                    Text(coordinator.identities.first?.label ?? "Karta pripojená")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                    Button("Načítať certifikáty") {
-                        Task { await coordinator.readCertificates() }
-                    }
-                    .buttonStyle(.link)
-                }
+            } else if !coordinator.certificatesResolved && !coordinator.selectedIdentityRequiresPIN {
+                Text(coordinator.identities.first?.label ?? "Karta pripojená")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
             } else {
                 Picker("", selection: $coordinator.selectedIdentityID) {
                     ForEach(coordinator.identities) { identity in
@@ -258,9 +266,7 @@ struct WebSigningSheet: View {
             }
             Text(coordinator.isReadingCertificates || coordinator.isWorking
                  ? "Zadajte BOK v okne eID klienta."
-                 : coordinator.certificatesWaitForClick
-                    ? "Kliknite do tohto okna a eID klient si vypýta BOK na načítanie certifikátov."
-                    : "BOK zadáte v okne eID klienta, pri načítaní certifikátov aj pri podpise.")
+                 : "Po kliknutí na Podpísať si eID klient vypýta BOK dvakrát: prihlásenie ku karte a potvrdenie podpisu.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
         }
