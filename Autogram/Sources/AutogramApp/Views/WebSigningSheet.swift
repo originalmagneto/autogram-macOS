@@ -222,14 +222,20 @@ struct WebSigningSheet: View {
                 Text(coordinator.identities.first?.label ?? "Karta pripojená")
                     .font(.callout)
                     .foregroundStyle(.secondary)
-            } else {
-                Picker("", selection: $coordinator.selectedIdentityID) {
+            } else if coordinator.certificatesResolved {
+                // Every certificate on the card at once, marked qualified, mandate or
+                // commercial, as in the main window, instead of a menu that hides the second.
+                VStack(spacing: 6) {
                     ForEach(coordinator.identities) { identity in
-                        Text(identity.label).tag(Optional(identity.id))
+                        IdentityRow(identity: identity,
+                                    isSelected: coordinator.selectedIdentityID == identity.id,
+                                    onSelect: { coordinator.selectedIdentityID = identity.id })
                     }
                 }
-                .labelsHidden()
-                .pickerStyle(.menu)
+            } else {
+                Text(coordinator.identities.first?.label ?? "Karta pripojená")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
             }
         }
     }
