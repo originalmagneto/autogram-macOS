@@ -507,6 +507,42 @@ class MachineSigningServiceTest {
         assertEquals(null, validator.validationFailure(output, java.util.Set.of(), false));
     }
 
+    /// nove.slovensko.sk asks for XAdES Baseline B around a PDF and rejects a
+    /// signature with a timestamp it did not ask for. Such an output carries no
+    /// timestamp, so only its level and cryptographic integrity can be checked.
+    @Test
+    void portalBaselineBOutputNeedsNoTimestampButTheRequestedLevel() {
+        var report = mock(SimpleReport.class);
+        when(report.getSignatureIdList()).thenReturn(List.of("new"));
+        when(report.getSignatureFormat("new")).thenReturn(SignatureLevel.XAdES_BASELINE_B);
+        when(report.isValid("new")).thenReturn(true);
+        when(report.getIndication("new")).thenReturn(Indication.TOTAL_PASSED);
+        when(report.getSignatureTimestamps("new")).thenReturn(List.of());
+        var validator = new MachineSigningService.PdfOutputValidator(new MachineInspectionService(path -> report,
+                content -> report));
+        var asice = new byte[] { 'P', 'K', 3, 4, 0, 0, 0, 0 };
+
+        assertEquals(null, validator.validationFailure(asice, java.util.Set.of(), false, "XAdES_BASELINE_B"));
+        assertEquals("OUTPUT_VALIDATION_FAILED",
+                validator.validationFailure(asice, java.util.Set.of(), false, "XAdES_BASELINE_T"));
+    }
+
+    @Test
+    void portalBaselineBOutputStillRejectsABrokenSignature() {
+        var report = mock(SimpleReport.class);
+        when(report.getSignatureIdList()).thenReturn(List.of("new"));
+        when(report.getSignatureFormat("new")).thenReturn(SignatureLevel.XAdES_BASELINE_B);
+        when(report.isValid("new")).thenReturn(false);
+        when(report.getIndication("new")).thenReturn(Indication.TOTAL_FAILED);
+        when(report.getSignatureTimestamps("new")).thenReturn(List.of());
+        var validator = new MachineSigningService.PdfOutputValidator(new MachineInspectionService(path -> report,
+                content -> report));
+        var asice = new byte[] { 'P', 'K', 3, 4, 0, 0, 0, 0 };
+
+        assertEquals("OUTPUT_VALIDATION_FAILED",
+                validator.validationFailure(asice, java.util.Set.of(), false, "XAdES_BASELINE_B"));
+    }
+
     @Test
     void outputValidatorRejectsSymlinkPaths() throws Exception {
         var document = Files.writeString(target("regular.pdf"), "%PDF-1.7\nregular\n%%EOF");

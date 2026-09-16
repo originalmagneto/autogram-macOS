@@ -101,7 +101,7 @@ public final class MachineSigningService {
             }
             try (var session = sessionFactory.apply(request)) {
                 for (; processedFiles < preparedFiles.size(); processedFiles++) {
-                    signFile(requestId, session, preparedFiles.get(processedFiles));
+                    signFile(requestId, session, preparedFiles.get(processedFiles), validatedRequest.request().signatureLevel());
                 }
             }
         } catch (Throwable exception) {
@@ -159,7 +159,7 @@ public final class MachineSigningService {
         }
     }
 
-    private void signFile(String requestId, SigningSession session, PreparedFile prepared) {
+    private void signFile(String requestId, SigningSession session, PreparedFile prepared, String requestedLevel) {
         var file = prepared.file();
         writer.write("file.signingStarted", requestId, file.id(), new JsonObject());
         try {
@@ -173,7 +173,7 @@ public final class MachineSigningService {
             progress(requestId, file, "validating");
             var signedContent = prepared.readSignedContent();
             var validationFailure = outputValidationFailure(signedContent, previousSignatureIds,
-                    prepared.hasVisibleAppearance());
+                    prepared.hasVisibleAppearance(), requestedLevel);
             if (validationFailure != null) {
                 throw new MachineProtocolException(validationFailure);
             }
@@ -212,9 +212,9 @@ public final class MachineSigningService {
     }
 
     private String outputValidationFailure(byte[] content, Set<String> previousSignatureIds,
-            boolean visibleAppearance) {
+            boolean visibleAppearance, String requestedLevel) {
         try {
-            return outputValidator.validationFailure(content, previousSignatureIds, visibleAppearance);
+            return outputValidator.validationFailure(content, previousSignatureIds, visibleAppearance, requestedLevel);
         } catch (Throwable exception) {
             throw new MachineProtocolException("OUTPUT_VALIDATION_FAILED", exception);
         }
@@ -470,6 +470,11 @@ public final class MachineSigningService {
         default String validationFailure(byte[] content, Set<String> previousSignatureIds,
                 boolean visibleAppearance) throws Exception {
             return validationFailure(content, previousSignatureIds);
+        }
+
+        default String validationFailure(byte[] content, Set<String> previousSignatureIds,
+                boolean visibleAppearance, String requestedLevel) throws Exception {
+            return validationFailure(content, previousSignatureIds, visibleAppearance);
         }
     }
 
@@ -769,6 +774,35 @@ public final class MachineSigningService {
         @Override
         public String validationFailure(byte[] content, Set<String> previousSignatureIds) {
             return validationFailure(content, previousSignatureIds, false);
+        }
+
+        /**
+         * Baseline B carries no timestamp, and only a portal asks for it, so such an
+         * output is checked for exactly one new signature of the requested level with
+         * intact cryptography. Everything else keeps the qualified Baseline T checks.
+         */
+        @Override
+        public String validationFailure(byte[] content, Set<String> previousSignatureIds,
+                boolean visibleAppearance, String requestedLevel) {
+            if (visibleAppearance || requestedLevel == null || !requestedLevel.endsWith("_B")) {
+                return validationFailure(content, previousSignatureIds, visibleAppearance);
+            }
+            if (!hasPdfHeaderAndEof(content) && !isAsic("output.asice", content)) {
+                return "OUTPUT_VALIDATION_FAILED";
+            }
+            var signatures = inspectionService.inspect(content).getAsJsonArray("signatures");
+            var signatureIds = signatures.asList().stream().map(value -> value.getAsJsonObject())
+                    .map(signature -> string(signature, "id")).collect(java.util.stream.Collectors.toSet());
+            if (!signatureIds.containsAll(previousSignatureIds)) {
+                return "OUTPUT_VALIDATION_FAILED";
+            }
+            var added = signatures.asList().stream().map(value -> value.getAsJsonObject())
+                    .filter(signature -> !previousSignatureIds.contains(string(signature, "id"))).toList();
+            if (added.size() != 1 || !requestedLevel.equals(string(added.getFirst(), "format"))
+                    || !hasCryptographicIntegrity(added.getFirst())) {
+                return "OUTPUT_VALIDATION_FAILED";
+            }
+            return null;
         }
 
         @Override
