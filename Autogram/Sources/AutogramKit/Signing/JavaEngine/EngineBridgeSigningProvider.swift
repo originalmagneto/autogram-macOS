@@ -256,6 +256,18 @@ public final class EngineBridgeSigningProvider: QualifiedSigningProviding, @unch
         return filename
     }
 
+    /// Serial the engine reads as "the signing key on this token".
+    static let signingKeyOnToken = "*"
+    static let eidSignerLabel = "Občiansky preukaz (eID)"
+
+    /// An eID with no certificate chosen yet and no visible stamp signs without a
+    /// certificate discovery first: the visible stamp needs the signer's name, and a
+    /// certificate the person picked keeps its serial.
+    static func signsWithoutCertificateDiscovery(driverID: String, preferredSerial: String?,
+                                                 hasVisualStamp: Bool) -> Bool {
+        !requiresPIN(driverID: driverID) && preferredSerial == nil && !hasVisualStamp
+    }
+
     /// Whether the app has to collect the PIN for a card on this driver.
     public static func requiresPIN(driverID: String) -> Bool {
         driverID != Self.driverID
@@ -284,43 +296,59 @@ public final class EngineBridgeSigningProvider: QualifiedSigningProviding, @unch
         let preferredSerial = request.identityID.hasPrefix(Self.certificateIdentityPrefix)
             ? String(request.identityID.dropFirst(Self.certificateIdentityPrefix.count))
             : nil
-        // eID PKCS#11: every C_Login opens the eID client's BOK window. When the
-        // certificates were already read from this eID, reuse them so signing asks
-        // for the BOK once more (the signature itself), not twice. Other cards take
-        // the PIN programmatically, so re-reading them costs nothing and re-checks the PIN.
-        let reusable: [SigningCertificate] = {
-            guard !Self.requiresPIN(driverID: driverID), let preferredSerial,
-                  cachedCertificatesDriverID.withLock({ $0 }) == driverID else { return [] }
-            let cached = cachedCertificates.withLock { $0 }
-            return cached.contains(where: { $0.serialNumber == preferredSerial }) ? cached : []
-        }()
-        let certificates: [SigningCertificate]
-        if !reusable.isEmpty {
-            certificates = reusable
+        let signingSerial: String
+        let signerName: String
+        let signerQualification: String?
+        if Self.signsWithoutCertificateDiscovery(driverID: driverID, preferredSerial: preferredSerial,
+                                                 hasVisualStamp: request.visualStamp != nil) {
+            // The eID signing slot holds one qualified key. Reading its certificates
+            // first would open the eID client's BOK window once more, so the engine
+            // picks that key itself inside the signing session.
+            signingSerial = Self.signingKeyOnToken
+            signerName = Self.eidSignerLabel
+            signerQualification = nil
         } else {
-            statusLog("Čítam podpisové certifikáty z karty…")
-            let discovery: CertificateDiscovery
-            do {
-                discovery = try await engine.certificateDiscovery(driverID: driverID, pin: Secret(pin))
-            } catch {
-                cachedCertificates.withLock { $0 = [] }
-                cachedCertificatesDriverID.withLock { $0 = nil }
-                invalidateIdentityCache()
-                throw Self.mapAny(error)
+            // eID PKCS#11: every C_Login opens the eID client's BOK window. When the
+            // certificates were already read from this eID, reuse them so signing asks
+            // for the BOK once more (the signature itself), not twice. Other cards take
+            // the PIN programmatically, so re-reading them costs nothing and re-checks the PIN.
+            let reusable: [SigningCertificate] = {
+                guard !Self.requiresPIN(driverID: driverID), let preferredSerial,
+                      cachedCertificatesDriverID.withLock({ $0 }) == driverID else { return [] }
+                let cached = cachedCertificates.withLock { $0 }
+                return cached.contains(where: { $0.serialNumber == preferredSerial }) ? cached : []
+            }()
+            let certificates: [SigningCertificate]
+            if !reusable.isEmpty {
+                certificates = reusable
+            } else {
+                statusLog("Čítam podpisové certifikáty z karty…")
+                let discovery: CertificateDiscovery
+                do {
+                    discovery = try await engine.certificateDiscovery(driverID: driverID, pin: Secret(pin))
+                } catch {
+                    cachedCertificates.withLock { $0 = [] }
+                    cachedCertificatesDriverID.withLock { $0 = nil }
+                    invalidateIdentityCache()
+                    throw Self.mapAny(error)
+                }
+                guard !discovery.certificates.isEmpty else {
+                    cachedCertificates.withLock { $0 = [] }
+                    cachedCertificatesDriverID.withLock { $0 = nil }
+                    invalidateIdentityCache()
+                    throw SigningError.identityUnavailable
+                }
+                cachedCertificates.withLock { $0 = discovery.certificates }
+                cachedCertificatesDriverID.withLock { $0 = driverID }
+                certificates = discovery.certificates
             }
-            guard !discovery.certificates.isEmpty else {
-                cachedCertificates.withLock { $0 = [] }
-                cachedCertificatesDriverID.withLock { $0 = nil }
-                invalidateIdentityCache()
+            guard let certificate = Self.selectCertificate(from: certificates,
+                                                           preferredSerialNumber: preferredSerial) else {
                 throw SigningError.identityUnavailable
             }
-            cachedCertificates.withLock { $0 = discovery.certificates }
-            cachedCertificatesDriverID.withLock { $0 = driverID }
-            certificates = discovery.certificates
-        }
-        guard let certificate = Self.selectCertificate(from: certificates,
-                                                       preferredSerialNumber: preferredSerial) else {
-            throw SigningError.identityUnavailable
+            signingSerial = certificate.serialNumber
+            signerName = certificate.displayName
+            signerQualification = certificate.certificateQualification
         }
 
         let workDirectory = try Self.makeWorkspace()
@@ -348,8 +376,8 @@ public final class EngineBridgeSigningProvider: QualifiedSigningProviding, @unch
         if wantsPAdES, let stamp = request.visualStamp {
             statusLog("Renderujem grafický podpis…")
             appearanceRequest = try self.visibleAppearance(for: stamp,
-                                                           certificateDisplayName: certificate.displayName,
-                                                           qualification: certificate.certificateQualification,
+                                                           certificateDisplayName: signerName,
+                                                           qualification: signerQualification,
                                                            pdfData: request.pdfData,
                                                            directory: workDirectory)
         }
@@ -360,7 +388,7 @@ public final class EngineBridgeSigningProvider: QualifiedSigningProviding, @unch
         let engineRequest = EngineSigningRequest(
             sessionID: UUID(),
             driverID: driverID,
-            certificateSerial: certificate.serialNumber,
+            certificateSerial: signingSerial,
             pin: Secret(pin),
             files: [signingFile],
             outputFormat: wantsPAdES ? .pades : .asiceXAdES,
@@ -409,13 +437,13 @@ public final class EngineBridgeSigningProvider: QualifiedSigningProviding, @unch
             return SignedConversionResult(pdfData: signedData,
                                           asicData: nil,
                                           signedAt: Date(),
-                                          signatureLabel: certificate.displayName,
+                                          signatureLabel: signerName,
                                           isLegallyBinding: true)
         }
         return SignedConversionResult(pdfData: request.pdfData,
                                       asicData: signedData,
                                       signedAt: Date(),
-                                      signatureLabel: certificate.displayName,
+                                      signatureLabel: signerName,
                                       isLegallyBinding: true)
     }
 

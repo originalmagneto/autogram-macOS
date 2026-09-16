@@ -183,6 +183,20 @@ final class EngineBridgeSelectionTests: XCTestCase {
         XCTAssertNil(unknown.cardKindLabel)
     }
 
+    /// Each eID certificate read opens the BOK window, so a portal signature with the
+    /// eID goes straight to signing, where the engine picks the card's signing key.
+    func testOnlyAnEIDWithoutChosenCertificateOrStampSkipsDiscovery() {
+        XCTAssertTrue(EngineBridgeSigningProvider.signsWithoutCertificateDiscovery(
+            driverID: "eid", preferredSerial: nil, hasVisualStamp: false))
+        XCTAssertFalse(EngineBridgeSigningProvider.signsWithoutCertificateDiscovery(
+            driverID: "eid", preferredSerial: "42", hasVisualStamp: false))
+        XCTAssertFalse(EngineBridgeSigningProvider.signsWithoutCertificateDiscovery(
+            driverID: "eid", preferredSerial: nil, hasVisualStamp: true))
+        XCTAssertFalse(EngineBridgeSigningProvider.signsWithoutCertificateDiscovery(
+            driverID: "secure_store", preferredSerial: nil, hasVisualStamp: false))
+        XCTAssertEqual(EngineBridgeSigningProvider.signingKeyOnToken, "*")
+    }
+
     func testEnginePINUsesThePlaceholderOnlyForAnEmptyEIDEntry() {
         let placeholder = EngineBridgeSigningProvider.protectedAuthenticationPathPIN
         XCTAssertEqual(EngineBridgeSigningProvider.enginePIN(entered: "", driverID: "eid"), placeholder)

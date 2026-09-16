@@ -52,6 +52,13 @@ import java.util.function.BiFunction;
 import java.util.function.Function;
 
 public final class MachineSigningService {
+    /**
+     * Certificate serial meaning "the signing key on this token". The eID signing slot
+     * holds one qualified key, and reading its certificates first would cost the
+     * person an extra BOK entry.
+     */
+    public static final String SIGNING_KEY_ON_TOKEN = "*";
+
     private final MachineEventWriter writer;
     private final Function<SignRequest, SigningSession> sessionFactory;
     private final OutputValidator outputValidator;
@@ -672,12 +679,31 @@ public final class MachineSigningService {
         }
 
         static DSSPrivateKeyEntry selectedKey(List<DSSPrivateKeyEntry> keys, String certificateSerial) {
+            if (SIGNING_KEY_ON_TOKEN.equals(certificateSerial)) {
+                return onlySigningKey(keys);
+            }
             var matches = keys.stream().filter(key -> CliKeySelector.serial(key).equals(certificateSerial)).toList();
             if (matches.size() != 1) {
                 throw new MachineProtocolException(matches.isEmpty() ? "CERTIFICATE_NOT_FOUND" : "CERTIFICATE_AMBIGUOUS");
             }
             return matches.getFirst();
         }
+    }
+
+    /// The only key on the token, or the only one allowed to make non-repudiation
+    /// signatures. Never a guess between several signing keys.
+    private static DSSPrivateKeyEntry onlySigningKey(List<DSSPrivateKeyEntry> keys) {
+        if (keys.size() == 1) {
+            return keys.getFirst();
+        }
+        var signing = keys.stream()
+                .filter(key -> key.getCertificate() != null
+                        && key.getCertificate().checkKeyUsage(eu.europa.esig.dss.enumerations.KeyUsageBit.NON_REPUDIATION))
+                .toList();
+        if (signing.size() != 1) {
+            throw new MachineProtocolException(signing.isEmpty() ? "CERTIFICATE_NOT_FOUND" : "CERTIFICATE_AMBIGUOUS");
+        }
+        return signing.getFirst();
     }
 
     static final class MachineTimestampDataLoader extends TimestampDataLoader {

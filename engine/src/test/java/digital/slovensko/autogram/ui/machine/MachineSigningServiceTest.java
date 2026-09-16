@@ -32,6 +32,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -552,6 +553,42 @@ class MachineSigningServiceTest {
                 content -> qualifiedReport("new")));
 
         assertThrows(java.io.IOException.class, () -> validator.isValid(link, java.util.Set.of()));
+    }
+
+    /// An eID signing slot holds one qualified signing key. Reading the certificates
+    /// first costs the person a BOK entry, so the app may ask for "the signing key"
+    /// instead of a serial.
+    @Test
+    void anySerialPicksTheOnlyNonRepudiationKey() {
+        var signing = key(true);
+        var other = key(false);
+
+        assertSame(signing, MachineSigningService.DefaultSigningSession.selectedKey(List.of(other, signing),
+                MachineSigningService.SIGNING_KEY_ON_TOKEN));
+        assertSame(other, MachineSigningService.DefaultSigningSession.selectedKey(List.of(other),
+                MachineSigningService.SIGNING_KEY_ON_TOKEN));
+    }
+
+    @Test
+    void anySerialRefusesToGuessBetweenSigningKeys() {
+        var failure = assertThrows(MachineProtocolException.class,
+                () -> MachineSigningService.DefaultSigningSession.selectedKey(List.of(key(true), key(true)),
+                        MachineSigningService.SIGNING_KEY_ON_TOKEN));
+        assertEquals("CERTIFICATE_AMBIGUOUS", failure.getMessage());
+
+        var none = assertThrows(MachineProtocolException.class,
+                () -> MachineSigningService.DefaultSigningSession.selectedKey(List.of(),
+                        MachineSigningService.SIGNING_KEY_ON_TOKEN));
+        assertEquals("CERTIFICATE_NOT_FOUND", none.getMessage());
+    }
+
+    private static eu.europa.esig.dss.token.DSSPrivateKeyEntry key(boolean nonRepudiation) {
+        var certificate = mock(eu.europa.esig.dss.model.x509.CertificateToken.class);
+        when(certificate.checkKeyUsage(eu.europa.esig.dss.enumerations.KeyUsageBit.NON_REPUDIATION))
+                .thenReturn(nonRepudiation);
+        var key = mock(eu.europa.esig.dss.token.DSSPrivateKeyEntry.class);
+        when(key.getCertificate()).thenReturn(certificate);
+        return key;
     }
 
     @Test
