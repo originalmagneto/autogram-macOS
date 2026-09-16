@@ -223,6 +223,7 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
                                 }
                                 return machineFile(id: file.id, sourceURL: file.sourceURL, targetURL: reservation.temporaryURL)
                             }
+                            let levelAndTimestamp = Self.levelAndTimestamp(for: request, endpoints: timestamp.endpoints)
                             let machineRequest = MachineRequest(
                                 protocolVersion: 1,
                                 requestID: request.sessionID.uuidString,
@@ -230,11 +231,8 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
                                 payload: [
                                     "driver": .string(request.driverID),
                                     "certificateSerial": .string(request.certificateSerial),
-                                    "signatureLevel": .string(request.outputFormat.signatureLevel),
-                                    "timestamp": .object([
-                                        "required": .bool(true),
-                                        "servers": .array(timestamp.endpoints.map(JSONValue.string))
-                                    ]),
+                                    "signatureLevel": .string(levelAndTimestamp.level),
+                                    "timestamp": levelAndTimestamp.timestamp,
                                     "files": .array(files)
                                 ]
                             )
@@ -301,6 +299,19 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
         }
     }
 
+    /// Signature level and timestamp block for both protocol versions. The level a
+    /// portal asks for wins over the output format, and only a Baseline T level
+    /// requires a timestamp, so a portal's Baseline B carries none.
+    static func levelAndTimestamp(for request: EngineSigningRequest,
+                                  endpoints: [String]) -> (level: String, timestamp: JSONValue) {
+        let level = request.signatureLevelOverride ?? request.outputFormat.signatureLevel
+        let wantsTimestamp = level.hasSuffix("_T")
+        return (level, .object([
+            "required": .bool(wantsTimestamp),
+            "servers": .array(wantsTimestamp ? endpoints.map(JSONValue.string) : [])
+        ]))
+    }
+
     func cancel() async {
         await runner.cancel()
         await machineSession.stop()
@@ -326,14 +337,12 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
                 appearance: file.visibleAppearance)
         }
         let requestID = request.sessionID.uuidString
+        let levelAndTimestamp = Self.levelAndTimestamp(for: request, endpoints: timestamp.endpoints)
         var signPayload: [String: JSONValue] = [
             "driver": .string(request.driverID),
             "certificateSerial": .string(request.certificateSerial),
-            "signatureLevel": .string(request.signatureLevelOverride ?? request.outputFormat.signatureLevel),
-            "timestamp": .object([
-                "required": .bool(!timestamp.endpoints.isEmpty),
-                "servers": .array(timestamp.endpoints.map(JSONValue.string))
-            ]),
+            "signatureLevel": .string(levelAndTimestamp.level),
+            "timestamp": levelAndTimestamp.timestamp,
             "files": .array(files)
         ]
         if let eform = request.eform {

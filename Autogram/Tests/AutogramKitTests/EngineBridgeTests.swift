@@ -302,6 +302,32 @@ final class JavaEngineLocatorTests: XCTestCase {
 }
 
 final class MachineRequestEncodingTests: XCTestCase {
+    private func request(format: EngineSigningOutputFormat, override: String?) -> EngineSigningRequest {
+        EngineSigningRequest(sessionID: UUID(), driverID: "secure_store", certificateSerial: "1",
+                             pin: Secret("1234"), files: [], outputFormat: format,
+                             signatureLevelOverride: override)
+    }
+
+    /// A portal's XAdES Baseline B went out as Baseline T on the protocol v1 path,
+    /// which ignored the override: with the timestamp switch off that failed with
+    /// TSA_REQUIRED, with it on the portal got a timestamp it had not asked for.
+    func testPortalBaselineBGoesOutWithoutATimestamp() {
+        let payload = AutogramCLIEngine.levelAndTimestamp(for: request(format: .asiceXAdES, override: "XAdES_BASELINE_B"),
+                                                          endpoints: [])
+
+        XCTAssertEqual(payload.level, "XAdES_BASELINE_B")
+        XCTAssertEqual(payload.timestamp, .object(["required": .bool(false), "servers": .array([])]))
+    }
+
+    func testAppFlowsKeepTheQualifiedTimestamp() {
+        let payload = AutogramCLIEngine.levelAndTimestamp(for: request(format: .asiceXAdES, override: nil),
+                                                          endpoints: ["https://tsa.example.test"])
+
+        XCTAssertEqual(payload.level, "XAdES_BASELINE_T")
+        XCTAssertEqual(payload.timestamp,
+                       .object(["required": .bool(true), "servers": .array([.string("https://tsa.example.test")])]))
+    }
+
     func testUnauthenticatedV1RequestKeepsDriversPayloadEmpty() throws {
         let request = MachineRequest(
             protocolVersion: 1,
