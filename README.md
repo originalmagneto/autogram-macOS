@@ -97,6 +97,7 @@ Natívna macOS aplikácia v SwiftUI pre kvalifikované elektronické podpisovani
 - Inšpektor podpisu sa dá skryť a meniť jeho šírku, aby zostalo viac miesta na dokument. Vizuálny podpis má priehľadné pozadie.
 - Počas podpisovania a autorizácie sú zablokované akcie, ktoré by vynulovali rozpracovanú operáciu.
 - Register používa natívne vyhľadávanie, nastavenia bočnú navigáciu a ovládanie podporuje klávesnicu vrátane pridania bezpečnostného prvku na aktuálnu stranu.
+- Bočný panel má zbaliteľné sekcie podpísaných a nedávnych dokumentov s piatimi položkami a „Zobraziť všetky“, pri karte ukazuje jej typ (eID alebo I.CA) a podpísané kópie sa dajú odstrániť aj so súborom do Koša.
 
 ## AI Vision: vrstvená detekcia bezpečnostných prvkov
 
@@ -294,14 +295,16 @@ Rozšírenie do Safari podpisuje priamo na slovensko.sk, financnasprava.sk, sluz
 <th align="left">Detail</th>
 </tr>
 <tr><td>Transport</td><td>Natívny messaging, žiadny HTTP server a žiaden počúvajúci port. Meno Mach služby vlastní malý launchd agent, ktorý slúži len ako miesto stretnutia; aplikácia uňho zaregistruje anonymný endpoint a rozšírenie sa naň pripojí priamo. Cez agenta neprejde ani jeden dokument.</td></tr>
-<tr><td>Spustenie</td><td>Aplikácia sa spustí sama, keď príde požiadavka, a otvorí sa bez aktivácie, takže neberie prehliadaču zameranie.</td></tr>
-<tr><td>Potvrdenie</td><td>Stránka nepodpíše nič ticho. Každá požiadavka otvorí plávajúce okno nad prehliadačom s tým, čo sa podpisuje, a čaká na certifikát a PIN alebo na mobil. Naraz sa spracúva jedna požiadavka.</td></tr>
+<tr><td>Spustenie</td><td>Autogram macOS netreba mať otvorený. Pri požiadavke ho launchd agent spustí na pozadí, bez ikony v Docku a bez hlavného okna, a zobrazí sa iba okno podpisu vycentrované nad oknom Safari. Po otvorení Autogramu z Docku alebo Findera sa z neho stane bežná aplikácia s hlavným oknom.</td></tr>
+<tr><td>Potvrdenie</td><td>Stránka nepodpíše nič ticho. Každá požiadavka otvorí plávajúce okno nad prehliadačom: vľavo všetky strany PDF a tlačidlo <strong>Otvoriť náhľad</strong> (Quick Look), vpravo mobil a karta. Naraz sa spracúva jedna požiadavka.</td></tr>
+<tr><td>Karty</td><td>Karta I.CA: po vložení dostane zameranie pole PIN, Enter načíta certifikáty a oba sa zobrazia pod sebou s označením mandátny, QCP alebo komerčný. Občiansky preukaz: certifikáty sa vopred nečítajú, engine použije jediný podpisový kľúč na karte a BOK sa zadáva dvakrát v okne eID klienta (prihlásenie a potvrdenie podpisu); okno podpisu ostane viditeľné pod ním.</td></tr>
 <tr><td>Mobil</td><td>Podpísať sa dá aj občianskym preukazom cez NFC. Relay prijíma tie isté eForm atribúty ako lokálny engine, takže mobilom sa dá podpísať aj elektronický formulár, nielen PDF.</td></tr>
-<tr><td>Formát</td><td>Určuje ho portál, nie nastavenia: PDF objekt sa podpíše ako PAdES, elektronický formulár ako XAdES v ASiC-E s XML Data Containerom.</td></tr>
-<tr><td>Časová pečiatka</td><td>Portály pýtajú úroveň Baseline B, teda bez pečiatky, a aplikácia im predvolene pošle presne to. Prepínač v okne úroveň povýši na Baseline T; portál však môže podpis, ktorý si nevyžiadal, odmietnuť.</td></tr>
-<tr><td>Ukladanie</td><td>Podpis z prehliadača sa vracia stránke. Kópiu si aplikácia predvolene odkladá do vlastného priečinka, ktorý sa dá zmeniť alebo ukladanie vypnúť.</td></tr>
+<tr><td>Formát</td><td>Určuje ho portál, nie nastavenia. PDF, ktoré portál pýta v obálke ASiC-E (nove.slovensko.sk), sa podpíše ako XAdES v ASiC-E s pôvodným PDF vnútri, kartou aj mobilom. Elektronický formulár ide ako XAdES v ASiC-E s XML Data Containerom.</td></tr>
+<tr><td>Dlhé podpisy</td><td>Safari ukončuje pozadie rozšírenia asi po 30 sekundách, preto stránka podpis len spustí a výsledok si vyzdvihuje krátkymi správami. Podpis s PIN alebo mobilom tak môže trvať ľubovoľne dlho.</td></tr>
+<tr><td>Časová pečiatka</td><td>Portály pýtajú úroveň Baseline B, teda bez pečiatky, a aplikácia im pošle presne to. Na slovensko.sk sa prepínač pečiatky neponúka vôbec, lebo nove.slovensko.sk podpis s nevyžiadanou pečiatkou odmietne (overené porovnaním s oficiálnym Autogramom). Na ostatných weboch prepínač úroveň povýši na Baseline T a pri každej požiadavke začína vypnutý. Autogram v mobile ponúkne pri Baseline B vlastnoručný podpis, pri Baseline T osvedčený.</td></tr>
+<tr><td>Ukladanie</td><td>Podpis z prehliadača sa vracia stránke. Kópiu si aplikácia predvolene odkladá do vlastného priečinka, ktorý sa dá zmeniť alebo ukladanie vypnúť; v nastaveniach sa dá zapnúť presun kópií do Koša po 7, 30 alebo 90 dňoch.</td></tr>
 <tr><td>Návrat k pôvodnému</td><td>Prepínač v rozšírení vráti konkrétnu stránku jej pôvodnému podpisovaču, napríklad D.Bridge 2, bez vypínania celého rozšírenia a bez obnovenia stránky.</td></tr>
-<tr><td>Hranice</td><td>Rozšírenie nie je podpísané Developer ID, takže Safari ho načíta len pri zapnutom <strong>Develop &gt; Allow Unsigned Extensions</strong>, a to po každom štarte. Podporované sú zatiaľ formuláre XAdES s XML Data Containerom a PDF; ostatné typy objektov hlásia nepodporovaný typ.</td></tr>
+<tr><td>Hranice</td><td>Rozšírenie nie je podpísané Developer ID, takže Safari ho načíta len pri zapnutom <strong>Develop &gt; Allow Unsigned Extensions</strong>, a to po každom štarte. Po reinštalácii aplikácie treba Safari ukončiť (⌘Q) a otvoriť znova. Autogram macOS a oficiálny Autogram si nárokujú rovnaký odkaz <code>autogram://</code>, takže portál v režime „Autogram“ otvorí Autogram macOS. Podporované sú zatiaľ formuláre XAdES s XML Data Containerom a PDF; ostatné typy objektov hlásia nepodporovaný typ.</td></tr>
 </table>
 
 <details>
@@ -313,7 +316,7 @@ DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" ./build_app.sh --rele
 ./scripts/safari-spike.sh
 ```
 
-`safari-spike.sh` overí všetko, čo sa overiť dá bez Safari: prítomnosť appexu, jeho entitlement, registráciu agenta a spojenie s aplikáciou. Potom vypíše tri kroky, ktoré treba spraviť v Safari ručne.
+`build_app.sh install` rozšírenie v systéme zaregistruje, takže sa v Safari zobrazí aj bez spustenia aplikácie; ak Safari počas inštalácie beží, pripomenie jeho reštart. `safari-spike.sh` overí všetko, čo sa overiť dá bez Safari: prítomnosť appexu, jeho entitlement, registráciu agenta a spojenie s aplikáciou. Potom vypíše tri kroky, ktoré treba spraviť v Safari ručne.
 
 Podpis bez Safari sa dá vyskúšať priamo:
 
@@ -453,7 +456,9 @@ xattr -d com.apple.quarantine "/Applications/Autogram macOS.app"
 
 ### Build a inštalácia
 
-Podpisový engine (Java fork Autogramu s DSS, machine protokol v1/v2, Finder Quick Action) je v priečinku `engine/` a zostavuje sa raz, pred buildom aplikácie. Potrebuje arm64 JDK 25 s JavaFX jmods ([Azul Zulu FX 25](https://www.azul.com/downloads/?version=java-25-lts&os=macos&architecture=arm-64-bit&package=jdk-fx)) rozbalený pod `~/Library/Java`, prípadne cestu v `AUTOGRAM_JAVA_HOME`.
+Podpisový engine (Java fork Autogramu s DSS, machine protokol v1/v2, Finder Quick Action) je v priečinku `engine/` a zostavuje sa raz, pred buildom aplikácie. Potrebuje arm64 JDK 25 s JavaFX jmods ([Azul Zulu FX 25](https://www.azul.com/downloads/?version=java-25-lts&os=macos&architecture=arm-64-bit&package=jdk-fx)) rozbalený pod `~/Library/Java`, prípadne cestu v `AUTOGRAM_JAVA_HOME`. Funguje aj Liberica 25 FX zo sdkman, napríklad `AUTOGRAM_JAVA_HOME="$HOME/.sdkman/candidates/java/25.0.4.fx-librca"`.
+
+Aplikácia sa zostavuje finálnym Xcode 27 v `/Applications/Xcode.app`. Build z beta SDK padal hneď pri štarte na chýbajúcom symbole FoundationModels, preto beta Xcode nepoužívajte.
 
 ```bash
 cd Autogram
@@ -471,6 +476,8 @@ Aplikácia sa nainštaluje do `/Applications/Autogram macOS.app`.
 cd Autogram
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test
 ```
+
+Na niektorých strojoch `SecurityElementsDetectorTests` prekročí 60-sekundový limit a zhodí zvyšok behu; vtedy pomôže `--skip SecurityElementsDetectorTests`. Testy strojového režimu enginu spúšťajte z cesty bez medzier, inak časť z nich nenájde svoje zdroje (`%20` v ceste).
 
 <details>
 <summary><strong>Voliteľné live testy</strong></summary>
@@ -523,7 +530,7 @@ Aktuálny ZaKo profil je implementačný P2E pilot s PDF/A-2b. Lokálny `PDFAVal
 <tr><td><strong>vision-eval</strong></td><td>Samostatný CLI target na meranie presnosti detekcie; nie je súčasťou aplikácie.</td></tr>
 </table>
 
-Kompletná implementačná dokumentácia je v [`docs/PHASES.md`](docs/PHASES.md); návrh podpisu mobilom v [`docs/superpowers/specs/2026-09-11-avm-mobile-signing-design.md`](docs/superpowers/specs/2026-09-11-avm-mobile-signing-design.md); návrh podpisovania na štátnych weboch v [`Autogram/docs/superpowers/specs/2026-09-11-safari-extension-design.md`](Autogram/docs/superpowers/specs/2026-09-11-safari-extension-design.md); návrh vrstvenej detekcie v [`Autogram/docs/superpowers/specs/2026-09-05-layered-security-element-detection-design.md`](Autogram/docs/superpowers/specs/2026-09-05-layered-security-element-detection-design.md).
+Kompletná implementačná dokumentácia je v [`docs/PHASES.md`](docs/PHASES.md); návrh podpisu mobilom v [`docs/superpowers/specs/2026-09-11-avm-mobile-signing-design.md`](docs/superpowers/specs/2026-09-11-avm-mobile-signing-design.md); návrh podpisovania na štátnych weboch v [`Autogram/docs/superpowers/specs/2026-09-11-safari-extension-design.md`](Autogram/docs/superpowers/specs/2026-09-11-safari-extension-design.md) a jeho spúšťania na pozadí v [`Autogram/docs/superpowers/specs/2026-09-16-web-signing-background-design.md`](Autogram/docs/superpowers/specs/2026-09-16-web-signing-background-design.md); zistenia z ladenia podpisovania na nove.slovensko.sk kartou I.CA, eID a mobilom v [`Autogram/docs/WEB-SIGNING-FINDINGS-2026-09-16.md`](Autogram/docs/WEB-SIGNING-FINDINGS-2026-09-16.md); návrh vrstvenej detekcie v [`Autogram/docs/superpowers/specs/2026-09-05-layered-security-element-detection-design.md`](Autogram/docs/superpowers/specs/2026-09-05-layered-security-element-detection-design.md).
 
 ## Právne a bezpečnostné upozornenie
 
