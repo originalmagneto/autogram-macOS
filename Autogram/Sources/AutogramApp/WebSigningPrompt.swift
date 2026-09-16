@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import os
 
 private final class WebSigningPanelDelegate: NSObject, NSWindowDelegate {
     private weak var coordinator: WebSigningCoordinator?
@@ -10,6 +11,12 @@ private final class WebSigningPanelDelegate: NSObject, NSWindowDelegate {
 
     func windowWillClose(_ notification: Notification) {
         coordinator?.cancel()
+    }
+
+    func windowDidBecomeKey(_ notification: Notification) {
+        MainActor.assumeIsolated {
+            coordinator?.promptBecameKey()
+        }
     }
 }
 
@@ -28,6 +35,7 @@ final class WebSigningPrompt {
     private var panel: NSPanel?
     private var delegate: WebSigningPanelDelegate?
     private var middlewareInputDepth = 0
+    private let log = Logger(subsystem: "sk.autogram.Autogram", category: "web-signing")
     private var keyboardHandoff: Task<Void, Never>?
 
     func show(coordinator: WebSigningCoordinator) {
@@ -88,14 +96,30 @@ final class WebSigningPrompt {
         guard middlewareInputDepth == 1 else { return }
         panel?.level = .normal
         keyboardHandoff?.cancel()
-        keyboardHandoff = Task { @MainActor in
+        log.notice("BOK handoff started, app active: \(NSApp.isActive, privacy: .public)")
+        keyboardHandoff = Task { @MainActor [log] in
             var activated = Set<pid_t>()
+            var reported = Set<pid_t>()
             while !Task.isCancelled {
-                for app in NSWorkspace.shared.runningApplications
-                where Self.isEIDKeyboard(app) && !activated.contains(app.processIdentifier) {
+                for app in NSWorkspace.shared.runningApplications {
+                    let path = app.executableURL?.path ?? "-"
+                    // Diagnostics: every eID client process seen while the BOK is expected.
+                    if path.contains("eID") || path.contains("VirtualKeyboard"), !reported.contains(app.processIdentifier) {
+                        reported.insert(app.processIdentifier)
+                        log.notice("""
+                            eID process pid=\(app.processIdentifier, privacy: .public) \
+                            bundle=\(app.bundleIdentifier ?? "-", privacy: .public) path=\(path, privacy: .public) \
+                            policy=\(app.activationPolicy.rawValue, privacy: .public) active=\(app.isActive, privacy: .public)
+                            """)
+                    }
+                    guard Self.isEIDKeyboard(app), !activated.contains(app.processIdentifier) else { continue }
                     activated.insert(app.processIdentifier)
                     NSApp.yieldActivation(to: app)
-                    app.activate(from: .current, options: [])
+                    let accepted = app.activate(from: .current, options: [])
+                    log.notice("""
+                        BOK window activation pid=\(app.processIdentifier, privacy: .public) \
+                        accepted=\(accepted, privacy: .public) app active=\(NSApp.isActive, privacy: .public)
+                        """)
                 }
                 try? await Task.sleep(for: .milliseconds(250))
             }
@@ -110,7 +134,13 @@ final class WebSigningPrompt {
         keyboardHandoff = nil
         guard let panel else { return }
         panel.level = .floating
-        panel.orderFrontRegardless()
+        // Closing the BOK window hands activation back to this app, which raises
+        // its main window over the prompt; the prompt takes the front and keyboard back.
+        if NSApp.isActive {
+            panel.makeKeyAndOrderFront(nil)
+        } else {
+            panel.orderFrontRegardless()
+        }
     }
 
     private static func isEIDKeyboard(_ app: NSRunningApplication) -> Bool {

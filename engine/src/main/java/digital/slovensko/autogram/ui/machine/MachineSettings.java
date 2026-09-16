@@ -40,6 +40,19 @@ public final class MachineSettings extends UserSettings {
         setTsaEnabled(true);
     }
 
+    /**
+     * UserSettings forces a context-specific login whenever bulk mode is on, and the
+     * machine session runs in bulk mode to reuse the PIN across files. On a token
+     * with CKF_PROTECTED_AUTHENTICATION_PATH (the eID) that sent the PIN from the
+     * app to the card as the BOK, where a wrong value spends an attempt. Without the
+     * force, such a token asks for the BOK in the eID client's own window, as the
+     * official Autogram does; tokens without that flag still log in with the PIN.
+     */
+    @Override
+    public boolean getForceContextSpecificLoginEnabled() {
+        return false;
+    }
+
     @Override
     public String getCustomKeystorePath() {
         return disabledKeystorePath;

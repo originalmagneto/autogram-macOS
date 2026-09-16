@@ -250,7 +250,9 @@ struct WebSigningSheet: View {
             }
             Text(coordinator.isReadingCertificates || coordinator.isWorking
                  ? "Zadajte BOK v okne eID klienta."
-                 : "BOK zadáte v okne eID klienta, pri načítaní certifikátov aj pri podpise.")
+                 : coordinator.certificatesWaitForClick
+                    ? "Kliknite do tohto okna a eID klient si vypýta BOK na načítanie certifikátov."
+                    : "BOK zadáte v okne eID klienta, pri načítaní certifikátov aj pri podpise.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
         }

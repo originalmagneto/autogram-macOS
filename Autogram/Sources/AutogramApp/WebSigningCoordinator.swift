@@ -61,6 +61,10 @@ final class WebSigningCoordinator {
     /// Bumped whenever the PIN field should take the keyboard.
     private(set) var pinFocusRequest = 0
     private var cardPresent = false
+    /// An eID was inserted while the prompt sat over the browser. The BOK window
+    /// can only take the keyboard once this app is active, so the certificates are
+    /// read when the person clicks the prompt, not at once.
+    private(set) var certificatesWaitForClick = false
     private var cardWatch: Task<Void, Never>?
 
     /// An eID takes its BOK in the eID client's own window; every other card
@@ -223,6 +227,7 @@ final class WebSigningCoordinator {
         let wasPresent = cardPresent
         cardPresent = !discovered.isEmpty
         guard cardPresent else {
+            certificatesWaitForClick = false
             if wasPresent {
                 pin = ""
                 errorText = nil
@@ -236,7 +241,11 @@ final class WebSigningCoordinator {
             selectedIdentityID = Self.preferredIdentity(in: discovered)
         }
         if !wasPresent {
-            await readCertificates()
+            if !selectedIdentityRequiresPIN && !NSApp.isActive {
+                certificatesWaitForClick = true
+            } else {
+                await readCertificates()
+            }
         }
     }
 
@@ -266,6 +275,13 @@ final class WebSigningCoordinator {
                 ?? "Certifikáty z karty sa nepodarilo načítať."
             if needsPIN { requestPINFocus() }
         }
+    }
+
+    /// Called when the prompt becomes the key window, which means this app is active.
+    func promptBecameKey() {
+        guard certificatesWaitForClick else { return }
+        certificatesWaitForClick = false
+        Task { await readCertificates() }
     }
 
     /// Return in the PIN field reads the certificates first and signs once they are known.
@@ -415,6 +431,7 @@ final class WebSigningCoordinator {
         cardWatch?.cancel()
         cardWatch = nil
         cardPresent = false
+        certificatesWaitForClick = false
         pending = nil
         pin = ""
         prompt.hide()
