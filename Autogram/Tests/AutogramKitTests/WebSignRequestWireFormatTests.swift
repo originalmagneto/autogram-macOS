@@ -92,6 +92,64 @@ final class WebSignRequestWireFormatTests: XCTestCase {
         XCTAssertNil(eform.identifier)
     }
 
+    /// nove.slovensko.sk signs a PDF through `dSigXadesBpJs.addPdfObject` and
+    /// `getSignatureWithASiCEnvelopeBase64`, which expects a XAdES ASiC-E
+    /// container back, not a PAdES PDF.
+    func testPdfWithAsicEnvelopeAsksForAContainer() throws {
+        let request = try decode("""
+        {
+          "requestID": "ditec-1757600000002",
+          "filename": "Navrhasuhlas.pdf",
+          "content": "JVBERi0xLjQ=",
+          "payloadMimeType": "application/pdf;base64",
+          "signatureLevel": "XAdES_BASELINE_B",
+          "container": "ASiC_E"
+        }
+        """)
+
+        XCTAssertEqual(request.container, "ASiC_E")
+        XCTAssertTrue(request.wantsASiCContainer)
+    }
+
+    /// Extension builds before the container field still sent XAdES for a PDF.
+    /// A PDF has no XAdES form here other than inside ASiC-E.
+    func testPdfWithXadesLevelAndNoContainerStillAsksForAContainer() throws {
+        let request = try decode("""
+        {
+          "requestID": "r",
+          "filename": "dokument.pdf",
+          "content": "JVBERi0xLjQ=",
+          "payloadMimeType": "application/pdf;base64",
+          "signatureLevel": "XAdES_BASELINE_B"
+        }
+        """)
+
+        XCTAssertTrue(request.wantsASiCContainer)
+    }
+
+    func testPadesPdfStaysAPdf() throws {
+        let request = try decode("""
+        {
+          "requestID": "r",
+          "filename": "dokument.pdf",
+          "content": "JVBERi0xLjQ=",
+          "payloadMimeType": "application/pdf;base64",
+          "signatureLevel": "PAdES_BASELINE_B"
+        }
+        """)
+
+        XCTAssertFalse(request.wantsASiCContainer)
+    }
+
+    func testEFormAlwaysAsksForAContainer() {
+        let request = WebSignRequest(requestID: "r", filename: "f.xml", content: "PHgvPg==",
+                                     payloadMimeType: "application/xml;base64",
+                                     signatureLevel: "XAdES_BASELINE_B",
+                                     eform: EFormSigningAttributes(containerXmlns: "urn:x"))
+
+        XCTAssertTrue(request.wantsASiCContainer)
+    }
+
     func testResponseEncodesTheShapeTheExtensionReads() throws {
         let response = WebSignResponse(requestID: "r", content: "AAA",
                                        signedBy: "CN=Test", issuedBy: "CN=CA")

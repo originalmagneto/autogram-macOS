@@ -96,7 +96,11 @@
     var level = options.level || "XAdES_BASELINE_B";
 
     if (object.type === "XadesPdf" || object.type === "XadesBpPdf") {
-      return {
+      // getSignatureWithASiCEnvelopeBase64 expects XAdES in an ASiC-E container
+      // around the PDF, exactly as upstream autogram-extension sends it. Without
+      // the container the phone relay rejects the request and a card signature
+      // comes back as a PAdES PDF the portal cannot use.
+      var pdfRequest = {
         requestID: session.signatureId || ("ditec-" + Date.now()),
         filename: (function (id) {
           var name = String(id || "dokument");
@@ -106,6 +110,10 @@
         payloadMimeType: "application/pdf;base64",
         signatureLevel: options.level || "PAdES_BASELINE_B"
       };
+      if (options.container) {
+        pdfRequest.container = options.container;
+      }
+      return pdfRequest;
     }
 
     var isXdc = object.type === "XadesBpXml" || object.type === "XadesXml"

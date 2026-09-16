@@ -115,7 +115,7 @@ final class WebSigningCoordinator {
             : URL(fileURLWithPath: (configured as NSString).expandingTildeInPath, isDirectory: true)
         let base = (request.filename as NSString).deletingPathExtension
         let stem = (base.isEmpty ? "dokument" : base) + "_podpisane"
-        let ext = request.eform == nil ? "pdf" : "asice"
+        let ext = request.wantsASiCContainer ? "asice" : "pdf"
 
         do {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -206,9 +206,12 @@ final class WebSigningCoordinator {
         do {
             let bytes = try Self.decode(pending.request)
             let isEForm = pending.request.eform != nil
+            let wantsContainer = pending.request.wantsASiCContainer
             let requested = effectiveLevel(for: pending.request)
             let wantsTimestamp = requested.hasSuffix("_T")
-            let level: AVMSignatureLevel = isEForm || requested.hasPrefix("XAdES")
+            // The relay rejects a XAdES level on a PDF without a container, so
+            // level and container are decided together.
+            let level: AVMSignatureLevel = wantsContainer
                 ? (wantsTimestamp ? .xadesT : .xadesB)
                 : (wantsTimestamp ? .padesT : .padesB)
 
@@ -217,7 +220,7 @@ final class WebSigningCoordinator {
                 data: bytes,
                 mimeType: isEForm ? AVMUploadRequest.xmlMimeType : AVMUploadRequest.pdfMimeType,
                 level: level,
-                container: isEForm ? .asicE : nil,
+                container: wantsContainer ? .asicE : nil,
                 eform: pending.request.eform)
 
             let document = try await mobileSigning.sign(upload)
@@ -257,19 +260,26 @@ final class WebSigningCoordinator {
             let bytes = try Self.decode(pending.request)
             let level = effectiveLevel(for: pending.request)
             let wantsTimestamp = level.hasSuffix("_T")
+            let wantsContainer = pending.request.wantsASiCContainer
+            // A plain PDF for a XAdES container goes in as an unsigned ASiC-E, the
+            // same way the app's own ASiC-E output does; an eForm is built by the engine.
+            let containerEntries = wantsContainer && pending.request.eform == nil
+                ? [ASiCEPackager.Entry(path: pending.request.filename, data: bytes)]
+                : []
             let signingRequest = SigningRequest(
                 pdfData: bytes,
                 identityID: identityID,
                 includeTimestamp: wantsTimestamp,
                 tsaURL: wantsTimestamp ? settingsStore.settings.activeTSA.url : nil,
-                outputFormat: pending.request.eform == nil ? .embeddedPAdES : .attachedASIC,
+                outputFormat: wantsContainer ? .attachedASIC : .embeddedPAdES,
                 pin: pin.isEmpty ? nil : pin,
+                extraFiles: containerEntries,
                 eform: pending.request.eform,
                 signatureLevelOverride: level,
                 filename: pending.request.filename)
 
             let signed = try await provider.sign(signingRequest)
-            let payload = pending.request.eform == nil ? signed.pdfData : (signed.asicData ?? signed.pdfData)
+            let payload = wantsContainer ? (signed.asicData ?? signed.pdfData) : signed.pdfData
             let saved = archive(payload, for: pending.request)
             signedDocumentStore.record(displayName: pending.request.filename,
                                        origin: .browser,

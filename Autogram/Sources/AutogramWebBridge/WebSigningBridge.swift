@@ -137,6 +137,15 @@ public struct WebSignRequest: Codable, Sendable, Equatable {
     public var isBase64: Bool {
         payloadMimeType.replacingOccurrences(of: " ", with: "").hasSuffix(";base64")
     }
+
+    /// True when the page expects a XAdES ASiC-E container back rather than a
+    /// PAdES PDF: every eForm, an explicit ASiC container, and any XAdES level,
+    /// because a PDF has no XAdES form here other than inside ASiC-E.
+    public var wantsASiCContainer: Bool {
+        eform != nil
+            || container?.uppercased().hasPrefix("ASIC") == true
+            || signatureLevel.uppercased().hasPrefix("XADES")
+    }
 }
 
 /// The signed result handed back to the page.
