@@ -344,4 +344,7 @@ if [[ "$INSTALL" == true ]]; then
         done
     fi
     echo "✔ Nainštalované: $INSTALL_DIR"
+    if pgrep -x Safari >/dev/null 2>&1; then
+        echo "  Safari beží: ukončite ho (⌘Q) a otvorte znova, inak rozšírenie hlási SFErrorDomain error 3."
+    fi
 fi

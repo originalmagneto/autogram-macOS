@@ -1,5 +1,15 @@
 // Content script. Injects the page-context shim and relays its requests to the
 // background worker, which is the only caller of native messaging.
+//
+// Safari injects content scripts again into pages that are already open when the
+// extension is reloaded, for instance after Autogram is reinstalled. A second copy
+// in the same isolated world failed on its `const` declarations, so the whole
+// script runs once per frame.
+(() => {
+if (globalThis.__autogramMacOSContentScript) {
+  return;
+}
+globalThis.__autogramMacOSContentScript = true;
 
 console.log("[Autogram macOS] content script beží na", location.href);
 
@@ -73,3 +83,5 @@ window.addEventListener(CHANNEL_REQUEST, async (event) => {
     detail: { id: detail.id, reply }
   }));
 });
+
+})();
