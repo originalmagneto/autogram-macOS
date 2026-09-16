@@ -177,22 +177,79 @@
       return;
     }
 
-    call("sign", JSON.stringify(request)).then(function (reply) {
-      if (!reply || reply.ok !== true) {
-        var message = (reply && reply.error) || "Podpisovanie zlyhalo.";
-        if (callback && callback.onError) callback.onError(message);
-        return;
-      }
+    function fail(message) {
+      if (callback && callback.onError) callback.onError(message);
+    }
+
+    function deliver(responseText) {
       var parsed;
       try {
-        parsed = JSON.parse(reply.response);
+        parsed = JSON.parse(responseText);
       } catch (error) {
-        if (callback && callback.onError) callback.onError("Odpoveď sa nepodarilo prečítať.");
+        fail("Odpoveď sa nepodarilo prečítať.");
         return;
       }
       session.signed = parsed;
       if (callback && callback.onSuccess) callback.onSuccess(parsed.content);
-    });
+    }
+
+    // Safari ends the extension's background after about 30 seconds and then
+    // answers with undefined, while a signature waits for a PIN or a phone much
+    // longer. So the request only starts a job, and the result is collected with
+    // short messages. A missing reply is the background restarting, not a failure.
+    var MISSING_REPLY_LIMIT = 40;
+    var POLL_INTERVAL_MS = 1500;
+    var missingReplies = 0;
+
+    function poll(jobID) {
+      call("sign-result", jobID).then(function (reply) {
+        if (!reply) {
+          missingReplies += 1;
+          if (missingReplies > MISSING_REPLY_LIMIT) {
+            fail("Spojenie s Autogramom sa prerušilo. Skúste podpísať znova.");
+            return;
+          }
+          setTimeout(function () { poll(jobID); }, POLL_INTERVAL_MS);
+          return;
+        }
+        missingReplies = 0;
+        if (reply.done !== true) {
+          if (reply.ok !== true) {
+            fail(reply.error || "Podpisovanie zlyhalo.");
+            return;
+          }
+          setTimeout(function () { poll(jobID); }, POLL_INTERVAL_MS);
+          return;
+        }
+        if (reply.ok !== true) {
+          fail(reply.error || "Podpisovanie zlyhalo.");
+          return;
+        }
+        deliver(reply.response);
+      });
+    }
+
+    function begin() {
+      call("sign-begin", JSON.stringify(request)).then(function (reply) {
+        if (!reply) {
+          missingReplies += 1;
+          if (missingReplies > MISSING_REPLY_LIMIT) {
+            fail("Autogram macOS neodpovedal. Skontrolujte, či je rozšírenie zapnuté.");
+            return;
+          }
+          setTimeout(begin, POLL_INTERVAL_MS);
+          return;
+        }
+        missingReplies = 0;
+        if (reply.ok !== true || !reply.jobID) {
+          fail(reply.error || "Podpisovanie zlyhalo.");
+          return;
+        }
+        poll(reply.jobID);
+      });
+    }
+
+    begin();
   }
 
   // MARK: adapters

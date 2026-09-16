@@ -29,7 +29,9 @@ browser.runtime.onMessage.addListener((message, sender) => {
     case "status":
       return callNative({ kind: "status" });
     case "sign":
-      return callNative({ kind: "sign", request: message.request });
+    case "sign-begin":
+    case "sign-result":
+      return callNative({ kind: message.kind, request: message.request });
     default:
       return Promise.resolve({ ok: false, error: `Neznámy typ správy: ${message?.kind}` });
   }

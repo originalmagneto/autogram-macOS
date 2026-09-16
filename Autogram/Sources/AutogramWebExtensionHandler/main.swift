@@ -108,6 +108,39 @@ final class AutogramWebExtensionHandler: NSObject, NSExtensionRequestHandling {
                 }
                 finish(["ok": true, "response": text])
             }
+        case "sign-begin":
+            guard let requestJSON = message["request"] as? String,
+                  let data = requestJSON.data(using: .utf8) else {
+                finish(["ok": false, "error": "Požiadavka na podpis je poškodená."])
+                return
+            }
+            proxy.beginSign(request: data) { jobID, error in
+                guard let jobID else {
+                    finish(["ok": false, "error": error ?? "Autogram požiadavku na podpis neprijal."])
+                    return
+                }
+                finish(["ok": true, "jobID": jobID])
+            }
+        case "sign-result":
+            guard let jobID = message["request"] as? String, !jobID.isEmpty else {
+                finish(["ok": false, "error": "Chýba identifikátor podpisovania."])
+                return
+            }
+            proxy.signResult(jobID: jobID) { done, response, error in
+                guard done else {
+                    finish(["ok": true, "done": false])
+                    return
+                }
+                if let error {
+                    finish(["ok": false, "done": true, "error": error])
+                    return
+                }
+                guard let response, let text = String(data: response, encoding: .utf8) else {
+                    finish(["ok": false, "done": true, "error": "Autogram vrátil prázdnu odpoveď."])
+                    return
+                }
+                finish(["ok": true, "done": true, "response": text])
+            }
         default:
             finish(["ok": false, "error": "Neznámy typ správy: \(kind)"])
         }

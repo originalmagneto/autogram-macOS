@@ -101,7 +101,19 @@ public enum WebSigningBridge {
 
     /// Signs one document. `request` is the JSON encoding of ``WebSignRequest``
     /// and the reply carries the JSON encoding of ``WebSignResponse``.
+    ///
+    /// The reply waits for the person, so Safari's extension background may be
+    /// gone before it arrives. The extension uses ``beginSign(request:reply:)``;
+    /// this stays for `webbridge-probe`.
     func sign(request: Data, reply: @escaping (_ response: Data?, _ error: String?) -> Void)
+
+    /// Starts signing one document and answers at once with a job identifier,
+    /// or an error when the request cannot be accepted.
+    func beginSign(request: Data, reply: @escaping (_ jobID: String?, _ error: String?) -> Void)
+
+    /// Reports a job started by ``beginSign(request:reply:)``: `done` is false while
+    /// the person is still signing. A finished result is delivered once.
+    func signResult(jobID: String, reply: @escaping (_ done: Bool, _ response: Data?, _ error: String?) -> Void)
 }
 
 /// A signing request as it arrives from a state portal, before the app turns it

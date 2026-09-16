@@ -16,6 +16,7 @@ final class WebBridgeListener: NSObject, NSXPCListenerDelegate, @unchecked Senda
     private var rendezvous: NSXPCConnection?
     private let lock = NSLock()
     private var signHandler: (@Sendable (WebSignRequest) async throws -> WebSignResponse)?
+    private let jobs = WebSignJobStore()
 
     /// Installs the handler that turns a portal request into a real signature.
     /// Kept injectable so the transport can be exercised without the signing UI.
@@ -89,18 +90,77 @@ extension WebBridgeListener: WebSigningBridgeProtocol {
     }
 
     func sign(request: Data, reply: @escaping (Data?, String?) -> Void) {
+        let decoded: (handler: @Sendable (WebSignRequest) async throws -> WebSignResponse, request: WebSignRequest)
+        switch accept(request) {
+        case .success(let accepted): decoded = accepted
+        case .failure(let message):
+            reply(nil, message.text)
+            return
+        }
+
+        // NSXPC hands back a plain closure; the signing work is async, so it is
+        // carried across the task boundary explicitly.
+        let sendableReply = ReplyBox(reply)
+        Task {
+            do {
+                let response = try await decoded.handler(decoded.request)
+                sendableReply.value(try JSONEncoder().encode(response), nil)
+            } catch {
+                sendableReply.value(nil, error.localizedDescription)
+            }
+        }
+    }
+
+    func beginSign(request: Data, reply: @escaping (String?, String?) -> Void) {
+        let decoded: (handler: @Sendable (WebSignRequest) async throws -> WebSignResponse, request: WebSignRequest)
+        switch accept(request) {
+        case .success(let accepted): decoded = accepted
+        case .failure(let message):
+            reply(nil, message.text)
+            return
+        }
+
+        let jobID = jobs.begin()
+        let jobs = self.jobs
+        Task {
+            do {
+                let response = try await decoded.handler(decoded.request)
+                jobs.finish(jobID, response: try JSONEncoder().encode(response), error: nil)
+            } catch {
+                jobs.finish(jobID, response: nil, error: error.localizedDescription)
+            }
+        }
+        reply(jobID, nil)
+    }
+
+    func signResult(jobID: String, reply: @escaping (Bool, Data?, String?) -> Void) {
+        switch jobs.take(jobID) {
+        case .pending:
+            reply(false, nil, nil)
+        case .finished(let response, let error):
+            reply(true, response, error)
+        case .unknown:
+            reply(true, nil, "Požiadavka na podpis sa v Autograme nenašla. Skúste podpísať znova.")
+        }
+    }
+
+    private struct RejectedRequest: Error {
+        let text: String
+    }
+
+    /// Decodes a request from the extension and pairs it with the installed handler.
+    private func accept(_ request: Data)
+        -> Result<(handler: @Sendable (WebSignRequest) async throws -> WebSignResponse, request: WebSignRequest), RejectedRequest> {
         lock.lock()
         let handler = signHandler
         lock.unlock()
 
         guard let handler else {
-            reply(nil, "Podpisovanie z prehliadača zatiaľ nie je v tejto zostave zapojené.")
-            return
+            return .failure(RejectedRequest(text: "Podpisovanie z prehliadača zatiaľ nie je v tejto zostave zapojené."))
         }
 
-        let decoded: WebSignRequest
         do {
-            decoded = try JSONDecoder().decode(WebSignRequest.self, from: request)
+            return .success((handler, try JSONDecoder().decode(WebSignRequest.self, from: request)))
         } catch {
             // The detail goes back to the page on purpose: without it a wire
             // format mismatch looks the same as a corrupt document, and the
@@ -114,20 +174,7 @@ extension WebBridgeListener: WebSigningBridgeProtocol {
                 detail = String(describing: error)
             }
             log.error("Rejected a malformed web sign request: \(String(describing: error), privacy: .public)")
-            reply(nil, "Požiadavka na podpis je poškodená: \(detail)")
-            return
-        }
-
-        // NSXPC hands back a plain closure; the signing work is async, so it is
-        // carried across the task boundary explicitly.
-        let sendableReply = ReplyBox(reply)
-        Task {
-            do {
-                let response = try await handler(decoded)
-                sendableReply.value(try JSONEncoder().encode(response), nil)
-            } catch {
-                sendableReply.value(nil, error.localizedDescription)
-            }
+            return .failure(RejectedRequest(text: "Požiadavka na podpis je poškodená: \(detail)"))
         }
     }
 }

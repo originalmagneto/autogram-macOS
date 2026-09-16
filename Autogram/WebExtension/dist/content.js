@@ -45,10 +45,18 @@ browser.runtime.onMessage.addListener((message) => {
 
 window.addEventListener(CHANNEL_REQUEST, async (event) => {
   const detail = event.detail || {};
-  const reply = await browser.runtime.sendMessage({
-    kind: detail.kind,
-    request: detail.request
-  });
+  // Safari may have ended the background worker, which rejects the message or
+  // answers undefined. The page always gets an answer so it can retry.
+  let reply;
+  try {
+    reply = await browser.runtime.sendMessage({
+      kind: detail.kind,
+      request: detail.request
+    });
+  } catch (error) {
+    console.warn("[Autogram macOS] správa pre pozadie rozšírenia zlyhala", error);
+    reply = undefined;
+  }
   window.dispatchEvent(new CustomEvent(CHANNEL_RESPONSE, {
     detail: { id: detail.id, reply }
   }));
