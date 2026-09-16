@@ -137,6 +137,37 @@ final class EngineBridgeSelectionTests: XCTestCase {
         XCTAssertTrue(named.label.contains("I.CA SecureStore"))
     }
 
+    /// eID tokens report CKF_PROTECTED_AUTHENTICATION_PATH (checked on a real card:
+    /// slots Sig_ZEP and Sig_EP), so the BOK is typed in the eID client's own
+    /// window. `requiresPIN` stays true because the main window still collects it.
+    func testOnlyEIDIdentitiesUseTheProtectedAuthenticationPath() {
+        let eid = EngineBridgeSigningProvider.syntheticIdentity(driverNames: ["eID"], driverID: "eid")
+        XCTAssertTrue(eid.usesProtectedAuthenticationPath)
+        XCTAssertTrue(eid.requiresPIN)
+        XCTAssertFalse(EngineBridgeSigningProvider.syntheticIdentity(driverNames: ["I.CA"], driverID: "secure_store")
+            .usesProtectedAuthenticationPath)
+
+        let certificate = SigningCertificate(serialNumber: "42", displayName: "Marián Čuprík")
+        XCTAssertTrue(EngineBridgeSigningProvider.identityInfo(from: certificate, driverID: "eid").usesProtectedAuthenticationPath)
+        XCTAssertTrue(EngineBridgeSigningProvider.identityInfo(from: certificate, driverID: "eid").requiresPIN)
+        XCTAssertFalse(EngineBridgeSigningProvider.identityInfo(from: certificate, driverID: "secure_store")
+            .usesProtectedAuthenticationPath)
+    }
+
+    func testEnginePINUsesThePlaceholderOnlyForAnEmptyEIDEntry() {
+        let placeholder = EngineBridgeSigningProvider.protectedAuthenticationPathPIN
+        XCTAssertEqual(EngineBridgeSigningProvider.enginePIN(entered: "", driverID: "eid"), placeholder)
+        XCTAssertEqual(EngineBridgeSigningProvider.enginePIN(entered: "123456", driverID: "eid"), "123456")
+        XCTAssertNil(EngineBridgeSigningProvider.enginePIN(entered: "", driverID: "secure_store"))
+        XCTAssertEqual(EngineBridgeSigningProvider.enginePIN(entered: "1234", driverID: "secure_store"), "1234")
+    }
+
+    func testPrimaryDriverPrefersEIDLikeCertificateDiscovery() {
+        XCTAssertEqual(EngineBridgeSigningProvider.primaryDriverID(fingerprint: "eid,secure_store"), "eid")
+        XCTAssertEqual(EngineBridgeSigningProvider.primaryDriverID(fingerprint: "secure_store"), "secure_store")
+        XCTAssertNil(EngineBridgeSigningProvider.primaryDriverID(fingerprint: ""))
+    }
+
     func testMandateDetectionDistinguishesCards() {
         XCTAssertFalse(EngineBridgeSigningProvider.isMandateCertificate(
             issuer: "SVK eID ACA2", displayName: "Marián Čuprík"))
@@ -156,7 +187,7 @@ final class EngineBridgeSelectionTests: XCTestCase {
 
     func testIdentityInfoMapsCertificateFields() {
         let info = EngineBridgeSigningProvider.identityInfo(
-            from: certificate(serial: "42", qualification: "QESIG"))
+            from: certificate(serial: "42", qualification: "QESIG"), driverID: "eid")
         XCTAssertEqual(info.id, "engine-cert:42")
         XCTAssertEqual(info.label, "Cert 42")
         XCTAssertEqual(info.issuerSummary, "eID SR")

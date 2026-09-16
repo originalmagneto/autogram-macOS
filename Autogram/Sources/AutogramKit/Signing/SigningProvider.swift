@@ -15,12 +15,15 @@ public struct SigningIdentityInfo: Identifiable, Hashable, Sendable {
     public var pkcs11CertSHA256Hex: String?
     public var pkcs11IsRSA: Bool
     public var requiresPIN: Bool
+    /// The card takes its PIN in the middleware's own window (an eID reports
+    /// CKF_PROTECTED_AUTHENTICATION_PATH), so a prompt may skip its PIN field.
+    public var usesProtectedAuthenticationPath: Bool
 
     public init(id: String, label: String, issuerSummary: String,
                 validUntil: Date? = nil, isMandateCertificate: Bool = false,
                 isQualified: Bool = false, hasPrivateKey: Bool = true,
                 pkcs11CertSHA256Hex: String? = nil, pkcs11IsRSA: Bool = true,
-                requiresPIN: Bool = false) {
+                requiresPIN: Bool = false, usesProtectedAuthenticationPath: Bool = false) {
         self.id = id
         self.label = label
         self.issuerSummary = issuerSummary
@@ -31,6 +34,7 @@ public struct SigningIdentityInfo: Identifiable, Hashable, Sendable {
         self.pkcs11CertSHA256Hex = pkcs11CertSHA256Hex
         self.pkcs11IsRSA = pkcs11IsRSA
         self.requiresPIN = requiresPIN
+        self.usesProtectedAuthenticationPath = usesProtectedAuthenticationPath
     }
 }
 

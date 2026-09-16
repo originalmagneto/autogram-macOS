@@ -55,6 +55,25 @@ final class WebSigningCoordinator {
     var identities: [SigningIdentityInfo] = []
     private(set) var isWorking = false
     private(set) var errorText: String?
+    /// True while certificates are read from the card, which for an eID means
+    /// the eID client's BOK window is open.
+    private(set) var isReadingCertificates = false
+    /// Bumped whenever the PIN field should take the keyboard.
+    private(set) var pinFocusRequest = 0
+    private var cardPresent = false
+    private var cardWatch: Task<Void, Never>?
+
+    /// An eID takes its BOK in the eID client's own window; every other card
+    /// needs the PIN typed here.
+    var selectedIdentityRequiresPIN: Bool {
+        !(identities.first(where: { $0.id == selectedIdentityID })?.usesProtectedAuthenticationPath ?? false)
+    }
+
+    /// Whether the certificates were already read from the card, rather than the
+    /// placeholder that only says a card is connected.
+    var certificatesResolved: Bool {
+        identities.contains { $0.id.hasPrefix(EngineBridgeSigningProvider.certificateIdentityPrefix) }
+    }
 
     private let log = Logger(subsystem: "sk.autogram.Autogram", category: "web-signing")
 
@@ -174,19 +193,96 @@ final class WebSigningCoordinator {
         pin = ""
         errorText = nil
         prompt.show(coordinator: self)
-        await refreshIdentities()
+        startCardWatch()
 
         return try await withCheckedThrowingContinuation { continuation in
             self.continuation = continuation
         }
     }
 
+    /// Polls for the card while the prompt is open, so inserting one needs no
+    /// button: an eID opens the BOK window at once, other cards focus the PIN.
+    private func startCardWatch() {
+        cardWatch?.cancel()
+        cardPresent = false
+        identities = []
+        selectedIdentityID = nil
+        cardWatch = Task { [weak self] in
+            while !Task.isCancelled {
+                await self?.refreshIdentities()
+                try? await Task.sleep(for: .seconds(2))
+            }
+        }
+    }
+
     func refreshIdentities() async {
+        guard pending != nil, !isWorking, !isReadingCertificates else { return }
         let discovered = await provider.availableIdentities()
+        guard pending != nil, !isWorking, !isReadingCertificates else { return }
+        let wasPresent = cardPresent
+        cardPresent = !discovered.isEmpty
+        guard cardPresent else {
+            if wasPresent {
+                pin = ""
+                errorText = nil
+            }
+            identities = []
+            selectedIdentityID = nil
+            return
+        }
         identities = discovered
         if selectedIdentityID == nil || !discovered.contains(where: { $0.id == selectedIdentityID }) {
-            selectedIdentityID = discovered.first?.id
+            selectedIdentityID = Self.preferredIdentity(in: discovered)
         }
+        if !wasPresent {
+            await readCertificates()
+        }
+    }
+
+    /// Reads the certificates from the connected card. An eID asks for the BOK in
+    /// the eID client's window; any other card needs the PIN first, so without one
+    /// this only moves the keyboard to the PIN field.
+    func readCertificates() async {
+        guard pending != nil, cardPresent, !isWorking, !isReadingCertificates else { return }
+        let needsPIN = selectedIdentityRequiresPIN
+        guard !needsPIN || !pin.isEmpty else {
+            requestPINFocus()
+            return
+        }
+        isReadingCertificates = true
+        errorText = nil
+        if !needsPIN { prompt.beginMiddlewareInput() }
+        let resolved = await provider.resolveIdentities(pin: needsPIN ? pin : "")
+        if !needsPIN { prompt.endMiddlewareInput() }
+        isReadingCertificates = false
+        guard pending != nil else { return }
+
+        if let resolved, !resolved.isEmpty {
+            identities = resolved
+            selectedIdentityID = Self.preferredIdentity(in: resolved)
+        } else {
+            errorText = (provider as? EngineBridgeSigningProvider)?.lastResolveError
+                ?? "Certifikáty z karty sa nepodarilo načítať."
+            if needsPIN { requestPINFocus() }
+        }
+    }
+
+    /// Return in the PIN field reads the certificates first and signs once they are known.
+    func submitPIN() async {
+        if certificatesResolved {
+            await confirm()
+        } else {
+            await readCertificates()
+        }
+    }
+
+    private func requestPINFocus() {
+        pinFocusRequest += 1
+        prompt.focus()
+    }
+
+    private static func preferredIdentity(in identities: [SigningIdentityInfo]) -> String? {
+        (identities.first(where: \.isQualified) ?? identities.first)?.id
     }
 
     func cancel() {
@@ -252,6 +348,12 @@ final class WebSigningCoordinator {
             errorText = Failure.identityUnavailable.errorDescription
             return
         }
+        let needsPIN = selectedIdentityRequiresPIN
+        guard !needsPIN || !pin.isEmpty else {
+            errorText = "Zadajte PIN karty."
+            requestPINFocus()
+            return
+        }
         isWorking = true
         errorText = nil
         defer { isWorking = false }
@@ -278,7 +380,16 @@ final class WebSigningCoordinator {
                 signatureLevelOverride: level,
                 filename: pending.request.filename)
 
-            let signed = try await provider.sign(signingRequest)
+            // An eID opens the eID client's BOK window for the signature itself.
+            if !needsPIN { prompt.beginMiddlewareInput() }
+            let signed: SignedConversionResult
+            do {
+                signed = try await provider.sign(signingRequest)
+                if !needsPIN { prompt.endMiddlewareInput() }
+            } catch {
+                if !needsPIN { prompt.endMiddlewareInput() }
+                throw error
+            }
             let payload = wantsContainer ? (signed.asicData ?? signed.pdfData) : signed.pdfData
             let saved = archive(payload, for: pending.request)
             signedDocumentStore.record(displayName: pending.request.filename,
@@ -296,12 +407,16 @@ final class WebSigningCoordinator {
             // Kept open so a mistyped PIN can be corrected without the page
             // having to start over.
             errorText = error.localizedDescription
+            if needsPIN { requestPINFocus() }
         }
     }
 
     private func finish(_ result: Result<WebSignResponse, Error>) {
         guard let continuation else { return }
         self.continuation = nil
+        cardWatch?.cancel()
+        cardWatch = nil
+        cardPresent = false
         pending = nil
         pin = ""
         prompt.hide()

@@ -7,6 +7,7 @@ import AutogramKit
 /// only path from a browser request to the card.
 struct WebSigningSheet: View {
     @Bindable var coordinator: WebSigningCoordinator
+    @FocusState private var pinFocused: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -24,7 +25,11 @@ struct WebSigningSheet: View {
             }
 
             identityPicker
-            pinField
+            if coordinator.selectedIdentityRequiresPIN {
+                pinField
+            } else if !coordinator.identities.isEmpty {
+                bokNotice
+            }
 
             if let error = coordinator.errorText {
                 Label(error, systemImage: "exclamationmark.triangle.fill")
@@ -37,6 +42,9 @@ struct WebSigningSheet: View {
         }
         .padding(24)
         .frame(minWidth: 480, idealWidth: 540, maxWidth: 620)
+        .onChange(of: coordinator.pinFocusRequest) {
+            pinFocused = true
+        }
         .sheet(isPresented: Bindable(coordinator.mobileSigning).isPresented) {
             if let session = coordinator.mobileSigning.session {
                 MobileSigningSheet(session: session) {
@@ -174,11 +182,22 @@ struct WebSigningSheet: View {
                 .foregroundStyle(.secondary)
             if coordinator.identities.isEmpty {
                 HStack(spacing: 8) {
-                    Text("Nenašiel sa žiadny certifikát.")
+                    Text("Vložte kartu do čítačky.")
                         .font(.callout)
                         .foregroundStyle(.secondary)
                     Button("Hľadať znova") {
                         Task { await coordinator.refreshIdentities() }
+                    }
+                    .buttonStyle(.link)
+                }
+            } else if !coordinator.certificatesResolved && !coordinator.isReadingCertificates
+                        && !coordinator.selectedIdentityRequiresPIN {
+                HStack(spacing: 8) {
+                    Text(coordinator.identities.first?.label ?? "Karta pripojená")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                    Button("Načítať certifikáty") {
+                        Task { await coordinator.readCertificates() }
                     }
                     .buttonStyle(.link)
                 }
@@ -201,7 +220,34 @@ struct WebSigningSheet: View {
                 .foregroundStyle(.secondary)
             SecureField("PIN", text: $coordinator.pin)
                 .textFieldStyle(.roundedBorder)
-                .onSubmit { confirm() }
+                .focused($pinFocused)
+                .onSubmit {
+                    guard !coordinator.isWorking else { return }
+                    Task { await coordinator.submitPIN() }
+                }
+            Text(coordinator.certificatesResolved
+                 ? "Enter podpíše dokument."
+                 : "Enter načíta certifikáty z karty.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    /// The eID client asks for the BOK in its own window, both when the
+    /// certificates are read and when the document is signed.
+    private var bokNotice: some View {
+        HStack(spacing: 8) {
+            if coordinator.isReadingCertificates || coordinator.isWorking {
+                ProgressView().controlSize(.small)
+            } else {
+                Image(systemName: "person.text.rectangle")
+                    .foregroundStyle(.secondary)
+            }
+            Text(coordinator.isReadingCertificates || coordinator.isWorking
+                 ? "Zadajte BOK v okne eID klienta."
+                 : "BOK zadáte v okne eID klienta, pri načítaní certifikátov aj pri podpise.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
         }
     }
 

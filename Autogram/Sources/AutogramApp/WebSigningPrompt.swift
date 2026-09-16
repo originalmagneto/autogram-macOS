@@ -27,6 +27,8 @@ private final class WebSigningPanelDelegate: NSObject, NSWindowDelegate {
 final class WebSigningPrompt {
     private var panel: NSPanel?
     private var delegate: WebSigningPanelDelegate?
+    private var middlewareInputDepth = 0
+    private var keyboardHandoff: Task<Void, Never>?
 
     func show(coordinator: WebSigningCoordinator) {
         if let panel {
@@ -64,7 +66,62 @@ final class WebSigningPrompt {
         NSApp.requestUserAttention(.criticalRequest)
     }
 
+    /// Moves the keyboard to the PIN field's window, when the system allows it.
+    ///
+    /// An app in the background cannot take the keyboard since macOS Sonoma, so
+    /// this only helps once the person has clicked the prompt or the app.
+    func focus() {
+        guard let panel, NSApp.isActive else { return }
+        panel.makeKeyAndOrderFront(nil)
+    }
+
+    /// Steps aside while the eID client asks for the BOK.
+    ///
+    /// The eID PKCS#11 module, running inside the signing engine, starts the eID
+    /// client's `VirtualKeyboard` process for the BOK. A process started that way
+    /// is not activated, so the keyboard stayed with this floating panel. The
+    /// panel drops to the normal level so it cannot cover that window, and each
+    /// BOK window that appears is activated from here, which the system allows
+    /// while this app is the active one.
+    func beginMiddlewareInput() {
+        middlewareInputDepth += 1
+        guard middlewareInputDepth == 1 else { return }
+        panel?.level = .normal
+        keyboardHandoff?.cancel()
+        keyboardHandoff = Task { @MainActor in
+            var activated = Set<pid_t>()
+            while !Task.isCancelled {
+                for app in NSWorkspace.shared.runningApplications
+                where Self.isEIDKeyboard(app) && !activated.contains(app.processIdentifier) {
+                    activated.insert(app.processIdentifier)
+                    NSApp.yieldActivation(to: app)
+                    app.activate(from: .current, options: [])
+                }
+                try? await Task.sleep(for: .milliseconds(250))
+            }
+        }
+    }
+
+    func endMiddlewareInput() {
+        guard middlewareInputDepth > 0 else { return }
+        middlewareInputDepth -= 1
+        guard middlewareInputDepth == 0 else { return }
+        keyboardHandoff?.cancel()
+        keyboardHandoff = nil
+        guard let panel else { return }
+        panel.level = .floating
+        panel.orderFrontRegardless()
+    }
+
+    private static func isEIDKeyboard(_ app: NSRunningApplication) -> Bool {
+        guard let executable = app.executableURL else { return false }
+        return executable.lastPathComponent == "VirtualKeyboard" && executable.path.contains("eID")
+    }
+
     func hide() {
+        keyboardHandoff?.cancel()
+        keyboardHandoff = nil
+        middlewareInputDepth = 0
         panel?.delegate = nil
         panel?.close()
         panel = nil

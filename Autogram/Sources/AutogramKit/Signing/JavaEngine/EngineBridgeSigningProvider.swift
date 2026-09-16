@@ -9,10 +9,18 @@ public final class EngineBridgeSigningProvider: QualifiedSigningProviding, @unch
     public static let driverID = "eid"
     public static let syntheticIdentityIDPrefix = "engine:"
     public static let certificateIdentityPrefix = "engine-cert:"
+    /// Sent to the engine for an eID when the app collected no BOK. eID tokens
+    /// report CKF_PROTECTED_AUTHENTICATION_PATH, so SunPKCS11 logs in with a null
+    /// PIN and the eID client asks for the BOK in its own window; this value
+    /// never reaches the card. The engine only insists on a non-blank field.
+    public static let protectedAuthenticationPathPIN = "protected-authentication-path"
 
     private let engine: AutogramCLIEngine
     private let renderer: VisibleSignatureRenderer
     private let cachedCertificates = OSAllocatedUnfairLock<[SigningCertificate]>(initialState: [])
+    /// Driver the cached certificates were read from, so signing can reuse them
+    /// instead of asking the eID client for the BOK a second time.
+    private let cachedCertificatesDriverID = OSAllocatedUnfairLock<String?>(initialState: nil)
     private let identityCache = OSAllocatedUnfairLock<(fingerprint: String, identities: [SigningIdentityInfo], fetchedAt: Date)?>(
         initialState: nil)
     private let identityCacheTTL: TimeInterval = 6
@@ -33,6 +41,7 @@ public final class EngineBridgeSigningProvider: QualifiedSigningProviding, @unch
         let fingerprint = probe?.fingerprint ?? ""
         if fingerprint.isEmpty {
             cachedCertificates.withLock { $0 = [] }
+            cachedCertificatesDriverID.withLock { $0 = nil }
             identityCache.withLock { $0 = nil }
             return []
         }
@@ -56,21 +65,22 @@ public final class EngineBridgeSigningProvider: QualifiedSigningProviding, @unch
                 lastResolveErrorLock.withLock { $0 = "Karta nie je dostupná — vložte ju do čítačky." }
                 return []
             }
-            // eID má chránenú autentizačnú cestu — prázdny PIN nechá BOK dialóg na middleware.
+            // eID má chránenú autentizačnú cestu — BOK si vypýta eID klient vo vlastnom okne.
             // Komerčné karty (I.CA SecureStore a pod.) vyžadujú programovo zadaný PIN.
-            guard !pin.isEmpty || driverID == Self.driverID else {
+            guard let enginePIN = Self.enginePIN(entered: pin, driverID: driverID) else {
                 lastResolveErrorLock.withLock { $0 = "Pre túto kartu zadajte PIN." }
                 return nil
             }
-            let discovery = try await engine.certificateDiscovery(driverID: driverID, pin: Secret(pin))
+            let discovery = try await engine.certificateDiscovery(driverID: driverID, pin: Secret(enginePIN))
             guard !discovery.certificates.isEmpty else {
                 lastResolveErrorLock.withLock { $0 = "Na karte neboli nájdené podpisové certifikáty." }
                 return []
             }
             cachedCertificates.withLock { $0 = discovery.certificates }
+            cachedCertificatesDriverID.withLock { $0 = driverID }
             invalidateIdentityCache()
             lastResolveErrorLock.withLock { $0 = nil }
-            return discovery.certificates.map(Self.identityInfo(from:))
+            return discovery.certificates.map { Self.identityInfo(from: $0, driverID: driverID) }
         } catch {
             let message = error.localizedDescription
             let friendly: String
@@ -217,19 +227,34 @@ public final class EngineBridgeSigningProvider: QualifiedSigningProviding, @unch
     }
 
     private func computeIdentities(fingerprint: String, driverNames: [String]) async -> [SigningIdentityInfo] {
-        guard !fingerprint.isEmpty else { return [] }
+        guard let primaryDriverID = Self.primaryDriverID(fingerprint: fingerprint) else { return [] }
         let cached = cachedCertificates.withLock { $0 }
+        let cachedDriverID = cachedCertificatesDriverID.withLock { $0 }
         if !cached.isEmpty {
-            return cached.map(Self.identityInfo(from:))
+            return cached.map { Self.identityInfo(from: $0, driverID: cachedDriverID ?? primaryDriverID) }
         }
-        return [Self.syntheticIdentity(driverNames: driverNames)]
+        return [Self.syntheticIdentity(driverNames: driverNames, driverID: primaryDriverID)]
+    }
+
+    /// The driver certificate discovery and signing pick when several cards are
+    /// connected: the eID first, as `resolveIdentities` and `sign` do.
+    static func primaryDriverID(fingerprint: String) -> String? {
+        let ids = fingerprint.split(separator: ",").map(String.init).filter { !$0.isEmpty }
+        return ids.contains(driverID) ? driverID : ids.first
+    }
+
+    /// Whether the app has to collect the PIN for a card on this driver.
+    public static func requiresPIN(driverID: String) -> Bool {
+        driverID != Self.driverID
+    }
+
+    /// The PIN handed to the engine, or nil when the card needs one and none was entered.
+    static func enginePIN(entered: String, driverID: String) -> String? {
+        if !entered.isEmpty { return entered }
+        return requiresPIN(driverID: driverID) ? nil : protectedAuthenticationPathPIN
     }
 
     public func sign(_ request: SigningRequest) async throws -> SignedConversionResult {
-        guard let pin = request.pin, !pin.isEmpty else {
-            throw SigningError.identityUnavailable
-        }
-
         let drivers = (try? await engine.drivers()) ?? []
         let present = drivers.filter { $0.tokenPresent == true }
         let usable = present.isEmpty ? drivers.filter { $0.tokenPresent != false } : present
@@ -239,28 +264,48 @@ public final class EngineBridgeSigningProvider: QualifiedSigningProviding, @unch
             invalidateIdentityCache()
             throw SigningError.identityUnavailable
         }
+        guard let pin = Self.enginePIN(entered: request.pin ?? "", driverID: driverID) else {
+            throw SigningError.identityUnavailable
+        }
 
         let preferredSerial = request.identityID.hasPrefix(Self.certificateIdentityPrefix)
             ? String(request.identityID.dropFirst(Self.certificateIdentityPrefix.count))
             : nil
-        // eID PKCS#11: C_Login pri výpise kľúčov a znova pri podpise — dva BOK dialógy sú očakávané
-        // (pôvodný Autogram aj eID klient). Neskratovať CERTIFICATES.
-        statusLog("Čítam podpisové certifikáty z karty…")
-        let discovery: CertificateDiscovery
-        do {
-            discovery = try await engine.certificateDiscovery(driverID: driverID, pin: Secret(pin))
-        } catch {
-            cachedCertificates.withLock { $0 = [] }
-            invalidateIdentityCache()
-            throw Self.mapAny(error)
+        // eID PKCS#11: every C_Login opens the eID client's BOK window. When the
+        // certificates were already read from this eID, reuse them so signing asks
+        // for the BOK once more (the signature itself), not twice. Other cards take
+        // the PIN programmatically, so re-reading them costs nothing and re-checks the PIN.
+        let reusable: [SigningCertificate] = {
+            guard !Self.requiresPIN(driverID: driverID), let preferredSerial,
+                  cachedCertificatesDriverID.withLock({ $0 }) == driverID else { return [] }
+            let cached = cachedCertificates.withLock { $0 }
+            return cached.contains(where: { $0.serialNumber == preferredSerial }) ? cached : []
+        }()
+        let certificates: [SigningCertificate]
+        if !reusable.isEmpty {
+            certificates = reusable
+        } else {
+            statusLog("Čítam podpisové certifikáty z karty…")
+            let discovery: CertificateDiscovery
+            do {
+                discovery = try await engine.certificateDiscovery(driverID: driverID, pin: Secret(pin))
+            } catch {
+                cachedCertificates.withLock { $0 = [] }
+                cachedCertificatesDriverID.withLock { $0 = nil }
+                invalidateIdentityCache()
+                throw Self.mapAny(error)
+            }
+            guard !discovery.certificates.isEmpty else {
+                cachedCertificates.withLock { $0 = [] }
+                cachedCertificatesDriverID.withLock { $0 = nil }
+                invalidateIdentityCache()
+                throw SigningError.identityUnavailable
+            }
+            cachedCertificates.withLock { $0 = discovery.certificates }
+            cachedCertificatesDriverID.withLock { $0 = driverID }
+            certificates = discovery.certificates
         }
-        guard !discovery.certificates.isEmpty else {
-            cachedCertificates.withLock { $0 = [] }
-            invalidateIdentityCache()
-            throw SigningError.identityUnavailable
-        }
-        cachedCertificates.withLock { $0 = discovery.certificates }
-        guard let certificate = Self.selectCertificate(from: discovery.certificates,
+        guard let certificate = Self.selectCertificate(from: certificates,
                                                        preferredSerialNumber: preferredSerial) else {
             throw SigningError.identityUnavailable
         }
@@ -529,13 +574,14 @@ public final class EngineBridgeSigningProvider: QualifiedSigningProviding, @unch
         return qualification == "QESIG" && text.contains("qualified")
     }
 
-    static func syntheticIdentity(driverNames: [String] = []) -> SigningIdentityInfo {
+    static func syntheticIdentity(driverNames: [String] = [], driverID connectedDriverID: String? = nil) -> SigningIdentityInfo {
         let label: String
         if driverNames.isEmpty {
             label = "Podpisová karta (eID / advokátsky preukaz)"
         } else {
             label = "Karta pripojená: \(driverNames.joined(separator: " + "))"
         }
+        let protectedPath = connectedDriverID.map { !requiresPIN(driverID: $0) } ?? false
         return SigningIdentityInfo(
             id: "\(syntheticIdentityIDPrefix)\(driverID)",
             label: label,
@@ -543,10 +589,11 @@ public final class EngineBridgeSigningProvider: QualifiedSigningProviding, @unch
             isMandateCertificate: false,
             isQualified: true,
             hasPrivateKey: true,
-            requiresPIN: true)
+            requiresPIN: true,
+            usesProtectedAuthenticationPath: protectedPath)
     }
 
-    static func identityInfo(from certificate: SigningCertificate) -> SigningIdentityInfo {
+    static func identityInfo(from certificate: SigningCertificate, driverID connectedDriverID: String) -> SigningIdentityInfo {
         SigningIdentityInfo(
             id: "\(certificateIdentityPrefix)\(certificate.serialNumber)",
             label: certificate.displayName,
@@ -559,7 +606,8 @@ public final class EngineBridgeSigningProvider: QualifiedSigningProviding, @unch
                                                 displayName: certificate.displayName,
                                                 qualification: certificate.certificateQualification),
             hasPrivateKey: true,
-            requiresPIN: true)
+            requiresPIN: true,
+            usesProtectedAuthenticationPath: !requiresPIN(driverID: connectedDriverID))
     }
 
     static func selectCertificate(from certificates: [SigningCertificate],
