@@ -75,14 +75,6 @@ if [[ -n "$LEGACY_CONTENTS" \
     cp "$LEGACY_CONTENTS/app/autogram.jar" "$CONTENTS/app/autogram.jar"
     ditto "$LEGACY_CONTENTS/app/dependency-jars" "$CONTENTS/app/dependency-jars"
     ditto "$LEGACY_CONTENTS/runtime" "$CONTENTS/runtime"
-
-    MACHINE_SETTINGS_PATCH_ROOT="Assets/LegacyEnginePatches"
-    MACHINE_SETTINGS_PATCH="digital/slovensko/autogram/ui/machine/MachineSettings.class"
-    if [[ ! -f "$MACHINE_SETTINGS_PATCH_ROOT/$MACHINE_SETTINGS_PATCH" ]] || ! command -v jar >/dev/null 2>&1; then
-        echo "Error: Java machine settings patch or jar tool is unavailable." >&2
-        exit 1
-    fi
-    jar uf "$CONTENTS/app/autogram.jar" -C "$MACHINE_SETTINGS_PATCH_ROOT" "$MACHINE_SETTINGS_PATCH"
 else
     echo "Warning: signing engine not found. Run scripts/build-engine.sh first; without it KEP signing falls back to Keychain/DEMO and the Finder Quick Action cannot sign." >&2
 fi

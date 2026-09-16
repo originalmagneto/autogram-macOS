@@ -8,9 +8,13 @@ import java.util.List;
 import java.util.UUID;
 
 public final class MachineSettings extends UserSettings {
+    private static final String SECURE_STORE_DRIVER = "secure_store";
+    /** I.CA SecureStore exposes an empty reader at slot index 0 and the card at index 1. */
+    private static final int SECURE_STORE_CARD_SLOT_INDEX = 1;
+
     private final String disabledKeystorePath = disabledPath("keystore");
     private final String disabledPkcs11DriverPath = disabledPath("pkcs11");
-    private final List<String> trustedList = List.copyOf(UserSettings.load().getTrustedList());
+    private final List<String> trustedList;
     private EFormRequest eform;
 
     public EFormRequest getEform() {
@@ -26,6 +30,10 @@ public final class MachineSettings extends UserSettings {
     }
 
     MachineSettings(boolean cacheContextSpecificPassword) {
+        // Machine mode ignores the GUI slot mappings except an explicit SecureStore slot.
+        var loaded = UserSettings.load();
+        trustedList = List.copyOf(loaded.getTrustedList());
+        setDriverSlotIndex(SECURE_STORE_DRIVER, secureStoreSlotIndex(loaded.getDriverSlotIndex(SECURE_STORE_DRIVER)));
         setCorrectDocumentDisplay(false);
         setBulkEnabled(cacheContextSpecificPassword);
         setSignatureLevel(SignatureLevel.PAdES_BASELINE_T);
@@ -45,6 +53,10 @@ public final class MachineSettings extends UserSettings {
     @Override
     public List<String> getTrustedList() {
         return trustedList;
+    }
+
+    static int secureStoreSlotIndex(int configuredSlotIndex) {
+        return configuredSlotIndex >= 0 ? configuredSlotIndex : SECURE_STORE_CARD_SLOT_INDEX;
     }
 
     private static String disabledPath(String kind) {
