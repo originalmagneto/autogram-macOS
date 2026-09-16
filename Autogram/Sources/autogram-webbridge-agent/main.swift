@@ -38,8 +38,16 @@ final class Rendezvous: NSObject, NSXPCListenerDelegate, WebBridgeRendezvousProt
     }
 
     func appEndpoint(reply: @escaping (NSXPCListenerEndpoint?) -> Void) {
-        if let current = registry.current, Self.appIsRunning() {
+        let appIsRunning = Self.appIsRunning()
+        if let current = registry.current, appIsRunning {
             reply(current)
+            return
+        }
+        if appIsRunning {
+            // Already starting, typically for the previous request: wait for it to
+            // register. Opening a running app again would count as a reopen and
+            // bring up its main window and Dock icon.
+            waitForRegistration(reply: reply)
             return
         }
         registry.forget()
