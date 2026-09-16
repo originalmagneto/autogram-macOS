@@ -29,7 +29,9 @@ private final class WebSigningPanelDelegate: NSObject, NSWindowDelegate {
 ///
 /// A panel ordered front regardless of activation appears over the browser
 /// without stealing the keyboard. Clicking it activates the app the ordinary
-/// way, which is what every password prompt on this platform does.
+/// way, which is what every password prompt on this platform does. It is
+/// centered over Safari's front window (`WebSigningPanelPlacement`), so it
+/// covers the portal's own waiting modal instead of sitting beside it.
 @MainActor
 final class WebSigningPrompt {
     private var panel: NSPanel?
@@ -40,6 +42,7 @@ final class WebSigningPrompt {
 
     func show(coordinator: WebSigningCoordinator) {
         if let panel {
+            place(panel)
             panel.orderFrontRegardless()
             return
         }
@@ -61,17 +64,46 @@ final class WebSigningPrompt {
         panel.hidesOnDeactivate = false
         panel.isReleasedWhenClosed = false
         panel.minSize = NSSize(width: 480, height: 420)
-        panel.center()
+        place(panel)
 
         let delegate = WebSigningPanelDelegate(coordinator: coordinator)
         panel.delegate = delegate
         self.delegate = delegate
         self.panel = panel
 
+        // Over Safari at the floating level the panel is visible at once, so it no
+        // longer bounces the Dock icon, which a web-signing launch does not even show.
         panel.orderFrontRegardless()
-        // Bounces the Dock icon. Activation itself is the system's call, but a
-        // request for attention is always honoured.
-        NSApp.requestUserAttention(.criticalRequest)
+    }
+
+    private func place(_ panel: NSPanel) {
+        let screens = NSScreen.screens.map {
+            WebSigningPanelPlacement.Screen(frame: $0.frame, visibleFrame: $0.visibleFrame)
+        }
+        let origin = WebSigningPanelPlacement.origin(panelSize: panel.frame.size,
+                                                     safariQuartzBounds: Self.safariFrontWindowBounds(),
+                                                     screens: screens,
+                                                     mouseLocation: NSEvent.mouseLocation)
+        panel.setFrameOrigin(origin)
+    }
+
+    /// Front on-screen Safari window, in Quartz coordinates. Window bounds need no
+    /// Screen Recording permission; only window titles would.
+    private static func safariFrontWindowBounds() -> CGRect? {
+        let safariPIDs = Set(NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.Safari")
+            .map(\.processIdentifier))
+        guard !safariPIDs.isEmpty,
+              let windows = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements],
+                                                       kCGNullWindowID) as? [[String: Any]] else { return nil }
+        for window in windows {
+            guard let pid = window[kCGWindowOwnerPID as String] as? pid_t, safariPIDs.contains(pid),
+                  (window[kCGWindowLayer as String] as? Int) == 0,
+                  let boundsDictionary = window[kCGWindowBounds as String] as? NSDictionary,
+                  let bounds = CGRect(dictionaryRepresentation: boundsDictionary as CFDictionary),
+                  bounds.width > 200, bounds.height > 200 else { continue }
+            return bounds
+        }
+        return nil
     }
 
     /// Moves the keyboard to the PIN field's window, when the system allows it.
