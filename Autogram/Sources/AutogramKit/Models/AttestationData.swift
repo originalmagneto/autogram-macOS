@@ -44,6 +44,8 @@ public struct AttestationData: Codable, Hashable, Sendable {
 
     public var conversionExecutionDateTime: Date
     public var evidenceNumber: String?
+    /// EZZK server time when the evidence number was obtained. Nil for a number typed by hand.
+    public var evidenceNumberAllocatedAt: Date?
 
     public var performingPerson: AdvocateProfile
     public var usedDeviceDescription: String
@@ -62,7 +64,7 @@ public struct AttestationData: Codable, Hashable, Sendable {
              originalDocumentTypeLabel, originConfirmed, noSecurityElementsConfirmed, numberOfSheets,
              sheetCountingMethod, nonEmptyPageCount, paperSizeBreakdown,
              newDocumentName, newDocumentFormatLabel, conversionExecutionDateTime,
-             evidenceNumber, performingPerson, usedDeviceDescription
+             evidenceNumber, evidenceNumberAllocatedAt, performingPerson, usedDeviceDescription
     }
 
     public init(originalDocumentOrder: Int = 1,
@@ -79,6 +81,7 @@ public struct AttestationData: Codable, Hashable, Sendable {
                 newDocumentFormatLabel: String = "PDF",
                 conversionExecutionDateTime: Date = Date(),
                 evidenceNumber: String? = nil,
+                evidenceNumberAllocatedAt: Date? = nil,
                 performingPerson: AdvocateProfile = .empty,
                 usedDeviceDescription: String = "") {
         self.originalDocumentOrder = originalDocumentOrder
@@ -95,6 +98,7 @@ public struct AttestationData: Codable, Hashable, Sendable {
         self.newDocumentFormatLabel = newDocumentFormatLabel
         self.conversionExecutionDateTime = conversionExecutionDateTime
         self.evidenceNumber = evidenceNumber
+        self.evidenceNumberAllocatedAt = evidenceNumberAllocatedAt
         self.performingPerson = performingPerson
         self.usedDeviceDescription = usedDeviceDescription
     }
@@ -115,6 +119,7 @@ public struct AttestationData: Codable, Hashable, Sendable {
         newDocumentFormatLabel = try container.decode(String.self, forKey: .newDocumentFormatLabel)
         conversionExecutionDateTime = try container.decode(Date.self, forKey: .conversionExecutionDateTime)
         evidenceNumber = try container.decodeIfPresent(String.self, forKey: .evidenceNumber)
+        evidenceNumberAllocatedAt = try container.decodeIfPresent(Date.self, forKey: .evidenceNumberAllocatedAt)
         performingPerson = try container.decode(AdvocateProfile.self, forKey: .performingPerson)
         usedDeviceDescription = try container.decode(String.self, forKey: .usedDeviceDescription)
     }
@@ -135,6 +140,7 @@ public struct AttestationData: Codable, Hashable, Sendable {
         try container.encode(newDocumentFormatLabel, forKey: .newDocumentFormatLabel)
         try container.encode(conversionExecutionDateTime, forKey: .conversionExecutionDateTime)
         try container.encodeIfPresent(evidenceNumber, forKey: .evidenceNumber)
+        try container.encodeIfPresent(evidenceNumberAllocatedAt, forKey: .evidenceNumberAllocatedAt)
         try container.encode(performingPerson, forKey: .performingPerson)
         try container.encode(usedDeviceDescription, forKey: .usedDeviceDescription)
     }

@@ -63,6 +63,28 @@ public struct AppSettings: Codable, Sendable {
         }
     }
 
+    public enum EZZKMode: String, Codable, CaseIterable, Sendable {
+        case demo
+        case test
+        case production
+
+        public var environment: EZZKEnvironment? {
+            switch self {
+            case .demo: nil
+            case .test: .sandbox
+            case .production: .production
+            }
+        }
+
+        public var label: String {
+            switch self {
+            case .demo: "Demo (lokálne)"
+            case .test: "Test"
+            case .production: "Produkcia"
+            }
+        }
+    }
+
     public var aiMode: AIMode
     public var aiPrompt: String?
     public var omlxURL: String
@@ -80,6 +102,9 @@ public struct AppSettings: Codable, Sendable {
     public var ezzkUsername: String
     public var ezzkNotificationEmail: String
     public var ezzkEdeskAddress: String
+    public var ezzkMode: EZZKMode
+    /// Name of the person performing conversions exactly as EZZK registered it.
+    public var ezzkPersonName: String
     public var retainRecentDocuments: Bool
     /// Use the on-device Foundation Model to classify uncertain candidates.
     public var useFoundationModelClassifier: Bool
@@ -114,7 +139,7 @@ public struct AppSettings: Codable, Sendable {
         case openAICompatibleBaseURL, openAICompatibleModel
         case customTSAServers, selectedTSAURL, legacyTSAURL = "tsaURL"
         case pdfaMode, profiles, activeProfileID
-        case ezzkICO, ezzkUsername, ezzkNotificationEmail, ezzkEdeskAddress
+        case ezzkICO, ezzkUsername, ezzkNotificationEmail, ezzkEdeskAddress, ezzkMode, ezzkPersonName
         case retainRecentDocuments
         case useFoundationModelClassifier, learnFromReviews
         case mobileSigningEnabled, avmBaseURL
@@ -138,6 +163,8 @@ public struct AppSettings: Codable, Sendable {
                 ezzkUsername: String = "",
                 ezzkNotificationEmail: String = "",
                 ezzkEdeskAddress: String = "",
+                ezzkMode: EZZKMode = .demo,
+                ezzkPersonName: String = "",
                 retainRecentDocuments: Bool = false,
                 useFoundationModelClassifier: Bool = true,
                 learnFromReviews: Bool = true,
@@ -163,6 +190,8 @@ public struct AppSettings: Codable, Sendable {
         self.ezzkUsername = ezzkUsername
         self.ezzkNotificationEmail = ezzkNotificationEmail
         self.ezzkEdeskAddress = ezzkEdeskAddress
+        self.ezzkMode = ezzkMode
+        self.ezzkPersonName = ezzkPersonName
         self.retainRecentDocuments = retainRecentDocuments
         self.useFoundationModelClassifier = useFoundationModelClassifier
         self.learnFromReviews = learnFromReviews
@@ -211,6 +240,8 @@ public struct AppSettings: Codable, Sendable {
         self.ezzkUsername = try container.decodeIfPresent(String.self, forKey: .ezzkUsername) ?? ""
         self.ezzkNotificationEmail = try container.decodeIfPresent(String.self, forKey: .ezzkNotificationEmail) ?? ""
         self.ezzkEdeskAddress = try container.decodeIfPresent(String.self, forKey: .ezzkEdeskAddress) ?? ""
+        self.ezzkMode = try container.decodeIfPresent(EZZKMode.self, forKey: .ezzkMode) ?? .demo
+        self.ezzkPersonName = try container.decodeIfPresent(String.self, forKey: .ezzkPersonName) ?? ""
         self.retainRecentDocuments = try container.decodeIfPresent(Bool.self, forKey: .retainRecentDocuments) ?? false
         self.useFoundationModelClassifier = try container.decodeIfPresent(Bool.self, forKey: .useFoundationModelClassifier) ?? true
         self.learnFromReviews = try container.decodeIfPresent(Bool.self, forKey: .learnFromReviews) ?? true
@@ -240,6 +271,8 @@ public struct AppSettings: Codable, Sendable {
         try container.encode(ezzkUsername, forKey: .ezzkUsername)
         try container.encode(ezzkNotificationEmail, forKey: .ezzkNotificationEmail)
         try container.encode(ezzkEdeskAddress, forKey: .ezzkEdeskAddress)
+        try container.encode(ezzkMode, forKey: .ezzkMode)
+        try container.encode(ezzkPersonName, forKey: .ezzkPersonName)
         try container.encode(retainRecentDocuments, forKey: .retainRecentDocuments)
         try container.encode(useFoundationModelClassifier, forKey: .useFoundationModelClassifier)
         try container.encode(learnFromReviews, forKey: .learnFromReviews)
