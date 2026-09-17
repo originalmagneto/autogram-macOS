@@ -102,7 +102,7 @@ final class EZZKAccountControllerTests: XCTestCase {
     private let loginRejected = #"<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope"><s:Body><OutputMessageOf_LogInOutput xmlns="http://ditec/2017/06/iam/core"><Content xmlns:i="http://www.w3.org/2001/XMLSchema-instance"><ErrorCode>CORE-003</ErrorCode><Account i:nil="true"/><TokenDescriptor i:nil="true"/></Content></OutputMessageOf_LogInOutput></s:Body></s:Envelope>"#
 }
 
-private final class MemoryCredentialStore: EZZKSOAPCredentialStoring, @unchecked Sendable {
+final class MemoryCredentialStore: EZZKSOAPCredentialStoring, @unchecked Sendable {
     private let lock = NSLock()
     private var items: [EZZKEnvironment: EZZKSOAPCredentials] = [:]
 
@@ -119,7 +119,7 @@ private final class MemoryCredentialStore: EZZKSOAPCredentialStoring, @unchecked
     }
 }
 
-private final class ScriptedTransport: EZZKHTTPTransport, @unchecked Sendable {
+final class ScriptedTransport: EZZKHTTPTransport, @unchecked Sendable {
     private let lock = NSLock()
     private var bodies: [String]
     private var count = 0

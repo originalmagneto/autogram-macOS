@@ -12,6 +12,15 @@ public enum EZZKEvidenceNumberPolicy {
         return calendar.isDate(allocatedAt, inSameDayAs: serverTime)
     }
 
+    /// A number fetched in one EZZK mode was never allocated by another one (a demo number
+    /// is a local simulation, a test number is not a production number). A number without a
+    /// mode (typed by hand or older data) is not judged.
+    public static func isFromCurrentMode(numberMode: AppSettings.EZZKMode?,
+                                         currentMode: AppSettings.EZZKMode) -> Bool {
+        guard let numberMode else { return true }
+        return numberMode == currentMode
+    }
+
     /// The name the clause gives the person, following `AttestationClauseGenerator`: the
     /// office for a legal entity or when an office name is set, otherwise the full name.
     public static func personName(for profile: AdvocateProfile) -> String {

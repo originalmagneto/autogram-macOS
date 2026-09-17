@@ -176,6 +176,15 @@ final class ZakoSessionStore {
     let formPackRepository: FormPackRepository
     private(set) var selectedFormPack: ConversionFormPack
     var ezzkService: any EZZKServicing { settingsStore.ezzkService }
+    /// The refusal for a number obtained in another EZZK mode than the one now selected,
+    /// or nil. Purely local: it never calls EZZK.
+    var evidenceNumberModeError: String? {
+        guard attestation.evidenceNumber != nil,
+              !EZZKEvidenceNumberPolicy.isFromCurrentMode(
+                  numberMode: attestation.evidenceNumberMode,
+                  currentMode: settingsStore.ezzkAccountController.mode) else { return nil }
+        return EZZKError.evidenceNumberFromOtherMode.errorDescription
+    }
     /// A warning, not a blocker: EZZK reports a record whose person differs from the account.
     var ezzkIdentityWarning: String? {
         guard !settingsStore.ezzkAccountController.isDemoMode else { return nil }
@@ -1003,24 +1012,31 @@ final class ZakoSessionStore {
                 evidenceRequestID = nil
             }
         }
+        // A number from one mode is never valid in another, so a reply that arrives after the
+        // mode changed is dropped without an error.
+        let mode = settingsStore.ezzkAccountController.mode
         do {
             let service = ezzkService
             let numbers = try await service.requestEvidenceNumbers(count: 1)
-            guard requestID == currentRecordID, !Task.isCancelled else { return }
+            guard requestID == currentRecordID, !Task.isCancelled,
+                  mode == settingsStore.ezzkAccountController.mode else { return }
             guard let number = numbers.first else {
                 throw EZZKError.invalidResponse
             }
             // EZZK consumes an unused number at midnight of its allocation day.
             let allocatedAt = try await service.serverTime()
-            guard requestID == currentRecordID, !Task.isCancelled else { return }
+            guard requestID == currentRecordID, !Task.isCancelled,
+                  mode == settingsStore.ezzkAccountController.mode else { return }
             attestation.evidenceNumber = number
             attestation.evidenceNumberAllocatedAt = allocatedAt
+            attestation.evidenceNumberMode = mode
             evidenceNumberRequested = true
             lastError = nil
             evidenceNumberError = nil
             recomputePreflight()
         } catch {
-            guard requestID == currentRecordID, !Task.isCancelled else { return }
+            guard requestID == currentRecordID, !Task.isCancelled,
+                  mode == settingsStore.ezzkAccountController.mode else { return }
             evidenceNumberError = error.localizedDescription
             lastError = error.localizedDescription
             recomputePreflight()
@@ -1057,6 +1073,14 @@ final class ZakoSessionStore {
         lastError = nil
         validationErrors = []
         preparePreflight()
+        // Local precondition before any EZZK call: a number from another EZZK mode (a demo
+        // number on Produkcia, for example) was never allocated there, so nothing is signed.
+        if let modeError = evidenceNumberModeError {
+            evidenceNumberError = modeError
+            lastError = modeError
+            recomputePreflight()
+            return
+        }
         guard viaMobile ? isMobilePreflightComplete : isPreflightComplete else { return }
         let confirmedElementsSnapshot = confirmedSecurityElements
         let securityReviewSnapshot = securityReviewStamp
@@ -1354,6 +1378,7 @@ final class ZakoSessionStore {
         attestation.noSecurityElementsConfirmed = false
         attestation.evidenceNumber = nil
         attestation.evidenceNumberAllocatedAt = nil
+        attestation.evidenceNumberMode = nil
         evidenceNumberRequested = false
         evidenceNumberError = nil
         preflightErrors = []

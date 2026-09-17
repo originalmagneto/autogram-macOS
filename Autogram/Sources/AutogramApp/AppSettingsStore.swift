@@ -18,13 +18,14 @@ final class AppSettingsStore {
     private(set) var evidenceStore: LocalEvidenceStore
     let exampleBank = ExampleBank(directory: ExampleBank.defaultDirectory)
 
-    init() {
+    /// Tests pass a controller with in-memory credentials and a scripted transport.
+    init(ezzkAccountController: EZZKAccountController? = nil) {
         let loaded = AppSettings.load()
         self.settings = loaded
-        self.ezzkAccountController = EZZKAccountController(mode: loaded.ezzkMode)
+        self.ezzkAccountController = ezzkAccountController ?? EZZKAccountController(mode: loaded.ezzkMode)
         self.evidenceStore = LocalEvidenceStore()
         self.signingProvider = SigningProviderFactory.makeDefault()
-        ezzkAccountController.configure(
+        self.ezzkAccountController.configure(
             person: { [weak self] in
                 guard let self else { return EZZKPerson(corporateBodyFullName: "", ico: "") }
                 return EZZKPerson(corporateBodyFullName: settings.ezzkPersonName, ico: settings.ezzkICO)

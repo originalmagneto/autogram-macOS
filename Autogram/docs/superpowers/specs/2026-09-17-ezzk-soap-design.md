@@ -267,6 +267,10 @@ time; 110 and 113 empty batch; 112 number allocated to another person.
   `Europe/Bratislava` time zone, because EZZK consumes unused numbers at midnight.
   A number without `evidenceNumberAllocatedAt` (typed by hand or from older data)
   is not blocked.
+- `Získať číslo` also stores the EZZK mode in `AttestationData.evidenceNumberMode`,
+  and ZaKo refuses a number fetched in another EZZK mode with
+  `evidenceNumberFromOtherMode` before any EZZK call, so a demo or test number is
+  never signed on Produkcia.
 - Preflight warns when the clause's performing person name or IČO differs from
   `ezzkPersonName` or `ezzkICO` in test and production.
 - After signing, `submit` throws `submissionUnavailable`. The row stays

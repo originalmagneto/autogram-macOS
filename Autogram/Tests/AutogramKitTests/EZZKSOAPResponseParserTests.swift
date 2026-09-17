@@ -89,7 +89,8 @@ final class EZZKSOAPResponseParserTests: XCTestCase {
             .notConfigured, .authenticationFailed, .invalidResponse, .serverRejected("x"), .networkFailure("x"),
             .credentialsRejected(code: "CORE-003"), .credentialsRejected(code: "CORE-022"), .accountLocked,
             .serviceRejected(code: 110, message: "x"), .invalidRequest("x"), .untrustedCertificate,
-            .productionAllocationDisabled, .submissionUnavailable, .evidenceNumberExpired, .outcomeUnknown
+            .productionAllocationDisabled, .submissionUnavailable, .evidenceNumberExpired, .evidenceNumberFromOtherMode,
+            .outcomeUnknown
         ]
         for error in errors {
             let text = error.errorDescription ?? ""

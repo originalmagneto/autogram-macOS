@@ -63,6 +63,7 @@ public enum EZZKError: LocalizedError, Equatable, Sendable {
     case productionAllocationDisabled
     case submissionUnavailable
     case evidenceNumberExpired
+    case evidenceNumberFromOtherMode
     case outcomeUnknown
 
     public var errorDescription: String? {
@@ -95,6 +96,8 @@ public enum EZZKError: LocalizedError, Equatable, Sendable {
             return "Odosielanie záznamov do EZZK zatiaľ nie je dostupné. Príde v ďalšej verzii."
         case .evidenceNumberExpired:
             return "Evidenčné číslo bolo pridelené v iný deň a EZZK ho o polnoci spotreboval. Získajte nové číslo."
+        case .evidenceNumberFromOtherMode:
+            return "Evidenčné číslo bolo získané v inom režime EZZK. Získajte nové číslo."
         case .outcomeUnknown:
             return "Spojenie s EZZK sa prerušilo a nie je isté, či EZZK požiadavku spracovalo. Pred opakovaním overte stav v EZZK."
         }

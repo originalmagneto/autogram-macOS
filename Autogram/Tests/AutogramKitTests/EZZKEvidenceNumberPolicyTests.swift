@@ -25,14 +25,35 @@ final class EZZKEvidenceNumberPolicyTests: XCTestCase {
         var attestation = AttestationData()
         attestation.evidenceNumber = "260917-A"
         attestation.evidenceNumberAllocatedAt = Date(timeIntervalSince1970: 1_789_624_800)
+        attestation.evidenceNumberMode = .test
         let data = try JSONEncoder().encode(attestation)
-        XCTAssertEqual(try JSONDecoder().decode(AttestationData.self, from: data).evidenceNumberAllocatedAt,
-                       Date(timeIntervalSince1970: 1_789_624_800))
+        let decoded = try JSONDecoder().decode(AttestationData.self, from: data)
+        XCTAssertEqual(decoded.evidenceNumberAllocatedAt, Date(timeIntervalSince1970: 1_789_624_800))
+        XCTAssertEqual(decoded.evidenceNumberMode, .test)
 
         var object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
         object.removeValue(forKey: "evidenceNumberAllocatedAt")
+        object.removeValue(forKey: "evidenceNumberMode")
         let old = try JSONSerialization.data(withJSONObject: object)
-        XCTAssertNil(try JSONDecoder().decode(AttestationData.self, from: old).evidenceNumberAllocatedAt)
+        let oldDecoded = try JSONDecoder().decode(AttestationData.self, from: old)
+        XCTAssertNil(oldDecoded.evidenceNumberAllocatedAt)
+        XCTAssertNil(oldDecoded.evidenceNumberMode)
+    }
+
+    func testAttestationWithoutModeDoesNotEncodeIt() throws {
+        let data = try JSONEncoder().encode(AttestationData())
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertNil(object["evidenceNumberMode"])
+    }
+
+    func testNumberIsUsableOnlyInTheModeThatFetchedIt() {
+        XCTAssertTrue(EZZKEvidenceNumberPolicy.isFromCurrentMode(numberMode: .demo, currentMode: .demo))
+        XCTAssertTrue(EZZKEvidenceNumberPolicy.isFromCurrentMode(numberMode: .test, currentMode: .test))
+        XCTAssertFalse(EZZKEvidenceNumberPolicy.isFromCurrentMode(numberMode: .demo, currentMode: .test))
+        XCTAssertFalse(EZZKEvidenceNumberPolicy.isFromCurrentMode(numberMode: .demo, currentMode: .production))
+        XCTAssertFalse(EZZKEvidenceNumberPolicy.isFromCurrentMode(numberMode: .test, currentMode: .production))
+        // A number typed by hand or from older data carries no mode and is not judged.
+        XCTAssertTrue(EZZKEvidenceNumberPolicy.isFromCurrentMode(numberMode: nil, currentMode: .production))
     }
 
     func testNumberIsUsableOnlyOnItsBratislavaAllocationDay() {

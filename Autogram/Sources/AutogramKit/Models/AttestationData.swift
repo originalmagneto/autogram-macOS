@@ -46,6 +46,8 @@ public struct AttestationData: Codable, Hashable, Sendable {
     public var evidenceNumber: String?
     /// EZZK server time when the evidence number was obtained. Nil for a number typed by hand.
     public var evidenceNumberAllocatedAt: Date?
+    /// EZZK mode the evidence number was obtained in. Nil for a number typed by hand.
+    public var evidenceNumberMode: AppSettings.EZZKMode?
 
     public var performingPerson: AdvocateProfile
     public var usedDeviceDescription: String
@@ -64,7 +66,8 @@ public struct AttestationData: Codable, Hashable, Sendable {
              originalDocumentTypeLabel, originConfirmed, noSecurityElementsConfirmed, numberOfSheets,
              sheetCountingMethod, nonEmptyPageCount, paperSizeBreakdown,
              newDocumentName, newDocumentFormatLabel, conversionExecutionDateTime,
-             evidenceNumber, evidenceNumberAllocatedAt, performingPerson, usedDeviceDescription
+             evidenceNumber, evidenceNumberAllocatedAt, evidenceNumberMode, performingPerson,
+             usedDeviceDescription
     }
 
     public init(originalDocumentOrder: Int = 1,
@@ -82,6 +85,7 @@ public struct AttestationData: Codable, Hashable, Sendable {
                 conversionExecutionDateTime: Date = Date(),
                 evidenceNumber: String? = nil,
                 evidenceNumberAllocatedAt: Date? = nil,
+                evidenceNumberMode: AppSettings.EZZKMode? = nil,
                 performingPerson: AdvocateProfile = .empty,
                 usedDeviceDescription: String = "") {
         self.originalDocumentOrder = originalDocumentOrder
@@ -99,6 +103,7 @@ public struct AttestationData: Codable, Hashable, Sendable {
         self.conversionExecutionDateTime = conversionExecutionDateTime
         self.evidenceNumber = evidenceNumber
         self.evidenceNumberAllocatedAt = evidenceNumberAllocatedAt
+        self.evidenceNumberMode = evidenceNumberMode
         self.performingPerson = performingPerson
         self.usedDeviceDescription = usedDeviceDescription
     }
@@ -120,6 +125,7 @@ public struct AttestationData: Codable, Hashable, Sendable {
         conversionExecutionDateTime = try container.decode(Date.self, forKey: .conversionExecutionDateTime)
         evidenceNumber = try container.decodeIfPresent(String.self, forKey: .evidenceNumber)
         evidenceNumberAllocatedAt = try container.decodeIfPresent(Date.self, forKey: .evidenceNumberAllocatedAt)
+        evidenceNumberMode = try container.decodeIfPresent(AppSettings.EZZKMode.self, forKey: .evidenceNumberMode)
         performingPerson = try container.decode(AdvocateProfile.self, forKey: .performingPerson)
         usedDeviceDescription = try container.decode(String.self, forKey: .usedDeviceDescription)
     }
@@ -141,6 +147,7 @@ public struct AttestationData: Codable, Hashable, Sendable {
         try container.encode(conversionExecutionDateTime, forKey: .conversionExecutionDateTime)
         try container.encodeIfPresent(evidenceNumber, forKey: .evidenceNumber)
         try container.encodeIfPresent(evidenceNumberAllocatedAt, forKey: .evidenceNumberAllocatedAt)
+        try container.encodeIfPresent(evidenceNumberMode, forKey: .evidenceNumberMode)
         try container.encode(performingPerson, forKey: .performingPerson)
         try container.encode(usedDeviceDescription, forKey: .usedDeviceDescription)
     }

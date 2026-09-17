@@ -308,6 +308,7 @@ On 2026-09-17 the podpisuj.sk team confirmed that EZZK is not maintained, MIRRI 
 
 - Production is read-only: login check, server time and public lookup. Number allocation is refused (`EZZKError.productionAllocationDisabled`) until part B builds and sends the signed record. `EZZKSOAPClient` refuses `evidenceNumbers`, `consume` and `receive` on production itself, before any network use, in addition to the adapter (`EZZKSOAPServiceAdapter`), the account controller (`EZZKAccountController`), Settings and `ezzk-probe`, each of which also refuses the same calls independently.
 - On those consequential calls, a network error that may have reached the server, or an HTTP 5xx response, becomes `EZZKError.outcomeUnknown` and is never repeated; the caller is told the outcome is unknown rather than risking a duplicate submission.
+- ZaKo refuses an evidence number fetched in another EZZK mode (`AttestationData.evidenceNumberMode`, `EZZKError.evidenceNumberFromOtherMode`) before any EZZK call, so a demo or test number never reaches a clause signed on production.
 - `ReceiveConversionRecord` exists only as a request builder and client call; the app's `submit` throws `submissionUnavailable` and rows stay queued.
 - `Result` 0 on `ReceiveConversionRecord` is acceptance for processing only; validation errors arrive later in the sender's eDesk. Podpisuj reports that EZZK marks many valid advocate records as invalid for a missing timestamp, so part B must add a qualified timestamp to the record signature.
 
