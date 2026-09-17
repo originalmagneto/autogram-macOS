@@ -34,6 +34,10 @@ let package = Package(
             dependencies: ["AutogramKit"]
         ),
         .executableTarget(
+            name: "ezzk-probe",
+            dependencies: ["AutogramKit"]
+        ),
+        .executableTarget(
             name: "AutogramWebExtensionHandler",
             dependencies: ["AutogramWebBridge"]
         ),
