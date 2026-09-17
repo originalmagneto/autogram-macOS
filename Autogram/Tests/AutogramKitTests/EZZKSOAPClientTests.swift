@@ -212,6 +212,44 @@ final class EZZKSOAPClientTests: XCTestCase {
         XCTAssertTrue(transport.requests.isEmpty)
     }
 
+    /// Sending records is not available in this version, on production as anywhere else.
+    func testReceiveOnProductionIsUnavailableWithoutAnyRequest() async {
+        let transport = SOAPScriptedTransport([])
+        let client = EZZKSOAPClient(environment: .production, transport: transport,
+                                    credentials: { EZZKSOAPCredentials(login: "ucet", password: "heslo") },
+                                    now: { Date(timeIntervalSince1970: 1_789_653_359) })
+        let record = EZZKRecordAttachment(evidenceNumber: "1563-260917-1", mimeType: "application/vnd.etsi.asic-e+zip",
+                                          data: Data("asic".utf8))
+
+        await assertThrows(EZZKError.submissionUnavailable) {
+            try await client.receive(records: [record], person: self.person)
+        }
+        XCTAssertTrue(transport.requests.isEmpty)
+    }
+
+    func testCancelledReadStaysACancellation() async {
+        let transport = SOAPScriptedTransport([.fail(CancellationError())])
+
+        do {
+            _ = try await makeClient(transport).serverTime()
+            XCTFail("expected CancellationError")
+        } catch {
+            XCTAssertTrue(error is CancellationError, "expected CancellationError, got \(error)")
+        }
+    }
+
+    func testCancelledConsequentialCallIsOutcomeUnknown() async {
+        let transport = SOAPScriptedTransport([
+            .ok(EZZKSOAPFixtures.loginSucceeded()),
+            .fail(CancellationError())
+        ])
+
+        await assertThrows(EZZKError.outcomeUnknown) {
+            try await self.makeClient(transport).consume(evidenceNumber: "a", person: self.person)
+        }
+        XCTAssertEqual(transport.requests.count, 2)
+    }
+
     private func makeClient(_ transport: SOAPScriptedTransport) -> EZZKSOAPClient {
         EZZKSOAPClient(environment: .sandbox, transport: transport,
                        credentials: { EZZKSOAPCredentials(login: "ucet", password: "heslo") },

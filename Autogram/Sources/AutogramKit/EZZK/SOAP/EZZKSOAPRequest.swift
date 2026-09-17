@@ -161,6 +161,8 @@ extension EZZKSOAPRequest {
         return service("GetConversionRecord", body: body, authenticated: true, consequential: false)
     }
 
+    public static let receiveOperation = "ReceiveConversionRecord"
+
     public static func receive(records: [EZZKRecordAttachment], person: EZZKPerson, messageID: UUID = UUID(),
                                objectID: UUID = UUID()) -> EZZKSOAPRequest {
         let attachments = records.map { record in
@@ -186,7 +188,7 @@ extension EZZKSOAPRequest {
             "</w:Container></iez:request>",
             "</iez:ReceiveConversionRecord>"
         ].joined()
-        return service("ReceiveConversionRecord", body: body, authenticated: true, consequential: true)
+        return service(receiveOperation, body: body, authenticated: true, consequential: true)
     }
 
     private static func service(_ operation: String, body: String, authenticated: Bool,

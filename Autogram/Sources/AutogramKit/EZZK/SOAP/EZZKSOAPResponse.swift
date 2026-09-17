@@ -49,8 +49,8 @@ enum EZZKSOAPResponseParser {
 
     /// `DeserializationFailed` and `ActionMismatch` are application defects (Autogram sent a
     /// malformed or mismatched request), never a normal user-facing condition, so they are
-    /// logged for diagnosis. Only the fault subcode and reason are logged, never the fault
-    /// detail or a stack trace.
+    /// logged for diagnosis. Only the fault subcode (public) and reason text (private) are
+    /// logged, never the fault detail or a stack trace.
     private static let logger = Logger(subsystem: "sk.autogram.macos", category: "EZZK")
 
     static func reply(data: Data, statusCode: Int) throws -> EZZKSOAPReply {
@@ -64,7 +64,7 @@ enum EZZKSOAPResponseParser {
                 return .authenticationRequired
             }
             if fault.subcode == "DeserializationFailed" || fault.subcode == "ActionMismatch" {
-                logger.error("Application defect: SOAP fault \(fault.subcode, privacy: .public) - \(fault.reason, privacy: .public)")
+                logger.error("Application defect: SOAP fault \(fault.subcode, privacy: .public) - \(fault.reason, privacy: .private)")
                 throw EZZKError.invalidRequest(fault.subcode)
             }
             throw EZZKError.serviceRejected(code: statusCode, message: fault.reason)

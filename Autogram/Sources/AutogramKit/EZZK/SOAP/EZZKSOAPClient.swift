@@ -98,7 +98,9 @@ public actor EZZKSOAPClient {
         // Consequential calls must be impossible by construction on production: no login,
         // no network use, regardless of what the transport would have replied.
         if request.isConsequential, environment == .production {
-            throw EZZKError.productionAllocationDisabled
+            throw request.operation == EZZKSOAPRequest.receiveOperation
+                ? EZZKError.submissionUnavailable
+                : EZZKError.productionAllocationDisabled
         }
         if request.requiresAuthentication, token == nil {
             try await logIn()
@@ -139,6 +141,9 @@ public actor EZZKSOAPClient {
             throw error
         } catch let error as URLError where Self.neverReachedServer(error) {
             throw EZZKError.networkFailure(error.localizedDescription)
+        } catch is CancellationError where !request.isConsequential {
+            // A cancelled read is not a network failure; the caller decides what to show.
+            throw CancellationError()
         } catch {
             // A consequential request may have been processed although no reply arrived.
             if request.isConsequential { throw EZZKError.outcomeUnknown }
