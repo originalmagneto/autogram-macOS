@@ -46,6 +46,16 @@ final class EZZKSOAPCredentialStoreTests: XCTestCase {
         }
     }
 
+    func testKeychainErrorsAreDescribedInSlovakWithTheStatusCode() {
+        XCTAssertEqual(EZZKTokenStoreError.keychainFailure(status: errSecInteractionNotAllowed).localizedDescription,
+                       "Bezpečné úložisko (Keychain) nie je dostupné (kód \(errSecInteractionNotAllowed)).")
+        for error in [EZZKTokenStoreError.malformedData, .encodingFailure] {
+            let text = error.errorDescription ?? ""
+            XCTAssertTrue(text.contains("Keychain"), "\(error): \(text)")
+            XCTAssertFalse(text.contains("\u{2014}"), "\(error)")
+        }
+    }
+
     func testDescriptionNeverShowsThePassword() {
         let credentials = EZZKSOAPCredentials(login: "ucet", password: "tajne-heslo")
         XCTAssertFalse(String(describing: credentials).contains("tajne-heslo"))

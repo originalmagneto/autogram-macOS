@@ -117,11 +117,8 @@ final class EZZKAccountController {
     }
 
     static func message(for error: Error) -> String {
-        if let error = error as? EZZKError, let description = error.errorDescription {
+        if let error = error as? LocalizedError, let description = error.errorDescription {
             return description
-        }
-        if error is EZZKTokenStoreError {
-            return "Bezpečné úložisko hesiel (Keychain) nie je dostupné."
         }
         return error.localizedDescription
     }

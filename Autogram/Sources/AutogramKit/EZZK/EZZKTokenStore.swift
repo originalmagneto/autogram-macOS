@@ -1,10 +1,22 @@
 import Foundation
 import Security
 
-public enum EZZKTokenStoreError: Error, Equatable, Sendable {
+public enum EZZKTokenStoreError: LocalizedError, Equatable, Sendable {
     case keychainFailure(status: Int32)
     case malformedData
     case encodingFailure
+
+    /// Shown in ZaKo and Settings when the SOAP credentials cannot be read or saved.
+    public var errorDescription: String? {
+        switch self {
+        case .keychainFailure(let status):
+            return "Bezpečné úložisko (Keychain) nie je dostupné (kód \(status))."
+        case .malformedData:
+            return "Údaje EZZK v bezpečnom úložisku (Keychain) sú poškodené. Prihláste sa znova v Nastaveniach."
+        case .encodingFailure:
+            return "Údaje EZZK sa nepodarilo pripraviť na uloženie do bezpečného úložiska (Keychain)."
+        }
+    }
 }
 
 public enum EZZKKeychainAdapterError: Error, Equatable, Sendable {
