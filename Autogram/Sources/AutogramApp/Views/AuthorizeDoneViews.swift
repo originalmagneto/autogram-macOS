@@ -402,15 +402,24 @@ struct DoneView: View {
                 }
 
                 if isQueued, let record = store.evidenceStore.record(id: store.currentRecordID) {
-                    Text("Odoslanie sa zopakuje najneskôr do \(record.submissionDeadline, style: .date) \(record.submissionDeadline, style: .time).")
-                        .font(.callout)
-                        .foregroundStyle(.orange)
-                    Button {
-                        Task { await store.retryQueuedSubmission() }
-                    } label: {
-                        Label("Znova odoslať do CEZZK", systemImage: "arrow.clockwise")
+                    if store.settingsStore.ezzkAccountController.isDemoMode {
+                        Text("Odoslanie sa zopakuje najneskôr do \(record.submissionDeadline, style: .date) \(record.submissionDeadline, style: .time).")
+                            .font(.callout)
+                            .foregroundStyle(.orange)
+                        Button {
+                            Task { await store.retryQueuedSubmission() }
+                        } label: {
+                            Label("Znova odoslať do CEZZK", systemImage: "arrow.clockwise")
+                        }
+                        .controlSize(.small)
+                    } else {
+                        // Test and Produkcia cannot send records in this version, so there is no
+                        // retry to promise or offer; the Register konverzií says the same.
+                        Text(EZZKError.submissionUnavailable.errorDescription ?? "")
+                            .font(.callout)
+                            .foregroundStyle(.orange)
+                            .multilineTextAlignment(.center)
                     }
-                    .controlSize(.small)
                 }
 
                 if let evidence = store.attestation.evidenceNumber {
