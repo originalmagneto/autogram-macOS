@@ -171,6 +171,33 @@ final class EZZKSOAPClientTests: XCTestCase {
         }
     }
 
+    func testGatewayTimeoutOnConsequentialCallIsOutcomeUnknownAndNotRepeated() async {
+        let transport = SOAPScriptedTransport([
+            .ok(EZZKSOAPFixtures.loginSucceeded()),
+            .reply(status: 504, body: "Gateway Timeout", headers: [:])
+        ])
+
+        await assertThrows(EZZKError.outcomeUnknown) {
+            try await self.makeClient(transport).consume(evidenceNumber: "a", person: self.person)
+        }
+        XCTAssertEqual(transport.requests.count, 2)
+    }
+
+    func testGatewayTimeoutOnPublicRecordStaysNetworkFailure() async {
+        let transport = SOAPScriptedTransport([
+            .reply(status: 504, body: "Gateway Timeout", headers: [:])
+        ])
+
+        do {
+            _ = try await makeClient(transport).publicRecord(evidenceNumber: "1563-260824-1")
+            XCTFail("expected networkFailure")
+        } catch {
+            guard case .networkFailure = error as? EZZKError else {
+                return XCTFail("expected networkFailure, got \(error)")
+            }
+        }
+    }
+
     /// Controller decision: consequential calls must be impossible by construction on
     /// production, regardless of what the transport would have replied.
     func testConsequentialCallOnProductionIsDisabledWithoutAnyRequest() async {

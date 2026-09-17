@@ -119,7 +119,13 @@ public actor EZZKSOAPClient {
 
     private func attempt(_ request: EZZKSOAPRequest) async throws -> EZZKSOAPReply {
         let (data, response) = try await send(request)
-        return try EZZKSOAPResponseParser.reply(data: data, statusCode: response.statusCode)
+        do {
+            return try EZZKSOAPResponseParser.reply(data: data, statusCode: response.statusCode)
+        } catch EZZKError.networkFailure where request.isConsequential && response.statusCode >= 500 {
+            // A gateway or backend timeout (502/504) may mean EZZK already processed a
+            // consequential request even though no readable reply came back.
+            throw EZZKError.outcomeUnknown
+        }
     }
 
     private func send(_ request: EZZKSOAPRequest) async throws -> (Data, HTTPURLResponse) {
