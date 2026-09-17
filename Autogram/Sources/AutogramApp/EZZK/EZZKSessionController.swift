@@ -393,6 +393,8 @@ final class EZZKSessionController {
                 return "EZZK zamietlo operáciu."
             case .networkFailure:
                 return "Spojenie s EZZK zlyhalo."
+            default:
+                return error.errorDescription ?? "Operácia EZZK zlyhala."
             }
         }
         if error is EZZKTokenStoreError {

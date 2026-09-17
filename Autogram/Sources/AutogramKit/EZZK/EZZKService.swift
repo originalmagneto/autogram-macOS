@@ -50,18 +50,53 @@ public struct ConversionRecordEnvelope: Codable, Sendable, Identifiable {
 
 public enum EZZKError: LocalizedError, Equatable, Sendable {
     case notConfigured
+    /// EZZK still rejects the token after one fresh login (also used by the dormant OAuth client).
     case authenticationFailed
     case invalidResponse
     case serverRejected(String)
     case networkFailure(String)
+    case credentialsRejected(code: String)
+    case accountLocked
+    case serviceRejected(code: Int, message: String)
+    case invalidRequest(String)
+    case untrustedCertificate
+    case productionAllocationDisabled
+    case submissionUnavailable
+    case evidenceNumberExpired
+    case outcomeUnknown
 
     public var errorDescription: String? {
         switch self {
-        case .notConfigured: return "Prístupové údaje do evidencie záznamov (EZZK) nie sú nastavené."
-        case .authenticationFailed: return "Prihlásenie do EZZK zlyhalo — skontrolujte IČO, meno a heslo."
-        case .invalidResponse: return "Nečitateľná odpoveď EZZK servera."
-        case .serverRejected(let reason): return "EZZK zamietlo operáciu: \(reason)"
-        case .networkFailure(let detail): return "Sieťová chyba pri spojení s EZZK: \(detail)"
+        case .notConfigured:
+            return "Prístupové údaje do EZZK nie sú nastavené. Zadajte ich v Nastaveniach."
+        case .authenticationFailed:
+            return "Prihlásenie do EZZK zlyhalo. Prihláste sa znova v Nastaveniach."
+        case .invalidResponse:
+            return "Nečitateľná odpoveď EZZK servera."
+        case .serverRejected(let reason):
+            return "EZZK zamietlo operáciu: \(reason)"
+        case .networkFailure(let detail):
+            return "Sieťová chyba pri spojení s EZZK: \(detail)"
+        case .credentialsRejected(let code):
+            return code == "CORE-003"
+                ? "Nesprávne prihlasovacie meno alebo heslo."
+                : "EZZK odmietlo prihlásenie (\(code))."
+        case .accountLocked:
+            return "Účet v EZZK je zablokovaný."
+        case .serviceRejected(let code, let message):
+            return "EZZK odmietlo požiadavku (kód \(code)): \(message)"
+        case .invalidRequest(let detail):
+            return "EZZK nerozumie požiadavke Autogramu (\(detail)). Ide o chybu aplikácie."
+        case .untrustedCertificate:
+            return "Certifikát testovacieho prostredia EZZK sa zmenil. Aktualizujte odtlačok v aplikácii."
+        case .productionAllocationDisabled:
+            return "Pridelenie čísel na produkcii sa zapne spolu s odosielaním záznamov."
+        case .submissionUnavailable:
+            return "Odosielanie záznamov do EZZK zatiaľ nie je dostupné. Príde v ďalšej verzii."
+        case .evidenceNumberExpired:
+            return "Evidenčné číslo bolo pridelené v iný deň a EZZK ho o polnoci spotreboval. Získajte nové číslo."
+        case .outcomeUnknown:
+            return "Spojenie s EZZK sa prerušilo a nie je isté, či EZZK požiadavku spracovalo. Pred opakovaním overte stav v EZZK."
         }
     }
 }
