@@ -58,7 +58,7 @@ Natívna macOS aplikácia v SwiftUI pre kvalifikované elektronické podpisovani
 </tr>
 <tr>
 <td><strong>Integrácie</strong></td>
-<td>eID, advokátske preukazy, PKCS#11, Keychain, Finder Quick Action, podpis mobilom cez Autogram v mobile (NFC eID na iPhone), EZZK (OAuth2/PKCE, fail-closed).</td>
+<td>eID, advokátske preukazy, PKCS#11, Keychain, Finder Quick Action, podpis mobilom cez Autogram v mobile (NFC eID na iPhone), EZZK cez SOAP s vlastným prihlásením advokáta (produkcia zatiaľ len na čítanie).</td>
 <td>natívny pracovný tok</td>
 </tr>
 </table>
@@ -84,7 +84,7 @@ Natívna macOS aplikácia v SwiftUI pre kvalifikované elektronické podpisovani
 <li>Kontrolovaný import a potvrdenie pôvodu dokumentu.</li>
 <li>Katalóg 16 druhov bezpečnostných prvkov, AI návrhy a povinná manuálna kontrola vrátane šnúrok, pások a pečatí.</li>
 <li>PDF/A-2b, osvedčovacia doložka, XML a lokálna evidencia.</li>
-<li>Mandátny certifikát a fail-closed produkčné odoslanie do CEZZK.</li>
+<li>Mandátny certifikát, evidenčné číslo priamo z EZZK a kontrola, či číslo nie je z iného dňa alebo z iného režimu. Odosielanie záznamov do CEZZK príde v ďalšej časti.</li>
 </ul>
 </td>
 </tr>
@@ -231,9 +231,13 @@ Podrobnosti: [pravidlá tréningového datasetu](Autogram/docs/security-element-
 <details open>
 <summary><strong>Stav EZZK a produkčného odoslania</strong></summary>
 
-<p><strong>Produkčné EZZK zapojenie čaká na potvrdenie a integračné podklady od MIRRI SR.</strong> OAuth2/PKCE, OIDC discovery, natívny callback <code>autogram://ezzk/callback</code> a bezpečné uloženie session v Keychain sú hotové. Aplikácia zatiaľ pripraví konverzný artefakt, osvedčovaciu doložku a lokálnu evidenciu v pilotnom režime; produkčné pridelenie evidenčného čísla a odoslanie do CEZZK zostávajú oddelené a fail-closed, kým nie je vytvorený a validovaný samostatný podpísaný record ASiC a potvrdený receipt kontrakt.</p>
+<p><strong>Autogram komunikuje s EZZK cez SOAP rozhranie Ditec, s prihlasovacím menom a heslom, ktoré advokát dostal pri registrácii.</strong> Portálové REST rozhranie cez OAuth2/PKCE by vyžadovalo, aby MIRRI SR zaregistrovalo natívny callback pre Autogram; podľa integrátorov sa to nestane, lebo EZZK sa už nerozvíja. Pôvodný OAuth kód v projekte ostáva, ale nie je zapojený, a čaká na budúce prihlasovanie cez slovensko.sk.</p>
 
-<p>Pilotný postup: importovať dokument, skontrolovať každú neprázdnu stranu, potvrdiť bezpečnostné prvky, prihlásiť sa do EZZK sandboxu a vyžiadať evidenčné číslo. Bez čísla z EZZK aplikácia zámerne nepovolí autorizáciu.</p>
+<p>Prihlasovacie údaje sa zadávajú v <strong>Nastaveniach, karta EZZK</strong>, pre zvolené prostredie: Demo (lokálne), Test alebo Produkcia. Heslo sa uloží do Keychainu až vtedy, keď ho EZZK prijme; prihlasovací token existuje len v pamäti aplikácie. Testovacie prostredie má vlastný certifikát, ktorému aplikácia dôveruje len podľa pripnutého odtlačku.</p>
+
+<p><strong>Čo funguje kde:</strong> na Teste prihlásenie, čas servera, pridelenie a spotrebovanie evidenčných čísel aj overenie záznamu. Na Produkcii zatiaľ len prihlásenie, čas servera a verejné overenie záznamu; pridelenie čísla a odoslanie záznamu sú zámerne zamknuté, kým nebude hotový podpísaný záznam v ASiC a jeho odoslanie cez <code>ReceiveConversionRecord</code>. Bez evidenčného čísla aplikácia nepovolí autorizáciu, a číslo z iného dňa alebo z iného režimu odmietne ešte pred podpisom, lebo EZZK nepoužité čísla o polnoci spotrebuje.</p>
+
+<p>Podrobne: <a href="Autogram/docs/EZZK-INTEGRATION.md">Autogram/docs/EZZK-INTEGRATION.md</a>.</p>
 </details>
 
 <p align="center">
@@ -384,7 +388,7 @@ Podpis bez Safari sa dá vyskúšať priamo:
 <tr><td>Xcode 27.0 a Swift 6</td><td>Iba pre build zo zdrojov. Samotné Command Line Tools nestačia (chýba SwiftUI macro plugin).</td></tr>
 <tr><td>Apple Intelligence</td><td>Voliteľné. Zapína on-device klasifikáciu neistých nálezov.</td></tr>
 <tr><td>eID, advokátsky preukaz, PKCS#11, CryptoTokenKit alebo Keychain token</td><td>Pre reálny kvalifikovaný podpis.</td></tr>
-<tr><td>EZZK účet, callback <code>autogram://ezzk/callback</code>, sandbox</td><td>Pre pilotné overenie integrácie ZaKo; produkčné zapojenie čaká na potvrdenie.</td></tr>
+<tr><td>Vlastný EZZK účet (meno a heslo z registrácie)</td><td>Pre prihlásenie, evidenčné čísla na Teste a overovanie záznamov. Zadáva sa v Nastaveniach, karta EZZK. Bez účtu funguje režim Demo.</td></tr>
 </table>
 
 ### Stiahnutie
@@ -496,7 +500,23 @@ swift test --filter JavaEngineLiveProcessTests
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
 swift test --filter FoundationModelClassifierTests
 ```
+
+<p>Pripnutý certifikát testovacieho EZZK (pošle len neautentizované <code>GetOptions</code> na <code>ezzk-test.iomo.sk</code>):</p>
+
+```bash
+EZZK_LIVE=1 \
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
+swift test --filter EZZKSOAPTransportTests
+```
 </details>
+
+### EZZK z príkazového riadka
+
+```bash
+swift run ezzk-probe <login|time|numbers|consume|lookup> [číslo] [--env test|production] [--name N] [--ico I] [--at ISO]
+```
+
+Údaje berie z `EZZK_LOGIN` a `EZZK_PASSWORD`, inak z Keychainu uloženého cez Nastavenia. `numbers` a `consume` odmietnu `--env production`. Heslo ani token sa nikdy nevypisujú.
 
 ## Výstupy a hranice
 
@@ -508,11 +528,11 @@ swift test --filter FoundationModelClassifierTests
 <tr><td>Podpísané a konvertované súbory</td><td>Prednostne vedľa zdrojového dokumentu, inak <code>~/Library/Application Support/Autogram/Output</code>. Existujúce súbory sa neprepíšu (<code>dokument (2).pdf</code>).</td></tr>
 <tr><td>Register konverzií</td><td><code>~/Library/Application Support/Autogram/Evidence/register.json</code>, bez obsahu dokumentov.</td></tr>
 <tr><td>Dataset AI Vision</td><td><code>~/Library/Application Support/Autogram/VisionBank</code>: náhľady strán, výrezy a feature printy posúdených prvkov. Lokálne, vymazateľné.</td></tr>
-<tr><td>Tajomstvá</td><td>Keychain (API kľúče, EZZK session). Security-scoped bookmarks pre prístup k súborom.</td></tr>
+<tr><td>Tajomstvá</td><td>Keychain: API kľúče a heslo do EZZK (položka <code>sk.autogram.Autogram.ezzk.soap</code>, zvlášť pre Test a Produkciu). Prihlasovací token do EZZK len v pamäti. Security-scoped bookmarks pre prístup k súborom.</td></tr>
 <tr><td>Podpis mobilom</td><td>Dokument dočasne na <code>autogram.slovensko.digital</code>, zašifrovaný kľúčom z tohto Macu, zmazaný po podpise alebo do 24 hodín. Bez registrácie a bez API kľúča.</td></tr>
 </table>
 
-Aktuálny ZaKo profil je implementačný P2E pilot s PDF/A-2b. Lokálny `PDFAValidator` nie je náhradou za veraPDF alebo Acrobat Preflight. Produkčné EZZK endpointy, aktívne formuláre a externé požiadavky treba overiť samostatne.
+Aktuálny ZaKo profil je implementačný P2E pilot s PDF/A-2b. Lokálny `PDFAValidator` nie je náhradou za veraPDF alebo Acrobat Preflight. Produkcia EZZK je zatiaľ len na čítanie: pridelenie evidenčného čísla a odoslanie záznamu sa otvoria až s podpísaným záznamom v ASiC. Aktívne formuláre a externé požiadavky treba overiť samostatne.
 
 ## Architektúra
 
@@ -527,10 +547,11 @@ Aktuálny ZaKo profil je implementačný P2E pilot s PDF/A-2b. Lokálny `PDFAVal
 <tr><td><strong>EngineBridge</strong></td><td>Persistentný machine session helper pre Java/DSS, PDFBox a PKCS#11 integrácie.</td></tr>
 <tr><td><strong>Signing/AVM</strong></td><td><code>AVMClient</code>, <code>AVMSigningSession</code> a <code>MobileSigningCoordinator</code>: podpis mobilom cez relay Autogram v mobile (upload, QR kód, polling, mapovanie výsledku, kontrola mandátu). <code>avm-probe</code> overuje protokol proti reálnemu serveru.</td></tr>
 <tr><td><strong>WebBridge</strong></td><td><code>AutogramWebBridge</code> nesie kontrakt medzi rozšírením a aplikáciou, <code>autogram-webbridge-agent</code> je launchd rendezvous vlastniaci meno Mach služby, <code>AutogramWebExtensionHandler</code> je appex v <code>Contents/PlugIns</code> a <code>WebExtension/</code> samotné rozšírenie. <code>webbridge-probe</code> otestuje celú appkovú polovicu bez Safari.</td></tr>
+<tr><td><strong>EZZK</strong></td><td><code>EZZK/SOAP/</code> nesie celú komunikáciu s registrom: stavbu SOAP požiadaviek overenú voči uloženej WSDL a XSD snímke, parser odpovedí, prenos s pripnutým testovacím certifikátom, heslo v Keychaine, aktéra klienta s jedným bezpečným opakovaním prihlásenia a adaptér pre ZaKo. <code>EZZKAccountController</code> drží stav účtu pre Nastavenia a ZaKo, <code>ezzk-probe</code> overí službu z príkazového riadka.</td></tr>
 <tr><td><strong>vision-eval</strong></td><td>Samostatný CLI target na meranie presnosti detekcie; nie je súčasťou aplikácie.</td></tr>
 </table>
 
-Kompletná implementačná dokumentácia je v [`docs/PHASES.md`](docs/PHASES.md); návrh podpisu mobilom v [`docs/superpowers/specs/2026-09-11-avm-mobile-signing-design.md`](docs/superpowers/specs/2026-09-11-avm-mobile-signing-design.md); návrh podpisovania na štátnych weboch v [`Autogram/docs/superpowers/specs/2026-09-11-safari-extension-design.md`](Autogram/docs/superpowers/specs/2026-09-11-safari-extension-design.md) a jeho spúšťania na pozadí v [`Autogram/docs/superpowers/specs/2026-09-16-web-signing-background-design.md`](Autogram/docs/superpowers/specs/2026-09-16-web-signing-background-design.md); zistenia z ladenia podpisovania na nove.slovensko.sk kartou I.CA, eID a mobilom v [`Autogram/docs/WEB-SIGNING-FINDINGS-2026-09-16.md`](Autogram/docs/WEB-SIGNING-FINDINGS-2026-09-16.md); návrh vrstvenej detekcie v [`Autogram/docs/superpowers/specs/2026-09-05-layered-security-element-detection-design.md`](Autogram/docs/superpowers/specs/2026-09-05-layered-security-element-detection-design.md).
+Kompletná implementačná dokumentácia je v [`docs/PHASES.md`](docs/PHASES.md); návrh podpisu mobilom v [`docs/superpowers/specs/2026-09-11-avm-mobile-signing-design.md`](docs/superpowers/specs/2026-09-11-avm-mobile-signing-design.md); návrh podpisovania na štátnych weboch v [`Autogram/docs/superpowers/specs/2026-09-11-safari-extension-design.md`](Autogram/docs/superpowers/specs/2026-09-11-safari-extension-design.md) a jeho spúšťania na pozadí v [`Autogram/docs/superpowers/specs/2026-09-16-web-signing-background-design.md`](Autogram/docs/superpowers/specs/2026-09-16-web-signing-background-design.md); zistenia z ladenia podpisovania na nove.slovensko.sk kartou I.CA, eID a mobilom v [`Autogram/docs/WEB-SIGNING-FINDINGS-2026-09-16.md`](Autogram/docs/WEB-SIGNING-FINDINGS-2026-09-16.md); integrácia EZZK cez SOAP, jej nastavenie, overený kontrakt a údržba v [`Autogram/docs/EZZK-INTEGRATION.md`](Autogram/docs/EZZK-INTEGRATION.md) a technický register zistení v [`Autogram/docs/P2E-EZZK-FINDINGS.md`](Autogram/docs/P2E-EZZK-FINDINGS.md); návrh vrstvenej detekcie v [`Autogram/docs/superpowers/specs/2026-09-05-layered-security-element-detection-design.md`](Autogram/docs/superpowers/specs/2026-09-05-layered-security-element-detection-design.md).
 
 ## Právne a bezpečnostné upozornenie
 
