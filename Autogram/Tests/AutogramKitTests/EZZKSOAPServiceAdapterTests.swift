@@ -6,8 +6,16 @@ final class EZZKSOAPServiceAdapterTests: XCTestCase {
     private let person = EZZKPerson(corporateBodyFullName: "Advokátska kancelária Test", ico: "12345678")
 
     func testProductionRefusesAllocationWithoutCallingEZZK() async {
+        // An incomplete person makes the client's own `evidenceNumbers(for:)` throw
+        // `.notConfigured` before it ever reaches its production guard. Only the
+        // adapter's own guard in `requestEvidenceNumbers` can produce
+        // `.productionAllocationDisabled` here, so this discriminates the adapter's
+        // guard from the client's independent one.
+        let incompletePerson = EZZKPerson(corporateBodyFullName: "", ico: "")
         let transport = SOAPScriptedTransport([])
-        let adapter = makeAdapter(.production, transport, used: [])
+        let client = EZZKSOAPClient(environment: .production, transport: transport,
+                                    credentials: { EZZKSOAPCredentials(login: "ucet", password: "heslo") })
+        let adapter = EZZKSOAPServiceAdapter(client: client, person: incompletePerson, usedEvidenceNumbers: [])
 
         do {
             _ = try await adapter.requestEvidenceNumbers(count: 1)
