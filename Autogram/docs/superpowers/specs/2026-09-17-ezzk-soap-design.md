@@ -86,7 +86,8 @@ Sources: MIRRI "Integračný manuál poskytovaných služieb modulu EZZK" versio
   holds the account name.
 - Failure: `ErrorCode` such as `CORE-003` (`ACCOUNT_OR_CREDENTIALS_INVALID`) or
   `CORE-018` (`LOGIN_LOCKED`).
-- The response also sets the load balancer cookie `SERVERID`.
+- The load balancer sets a `SERVERID` cookie and alternates nodes; a token works on
+  any node, so Autogram does not send the cookie back.
 - Every authenticated call sends `Cookie: IamTokenDescriptor=<token>`. The token as
   an HTTP header is ignored.
 - Without the cookie the service answers HTTP 500 with the fault "The service
@@ -153,8 +154,8 @@ time; 110 and 113 empty batch; 112 number allocated to another person.
   - `[String]` numbers
   - `EZZKRecordInfo`
   - `Data?` for the base64 object
-- `EZZKSOAPTransport` has one method, `send(URLRequest) async throws -> (Data,
-  HTTPURLResponse)`. `URLSessionEZZKSOAPTransport`:
+- The transport reuses the existing `EZZKHTTPTransport` protocol (`send(URLRequest)
+  async throws -> (Data, HTTPURLResponse)`). `URLSessionEZZKSOAPTransport`:
   - uses an ephemeral session without cookie storage
   - refuses every redirect
   - uses system trust on production
@@ -163,7 +164,7 @@ time; 110 and 113 empty batch; 112 number allocated to another person.
     `untrustedCertificate`.
 - `actor EZZKSOAPClient` owns one environment, a transport and a credentials
   provider:
-  - Keeps the token and `SERVERID` in memory only.
+  - Keeps the token in memory only.
   - Logs in lazily before the first authenticated call.
   - On code 101 or the "service implementation object was not initialized" fault,
     it logs in once more and repeats the call once. A second failure is
@@ -185,12 +186,13 @@ time; 110 and 113 empty batch; 112 number allocated to another person.
     already used by a record in `LocalEvidenceStore`, and returns the first `count`.
     The protocol signature does not change.
   - `submit(_:)` throws `submissionUnavailable` until part B.
-  - Also exposes `publicRecord(evidenceNumber:)` and `consume(evidenceNumber:)` for
-    Settings and the probe.
-- `EZZKError` gains:
-  - `authenticationFailed(code: String?)`
+  - Exposes its `client`; Settings and the probe call `publicRecord` and `consume` on it.
+- `EZZKError` gains (the existing `authenticationFailed` and `serverRejected(String)`
+  stay for the dormant OAuth client; `authenticationFailed` also covers a token
+  EZZK still rejects after one fresh login):
+  - `credentialsRejected(code: String)`
   - `accountLocked`
-  - `serverRejected(code: Int, message: String)`
+  - `serviceRejected(code: Int, message: String)`
   - `invalidRequest(String)` for `DeserializationFailed` and `ActionMismatch`
   - `untrustedCertificate`
   - `productionAllocationDisabled`
@@ -291,19 +293,19 @@ time; 110 and 113 empty batch; 112 number allocated to another person.
 
 | Situation | Behavior |
 | --- | --- |
-| Wrong name or password | `authenticationFailed("CORE-003")`, account state `failed`, stored credentials kept for correction |
+| Wrong name or password | `credentialsRejected(code: "CORE-003")`, account state `failed`, stored credentials kept for correction |
 | Locked account | `accountLocked` |
 | Token expired (101 or init fault) | one silent login and one repeat, then `authenticationFailed` |
 | Network error on a read | error shown, the user may retry |
 | Network error on numbers, consume or receive | `outcomeUnknown`, no automatic repeat |
 | Test certificate changed | `untrustedCertificate`: "Certifikát testovacieho prostredia EZZK sa zmenil. Aktualizujte odtlačok v aplikácii." |
 | `DeserializationFailed` or `ActionMismatch` | `invalidRequest`, logged as an application defect |
-| Unknown result code | `serverRejected(code, message)` with the server text |
+| Unknown result code | `serviceRejected(code:message:)` with the server text |
 
 ## Security
 
 - The password lives only in the Keychain, never in `AppSettings`, logs, probe
-  output or the repository. The token and `SERVERID` live only in memory.
+  output or the repository. The token lives only in memory.
 - The dead `ezzk.password` read in `AppSettingsStore` and the unused
   `saveEZZKPassword()` are removed.
 - No redirects are followed, so the password body and token cookie cannot leave
@@ -333,7 +335,7 @@ time; 110 and 113 empty batch; 112 number allocated to another person.
   - receive 110
 - Client tests with a recording transport:
   - lazy login
-  - cookie with token and `SERVERID`
+  - token cookie
   - one re-login on 101, and no loop on a second 101
   - no repeat after a network error for consequential calls
   - `Date` header parsing
@@ -346,7 +348,7 @@ time; 110 and 113 empty batch; 112 number allocated to another person.
 - App tests:
   - `EZZKAccountController` transitions with a fake client
   - `AppSettings` decoding old JSON to `demo`
-  - ZaKo preflight blocking an evidence number from a previous server day
+  - the day rule (`EZZKEvidenceNumberPolicy`) and ZaKo storing the allocation time
 - Manual live checks, not run in CI:
   - `swift run ezzk-probe login --env test` and `numbers --env test` with the
     sample account from environment variables
