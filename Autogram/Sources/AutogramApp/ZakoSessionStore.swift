@@ -176,6 +176,14 @@ final class ZakoSessionStore {
     let formPackRepository: FormPackRepository
     private(set) var selectedFormPack: ConversionFormPack
     var ezzkService: any EZZKServicing { settingsStore.ezzkService }
+    /// A warning, not a blocker: EZZK reports a record whose person differs from the account.
+    var ezzkIdentityWarning: String? {
+        guard !settingsStore.ezzkAccountController.isDemoMode else { return nil }
+        return EZZKEvidenceNumberPolicy.identityMismatch(
+            clausePerson: attestation.performingPerson,
+            accountName: settings.ezzkPersonName,
+            accountICO: settings.ezzkICO)
+    }
     var signingProvider: any QualifiedSigningProviding { settingsStore.signingProvider }
     var evidenceStore: LocalEvidenceStore { settingsStore.evidenceStore }
 
@@ -996,12 +1004,17 @@ final class ZakoSessionStore {
             }
         }
         do {
-            let numbers = try await ezzkService.requestEvidenceNumbers(count: 1)
+            let service = ezzkService
+            let numbers = try await service.requestEvidenceNumbers(count: 1)
             guard requestID == currentRecordID, !Task.isCancelled else { return }
             guard let number = numbers.first else {
                 throw EZZKError.invalidResponse
             }
+            // EZZK consumes an unused number at midnight of its allocation day.
+            let allocatedAt = try await service.serverTime()
+            guard requestID == currentRecordID, !Task.isCancelled else { return }
             attestation.evidenceNumber = number
+            attestation.evidenceNumberAllocatedAt = allocatedAt
             evidenceNumberRequested = true
             lastError = nil
             evidenceNumberError = nil
@@ -1051,6 +1064,12 @@ final class ZakoSessionStore {
         do {
             analysisProgressText = "Zisťujem dôveryhodný čas…"
             let conversionTime = try await ezzkService.serverTime()
+            guard EZZKEvidenceNumberPolicy.isUsable(allocatedAt: attestation.evidenceNumberAllocatedAt,
+                                                    at: conversionTime) else {
+                evidenceNumberError = EZZKError.evidenceNumberExpired.errorDescription
+                recomputePreflight()
+                throw EZZKError.evidenceNumberExpired
+            }
             serverTimeUsed = conversionTime
             attestation.conversionExecutionDateTime = conversionTime
             selectedFormPack = try formPackRepository.pack(
@@ -1334,6 +1353,7 @@ final class ZakoSessionStore {
         attestation.originConfirmed = false
         attestation.noSecurityElementsConfirmed = false
         attestation.evidenceNumber = nil
+        attestation.evidenceNumberAllocatedAt = nil
         evidenceNumberRequested = false
         evidenceNumberError = nil
         preflightErrors = []

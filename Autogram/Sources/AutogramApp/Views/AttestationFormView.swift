@@ -217,6 +217,12 @@ struct AttestationFormView: View {
                         .font(.caption)
                         .foregroundStyle(.red)
                 }
+                if let warning = store.ezzkIdentityWarning {
+                    Label(warning, systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 inlineError(.missingEvidenceNumber)
                 Text("Číslo sa viaže na registráciu v evidencii záznamov. Záznam sa odošle do centrálnej evidencie do 24 hodín.")
                     .font(.caption2)

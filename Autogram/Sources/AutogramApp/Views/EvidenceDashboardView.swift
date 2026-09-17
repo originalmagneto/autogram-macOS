@@ -337,6 +337,7 @@ struct EvidenceDashboardView: View {
         Task {
             var submittedCount = 0
             var failedCount = 0
+            var submissionUnavailable = false
             for record in pending {
                 do {
                     try await settingsStore.ezzkService.submit(record.envelope())
@@ -347,6 +348,10 @@ struct EvidenceDashboardView: View {
                         settingsStore.evidenceStore.upsert(updated)
                     }
                     submittedCount += 1
+                } catch EZZKError.submissionUnavailable {
+                    // Nothing was sent; the rows stay queued instead of being marked as failed.
+                    submissionUnavailable = true
+                    break
                 } catch {
                     var updated = record
                     updated.status = .submissionFailed
@@ -358,11 +363,15 @@ struct EvidenceDashboardView: View {
             await MainActor.run {
                 reload()
                 isSubmitting = false
-                submitFeedback = failedCount == 0
-                    ? (isDemoMode
-                        ? "✓ Demo: lokálne pripravených \(submittedCount) záznamov."
-                        : "✓ Odoslaných \(submittedCount) záznamov do CEZZK.")
-                    : "⚠ \(submittedCount) úspešných, \(failedCount) zlyhalo."
+                if submissionUnavailable {
+                    submitFeedback = EZZKError.submissionUnavailable.errorDescription
+                } else {
+                    submitFeedback = failedCount == 0
+                        ? (isDemoMode
+                            ? "✓ Demo: lokálne pripravených \(submittedCount) záznamov."
+                            : "✓ Odoslaných \(submittedCount) záznamov do CEZZK.")
+                        : "⚠ \(submittedCount) úspešných, \(failedCount) zlyhalo."
+                }
             }
         }
     }
