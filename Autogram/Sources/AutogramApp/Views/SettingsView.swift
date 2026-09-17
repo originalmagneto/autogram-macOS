@@ -660,7 +660,7 @@ struct SettingsView: View {
                 }
             }
             .pickerStyle(.segmented)
-            .disabled(controller.state == .verifying)
+            .disabled(controller.state == .verifying || ezzkLookupInProgress || ezzkNumbersInProgress)
 
             Text(ezzkModeExplanation(controller.mode))
                 .font(.caption)
@@ -890,15 +890,21 @@ struct SettingsView: View {
     private func lookUpEZZKRecord(_ controller: EZZKAccountController) {
         let number = ezzkLookupNumber.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !number.isEmpty, !ezzkLookupInProgress else { return }
+        let requestedMode = controller.mode
         ezzkLookupInProgress = true
         ezzkLookupError = nil
         ezzkLookupResult = nil
         Task {
             defer { ezzkLookupInProgress = false }
             do {
-                ezzkLookupResult = try await controller.lookUp(evidenceNumber: number)
+                let result = try await controller.lookUp(evidenceNumber: number)
+                if controller.mode == requestedMode {
+                    ezzkLookupResult = result
+                }
             } catch {
-                ezzkLookupError = EZZKAccountController.message(for: error)
+                if controller.mode == requestedMode {
+                    ezzkLookupError = EZZKAccountController.message(for: error)
+                }
             }
         }
     }
@@ -947,13 +953,20 @@ struct SettingsView: View {
     }
 
     private func requestEZZKTestNumbers() async {
+        let controller = settingsStore.ezzkAccountController
+        let requestedMode = controller.mode
         ezzkNumbersInProgress = true
         ezzkNumbersError = nil
         defer { ezzkNumbersInProgress = false }
         do {
-            ezzkTestNumbers = try await settingsStore.ezzkAccountController.requestTestNumbers()
+            let numbers = try await controller.requestTestNumbers()
+            if controller.mode == requestedMode {
+                ezzkTestNumbers = numbers
+            }
         } catch {
-            ezzkNumbersError = EZZKAccountController.message(for: error)
+            if controller.mode == requestedMode {
+                ezzkNumbersError = EZZKAccountController.message(for: error)
+            }
         }
     }
 
