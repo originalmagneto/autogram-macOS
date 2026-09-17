@@ -321,3 +321,16 @@ On 2026-09-17 the podpisuj.sk team confirmed that EZZK is not maintained, MIRRI 
 1. Build the record (`50349287.ConversionRecordOfPaperToElectronicDocument.sk` v1.0) in an `XMLDataContainer`, sign it with the mandate certificate and a qualified timestamp into its own ASiC.
 2. Send it with `ReceiveConversionRecord`, then open production allocation.
 3. Switch to record form v1.2 from 2027-01-01.
+
+### Known gaps left open in part A
+
+Recorded from the branch reviews so they are not rediscovered later. None of them blocks part A.
+
+1. The test pin covers the whole certificate and expires 2026-10-20; a renewal breaks test mode until the app ships a new pin. Pinning the public key would survive a renewal that keeps the key.
+2. A stored password that has become wrong causes one `LogIn` per authenticated call, so repeated attempts can lock the account (`CORE-018`). There is no single-flight login and no backoff.
+3. `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly` is honored only by the data protection keychain; the adapter uses the file based keychain, so the attribute is not in force. Reading `storedLogin` at launch also decrypts the password item, which prompts after an ad hoc rebuild.
+4. Demo numbers look like production numbers (`1563-yymmdd-N`). A `DEMO-` prefix would make screenshots and test data unmistakable.
+5. `EZZKSOAPClient` treats `notConnectedToInternet` as "nothing was sent" on consequential calls; URLSession can also report it when the network drops mid-request. Revisit before part B enables `ReceiveConversionRecord`.
+6. The ZaKo Done screen reads the current EZZK mode, not the mode the record was signed in, and the attestation form warns about a wrong-mode number only when signing starts.
+7. Three older ZaKo tests build `AppSettingsStore()` with the default controller, so they read the real Keychain (read only). `AppSettingsStore(ezzkAccountController:)` exists to switch them.
+8. Settings has not been checked visually in the running app, and no sign-in has been done from inside the app bundle.
