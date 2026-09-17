@@ -1,6 +1,6 @@
 # EZZK through the Ditec SOAP service
 
-Date: 2026-09-17. Status: approved in conversation, awaiting written review.
+Date: 2026-09-17. Status: approved.
 
 ## Problem
 
@@ -246,8 +246,8 @@ time; 110 and 113 empty batch; 112 number allocated to another person.
   - Code 1 shows "Záznam je evidovaný, ale ešte nespracovaný."
 - **Evidenčné čísla:**
   - Test only: `Vyžiadať čísla` with a confirmation dialog, then the returned list.
-  - Production: the button is disabled with "Pridelenie čísiel na produkcii sa
-    zapne spolu s odosielaním záznamov."
+  - Production: the card shows a locked label instead of the button, "Pridelenie
+    čísel na produkcii sa zapne spolu s odosielaním záznamov."
 - **Odosielanie záznamov:** informational, pointing to the next part.
 - **Migrácia:** unchanged.
 
@@ -286,7 +286,7 @@ time; 110 and 113 empty batch; 112 number allocated to another person.
 - Options `--env test|production` (default `test`), `--name`, `--ico`.
 - Credentials come from `EZZK_LOGIN` and `EZZK_PASSWORD`, or from the Keychain
   item Settings saved for that environment. They are never printed. Tokens are
-  printed redacted.
+  never printed.
 - `numbers` and `consume` refuse `--env production`.
 
 ## Error handling summary
@@ -315,6 +315,8 @@ time; 110 and 113 empty batch; 112 number allocated to another person.
 - The repository holds no credentials, including the sample account from the
   manual.
 - Consequential calls on production are impossible in part A by construction.
+  The client itself refuses them, in addition to the adapter, the account
+  controller and the probe.
 
 ## Testing
 

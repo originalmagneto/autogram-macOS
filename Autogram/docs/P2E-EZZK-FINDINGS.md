@@ -10,6 +10,7 @@ Scope: official form sources, observed Podpisuj output, authenticated EZZK inter
 - The current CEZZK conversion-record form remains version 1.0 until the official transition to record version 1.2 on 2027-01-01. Re-check the official source and dataset before changing this profile.
 - Autogram must not claim production compatibility from the existing legacy Swift renderer. The new validator is structural and digest-based only, and is not a certificate trust-list validator or a VeraPDF conformance proof.
 - EZZK authentication and submission must use the real authenticated service contract. No credentials, tokens, or guessed authorization flow are stored in the repository.
+- Since 2026-09-17 EZZK access uses the Ditec WCF SOAP service with the advocate's own EZZK name and password. MIRRI will not register a native OAuth callback, so the Keycloak OAuth/REST client stays in the code but is not wired. Design: `docs/superpowers/specs/2026-09-17-ezzk-soap-design.md`.
 - Initial end-to-end integration must target the EZZK test environment before any production submission path is enabled.
 
 ## Official Slovensko.sk and MIRRI findings
@@ -278,3 +279,44 @@ The verified debug bundle was installed at `/Applications/Autogram macOS.app`. T
 - **Demo status limitation:** the demo mock is still called for compatibility, but both the dashboard and conversion workflow now leave demo rows pending instead of assigning `.submitted`. It is not evidence of CEZZK acceptance; dashboard feedback labels the outcome as demo-local.
 
 Production readiness is not claimed.
+
+## SOAP integration (2026-09-17)
+
+### Why
+
+On 2026-09-17 the podpisuj.sk team confirmed that EZZK is not maintained, MIRRI has no administrative access to it, and user creation goes through paid change requests to Ditec. A native OAuth callback for `login-app` will not be registered. Every integrating system uses the SOAP service with the person's own EZZK login instead.
+
+### Verified contract
+
+- Sources: MIRRI "Integračný manuál poskytovaných služieb modulu EZZK" v1.4 (2019-11-18), the live WSDL and XSD (snapshot in `docs/reference/ezzk-soap/2026-09-17/`), and calls on 2026-09-17.
+- Endpoints: `/Iam.Core3.Svc.Wcf/LogInService.svc` and `/EZZK.Svc.Wcf/EZZKService.svc` on `ezzk-test.iomo.sk` and `ezzk.iomo.sk`.
+- SOAP 1.2 with mandatory WS-Addressing `Action`, `MessageID` and `To`; the manual's empty header fails with `ActionMismatch`.
+- `LogIn` with `ApplicationId` `EZZK` returns `TokenDescriptor`; authenticated calls send it as `Cookie: IamTokenDescriptor=<token>`. Without the cookie: HTTP 500 "service implementation object was not initialized". With an invalid token: result code 101.
+- Inherited request fields (`ZiadostVypis`, object header) live in the `Ditec.IOM.EZZK.Dol` namespace; the manual's operation namespace fails with `DeserializationFailed`.
+- `GetConversionRecordEvidenceNumber` has a required `EvidenceNumberAmount` element that the manual omits.
+- Result codes differ from the manual: an empty `ReceiveConversionRecord` batch returns 110 (manual: 113). Unknown public lookup: 105.
+- Test and production schemas differ only in `GetConversionRecord2` and where `OdpovedVypis` document fields sit.
+- The test sample account returned ten unconsumed numbers (`260917-dD9DbFE4f7` form); production numbers look like `1563-260824-1`. The test service did not bind the person's IČO to the account.
+- The unauthenticated `GetConversionRecordInformationPurpose` works against production from a Mac; record `1563-260824-1` was returned with its details.
+
+### Certificates
+
+- Production: public RapidSSL `CN=*.iomo.sk`, observed expiry 2026-09-21. If it lapses, EZZK fails for every integrator.
+- Test: self-signed `CN=ezzk-test.iomo.sk`, SHA-256 `D1:6F:5B:61:72:0A:59:53:08:56:5D:D8:4E:32:93:5E:7A:7D:E8:3A:6C:2F:A8:F0:E6:41:34:51:ED:2B:12:E2`, expiry 2026-10-20. Autogram pins it in `EZZKEnvironment.pinnedCertificateSHA256`; update the pin when it is renewed.
+
+### Implementation boundaries (part A)
+
+- Production is read-only: login check, server time and public lookup. Number allocation is refused (`EZZKError.productionAllocationDisabled`) until part B builds and sends the signed record. `EZZKSOAPClient` refuses `evidenceNumbers`, `consume` and `receive` on production itself, before any network use, in addition to the adapter (`EZZKSOAPServiceAdapter`), the account controller (`EZZKAccountController`), Settings and `ezzk-probe`, each of which also refuses the same calls independently.
+- On those consequential calls, a network error that may have reached the server, or an HTTP 5xx response, becomes `EZZKError.outcomeUnknown` and is never repeated; the caller is told the outcome is unknown rather than risking a duplicate submission.
+- `ReceiveConversionRecord` exists only as a request builder and client call; the app's `submit` throws `submissionUnavailable` and rows stay queued.
+- `Result` 0 on `ReceiveConversionRecord` is acceptance for processing only; validation errors arrive later in the sender's eDesk. Podpisuj reports that EZZK marks many valid advocate records as invalid for a missing timestamp, so part B must add a qualified timestamp to the record signature.
+
+### Live checks (2026-09-17)
+
+`ezzk-probe` ran against the live services: `time`, `login` and `numbers` on test (the MIRRI manual's sample account, ten numbers returned), and `lookup 1563-260824-1` on production (read-only). The pinned test certificate handshake also passed live. `ezzk-probe` never prints the token; `login` prints only the account name. The sample account's login and password are not recorded here or anywhere else in the repository.
+
+### Open work (part B)
+
+1. Build the record (`50349287.ConversionRecordOfPaperToElectronicDocument.sk` v1.0) in an `XMLDataContainer`, sign it with the mandate certificate and a qualified timestamp into its own ASiC.
+2. Send it with `ReceiveConversionRecord`, then open production allocation.
+3. Switch to record form v1.2 from 2027-01-01.
