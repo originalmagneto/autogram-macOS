@@ -8,7 +8,7 @@ final class AutogramAppModel {
     let recentDocumentStore: RecentDocumentStore
     let signingStore: SigningSessionStore
     let zakoStore: ZakoSessionStore
-    let ezzkSessionController: EZZKSessionController
+    let ezzkAccountController: EZZKAccountController
     let signedDocumentStore: SignedDocumentStore
     let webSigning: WebSigningCoordinator
 
@@ -17,7 +17,7 @@ final class AutogramAppModel {
         let recentDocuments = RecentDocumentStore(settingsStore: settings)
         settingsStore = settings
         recentDocumentStore = recentDocuments
-        ezzkSessionController = settings.ezzkSessionController
+        ezzkAccountController = settings.ezzkAccountController
         signingStore = SigningSessionStore(
             signingProvider: settings.signingProvider,
             settingsStore: settings,
@@ -66,7 +66,7 @@ struct AutogramApp: App {
     var body: some Scene {
         WindowGroup {
             RootView(model: model)
-                .environment(model.ezzkSessionController)
+                .environment(model.ezzkAccountController)
                 .frame(minWidth: MacOS27Layout.rootMinimumWidth, minHeight: 640)
                 .frame(idealWidth: 1320, idealHeight: 860)
         }
@@ -84,7 +84,7 @@ struct AutogramApp: App {
         // its window from the hosting view's preferred size and cannot be resized.
         Window("Nastavenia", id: SettingsWindow.id) {
             SettingsView(settingsStore: model.settingsStore, waitForLearningWrites: { await model.zakoStore.waitForBankWrites() })
-                .environment(model.ezzkSessionController)
+                .environment(model.ezzkAccountController)
                 .frame(minWidth: 900, minHeight: 560)
         }
         .defaultSize(width: 940, height: 720)

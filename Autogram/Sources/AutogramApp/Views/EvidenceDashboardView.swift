@@ -333,7 +333,7 @@ struct EvidenceDashboardView: View {
         submitFeedback = nil
         reload()
         let pending = records.filter(\.isSubmissionPending)
-        let isDemoMode = settingsStore.ezzkSessionController.isDemoMode
+        let isDemoMode = settingsStore.ezzkAccountController.isDemoMode
         Task {
             var submittedCount = 0
             var failedCount = 0

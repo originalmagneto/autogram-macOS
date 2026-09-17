@@ -1246,7 +1246,7 @@ final class ZakoSessionStore {
                 securityReview: securityReviewSnapshot)
             do {
                 try await ezzkService.submit(envelope)
-                if settingsStore.ezzkSessionController.isDemoMode {
+                if settingsStore.ezzkAccountController.isDemoMode {
                     var queued = record
                     queued.status = .queuedForSubmission
                     queued.updatedAt = Date()
@@ -1282,7 +1282,7 @@ final class ZakoSessionStore {
               record.status != .submitted else { return }
         do {
             try await ezzkService.submit(record.envelope())
-            if settingsStore.ezzkSessionController.isDemoMode {
+            if settingsStore.ezzkAccountController.isDemoMode {
                 var queued = record
                 queued.status = .queuedForSubmission
                 queued.updatedAt = Date()
