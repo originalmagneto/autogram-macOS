@@ -81,7 +81,7 @@ public struct EZZKTokenStore: EZZKTokenStoring, Sendable {
     }
 }
 
-private struct SystemEZZKKeychainAdapter: EZZKKeychainAdapter {
+struct SystemEZZKKeychainAdapter: EZZKKeychainAdapter {
     func read(service: String, account: String) throws -> Data? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
