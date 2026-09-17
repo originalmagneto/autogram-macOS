@@ -21,11 +21,16 @@ final class EZZKAccountController {
 
     private let credentialStore: any EZZKSOAPCredentialStoring
     private let transportFactory: @Sendable (EZZKEnvironment) -> any EZZKHTTPTransport
-    private var personProvider: @MainActor () -> EZZKPerson = { EZZKPerson(corporateBodyFullName: "", ico: "") }
-    private var usedEvidenceNumbersProvider: @MainActor () -> Set<String> = { [] }
+    @ObservationIgnored private var personProvider: @MainActor () -> EZZKPerson = {
+        EZZKPerson(corporateBodyFullName: "", ico: "")
+    }
+    @ObservationIgnored private var usedEvidenceNumbersProvider: @MainActor () -> Set<String> = { [] }
     private let demoService = MockEZZKService()
-    private var clients: [EZZKEnvironment: EZZKSOAPClient] = [:]
-    private var generation: UInt64 = 0
+    /// Clients read the password from the credential store for each login.
+    @ObservationIgnored private var clients: [EZZKEnvironment: EZZKSOAPClient] = [:]
+    /// One transport (and so one URLSession) per environment for the controller's lifetime.
+    @ObservationIgnored private var transports: [EZZKEnvironment: any EZZKHTTPTransport] = [:]
+    @ObservationIgnored private var generation: UInt64 = 0
 
     init(mode: AppSettings.EZZKMode,
          credentialStore: any EZZKSOAPCredentialStoring = EZZKSOAPCredentialStore(),
@@ -75,13 +80,15 @@ final class EZZKAccountController {
         let operation = generation
         state = .verifying
         let candidate = EZZKSOAPCredentials(login: login, password: password)
-        let client = EZZKSOAPClient(environment: environment, transport: transportFactory(environment),
-                                    credentials: { candidate })
+        let verification = EZZKSOAPClient(environment: environment, transport: transport(for: environment),
+                                          credentials: { candidate })
         do {
-            let accountName = try await client.logIn()
+            let accountName = try await verification.logIn()
             guard operation == generation else { return }
             try credentialStore.save(candidate, environment: environment)
-            clients[environment] = client
+            // The verification client keeps the password in its closure; never cache it. The next
+            // call builds a client that reads the saved item, at the cost of one more LogIn.
+            clients[environment] = nil
             storedLogin = login
             state = .signedIn(accountName: accountName, checkedAt: Date())
         } catch {
@@ -93,13 +100,14 @@ final class EZZKAccountController {
     func signOut() {
         guard let environment else { return }
         generation &+= 1
+        // Drop the live token first, even when the Keychain item cannot be deleted.
+        clients[environment] = nil
         do {
             try credentialStore.delete(environment: environment)
         } catch {
             state = .failed(Self.message(for: error))
             return
         }
-        clients[environment] = nil
         storedLogin = ""
         state = .signedOut
     }
@@ -126,10 +134,17 @@ final class EZZKAccountController {
     private func client(for environment: EZZKEnvironment) -> EZZKSOAPClient {
         if let client = clients[environment] { return client }
         let store = credentialStore
-        let client = EZZKSOAPClient(environment: environment, transport: transportFactory(environment),
+        let client = EZZKSOAPClient(environment: environment, transport: transport(for: environment),
                                     credentials: { try store.load(environment: environment) })
         clients[environment] = client
         return client
+    }
+
+    private func transport(for environment: EZZKEnvironment) -> any EZZKHTTPTransport {
+        if let transport = transports[environment] { return transport }
+        let transport = transportFactory(environment)
+        transports[environment] = transport
+        return transport
     }
 
     private func reloadStoredLogin() {

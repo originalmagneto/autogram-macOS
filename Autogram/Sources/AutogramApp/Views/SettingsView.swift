@@ -770,7 +770,8 @@ struct SettingsView: View {
                 if controller.hasStoredCredentials {
                     Button("Odhlásiť", role: .destructive) {
                         controller.signOut()
-                        ezzkLoginField = ""
+                        // A failed sign-out keeps the stored login, so keep showing it.
+                        ezzkLoginField = controller.storedLogin
                         ezzkPasswordField = ""
                     }
                     .controlSize(.small)
