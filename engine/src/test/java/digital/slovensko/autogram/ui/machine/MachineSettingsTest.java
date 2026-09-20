@@ -5,12 +5,11 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class MachineSettingsTest {
     @Test
     void secureStoreUsesTheCardSlotWhenNoSlotIsConfigured() {
-        assertEquals(1, MachineSettings.secureStoreSlotIndex(-1));
+        assertEquals(-1, MachineSettings.secureStoreSlotIndex(-1));
     }
 
     @Test
@@ -30,11 +29,10 @@ class MachineSettingsTest {
     }
 
     @Test
-    void machineSettingsNeverLeaveSecureStoreOnTheUnsetSlot() {
+    void machineSettingsLeaveSecureStoreUnsetSoTheProbeCanPickTheTokenSlot() {
         var settings = new MachineSettings();
 
-        // -1 would make NativePkcs11SignatureToken fall back to slot 0, the empty SecureStore reader.
-        assertTrue(settings.getDriverSlotIndex("secure_store") >= 0);
+        assertEquals(-1, settings.getDriverSlotIndex("secure_store"));
         assertNull(settings.getEform());
     }
 }

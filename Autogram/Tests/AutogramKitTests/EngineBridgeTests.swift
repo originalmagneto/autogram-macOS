@@ -205,6 +205,13 @@ final class EngineBridgeSelectionTests: XCTestCase {
         XCTAssertEqual(EngineBridgeSigningProvider.enginePIN(entered: "1234", driverID: "secure_store"), "1234")
     }
 
+    func testTrustedListFailureIsSlovak() {
+        let mapped = EngineBridgeSigningProvider.localizedEngineMessage(
+            "The machine request could not be completed. [TRUSTED_LIST_UNAVAILABLE]")
+        XCTAssertTrue(mapped.contains("dôveryhodných CA"))
+        XCTAssertFalse(mapped.contains("machine request"))
+    }
+
     func testPrimaryDriverPrefersEIDLikeCertificateDiscovery() {
         XCTAssertEqual(EngineBridgeSigningProvider.primaryDriverID(fingerprint: "eid,secure_store"), "eid")
         XCTAssertEqual(EngineBridgeSigningProvider.primaryDriverID(fingerprint: "secure_store"), "secure_store")

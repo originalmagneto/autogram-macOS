@@ -3,7 +3,7 @@ import AutogramKit
 import AppKit
 
 public extension View {
-    func glassCard(cornerRadius: CGFloat = 16, padding: CGFloat = 16) -> some View {
+    func glassCard(cornerRadius: CGFloat = 12, padding: CGFloat = 16) -> some View {
         self.padding(padding)
             .background(.regularMaterial, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .overlay(
@@ -34,9 +34,9 @@ struct StickyActionBar<Content: View>: View {
             HStack(spacing: 12) {
                 content()
             }
-            .padding(.horizontal, 18)
-            .padding(.vertical, 12)
+            .padding(12)
         }
+        .background(.regularMaterial)
     }
 }
 
@@ -47,18 +47,13 @@ struct SmartcardHUDStatus: View {
     let detail: String?
 
     var body: some View {
-        HStack(spacing: 10) {
-            ZStack {
-                Circle()
-                    .fill(isConnected ? Color.green.opacity(0.2) : Color.secondary.opacity(0.15))
-                    .frame(width: 24, height: 24)
-                Circle()
-                    .fill(isConnected ? Color.green : Color.secondary)
-                    .frame(width: 8, height: 8)
-            }
+        HStack(spacing: 8) {
+            Image(systemName: isConnected ? "creditcard.fill" : "creditcard")
+                .foregroundStyle(isConnected ? Color.green : Color.secondary)
+                .frame(width: 16)
             VStack(alignment: .leading, spacing: 1) {
                 Text(label)
-                    .font(.caption.weight(.semibold))
+                    .font(.callout)
                     .lineLimit(1)
                 if let detail, !detail.isEmpty {
                     Text(detail)
@@ -69,13 +64,9 @@ struct SmartcardHUDStatus: View {
             }
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 7)
-        .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 9, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.5)
-        )
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(label)
+        .accessibilityValue(detail ?? "")
     }
 }
 

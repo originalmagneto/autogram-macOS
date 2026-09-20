@@ -299,7 +299,7 @@ struct AttestationFormView: View {
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
                         .strokeBorder(Color.primary.opacity(0.1), lineWidth: 1)
                 )
-                .shadow(color: .black.opacity(0.06), radius: 5, y: 2)
+
             }
         }
         .padding(16)
@@ -405,7 +405,7 @@ struct AttestationFormView: View {
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.secondary)
             VStack(spacing: 8) { content() }
-                .glassCard(cornerRadius: 14, padding: 14)
+                .glassCard(padding: 14)
         }
     }
 }

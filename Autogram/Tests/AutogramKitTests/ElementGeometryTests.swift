@@ -74,6 +74,21 @@ final class ElementGeometryTests: XCTestCase {
         XCTAssertFalse(ElementGeometry.isInResizeHandle(box, outside))
     }
 
+    func testCornerHandleAcceptsPointOutsideBox() {
+        let box = NormalizedRect(x: 0.2, y: 0.3, width: 0.4, height: 0.2)
+        let viewRect = CGRect(x: 100, y: 200, width: 400, height: 200)
+        let pointOutsideTopLeft = CGPoint(x: viewRect.minX - 5, y: viewRect.minY - 5)
+
+        let anchor = ElementGeometry.oppositeCornerAnchor(
+            of: box,
+            viewRect: viewRect,
+            near: pointOutsideTopLeft,
+            tolerance: 14)
+
+        XCTAssertEqual(anchor?.x, box.x + box.width)
+        XCTAssertEqual(anchor?.y, box.y)
+    }
+
     func testAspectFitterLetterboxMapping() {
         let fitter = ElementGeometry.AspectFitter(container: CGSize(width: 400, height: 800),
                                                   imageAspect: 595.0 / 842.0)

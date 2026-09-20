@@ -13,7 +13,7 @@ struct AnalysisCanvasView: View {
 
     struct Interaction {
         enum Kind {
-            case moving(UUID)
+            case moving(UUID, offset: NormalizedPoint)
             case resizing(UUID, NormalizedPoint)
         }
         var kind: Kind
@@ -60,9 +60,7 @@ struct AnalysisCanvasView: View {
                     if store.analysis.totalPages > 1 {
                         pageThumbnailStrip
                             .frame(width: 80)
-                            .overlay(alignment: .trailing) {
-                                Rectangle().fill(Color.primary.opacity(0.08)).frame(width: 1)
-                            }
+                        Divider()
                     }
 
                     VStack(spacing: 10) {
@@ -172,7 +170,7 @@ struct AnalysisCanvasView: View {
                     } label: {
                         ZStack(alignment: .topTrailing) {
                             RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .fill(Color.white)
+                                .fill(Color.primary.opacity(0.04))
                                 .frame(width: thumbWidth, height: thumbHeight)
                                 .overlay {
                                     if let page {
@@ -281,7 +279,6 @@ struct AnalysisCanvasView: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .inspectorCard(cornerRadius: 12, padding: 12)
     }
 
     /// Indicator + inline switcher for the detection provider. Apple Vision
@@ -357,11 +354,11 @@ struct AnalysisCanvasView: View {
                 .lineLimit(1)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 5)
-                .background(isSelected ? Color.accentColor.opacity(0.16) : Color.primary.opacity(0.04),
-                            in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .background(isSelected ? Color.accentColor.opacity(0.16) : Color.clear,
+                            in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .strokeBorder(isSelected ? Color.accentColor : Color.primary.opacity(0.08), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .strokeBorder(isSelected ? Color.accentColor : Color.primary.opacity(0.12), lineWidth: 1)
                 )
                 .foregroundStyle(isSelected ? Color.accentColor : Color.primary)
         }
@@ -373,7 +370,7 @@ struct AnalysisCanvasView: View {
     private var pageImageLoader: some View {
         GeometryReader { geometry in
             ZStack(alignment: .center) {
-                Color(nsColor: .controlBackgroundColor).opacity(0.35)
+                Color(nsColor: .underPageBackgroundColor)
 
                 if let image = pageImage {
                     let baseFitter = ElementGeometry.AspectFitter(
@@ -398,7 +395,11 @@ struct AnalysisCanvasView: View {
                                                 imageAspect: pageAspect)),
                                         interaction: $interaction)
                                 }
-                                .shadow(color: .black.opacity(0.15), radius: 8, y: 3)
+                                .overlay {
+                                    Rectangle()
+                                        .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 0.5)
+                                }
+                                .shadow(color: .black.opacity(0.12), radius: 8, y: 2)
                                 .padding(16)
                         }
                     } else {
@@ -416,7 +417,11 @@ struct AnalysisCanvasView: View {
                                             imageAspect: pageAspect)),
                                     interaction: $interaction)
                             }
-                            .shadow(color: .black.opacity(0.15), radius: 8, y: 3)
+                            .overlay {
+                                Rectangle()
+                                    .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 0.5)
+                            }
+                            .shadow(color: .black.opacity(0.12), radius: 8, y: 2)
                     }
                 } else if store.isAnalyzing {
                     VStack(spacing: 8) {
@@ -452,7 +457,6 @@ struct AnalysisCanvasView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         }
     }
 
@@ -480,7 +484,7 @@ struct AnalysisCanvasView: View {
                     .frame(maxWidth: 320)
             }
             .padding(20)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
         .transition(.opacity)
         .accessibilityElement(children: .combine)
@@ -579,9 +583,11 @@ struct AnalysisCanvasView: View {
         VStack(spacing: 0) {
             ScrollViewReader { proxy in
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 16) {
                         pageReviewCard
+                        Divider().opacity(0.35)
                         findingsCard
+                        Divider().opacity(0.35)
                         addElementCard
                     }
                     .padding(12)
@@ -593,9 +599,6 @@ struct AnalysisCanvasView: View {
             }
         }
         .background(.regularMaterial)
-        .overlay(alignment: .leading) {
-            Rectangle().fill(Color.primary.opacity(0.08)).frame(width: 1)
-        }
     }
 
     /// Findings of the current page plus the collapsed numeric inspector.
@@ -674,7 +677,6 @@ struct AnalysisCanvasView: View {
                 .help("Číselné umiestnenie a klávesové posuny. Ťahanie na plátne a klik na prvok sú rýchlejšie.")
             }
         }
-        .inspectorCard(cornerRadius: 12, padding: 12)
     }
 
     /// Review status of the current page: counts, the reviewed toggle, and the
@@ -718,7 +720,6 @@ struct AnalysisCanvasView: View {
             }
 
         }
-        .inspectorCard(cornerRadius: 12, padding: 12)
     }
 
     @ViewBuilder
@@ -962,16 +963,11 @@ struct ElementOverlay: View {
     /// Returns the normalized point of the corner OPPOSITE to the grabbed corner,
     /// or nil when the point is not near any corner (with handleRadius tolerance).
     private func oppositeCornerAnchor(of box: NormalizedRect, at viewPoint: CGPoint) -> NormalizedPoint? {
-        let rect = mapper.viewRect(for: box)
-        let corners: [(CGFloat, CGFloat)] = [
-            (rect.minX, rect.minY), (rect.maxX, rect.minY),
-            (rect.minX, rect.maxY), (rect.maxX, rect.maxY)
-        ]
-        let grabbed = corners.first { hypot(viewPoint.x - $0.0, viewPoint.y - $0.1) <= handleRadius }
-        guard let grabbed else { return nil }
-        return NormalizedPoint(
-            x: grabbed.0 == rect.minX ? box.x + box.width : box.x,
-            y: grabbed.1 == rect.minY ? box.y + box.height : box.y)
+        ElementGeometry.oppositeCornerAnchor(
+            of: box,
+            viewRect: mapper.viewRect(for: box),
+            near: viewPoint,
+            tolerance: handleRadius)
     }
 
     private var dragGesture: some Gesture {
@@ -996,14 +992,40 @@ struct ElementOverlay: View {
         let normPoint = mapper.normalizedPoint(from: value.location)
 
         if interaction == nil {
+            // Handles sit 5pt outside the box. Hit-test interiors first miss them,
+            // and with a tool armed that used to place a new element.
+            if let selected = store.securityElements.first(where: {
+                $0.id == store.selectedElementID
+                    && $0.pageIndex == store.previewPageIndex
+                    && $0.hasScanRegion
+            }), let anchor = oppositeCornerAnchor(of: selected.boundingBox, at: value.location) {
+                interaction = .init(kind: .resizing(selected.id, anchor), startPoint: anchor)
+                return
+            }
+
+            // Selection can change while a drawing tool remains armed. Prefer any
+            // existing corner over creating an overlapping element.
+            if let resizeTarget = store.securityElements.first(where: {
+                $0.id != store.selectedElementID
+                    && $0.pageIndex == store.previewPageIndex
+                    && $0.hasScanRegion
+                    && oppositeCornerAnchor(of: $0.boundingBox, at: value.location) != nil
+            }), let anchor = oppositeCornerAnchor(of: resizeTarget.boundingBox, at: value.location) {
+                store.selectedElementID = resizeTarget.id
+                interaction = .init(kind: .resizing(resizeTarget.id, anchor), startPoint: anchor)
+                return
+            }
+
             if let hitID = store.elementID(at: normPoint, pageIndex: store.previewPageIndex),
                let element = store.securityElements.first(where: { $0.id == hitID }) {
                 store.selectedElementID = hitID
                 if let anchor = oppositeCornerAnchor(of: element.boundingBox, at: value.location) {
-
                     interaction = .init(kind: .resizing(hitID, anchor), startPoint: anchor)
                 } else {
-                    interaction = .init(kind: .moving(hitID), startPoint: normPoint)
+                    let offset = NormalizedPoint(
+                        x: element.boundingBox.midX - normPoint.x,
+                        y: element.boundingBox.midY - normPoint.y)
+                    interaction = .init(kind: .moving(hitID, offset: offset), startPoint: normPoint)
                 }
                 return
             }
@@ -1020,8 +1042,10 @@ struct ElementOverlay: View {
 
         guard let current = interaction else { return }
         switch current.kind {
-        case .moving(let id):
-            store.moveElement(id: id, center: normPoint)
+        case .moving(let id, let offset):
+            store.moveElement(
+                id: id,
+                center: NormalizedPoint(x: normPoint.x + offset.x, y: normPoint.y + offset.y))
             interaction?.moved = true
         case .resizing(let id, _):
             store.drawElement(id: id, from: current.startPoint, to: normPoint)
@@ -1133,12 +1157,12 @@ struct ElementRow: View {
                     .truncationMode(.tail)
             }
         }
-        .padding(isExpanded ? 10 : 8)
-        .background(isSelected ? Color.accentColor.opacity(0.1) : Color.primary.opacity(0.03),
+        .padding(isExpanded ? 10 : 6)
+        .background(isSelected ? Color.accentColor.opacity(0.1) : Color.clear,
                     in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .strokeBorder(isSelected ? Color.accentColor : Color.primary.opacity(0.08), lineWidth: 1)
+                .strokeBorder(isSelected ? Color.accentColor : Color.clear, lineWidth: 1)
         )
         .confirmationDialog("Naozaj chcete odstrániť tento prvok?",
                            isPresented: $showDeleteConfirmation,

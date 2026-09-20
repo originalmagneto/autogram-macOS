@@ -50,6 +50,24 @@ public enum ElementGeometry {
         return point.x >= handleX && point.y >= handleY
     }
 
+    public static func oppositeCornerAnchor(of box: NormalizedRect,
+                                            viewRect: CGRect,
+                                            near point: CGPoint,
+                                            tolerance: CGFloat) -> NormalizedPoint? {
+        let corners: [(CGFloat, CGFloat)] = [
+            (viewRect.minX, viewRect.minY), (viewRect.maxX, viewRect.minY),
+            (viewRect.minX, viewRect.maxY), (viewRect.maxX, viewRect.maxY)
+        ]
+        guard let grabbed = corners.first(where: {
+            hypot(point.x - $0.0, point.y - $0.1) <= tolerance
+        }) else {
+            return nil
+        }
+        return NormalizedPoint(
+            x: grabbed.0 == viewRect.minX ? box.x + box.width : box.x,
+            y: grabbed.1 == viewRect.minY ? box.y : box.y + box.height)
+    }
+
     public static func hitTest(elements: [(id: UUID, pageIndex: Int, box: NormalizedRect)],
                                point: NormalizedPoint,
                                pageIndex: Int) -> UUID? {

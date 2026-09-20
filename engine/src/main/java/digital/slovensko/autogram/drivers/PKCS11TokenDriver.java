@@ -14,7 +14,16 @@ public class PKCS11TokenDriver extends TokenDriver {
     }
 
     public AbstractKeyStoreTokenConnection createToken(PasswordManager pm, SignatureTokenSettings settings) {
-        return new NativePkcs11SignatureToken(getPath().toString(), pm, settings, settings.getDriverSlotIndex(getShortname()));
+        var probed = PKCS11TokenPresenceProbe.firstTokenSlotIndex(getPath());
+        int slotIndex;
+        if (probed.isPresent()) {
+            slotIndex = probed.getAsInt();
+        } else {
+            var configured = settings.getDriverSlotIndex(getShortname());
+            slotIndex = configured >= 0 ? configured
+                    : "secure_store".equals(getShortname()) ? 1 : -1;
+        }
+        return new NativePkcs11SignatureToken(getPath().toString(), pm, settings, slotIndex);
     }
 
     @Override

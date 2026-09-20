@@ -319,7 +319,7 @@ struct RootView: View {
                 // An opaque bar: without it the list scrolled underneath and the
                 // document names ran through the reader status.
                 sidebarBottomBar
-                    .background(.bar)
+                    .background(.regularMaterial)
             }
             .task(id: settingsStore.settings.webSigningRetentionDays) {
                 signedDocumentStore.purgeBrowserCopies(olderThanDays: settingsStore.settings.webSigningRetentionDays)
@@ -328,23 +328,6 @@ struct RootView: View {
             detailView
                 .navigationTitle(selection.rawValue)
                 .navigationSubtitle(subtitle)
-        }
-        .toolbar {
-            ToolbarItem(placement: .status) {
-                let isCardConnected = !signingStore.identities.isEmpty
-                let identity = signingStore.identities.first
-                let cardLabel = identity?.label ?? (settingsStore.signingProvider is DemoSigningProvider ? "DEMO" : "Karta nepripojená")
-                HStack(spacing: 5) {
-                    Circle()
-                        .fill(isCardConnected ? Color.green : Color.secondary.opacity(0.4))
-                        .frame(width: 7, height: 7)
-                    Text(cardLabel)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-                .help(isCardConnected ? "Čítačka a karta sú pripravené" : "Vložte eID alebo SAK kartu")
-            }
         }
         .focusedValue(\.autogramCommandActions, AutogramCommandActions(
             openDocument: openDocument,
@@ -384,44 +367,51 @@ struct RootView: View {
     }
 
     private var sidebarBottomBar: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 0) {
             Divider()
+                .opacity(0.5)
 
-            let isCardConnected = !signingStore.identities.isEmpty
-            let identity = signingStore.identities.first
-            let cardLabel = identity?.label ?? (settingsStore.signingProvider is DemoSigningProvider ? "DEMO režim" : "Karta nepripojená")
-            let cardDetail = isCardConnected
-                ? [identity?.cardKindLabel, "čítačka je pripravená"].compactMap { $0 }.joined(separator: " · ")
-                : "Vložte eID alebo SAK kartu"
+            VStack(alignment: .leading, spacing: 10) {
+                let identities = selection == .zako ? zakoStore.identities : signingStore.identities
+                let selectedIdentityID = selection == .zako
+                    ? zakoStore.selectedIdentityID
+                    : signingStore.selectedIdentityID
+                let isCardConnected = !identities.isEmpty
+                let identity = identities.first(where: { $0.id == selectedIdentityID }) ?? identities.first
+                let cardLabel = identity?.label ?? (settingsStore.signingProvider is DemoSigningProvider ? "DEMO režim" : "Karta nepripojená")
+                let cardDetail = isCardConnected
+                    ? [identity?.cardKindLabel, "čítačka je pripravená"].compactMap { $0 }.joined(separator: " · ")
+                    : "Vložte eID alebo SAK kartu"
 
-            SmartcardHUDStatus(
-                isConnected: isCardConnected,
-                label: cardLabel,
-                detail: cardDetail
-            )
+                SmartcardHUDStatus(
+                    isConnected: isCardConnected,
+                    label: cardLabel,
+                    detail: cardDetail
+                )
 
-            Button {
-                openMoreFiles()
-            } label: {
-                Label("Pridať súbory…", systemImage: "plus")
-                    .font(.caption.weight(.medium))
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
+                Button {
+                    openMoreFiles()
+                } label: {
+                    Label("Pridať súbory…", systemImage: "plus")
+                        .font(.callout)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
 
-            HStack {
                 OpenSettingsButton {
                     Label("Nastavenia", systemImage: "gearshape")
-                        .font(.caption)
+                        .font(.callout)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .buttonStyle(.borderless)
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
                 .accessibilityLabel("Nastavenia")
                 .help("Otvoriť nastavenia")
-                Spacer(minLength: 0)
             }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
         }
-        .padding(12)
     }
 
     private var subtitle: String {

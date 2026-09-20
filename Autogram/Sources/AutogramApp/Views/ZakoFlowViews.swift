@@ -32,17 +32,6 @@ struct ZakoFlowView: View {
                         .help("Vybrať iný dokument na konverziu")
                         .disabled(store.isAuthorizing)
                     }
-                }
-                ToolbarItemGroup(placement: .primaryAction) {
-                if store.isAnalyzing {
-                    HStack(spacing: 6) {
-                        ProgressView().controlSize(.small)
-                        Text(store.analysisProgressText)
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
-                }
             }
         }
     }

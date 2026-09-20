@@ -435,7 +435,7 @@ struct SigningPrepareView: View {
                     }
                 }
             }
-            .glassCard(cornerRadius: 18, padding: 6)
+            .glassCard(cornerRadius: 12, padding: 6)
 
             HStack(spacing: 12) {
                 StatChip(title: "Strany", value: "\(store.analysis.totalPages)", symbol: "doc.on.doc", tint: .blue)
@@ -629,14 +629,14 @@ struct SigningPrepareView: View {
                                 .background(
                                     isSelected
                                         ? Color.accentColor.opacity(0.12)
-                                        : Color.primary.opacity(0.03),
-                                    in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                                        : Color.clear,
+                                    in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                                 .overlay(
-                                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
                                         .strokeBorder(
                                             isSelected
                                                 ? Color.accentColor.opacity(0.55)
-                                                : Color.primary.opacity(0.10),
+                                                : Color.primary.opacity(0.12),
                                             lineWidth: 1))
                             }
                             .buttonStyle(.plain)
@@ -714,7 +714,7 @@ struct SigningPrepareView: View {
                     .foregroundStyle(.red)
                     .padding(10)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color.red.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+                    .background(Color.red.opacity(0.08), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
             }
         }
     }
@@ -904,7 +904,7 @@ struct SigningDoneView: View {
                     )
                 }
             }
-            .glassCard(cornerRadius: 18, padding: 6)
+            .glassCard(cornerRadius: 12, padding: 6)
 
             if let url = store.signedOutputURL {
                 Text(url.lastPathComponent)
@@ -1201,14 +1201,14 @@ struct SigningBatchView: View {
                                 .background(
                                     isSelected
                                         ? Color.accentColor.opacity(0.12)
-                                        : Color.primary.opacity(0.03),
-                                    in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                                        : Color.clear,
+                                    in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                                 .overlay(
-                                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
                                         .strokeBorder(
                                             isSelected
                                                 ? Color.accentColor.opacity(0.55)
-                                                : Color.primary.opacity(0.10),
+                                                : Color.primary.opacity(0.12),
                                             lineWidth: 1))
                             }
                             .buttonStyle(.plain)
@@ -1252,7 +1252,7 @@ struct SigningBatchView: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .glassCard(cornerRadius: 14, padding: 14)
+        .glassCard(padding: 14)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Spoločné nastavenia dávky")
     }
@@ -1287,7 +1287,7 @@ struct SigningBatchView: View {
                 batchItemRow(item)
             }
         }
-        .glassCard(cornerRadius: 14, padding: 14)
+        .glassCard(padding: 14)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Dokumenty v dávke, \(store.batchItems.count) položiek")
     }
@@ -1389,7 +1389,7 @@ struct SigningBatchView: View {
                 progressMetric("Zlyhania", count: failedCount, tint: .red, symbol: "xmark.circle.fill")
             }
         }
-        .glassCard(cornerRadius: 14, padding: 14)
+        .glassCard(padding: 14)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Priebeh podpisovania")
         .accessibilityValue(
@@ -1428,7 +1428,7 @@ struct SigningBatchView: View {
                 summaryMetric("Zrušené", count: cancelledCount, tint: .secondary)
             }
         }
-        .glassCard(cornerRadius: 14, padding: 14)
+        .glassCard(padding: 14)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Záverečné zhrnutie dávky")
         .accessibilityValue(

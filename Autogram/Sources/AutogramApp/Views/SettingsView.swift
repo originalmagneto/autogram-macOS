@@ -56,22 +56,22 @@ struct SettingsView: View {
     @State private var selectedPromptPreset: AIPromptPreset = .legalDocuments
     var body: some View {
         TabView {
-            settingsTabContent(aiTab)
-            .tabItem { Label("AI Vision", systemImage: "brain.head.profile") }
-
-            settingsTabContent(conversionTab)
-            .tabItem { Label("Konverzia PDF/A", systemImage: "doc.badge.gearshape") }
-
-            settingsTabContent(ezzkTab)
-            .tabItem { Label("EZZK", systemImage: "number.square") }
-
-            settingsTabContent(finderQuickActionTab)
-            .tabItem { Label("Finder Quick Action", systemImage: "finder") }
-
-            settingsTabContent(profilesTab)
-            .tabItem { Label("Profily advokáta", systemImage: "person.crop.circle.badge.checkmark") }
+            Tab("AI Vision", systemImage: "brain.head.profile") {
+                settingsTabContent(aiTab)
+            }
+            Tab("Konverzia PDF/A", systemImage: "doc.badge.gearshape") {
+                settingsTabContent(conversionTab)
+            }
+            Tab("EZZK", systemImage: "number.square") {
+                settingsTabContent(ezzkTab)
+            }
+            Tab("Finder Quick Action", systemImage: "finder") {
+                settingsTabContent(finderQuickActionTab)
+            }
+            Tab("Profily advokáta", systemImage: "person.crop.circle.badge.checkmark") {
+                settingsTabContent(profilesTab)
+            }
         }
-        .tabViewStyle(.sidebarAdaptable)
         .frame(minWidth: 720, maxWidth: .infinity, minHeight: 560, maxHeight: .infinity)
         .confirmationDialog("Naozaj chcete odstrániť tento TSA server?",
                            isPresented: $showTSADeleteConfirmation,
@@ -1123,7 +1123,7 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
                     .padding(20)
                     .frame(maxWidth: .infinity)
-                    .glassCard(cornerRadius: 14)
+                    .glassCard()
             } else {
                 ForEach($settingsStore.settings.profiles) { $profile in
                     let isActive = settingsStore.settings.activeProfileID == profile.id

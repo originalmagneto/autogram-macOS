@@ -682,7 +682,7 @@ public final class EngineBridgeSigningProvider: QualifiedSigningProviding, @unch
             return "Karta v čítačke nezodpovedá zvolenému ovládaču (eID klient alebo I.CA SecureStore)."
         }
         if code("DRIVER_UNAVAILABLE") || code("DRIVER_NOT_FOUND") {
-            return "Karta nie je dostupná — vložte ju do čítačky a skúste znova."
+            return "Karta nie je dostupná: vložte ju do čítačky a skúste znova."
         }
         if code("PIN_INCORRECT") {
             return "Nesprávny PIN alebo BOK."
@@ -694,10 +694,16 @@ public final class EngineBridgeSigningProvider: QualifiedSigningProviding, @unch
             return "Operácia s kartou bola zrušená."
         }
         if code("CERTIFICATE_NOT_FOUND") || code("CERTIFICATE_AMBIGUOUS") {
-            return "Zvolený certifikát už nie je na karte — obnovte zoznam certifikátov."
+            return "Zvolený certifikát už nie je na karte: obnovte zoznam certifikátov."
         }
         if code("TIMESTAMP_FAILED") {
             return "Nepodarilo sa získať kvalifikovanú časovú pečiatku (TSA)."
+        }
+        if code("TIMESTAMP_QUALIFICATION_FAILED") {
+            return "Časová pečiatka nie je kvalifikovaná. Skontrolujte TSA a internet."
+        }
+        if code("TRUSTED_LIST_UNAVAILABLE") {
+            return "EU zoznam dôveryhodných CA sa nepodarilo stiahnuť. Zapnite internet a skúste znova; vizuálna pečiatka tento zoznam potrebuje."
         }
         if code("OUTPUT_VALIDATION_FAILED") {
             return "Engine odmietol výsledok podpisu (výstupná validácia)."

@@ -182,7 +182,7 @@ struct AuthorizeView: View {
                 .accessibilityLabel("Detail overenia vstupných podpisov")
                 .accessibilityValue(store.inputSignatureInspection.detail)
         }
-        .glassCard(cornerRadius: 14, padding: 14)
+        .glassCard(padding: 14)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
@@ -271,7 +271,7 @@ struct AuthorizeView: View {
                 .background(Color.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
             }
         }
-        .glassCard(cornerRadius: 14, padding: 14)
+        .glassCard(padding: 14)
         .frame(minWidth: 280, idealWidth: 380, maxWidth: .infinity, alignment: .leading)
     }
 
@@ -359,11 +359,12 @@ struct IdentityRow: View {
                     badge("KOMERČNÝ", tint: .orange)
                 }
             }
-            .padding(9)
-            .background(isSelected ? Color.accentColor.opacity(0.09) : Color.primary.opacity(0.03),
+            .padding(.vertical, 6)
+            .padding(.horizontal, 4)
+            .background(isSelected ? Color.accentColor.opacity(0.09) : Color.clear,
                         in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 10)
-                .strokeBorder(isSelected ? Color.accentColor.opacity(0.5) : Color.primary.opacity(0.07)))
+            .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(isSelected ? Color.accentColor.opacity(0.5) : Color.clear))
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Certifikát \(identity.label)")
