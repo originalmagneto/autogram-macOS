@@ -55,6 +55,16 @@ struct AttestationFormView: View {
                 .keyboardShortcut(.defaultAction)
             }
         }
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    showingLivePreview.toggle()
+                } label: {
+                    Label("Živý náhľad doložky", systemImage: "sidebar.trailing")
+                }
+                .help(showingLivePreview ? "Skryť živý náhľad doložky" : "Zobraziť živý náhľad doložky")
+            }
+        }
         .onChange(of: store.attestation) { _, _ in
             store.recomputePreflight()
         }
@@ -243,22 +253,98 @@ struct AttestationFormView: View {
             }
 
             ScrollView {
-                Text(generatedClausePreviewText)
-                    .font(.system(size: 11, design: .serif))
-                    .lineSpacing(4)
-                    .padding(14)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 10))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10)
-                            .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
-                    )
+                VStack(alignment: .center, spacing: 10) {
+                    Image(systemName: "building.columns.fill")
+                        .font(.system(size: 22))
+                        .foregroundStyle(Color.accentColor.opacity(0.85))
+                        .padding(.top, 4)
+
+                    Text("OSVEDČOVACIA DOLOŽKA O ZARUČENEJ KONVERZII")
+                        .font(.system(size: 11, weight: .bold, design: .serif))
+                        .multilineTextAlignment(.center)
+
+                    Text("podľa § 35 až 39 zákona č. 305/2013 Z. z. o e-Governmente")
+                        .font(.system(size: 9, design: .serif))
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+
+                    Divider()
+                        .padding(.vertical, 2)
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        clauseFieldRow(number: "1.", label: "Názov pôvodného dokumentu:", value: clauseOriginalName)
+                        clauseFieldRow(number: "2.", label: "Druh pôvodného dokumentu:", value: store.attestation.originalDocumentTypeLabel)
+                        clauseFieldRow(number: "3.", label: "Počet listov pôvodného dokumentu:", value: "\(store.effectiveSheetCount)")
+                        clauseFieldRow(number: "4.", label: "Počet neprázdnych strán:", value: "\(store.analysis.nonEmptyPages)")
+                        clauseFieldRow(number: "5.", label: "Bezpečnostné prvky:", value: clauseElementSummary)
+                        clauseFieldRow(number: "6.", label: "Osoba vykonávajúca konverziu:", value: clausePerformingPerson)
+                        clauseFieldRow(number: "7.", label: "Evidenčné číslo záznamu:", value: store.attestation.evidenceNumber ?? "XXXXXX")
+                        clauseFieldRow(number: "8.", label: "Čas konverzie:", value: "bude určený časovou pečiatkou QTS")
+                    }
+
+                    Divider()
+                        .padding(.vertical, 2)
+
+                    Text("Tento elektronický dokument vznikol zaručenou konverziou z listinnej podoby a má rovnaké právne účinky ako pôvodný dokument.")
+                        .font(.system(size: 9, design: .serif))
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.bottom, 4)
+                }
+                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .top)
+                .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .strokeBorder(Color.primary.opacity(0.1), lineWidth: 1)
+                )
+                .shadow(color: .black.opacity(0.06), radius: 5, y: 2)
             }
         }
         .padding(16)
         .background(.regularMaterial)
         .overlay(alignment: .leading) {
             Rectangle().fill(Color.primary.opacity(0.08)).frame(width: 1)
+        }
+    }
+
+    private var clauseOriginalName: String {
+        store.attestation.originalDocumentName.isEmpty ? "Názov dokumentu" : store.attestation.originalDocumentName
+    }
+
+    private var clausePerformingPerson: String {
+        let name = store.attestation.performingPerson.fullName.isEmpty ? "JUDr. Meno Priezvisko" : store.attestation.performingPerson.fullName
+        let sak = store.attestation.performingPerson.registrationNumber.isEmpty ? "XXXX" : store.attestation.performingPerson.registrationNumber
+        return "\(name), advokát, ev. č. SAK: \(sak)"
+    }
+
+    private var clauseElementSummary: String {
+        if store.attestation.noSecurityElementsConfirmed {
+            return "Bez bezpečnostných prvkov (potvrdené kontrolou originálu)"
+        }
+        if store.confirmedSecurityElements.isEmpty {
+            return "Zatiaľ nepotvrdené"
+        }
+        return store.confirmedSecurityElements
+            .map { "\($0.descriptionForRecord), \($0.locationDescription(pageSizePt: .zero))" }
+            .joined(separator: "; ")
+    }
+
+    private func clauseFieldRow(number: String, label: String, value: String) -> some View {
+        HStack(alignment: .top, spacing: 4) {
+            Text(number)
+                .font(.system(size: 10, weight: .bold, design: .serif))
+                .frame(width: 14, alignment: .leading)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(label)
+                    .font(.system(size: 9, design: .serif))
+                    .foregroundStyle(.secondary)
+                Text(value)
+                    .font(.system(size: 10, weight: .semibold, design: .serif))
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 

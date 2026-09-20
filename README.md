@@ -93,11 +93,12 @@ Natívna macOS aplikácia v SwiftUI pre kvalifikované elektronické podpisovani
 
 ### Nové natívne rozhranie
 
-- Podpisovanie aj ZaKo zobrazujú aktuálny krok v podnadpise okna. Navigácia a voľba dokumentu sú v hornej lište.
-- Inšpektor podpisu sa dá skryť a meniť jeho šírku, aby zostalo viac miesta na dokument. Vizuálny podpis má priehľadné pozadie.
-- Počas podpisovania a autorizácie sú zablokované akcie, ktoré by vynulovali rozpracovanú operáciu.
-- Register používa natívne vyhľadávanie, nastavenia bočnú navigáciu a ovládanie podporuje klávesnicu vrátane pridania bezpečnostného prvku na aktuálnu stranu.
-- Bočný panel má zbaliteľné sekcie podpísaných a nedávnych dokumentov s piatimi položkami a „Zobraziť všetky“, pri karte ukazuje jej typ (eID alebo I.CA) a podpísané kópie sa dajú odstrániť aj so súborom do Koša.
+- Podpisovanie aj ZaKo zobrazujú aktuálny krok v podnadpise okna. Navigácia a voľba dokumentu sú v hornej lište. Stav karty (eID, I.CA alebo DEMO) je v stavovej lište.
+- Inšpektor podpisu sa dá skryť a meniť jeho šírku. Karty v inšpektore sú svetlé, bez vrstveného frosted glass. Vizuálny podpis má priehľadné pozadie.
+- Overenie originálu: lupa 100–250 %, Delete zmaže vybraný prvok, Escape zruší nástroj alebo výber. Klávesové posuny ostávajú ⌥ a ⇧⌥.
+- Doložka má štruktúrovaný živý náhľad (osem polí podľa zákona) a prepínač v toolbare.
+- Register má filter stavu, detail a odoslanie do CEZZK v toolbare. Pri autorizácii sa pole PIN zameria samo.
+- Počas podpisovania a autorizácie sú zablokované akcie, ktoré by vynulovali rozpracovanú operáciu. Bočný panel má zbaliteľné sekcie podpísaných a nedávnych dokumentov; podpísané kópie sa dajú odstrániť aj so súborom do Koša.
 
 ## AI Vision: vrstvená detekcia bezpečnostných prvkov
 
@@ -337,8 +338,8 @@ Podpis bez Safari sa dá vyskúšať priamo:
 <td width="50%" valign="top">
 <ul>
 <li><a href="docs/diagrams/autogram-visual-guide.html">AI Vision, architektúra a batch preflight</a> (HTML)</li>
+<li><a href="docs/diagrams/architecture.html">Architektúra aplikácie</a> (HTML) · <a href="docs/diagrams/architecture.svg">SVG</a></li>
 <li><a href="docs/gallery.html">Diagramová galéria</a></li>
-<li><a href="docs/diagrams/architecture.svg">Architektúra aplikácie</a></li>
 <li><a href="docs/diagrams/process-zako.svg">Proces zaručenej konverzie</a></li>
 <li><a href="docs/diagrams/mobile-signing.svg">Podpis mobilom (AVM)</a></li>
 </ul>
@@ -358,8 +359,8 @@ Podpis bez Safari sa dá vyskúšať priamo:
 <summary><strong>Ďalšie diagramy</strong></summary>
 
 <h3>Architektúra aplikácie</h3>
-<p>Natívny SwiftUI shell sa opiera o session stores a <code>AutogramKit</code>. Dokumentové služby zostávajú lokálne; externé hranice sú oddelené cez Java DSS helper, PKCS#11, PDFKit a EZZK.</p>
-<p align="center"><img src="docs/diagrams/architecture.svg" alt="Vrstvená architektúra Autogram macOS" width="100%"></p>
+<p>Tri zóny: povrchy (SwiftUI, Safari WebBridge, Autogram v mobile), jadro (session stores, AutogramKit, Java engine) a dôvera (evidencia, EZZK, PKCS#11 karty). Dokument neopúšťa Mac, kým to výslovne nezvolíte.</p>
+<p align="center"><img src="docs/diagrams/architecture.svg" alt="Architektúra Autogram macOS: povrchy, jadro a dôvera" width="100%"></p>
 
 <h3>PDF/A pipeline</h3>
 <p>Vloženie metadát a príloh, XMP profil, výpočet fingerprintu a kontrola, že exportovaný artefakt spĺňa požadovaný formát.</p>

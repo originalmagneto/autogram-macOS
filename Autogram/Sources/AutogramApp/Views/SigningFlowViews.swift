@@ -316,12 +316,22 @@ struct SigningPrepareView: View {
                 bridgePlacement = nil
             }
         }
+        .onAppear {
+            if let selected = store.identities.first(where: { $0.id == store.selectedIdentityID }),
+               selected.requiresPIN, store.signingPIN.isEmpty {
+                signingPINFocused = true
+            }
+        }
         .onChange(of: store.identities) { _, _ in
             refreshVisualCardContent()
             enableVisualCompositionIfReady()
         }
-        .onChange(of: store.selectedIdentityID) { _, _ in
+        .onChange(of: store.selectedIdentityID) { _, newID in
             refreshVisualCardContent()
+            if let selected = store.identities.first(where: { $0.id == newID }),
+               selected.requiresPIN, store.signingPIN.isEmpty {
+                signingPINFocused = true
+            }
         }
         .onChange(of: store.certificateLoadError) { _, _ in
             refreshVisualCardContent()
@@ -586,7 +596,7 @@ struct SigningPrepareView: View {
                     }
                 }
             }
-            .glassCard(cornerRadius: 14, padding: 14)
+            .inspectorCard(cornerRadius: 12, padding: 12)
 
             // Section 2: Parametre výstupu & TSA
             VStack(alignment: .leading, spacing: 12) {
@@ -668,7 +678,7 @@ struct SigningPrepareView: View {
                         .font(.callout)
                 }
             }
-            .glassCard(cornerRadius: 14, padding: 14)
+            .inspectorCard(cornerRadius: 12, padding: 12)
 
             // Section 3: Vizuálna pečiatka podpisu
             VStack(alignment: .leading, spacing: 12) {
@@ -686,7 +696,7 @@ struct SigningPrepareView: View {
                     VisibleAppearanceInspector(state: visualState)
                 }
             }
-            .glassCard(cornerRadius: 14, padding: 14)
+            .inspectorCard(cornerRadius: 12, padding: 12)
 
             // Section 4: Existujúce podpisy
             VStack(alignment: .leading, spacing: 8) {
@@ -696,7 +706,7 @@ struct SigningPrepareView: View {
 
                 existingSignaturesSection
             }
-            .glassCard(cornerRadius: 14, padding: 12)
+            .inspectorCard(cornerRadius: 12, padding: 12)
 
             if let error = store.lastError {
                 Text(error)
@@ -825,51 +835,58 @@ struct SignatureInfoRow: View {
 // MARK: - Step 3: Done View
 struct SigningDoneView: View {
     let store: SigningSessionStore
+    @State private var isInspectorPresented = true
 
     var body: some View {
-        HStack(alignment: .top, spacing: 0) {
+        VStack(spacing: 0) {
             previewColumn
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            VStack(spacing: 0) {
-                ScrollView {
-                    resultContent
-                        .padding(18)
+            StickyActionBar {
+                Button {
+                    store.reset()
+                    store.step = .intake
+                } label: {
+                    Label("Nový podpis", systemImage: "plus")
                 }
+                .controlSize(.large)
 
-                StickyActionBar {
+                Spacer()
+
+                if let url = store.signedOutputURL {
                     Button {
-                        store.reset()
-                        store.step = .intake
+                        NSWorkspace.shared.activateFileViewerSelecting([url])
                     } label: {
-                        Label("Nový podpis", systemImage: "plus")
+                        Label("Ukázať vo Finderi", systemImage: "folder")
                     }
                     .controlSize(.large)
 
-                    Spacer()
-
-                    if let url = store.signedOutputURL {
-                        Button {
-                            NSWorkspace.shared.activateFileViewerSelecting([url])
-                        } label: {
-                            Label("Ukázať vo Finderi", systemImage: "folder")
-                        }
-                        .controlSize(.large)
-
-                        Button {
-                            NSWorkspace.shared.open(url)
-                        } label: {
-                            Label("Otvoriť", systemImage: "doc.richtext")
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.large)
+                    Button {
+                        NSWorkspace.shared.open(url)
+                    } label: {
+                        Label("Otvoriť", systemImage: "doc.richtext")
                     }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
                 }
             }
-            .frame(width: 380)
-            .background(.bar)
-            .overlay(alignment: .leading) {
-                Rectangle().fill(Color.primary.opacity(0.08)).frame(width: 1)
+        }
+        .inspector(isPresented: $isInspectorPresented) {
+            ScrollView {
+                resultContent
+                    .padding(16)
+            }
+            .safeAreaPadding(.top)
+            .inspectorColumnWidth(min: 300, ideal: MacOS27Layout.inspectorIdealWidth, max: 480)
+        }
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    isInspectorPresented.toggle()
+                } label: {
+                    Label("Podrobnosti podpisu", systemImage: "sidebar.trailing")
+                }
+                .help("Zobraziť alebo skryť podrobnosti podpisu")
             }
         }
     }

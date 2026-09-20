@@ -329,6 +329,23 @@ struct RootView: View {
                 .navigationTitle(selection.rawValue)
                 .navigationSubtitle(subtitle)
         }
+        .toolbar {
+            ToolbarItem(placement: .status) {
+                let isCardConnected = !signingStore.identities.isEmpty
+                let identity = signingStore.identities.first
+                let cardLabel = identity?.label ?? (settingsStore.signingProvider is DemoSigningProvider ? "DEMO" : "Karta nepripojená")
+                HStack(spacing: 5) {
+                    Circle()
+                        .fill(isCardConnected ? Color.green : Color.secondary.opacity(0.4))
+                        .frame(width: 7, height: 7)
+                    Text(cardLabel)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                .help(isCardConnected ? "Čítačka a karta sú pripravené" : "Vložte eID alebo SAK kartu")
+            }
+        }
         .focusedValue(\.autogramCommandActions, AutogramCommandActions(
             openDocument: openDocument,
             addFiles: openMoreFiles,

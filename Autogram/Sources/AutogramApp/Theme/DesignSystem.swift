@@ -11,6 +11,16 @@ public extension View {
                     .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
             )
     }
+
+    /// Lighter container for inspector panels that avoids multiple frosted material layers.
+    func inspectorCard(cornerRadius: CGFloat = 12, padding: CGFloat = 12) -> some View {
+        self.padding(padding)
+            .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(0.07), lineWidth: 0.5)
+            )
+    }
 }
 
 // MARK: - Sticky Bottom Action Bar

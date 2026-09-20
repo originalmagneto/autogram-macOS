@@ -4,6 +4,7 @@ import AppKit
 
 struct AuthorizeView: View {
     @Bindable var store: ZakoSessionStore
+    @FocusState private var pinFocused: Bool
 
     var body: some View {
         VStack(spacing: 0) {
@@ -66,6 +67,16 @@ struct AuthorizeView: View {
             if let session = store.mobileSigning.session {
                 MobileSigningSheet(session: session) { store.mobileSigning.cancel() }
                     .interactiveDismissDisabled()
+            }
+        }
+        .onAppear {
+            if !store.signingProviderIsDemo, store.signingPIN.isEmpty {
+                pinFocused = true
+            }
+        }
+        .onChange(of: store.selectedIdentityID) { _, _ in
+            if !store.signingProviderIsDemo, store.signingPIN.isEmpty {
+                pinFocused = true
             }
         }
         .task { await store.refreshIdentities() }
@@ -208,6 +219,7 @@ struct AuthorizeView: View {
                 HStack(spacing: 8) {
                     SecureField("PIN karty", text: $store.signingPIN)
                         .textFieldStyle(.roundedBorder)
+                        .focused($pinFocused)
                         .onSubmit {
                             Task {
                                 await store.resolveCertificateForAuthorization(force: true)

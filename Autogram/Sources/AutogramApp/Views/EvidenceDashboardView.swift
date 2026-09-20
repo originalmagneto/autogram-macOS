@@ -19,9 +19,7 @@ struct EvidenceDashboardView: View {
     var body: some View {
         VStack(spacing: 0) {
             summaryHeader
-            Divider().opacity(0.6)
-            filterBar
-            Divider().opacity(0.4)
+            Divider().opacity(0.5)
 
             if records.isEmpty {
                 ContentUnavailableView("Register je prázdny",
@@ -93,6 +91,52 @@ struct EvidenceDashboardView: View {
             }
         }
         .searchable(text: $filterText, prompt: "Hľadať podľa názvu alebo čísla")
+        .toolbar {
+            ToolbarItem(placement: .automatic) {
+                Picker("Stav", selection: $statusFilter) {
+                    Text("Všetky stavy").tag(EvidenceRecord.Status?.none)
+                    ForEach(EvidenceRecord.Status.allCases, id: \.self) { status in
+                        Text(status.rawValue).tag(Optional(status))
+                    }
+                }
+                .pickerStyle(.menu)
+                .frame(minWidth: 130, idealWidth: 160)
+            }
+
+            ToolbarItemGroup(placement: .primaryAction) {
+                Button {
+                    showDetail = true
+                } label: {
+                    Label("Otvoriť detail", systemImage: "doc.text.magnifyingglass")
+                }
+                .disabled(selectedRecordID == nil)
+                .keyboardShortcut(.defaultAction)
+                .help("Otvoriť detail a doložku vybraného záznamu")
+
+                Button {
+                    submitPending()
+                } label: {
+                    HStack(spacing: 5) {
+                        if isSubmitting {
+                            ProgressView().controlSize(.small)
+                        } else {
+                            Image(systemName: "tray.and.arrow.up")
+                        }
+                        Text("Odoslať do CEZZK")
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(isSubmitting || !records.contains(where: \.isSubmissionPending))
+                .help("Odoslať čakajúce záznamy do centrálnej evidencie CEZZK")
+
+                Button {
+                    exportCSV()
+                } label: {
+                    Label("Export CSV", systemImage: "square.and.arrow.up.on.square")
+                }
+                .help("Exportovať záznamy do CSV")
+            }
+        }
         .onAppear {
             reload()
             startClock()
@@ -198,56 +242,6 @@ struct EvidenceDashboardView: View {
                     .padding(.vertical, 5)
                     .background(Color.primary.opacity(0.04), in: Capsule())
             }
-        }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 12)
-        .background(.bar)
-    }
-
-    private var filterBar: some View {
-        HStack(spacing: 12) {
-            Picker("Filtrovať podľa stavu", selection: $statusFilter) {
-                Text("Všetky stavy").tag(EvidenceRecord.Status?.none)
-                ForEach(EvidenceRecord.Status.allCases, id: \.self) { status in
-                    Text(status.rawValue).tag(Optional(status))
-                }
-            }
-            .pickerStyle(.menu)
-            .frame(minWidth: 150, idealWidth: 180, maxWidth: 220)
-
-            Spacer(minLength: 8)
-
-            Button {
-                showDetail = true
-            } label: {
-                Label("Otvoriť detail", systemImage: "doc.text.magnifyingglass")
-            }
-            .buttonStyle(.bordered)
-            .disabled(selectedRecordID == nil)
-            .keyboardShortcut(.defaultAction)
-
-            Button {
-                submitPending()
-            } label: {
-                HStack(spacing: 6) {
-                    if isSubmitting {
-                        ProgressView().controlSize(.small)
-                    } else {
-                        Image(systemName: "tray.and.arrow.up")
-                    }
-                    Text("Odoslať čakajúce do CEZZK")
-                }
-            }
-            .buttonStyle(.borderedProminent)
-            .disabled(isSubmitting || !records.contains(where: \.isSubmissionPending))
-
-            Button {
-                exportCSV()
-            } label: {
-                Label("Export CSV", systemImage: "square.and.arrow.up.on.square")
-            }
-            .buttonStyle(.bordered)
-
             if let exportError {
                 HStack(spacing: 4) {
                     Text(exportError)
@@ -260,7 +254,7 @@ struct EvidenceDashboardView: View {
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 10)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(.bar)
     }
 
     static let deadlineFormatter: DateFormatter = {

@@ -9,6 +9,7 @@ struct AnalysisCanvasView: View {
     @State private var interaction: Interaction?
     @State private var pageImage: NSImage?
     @State private var pageAspect: CGFloat = 1.414
+    @State private var zoomScale: CGFloat = 1.0
 
     struct Interaction {
         enum Kind {
@@ -114,6 +115,25 @@ struct AnalysisCanvasView: View {
             }
         }
         .sheet(isPresented: $showPhysicalElementSheet) { PhysicalSecurityElementSheet(store: store) }
+        .onKeyPress(.delete) {
+            if let id = store.selectedElementID {
+                store.selectedElementID = nil
+                store.removeSecurityElement(id: id)
+                return .handled
+            }
+            return .ignored
+        }
+        .onKeyPress(.escape) {
+            if store.activeTool != nil {
+                store.activeTool = nil
+                return .handled
+            }
+            if store.selectedElementID != nil {
+                store.selectedElementID = nil
+                return .handled
+            }
+            return .ignored
+        }
         .task(id: "\(store.previewPageIndex)-\(store.document == nil)") {
             renderPage()
         }
@@ -261,7 +281,7 @@ struct AnalysisCanvasView: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .glassCard(cornerRadius: 12, padding: 12)
+        .inspectorCard(cornerRadius: 12, padding: 12)
     }
 
     /// Indicator + inline switcher for the detection provider. Apple Vision
@@ -356,27 +376,48 @@ struct AnalysisCanvasView: View {
                 Color(nsColor: .controlBackgroundColor).opacity(0.35)
 
                 if let image = pageImage {
-                    // Fitter over the whole canvas resolves the letterboxed page rect.
-                    let canvasFitter = ElementGeometry.AspectFitter(
+                    let baseFitter = ElementGeometry.AspectFitter(
                         container: geometry.size,
                         imageAspect: pageAspect)
 
-                    // Image sized exactly to the page rect; overlay covers the same frame,
-                    // so normalized coordinates stay anchored to the document at any size.
-                    Image(nsImage: image)
-                        .resizable()
-                        .frame(width: canvasFitter.contentRect.width,
-                               height: canvasFitter.contentRect.height)
-                        .overlay {
-                            ElementOverlay(
-                                store: store,
-                                mapper: AnalysisCanvasView.CanvasMapper(
-                                    fitter: ElementGeometry.AspectFitter(
-                                        container: canvasFitter.contentRect.size,
-                                        imageAspect: pageAspect)),
-                                interaction: $interaction)
+                    if zoomScale > 1.0 {
+                        ScrollView([.horizontal, .vertical], showsIndicators: true) {
+                            let zoomedWidth = baseFitter.contentRect.width * zoomScale
+                            let zoomedHeight = baseFitter.contentRect.height * zoomScale
+                            let zoomedSize = CGSize(width: zoomedWidth, height: zoomedHeight)
+
+                            Image(nsImage: image)
+                                .resizable()
+                                .frame(width: zoomedWidth, height: zoomedHeight)
+                                .overlay {
+                                    ElementOverlay(
+                                        store: store,
+                                        mapper: AnalysisCanvasView.CanvasMapper(
+                                            fitter: ElementGeometry.AspectFitter(
+                                                container: zoomedSize,
+                                                imageAspect: pageAspect)),
+                                        interaction: $interaction)
+                                }
+                                .shadow(color: .black.opacity(0.15), radius: 8, y: 3)
+                                .padding(16)
                         }
-                        .shadow(color: .black.opacity(0.15), radius: 8, y: 3)
+                    } else {
+                        // Fit to window
+                        Image(nsImage: image)
+                            .resizable()
+                            .frame(width: baseFitter.contentRect.width,
+                                   height: baseFitter.contentRect.height)
+                            .overlay {
+                                ElementOverlay(
+                                    store: store,
+                                    mapper: AnalysisCanvasView.CanvasMapper(
+                                        fitter: ElementGeometry.AspectFitter(
+                                            container: baseFitter.contentRect.size,
+                                            imageAspect: pageAspect)),
+                                    interaction: $interaction)
+                            }
+                            .shadow(color: .black.opacity(0.15), radius: 8, y: 3)
+                    }
                 } else if store.isAnalyzing {
                     VStack(spacing: 8) {
                         ProgressView().controlSize(.regular)
@@ -454,11 +495,51 @@ struct AnalysisCanvasView: View {
                  + " · \(store.analysis.nonEmptyPages) neprázdne ·")
             sheetCountMenu
             Text("· " + SlovakCount.phrase(store.securityElements.count, "prvok", "prvky", "prvkov"))
+
+            Spacer(minLength: 8)
+
+            zoomControls
         }
         .font(.caption.monospacedDigit())
         .foregroundStyle(.secondary)
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityLabel("Súhrn dokumentu")
+    }
+
+    private var zoomControls: some View {
+        HStack(spacing: 3) {
+            Button {
+                zoomScale = max(1.0, zoomScale - 0.25)
+            } label: {
+                Image(systemName: "minus.magnifyingglass")
+            }
+            .buttonStyle(.borderless)
+            .disabled(zoomScale <= 1.0)
+            .help("Zmenšiť náhľad strany")
+
+            Menu {
+                Button("100% (prispôsobiť)") { zoomScale = 1.0 }
+                Button("125%") { zoomScale = 1.25 }
+                Button("150%") { zoomScale = 1.5 }
+                Button("200%") { zoomScale = 2.0 }
+            } label: {
+                Text("\(Int(zoomScale * 100))%")
+                    .font(.caption2.monospacedDigit())
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+
+            Button {
+                zoomScale = min(2.5, zoomScale + 0.25)
+            } label: {
+                Image(systemName: "plus.magnifyingglass")
+            }
+            .buttonStyle(.borderless)
+            .disabled(zoomScale >= 2.5)
+            .help("Zväčšiť náhľad strany (lupa na detaily)")
+        }
+        .controlSize(.small)
     }
 
     private var sheetCountMenu: some View {
@@ -593,7 +674,7 @@ struct AnalysisCanvasView: View {
                 .help("Číselné umiestnenie a klávesové posuny. Ťahanie na plátne a klik na prvok sú rýchlejšie.")
             }
         }
-        .glassCard(cornerRadius: 12, padding: 12)
+        .inspectorCard(cornerRadius: 12, padding: 12)
     }
 
     /// Review status of the current page: counts, the reviewed toggle, and the
@@ -637,7 +718,7 @@ struct AnalysisCanvasView: View {
             }
 
         }
-        .glassCard(cornerRadius: 12, padding: 12)
+        .inspectorCard(cornerRadius: 12, padding: 12)
     }
 
     @ViewBuilder
@@ -705,6 +786,15 @@ struct AnalysisCanvasView: View {
                         adjustSelectedElement(dx: 0, dy: 0, dw: 0, dh: 0.01)
                     }
                 }
+
+                HStack(spacing: 5) {
+                    Image(systemName: "keyboard")
+                        .font(.caption2)
+                    Text("Klávesy: ⌥+šípky (posun) · ⇧⌥+šípky (veľkosť) · ⌫ (zmazať)")
+                        .font(.caption2)
+                }
+                .foregroundStyle(.secondary)
+                .padding(.top, 2)
             }
             .padding(10)
             .background(Color.accentColor.opacity(0.07), in: RoundedRectangle(cornerRadius: 10))
