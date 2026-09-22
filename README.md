@@ -10,6 +10,7 @@
   <img src="https://img.shields.io/badge/Swift-6-f05138?style=flat-square" alt="Swift 6">
   <img src="https://img.shields.io/badge/AI-vstavan%C3%A1%20on--device-2e5aa8?style=flat-square" alt="Vstavaná AI beží na zariadení">
   <img src="https://img.shields.io/badge/z%C3%A1vislosti-0%20balíkov-4f5d75?style=flat-square" alt="0 Swift package závislostí">
+  <a href="https://buymeacoffee.com/chevron7"><img src="https://img.shields.io/badge/podpori%C5%A5-Buy%20Me%20a%20Coffee-ffdd00?style=flat-square&logo=buymeacoffee&logoColor=000" alt="Podporiť vývoj"></a>
 </p>
 
 <p align="center">
@@ -555,6 +556,17 @@ Aktuálny ZaKo profil je implementačný P2E pilot s PDF/A-2b. Lokálny `PDFAVal
 </table>
 
 Kompletná implementačná dokumentácia je v [`docs/PHASES.md`](docs/PHASES.md); návrh podpisu mobilom v [`docs/superpowers/specs/2026-09-11-avm-mobile-signing-design.md`](docs/superpowers/specs/2026-09-11-avm-mobile-signing-design.md); návrh podpisovania na štátnych weboch v [`Autogram/docs/superpowers/specs/2026-09-11-safari-extension-design.md`](Autogram/docs/superpowers/specs/2026-09-11-safari-extension-design.md) a jeho spúšťania na pozadí v [`Autogram/docs/superpowers/specs/2026-09-16-web-signing-background-design.md`](Autogram/docs/superpowers/specs/2026-09-16-web-signing-background-design.md); zistenia z ladenia podpisovania na nove.slovensko.sk kartou I.CA, eID a mobilom v [`Autogram/docs/WEB-SIGNING-FINDINGS-2026-09-16.md`](Autogram/docs/WEB-SIGNING-FINDINGS-2026-09-16.md); integrácia EZZK cez SOAP, jej nastavenie, overený kontrakt a údržba v [`Autogram/docs/EZZK-INTEGRATION.md`](Autogram/docs/EZZK-INTEGRATION.md) a technický register zistení v [`Autogram/docs/P2E-EZZK-FINDINGS.md`](Autogram/docs/P2E-EZZK-FINDINGS.md); návrh vrstvenej detekcie v [`Autogram/docs/superpowers/specs/2026-09-05-layered-security-element-detection-design.md`](Autogram/docs/superpowers/specs/2026-09-05-layered-security-element-detection-design.md).
+
+## Podporiť vývoj
+
+Aplikácia je open source a zostane zadarmo. Dobrovoľný príspevok cez
+[Buy Me a Coffee](https://buymeacoffee.com/chevron7) ide na konkrétnu vec: na
+členstvo v Apple Developer Program.
+
+Bez neho sa buildy podpisujú ad-hoc, a Safari načíta rozšírenie len pri zapnutom
+**Develop > Allow Unsigned Extensions**, ktoré si navyše nepamätá po reštarte.
+S ním je aplikácia podpísaná Developer ID a notarizovaná, takže rozšírenie sa
+načíta bez tohto kroku a inštalácia nevyžaduje obchádzanie Gatekeepera.
 
 ## Právne a bezpečnostné upozornenie
 

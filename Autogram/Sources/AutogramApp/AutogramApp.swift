@@ -152,7 +152,23 @@ private struct AutogramCommands: Commands {
             }
             .keyboardShortcut(",", modifiers: .command)
         }
+
+        CommandGroup(replacing: .help) {
+            Button {
+                NSWorkspace.shared.open(AppLinks.donate)
+            } label: {
+                Label("Podporiť vývoj…", systemImage: "cup.and.saucer")
+            }
+        }
     }
+}
+
+/// Links the app opens in the browser.
+enum AppLinks {
+    /// Voluntary contributions. They pay for the Apple Developer Program
+    /// membership, without which builds stay ad-hoc signed and Safari loads the
+    /// extension only with Allow Unsigned Extensions re-enabled after every start.
+    static let donate = URL(string: "https://buymeacoffee.com/chevron7")!
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {

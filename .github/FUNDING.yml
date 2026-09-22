@@ -1,0 +1,4 @@
+# Renders the Sponsor button on the repository.
+# The handle is chevron7, the name this project is being renamed to, so the
+# link survives the rename.
+buy_me_a_coffee: chevron7
