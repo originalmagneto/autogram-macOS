@@ -1,0 +1,82 @@
+#!/bin/bash
+set -euo pipefail
+
+# Guards the line the Chevron7 rename stops at: Autogram is a dependency and an
+# ancestor, not our name. Run it without arguments after every change. With
+# --strict it also fails on old product names left in product code and living
+# docs, which holds only once the rename is complete. Historical specs, plans
+# and findings keep their text and are not scanned.
+
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+package_root="$(cd -- "${script_dir}/.." && pwd)"
+repo_root="$(cd -- "${package_root}/.." && pwd)"
+
+strict=false
+[[ "${1:-}" == "--strict" ]] && strict=true
+
+failures=0
+ok()   { printf '  \033[32m✔\033[0m %s\n' "$1"; }
+fail() { printf '  \033[31m✘\033[0m %s\n' "$1"; failures=$((failures + 1)); }
+
+source_file() {
+    find "${package_root}/Sources" "${package_root}/WebExtension" -name "$1" -not -path '*/.build/*' -print -quit
+}
+
+must_keep() {
+    local file="$1" literal="$2"
+    if [[ -n "$file" && -f "$file" ]] && grep -qF -- "$literal" "$file"; then
+        ok "${file#"${repo_root}/"} keeps ${literal}"
+    else
+        fail "${file#"${repo_root}/"} lost ${literal}"
+    fi
+}
+
+echo "▸ Nothing of ours inside the upstream engine"
+if leaks="$(grep -rIil 'chevron7' "${repo_root}/engine" --exclude-dir=target 2>/dev/null)"; then
+    fail "chevron7 in engine/: ${leaks//$'\n'/, }"
+else
+    ok "engine/ carries no chevron7"
+fi
+
+echo "▸ Autogram names we depend on"
+avm_client="$(source_file AVMClient.swift)"
+must_keep "$avm_client" 'URL(string: "https://autogram.slovensko.digital/api/v1")'
+must_keep "$avm_client" '/qr-code?guid='
+must_keep "$avm_client" 'forHTTPHeaderField: "X-Encryption-Key"'
+if [[ -n "$avm_client" ]] && grep -rIil 'chevron7' "$(dirname "$avm_client")" >/dev/null 2>&1; then
+    fail "chevron7 in the AVM sources"
+else
+    ok "AVM sources carry no chevron7"
+fi
+must_keep "${package_root}/build_app.sh" '<string>org.autogram.asice</string>'
+must_keep "$(source_file SigningFlowViews.swift)" 'UTType(importedAs: "org.autogram.asice"'
+must_keep "$(source_file ditec.js)" 'isAutogram: true'
+must_keep "$(source_file FormPack.swift)" 'autogram-p2e-legacy-swift-1.0'
+must_keep "$(source_file UserPreferences.swift)" 'digital.slovensko.autogram.timestamp-provider'
+
+if $strict; then
+    echo "▸ No old product names left (strict)"
+    scanned=(
+        "${package_root}/Sources" "${package_root}/Tests" "${package_root}/scripts"
+        "${package_root}/build_app.sh" "${package_root}/WebExtension" "${package_root}/Assets"
+        "${package_root}/docs/EZZK-INTEGRATION.md" "${package_root}/docs/security-element-training.md"
+        "${repo_root}/README.md" "${repo_root}/AGENTS.md" "${repo_root}/CLAUDE.md" "${repo_root}/.gitignore"
+    )
+    # A missing path would make grep exit 2, which pipefail would report instead
+    # of the hits, so scan only what exists.
+    existing=()
+    for path in "${scanned[@]}"; do [[ -e "$path" ]] && existing+=("$path"); done
+    pattern='sk\.autogram|autogram://|Autogram macOS\.app|Autogram(Kit|App|WebBridge|WebExtension)|autogram-webbridge-agent|autogram-macos-|autogramMacOS|AUTOGRAM_(CLI_HELPER|JAVA_ENGINE_ROOT|ENGINE_LIVE_TEST|DIAG_PDF|LEGACY_APP_ROOT)|Application Support/Autogram'
+    if hits="$(grep -rIEn --exclude-dir=.build -- "$pattern" "${existing[@]}" | grep -v 'scripts/check-rename-boundary.sh')"; then
+        fail "old names remain:"
+        printf '%s\n' "$hits" | sed 's/^/      /'
+    else
+        ok "no old product names in product code or living docs"
+    fi
+fi
+
+if (( failures > 0 )); then
+    echo "✘ ${failures} boundary check(s) failed"
+    exit 1
+fi
+echo "✔ Boundary holds"
