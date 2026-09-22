@@ -1341,7 +1341,7 @@ struct WebSigningStorageCard: View {
         let configured = settingsStore.settings.webSigningOutputPath
             .trimmingCharacters(in: .whitespacesAndNewlines)
         if configured.isEmpty {
-            return SigningSessionStore.outputDirectoryURL().path
+            return settingsStore.outputDirectory.path
         }
         return (configured as NSString).expandingTildeInPath
     }

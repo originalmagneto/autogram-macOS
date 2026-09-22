@@ -4,7 +4,6 @@
 import Foundation
 import PDFKit
 import SwiftUI
-import Chevron7Identity
 import Chevron7Kit
 
 @MainActor
@@ -209,14 +208,15 @@ final class ZakoSessionStore {
 
     init(settingsStore: AppSettingsStore,
          formPackRepository: FormPackRepository = FormPackRepository(),
-         exampleBank: ExampleBank = ExampleBank(directory: ExampleBank.defaultDirectory)) {
+         exampleBank: ExampleBank? = nil) {
         self.settingsStore = settingsStore
         self.mobileSigning = MobileSigningCoordinator(settingsStore: settingsStore)
         self.pdfaConverter = PDFAConverter()
         self.clauseGenerator = AttestationClauseGenerator()
         self.embeddedFileService = EmbeddedFileService()
         self.formPackRepository = formPackRepository
-        self.exampleBank = exampleBank
+        // A bank of its own on the settings store root, as before; the app passes the shared one.
+        self.exampleBank = exampleBank ?? ExampleBank(directory: settingsStore.exampleBankDirectory)
         self.selectedFormPack = formPackRepository.packs.first {
             $0.direction == .paperToElectronic && $0.isActive(at: Date())
         } ?? FormPackRepository.currentLegacyUnverified
@@ -1190,7 +1190,7 @@ final class ZakoSessionStore {
             let directory = ConversionOutputNaming.outputDirectory(
                 sourceURL: sourceURL,
                 preferredDirectory: outputDirectoryOverride,
-                fallback: Self.outputDirectoryURL())
+                fallback: settingsStore.outputDirectory)
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
 
             let packager = ASiCEPackager()
@@ -1354,7 +1354,7 @@ final class ZakoSessionStore {
     }
 
     func saveTemplate() {
-        let url = Self.templatesDirectory().appendingPathComponent("\(sanitizedBaseName()).zako-template.json")
+        let url = templatesDirectory().appendingPathComponent("\(sanitizedBaseName()).zako-template.json")
         do {
             let data = try JSONEncoder.pretty.encode(attestation)
             try data.write(to: url, options: [.atomic])
@@ -1364,7 +1364,7 @@ final class ZakoSessionStore {
     }
 
     func loadLatestTemplate() {
-        let directory = Self.templatesDirectory()
+        let directory = templatesDirectory()
         guard let files = try? FileManager.default.contentsOfDirectory(at: directory,
                                                                        includingPropertiesForKeys: [.contentModificationDateKey]),
               let latest = files.filter({ $0.pathExtension == "json" })
@@ -1474,12 +1474,8 @@ func resetSession(keepingProfile: Bool) {
             requestedDocumentName: attestation.newDocumentName)
     }
 
-    static func outputDirectoryURL() -> URL {
-        ProductIdentity.applicationSupportDirectory().appendingPathComponent("Output", isDirectory: true)
-    }
-
-    static func templatesDirectory() -> URL {
-        let url = ProductIdentity.applicationSupportDirectory().appendingPathComponent("Templates", isDirectory: true)
+    func templatesDirectory() -> URL {
+        let url = settingsStore.templatesDirectory
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return url
     }

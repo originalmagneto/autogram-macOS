@@ -15,7 +15,7 @@ final class ZakoBankRecordingTests: XCTestCase {
     private func makeStore(learn: Bool) throws -> (ZakoSessionStore, ExampleBank) {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("zako-bank-\(UUID().uuidString)", isDirectory: true)
         let bank = ExampleBank(directory: dir)
-        let settingsStore = AppSettingsStore()
+        let settingsStore = makeSettingsStore()
         // AppSettingsStore.settings.didSet persists to disk, so the user's real
         // settings must be put back when the test finishes.
         let originalSettings = settingsStore.settings

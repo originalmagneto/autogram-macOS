@@ -9,7 +9,7 @@ import Chevron7Kit
 @MainActor
 final class ZakoEvidenceNumberTests: XCTestCase {
     func testFetchedNumberRecordsItsAllocationTime() async {
-        let settingsStore = AppSettingsStore()
+        let settingsStore = makeSettingsStore()
         // Never reach EZZK from a unit test, whatever the developer selected in the app.
         settingsStore.ezzkAccountController.setMode(.demo)
         let store = ZakoSessionStore(settingsStore: settingsStore)
@@ -28,7 +28,7 @@ final class ZakoEvidenceNumberTests: XCTestCase {
         let transport = ScriptedTransport([])
         let controller = EZZKAccountController(mode: .demo, credentialStore: MemoryCredentialStore(),
                                                transportFactory: { _ in transport })
-        let settingsStore = AppSettingsStore(ezzkAccountController: controller)
+        let settingsStore = makeSettingsStore(ezzkAccountController: controller)
         let store = ZakoSessionStore(settingsStore: settingsStore)
         await store.fetchEvidenceNumber()
         XCTAssertNotNil(store.attestation.evidenceNumber)
@@ -48,7 +48,7 @@ final class ZakoEvidenceNumberTests: XCTestCase {
     }
 
     func testIdentityWarningIsSilentInDemoMode() {
-        let settingsStore = AppSettingsStore()
+        let settingsStore = makeSettingsStore()
         let original = settingsStore.settings
         defer { settingsStore.settings = original }
         settingsStore.ezzkAccountController.setMode(.demo)
@@ -61,7 +61,7 @@ final class ZakoEvidenceNumberTests: XCTestCase {
     }
 
     func testIdentityWarningIsShownOutsideDemoModeOnMismatch() {
-        let settingsStore = AppSettingsStore()
+        let settingsStore = makeSettingsStore()
         let original = settingsStore.settings
         defer { settingsStore.settings = original }
         settingsStore.ezzkAccountController.setMode(.test)

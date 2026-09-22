@@ -41,9 +41,9 @@ final class EngineBridgeGeometryTests: XCTestCase {
             return XCTFail("Testovacie PDF sa nepodarilo otvoriť.")
         }
         let cropBox = page.bounds(for: .cropBox)
-        let provider = EngineBridgeSigningProvider()
         let workDirectory = try EngineBridgeSigningProvider.makeWorkspace()
         defer { try? FileManager.default.removeItem(at: workDirectory) }
+        let provider = EngineBridgeSigningProvider(renderer: VisibleSignatureRenderer(cacheRoot: workDirectory))
 
         // normalized y rastie zhora nadol; y=0.25 → cropBox-lokálne minY = 0.65 * height
         let stamp = VisualStampSpec(fullName: "Test Testovsky",
@@ -84,7 +84,7 @@ final class EngineBridgeGeometryTests: XCTestCase {
         let asset = SignatureAsset(id: UUID(), kind: .png, managedFilename: "art.png")
         try EngineBridgeSigningProvider.textArtworkPNG(fullName: "Test", timestamp: Date())
             .write(to: store.fileURL(for: asset))
-        let url = try VisibleSignatureRenderer(assetStore: store).render(
+        let url = try VisibleSignatureRenderer(assetStore: store, cacheRoot: work).render(
             asset: asset,
             content: VisibleSignatureCardContent(signerName: "Mgr. Test",
                                                  certificateQualification: "Kvalifikovaný elektronický podpis"),
@@ -519,7 +519,7 @@ final class EngineBridgeLiveSignTests: XCTestCase {
         let asset = SignatureAsset(id: UUID(), kind: .png, managedFilename: "art.png")
         try EngineBridgeSigningProvider.textArtworkPNG(fullName: "Test", timestamp: Date())
             .write(to: store.fileURL(for: asset))
-        let rendered = try VisibleSignatureRenderer(assetStore: store).render(
+        let rendered = try VisibleSignatureRenderer(assetStore: store, cacheRoot: work).render(
             asset: asset,
             content: VisibleSignatureCardContent(signerName: "Test", certificateQualification: nil),
             signingTime: Date(),

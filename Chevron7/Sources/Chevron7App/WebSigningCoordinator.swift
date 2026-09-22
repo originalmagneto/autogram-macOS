@@ -141,7 +141,7 @@ final class WebSigningCoordinator {
         let configured = settingsStore.settings.webSigningOutputPath
             .trimmingCharacters(in: .whitespacesAndNewlines)
         let directory = configured.isEmpty
-            ? SigningSessionStore.outputDirectoryURL()
+            ? settingsStore.outputDirectory
             : URL(fileURLWithPath: (configured as NSString).expandingTildeInPath, isDirectory: true)
         let base = (request.filename as NSString).deletingPathExtension
         let stem = (base.isEmpty ? "dokument" : base) + "_podpisane"

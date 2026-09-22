@@ -612,7 +612,7 @@ final class SigningBatchTests: XCTestCase {
 
 
     private func makeStore(provider: RecordingSigningProvider) -> SigningSessionStore {
-        let settings = AppSettingsStore()
+        let settings = makeSettingsStore()
         let defaults = UserDefaults(suiteName: "SigningBatchTests.\(UUID().uuidString)")!
         let recent = RecentDocumentStore(settingsStore: settings, defaults: defaults)
         return SigningSessionStore(

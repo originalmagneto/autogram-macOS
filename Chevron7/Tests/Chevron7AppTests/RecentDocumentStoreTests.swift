@@ -10,7 +10,7 @@ import Chevron7Kit
 final class RecentDocumentStoreTests: XCTestCase {
     func testStoreIsDisabledByDefaultAndDoesNotRecord() {
         XCTAssertFalse(AppSettings().retainRecentDocuments)
-        let settingsStore = AppSettingsStore()
+        let settingsStore = makeSettingsStore()
         settingsStore.settings.retainRecentDocuments = false
         let defaults = makeDefaults()
         let store = RecentDocumentStore(settingsStore: settingsStore, defaults: defaults)
@@ -23,7 +23,7 @@ final class RecentDocumentStoreTests: XCTestCase {
         XCTAssertNil(defaults.data(forKey: "app.slovensko.chevron7.recentDocuments.v1"))
     }
     func testSigningStoreRecordsOnlyNewlyAcceptedDocuments() async {
-        let settingsStore = AppSettingsStore()
+        let settingsStore = makeSettingsStore()
         settingsStore.settings.retainRecentDocuments = true
         let recentStore = RecentDocumentStore(settingsStore: settingsStore, defaults: makeDefaults())
         let signingStore = SigningSessionStore(
@@ -44,7 +44,7 @@ final class RecentDocumentStoreTests: XCTestCase {
     }
 
     func testRemovingOrResettingQueueSelectionClearsSelectedQueueID() async {
-        let settingsStore = AppSettingsStore()
+        let settingsStore = makeSettingsStore()
         let recentStore = RecentDocumentStore(settingsStore: settingsStore, defaults: makeDefaults())
         let signingStore = SigningSessionStore(
             signingProvider: DemoSigningProvider(),
@@ -67,7 +67,7 @@ final class RecentDocumentStoreTests: XCTestCase {
     }
 
     func testEnablingPersistenceRecordsEntryAndPersistsMetadata() throws {
-        let settingsStore = AppSettingsStore()
+        let settingsStore = makeSettingsStore()
         settingsStore.settings.retainRecentDocuments = true
         let defaults = makeDefaults()
         let store = RecentDocumentStore(settingsStore: settingsStore, defaults: defaults)
@@ -90,7 +90,7 @@ final class RecentDocumentStoreTests: XCTestCase {
 
     }
     func testEntriesAreBoundedAndOrderedMostRecentlyOpenedFirst() {
-        let settingsStore = AppSettingsStore()
+        let settingsStore = makeSettingsStore()
         settingsStore.settings.retainRecentDocuments = true
         let store = RecentDocumentStore(settingsStore: settingsStore, defaults: makeDefaults())
         let urls = (0..<10).map { makeDocument(named: "document-\($0).pdf") }
@@ -104,7 +104,7 @@ final class RecentDocumentStoreTests: XCTestCase {
     }
 
     func testRecordingDuplicateRefreshesExistingEntryToTheFront() {
-        let settingsStore = AppSettingsStore()
+        let settingsStore = makeSettingsStore()
         settingsStore.settings.retainRecentDocuments = true
         let store = RecentDocumentStore(settingsStore: settingsStore, defaults: makeDefaults())
         let firstURL = makeDocument(named: "first.pdf")
@@ -122,7 +122,7 @@ final class RecentDocumentStoreTests: XCTestCase {
     }
 
     func testResolveStartsSecurityScopedAccessAndReturnsDocumentURL() {
-        let settingsStore = AppSettingsStore()
+        let settingsStore = makeSettingsStore()
         settingsStore.settings.retainRecentDocuments = true
         let store = RecentDocumentStore(settingsStore: settingsStore, defaults: makeDefaults())
         let url = makeDocument(named: "resolve.pdf")
@@ -134,7 +134,7 @@ final class RecentDocumentStoreTests: XCTestCase {
     }
 
     func testAvailabilityChecksBookmarkWithoutOpeningDocument() {
-        let settingsStore = AppSettingsStore()
+        let settingsStore = makeSettingsStore()
         settingsStore.settings.retainRecentDocuments = true
         let store = RecentDocumentStore(settingsStore: settingsStore, defaults: makeDefaults())
         let url = makeDocument(named: "availability.pdf")
@@ -148,7 +148,7 @@ final class RecentDocumentStoreTests: XCTestCase {
     }
 
     func testWithResolvedURLRunsOperationForAvailableEntry() async {
-        let settingsStore = AppSettingsStore()
+        let settingsStore = makeSettingsStore()
         settingsStore.settings.retainRecentDocuments = true
         let store = RecentDocumentStore(settingsStore: settingsStore, defaults: makeDefaults())
         let url = makeDocument(named: "balanced.pdf")
@@ -165,7 +165,7 @@ final class RecentDocumentStoreTests: XCTestCase {
     }
 
     func testResolveReturnsStaleBookmarkURLWithoutRemovingEntry() throws {
-        let settingsStore = AppSettingsStore()
+        let settingsStore = makeSettingsStore()
         settingsStore.settings.retainRecentDocuments = true
         let defaults = makeDefaults()
         let originalURL = makeDocument(named: "stale-original.pdf")
@@ -200,7 +200,7 @@ final class RecentDocumentStoreTests: XCTestCase {
     }
 
     func testMissingBookmarkCanBeRemovedExplicitlyWithoutMutatingDuringResolution() throws {
-        let settingsStore = AppSettingsStore()
+        let settingsStore = makeSettingsStore()
         settingsStore.settings.retainRecentDocuments = true
         let defaults = makeDefaults()
         let missing = RecentDocumentStore.RecentDocument(
@@ -221,7 +221,7 @@ final class RecentDocumentStoreTests: XCTestCase {
     }
 
     func testClearRemovesAllEntriesAndPersistedData() {
-        let settingsStore = AppSettingsStore()
+        let settingsStore = makeSettingsStore()
         settingsStore.settings.retainRecentDocuments = true
         let defaults = makeDefaults()
         let store = RecentDocumentStore(settingsStore: settingsStore, defaults: defaults)

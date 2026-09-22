@@ -511,10 +511,14 @@ public final class EngineBridgeSigningProvider: QualifiedSigningProviding, @unch
         let signingTime = stamp.timestamp
         let renderedURL: URL
         do {
-            renderedURL = try VisibleSignatureRenderer(assetStore: store).render(asset: asset,
-                                                                                 content: content,
-                                                                                 signingTime: signingTime,
-                                                                                 rotationDegrees: placement.rotationDegrees)
+            // Keep the injected renderer's cache root; only the artwork store is per call.
+            renderedURL = try VisibleSignatureRenderer(assetStore: store,
+                                                       cacheRoot: renderer.cacheRoot,
+                                                       fileManager: renderer.fileManager)
+                .render(asset: asset,
+                        content: content,
+                        signingTime: signingTime,
+                        rotationDegrees: placement.rotationDegrees)
         } catch {
             throw SigningError.signingFailed("Náhľad grafického podpisu sa nepodarilo vyrenderovať.")
         }

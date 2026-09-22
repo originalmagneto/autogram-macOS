@@ -9,7 +9,7 @@ import Chevron7Kit
 @MainActor
 final class ZakoCertificateResolutionTests: XCTestCase {
     func testRefreshIdentitiesResolvesCertificatesWhenPINIsPresent() async {
-        let settingsStore = AppSettingsStore()
+        let settingsStore = makeSettingsStore()
         let provider = CertificateResolutionProbeProvider()
         settingsStore.useRealSigningProvider(provider)
         let store = ZakoSessionStore(settingsStore: settingsStore)
@@ -23,7 +23,7 @@ final class ZakoCertificateResolutionTests: XCTestCase {
     }
 
     func testChangingPINDuringResolutionDoesNotPublishStaleCertificate() async {
-        let settingsStore = AppSettingsStore()
+        let settingsStore = makeSettingsStore()
         let provider = CertificateResolutionProbeProvider()
         provider.suspendFirstResolution = true
         settingsStore.useRealSigningProvider(provider)

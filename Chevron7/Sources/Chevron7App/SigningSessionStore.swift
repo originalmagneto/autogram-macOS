@@ -4,7 +4,6 @@
 import Foundation
 import PDFKit
 import SwiftUI
-import Chevron7Identity
 import Chevron7Kit
 
 @MainActor
@@ -424,7 +423,7 @@ final class SigningSessionStore {
                 || (viaMobile && outputFormat == .embeddedPAdES)
             if convertToPDFA, includeVisibleSignature, preappliesVisualStamp {
                 let imageData = visualArtworkOverride
-                    ?? VisualSignatureStore.imageData(for: selectedVisualAppearanceID)
+                    ?? VisualSignatureStore.imageData(for: selectedVisualAppearanceID, in: settingsStore.signaturesDirectory)
                 let stamp = VisibleSignatureStamper.StampData(
                     fullName: displayName(),
                     timestamp: Date(),
@@ -472,7 +471,7 @@ final class SigningSessionStore {
             }
             if !convertToPDFA, includeVisibleSignature, preappliesVisualStamp {
                 let imageData = visualArtworkOverride
-                    ?? VisualSignatureStore.imageData(for: selectedVisualAppearanceID)
+                    ?? VisualSignatureStore.imageData(for: selectedVisualAppearanceID, in: settingsStore.signaturesDirectory)
                 let stamp = VisibleSignatureStamper.StampData(
                     fullName: displayName(),
                     timestamp: Date(),
@@ -494,7 +493,7 @@ final class SigningSessionStore {
 
             statusText = viaMobile ? "Čakám na podpis z mobilu…" : "Podpisujem kvalifikovaným podpisom…"
             let pdfName = sourceURL?.lastPathComponent ?? "dokument.pdf"
-            let artworkPNG = visualArtworkOverride ?? VisualSignatureStore.imageData(for: selectedVisualAppearanceID)
+            let artworkPNG = visualArtworkOverride ?? VisualSignatureStore.imageData(for: selectedVisualAppearanceID, in: settingsStore.signaturesDirectory)
             let visualStamp: VisualStampSpec?
             if includeVisibleSignature, outputFormat == .embeddedPAdES {
                 visualStamp = VisualStampSpec(
@@ -1071,7 +1070,7 @@ final class SigningSessionStore {
                         pageIndex: snapshot.visualPlacement?.pageIndex ?? snapshot.signaturePage,
                         normalizedRect: snapshot.signatureRect,
                         imagePNG: snapshot.visualArtworkOverride
-                            ?? VisualSignatureStore.imageData(for: snapshot.selectedVisualAppearanceID),
+                            ?? VisualSignatureStore.imageData(for: snapshot.selectedVisualAppearanceID, in: settingsStore.signaturesDirectory),
                         certificateName: snapshot.identityLabel,
                         certificateQualification: snapshot.identityIsQualified
                             ? "Kvalifikovaný elektronický podpis" : nil,
@@ -1244,7 +1243,7 @@ final class SigningSessionStore {
                 pageIndex: snapshot.visualPlacement?.pageIndex ?? snapshot.signaturePage,
                 normalizedRect: snapshot.signatureRect,
                 imagePNG: snapshot.visualArtworkOverride
-                    ?? VisualSignatureStore.imageData(for: snapshot.selectedVisualAppearanceID),
+                    ?? VisualSignatureStore.imageData(for: snapshot.selectedVisualAppearanceID, in: settingsStore.signaturesDirectory),
                 certificateName: snapshot.identityLabel,
                 certificateQualification: snapshot.identityIsQualified
                     ? "Kvalifikovaný elektronický podpis" : nil,
@@ -1293,7 +1292,7 @@ final class SigningSessionStore {
            snapshot.includeVisibleSignature,
            snapshot.outputFormat == .attachedASIC {
             let imageData = snapshot.visualArtworkOverride
-                ?? VisualSignatureStore.imageData(for: snapshot.selectedVisualAppearanceID)
+                ?? VisualSignatureStore.imageData(for: snapshot.selectedVisualAppearanceID, in: settingsStore.signaturesDirectory)
             let stamp = VisibleSignatureStamper.StampData(
                 fullName: snapshot.identityLabel,
                 timestamp: Date(),
@@ -1325,7 +1324,7 @@ final class SigningSessionStore {
                 pageIndex: snapshot.visualPlacement?.pageIndex ?? snapshot.signaturePage,
                 normalizedRect: snapshot.signatureRect,
                 imagePNG: snapshot.visualArtworkOverride
-                    ?? VisualSignatureStore.imageData(for: snapshot.selectedVisualAppearanceID),
+                    ?? VisualSignatureStore.imageData(for: snapshot.selectedVisualAppearanceID, in: settingsStore.signaturesDirectory),
                 // Batch placement is always relative to the current target page.
                 pdfPageRect: nil,
                 rotationDegrees: snapshot.visualPlacement?.rotationDegrees ?? 0,
@@ -1502,7 +1501,7 @@ final class SigningSessionStore {
     private func outputLocation(for url: URL) -> (directory: URL, stem: String) {
         let directory = FileManager.default.isWritableFile(
             atPath: url.deletingLastPathComponent().path)
-            ? url.deletingLastPathComponent() : Self.outputDirectoryURL()
+            ? url.deletingLastPathComponent() : settingsStore.outputDirectory
         return (directory, "\(url.deletingPathExtension().lastPathComponent)_podpisane")
     }
 
@@ -1556,7 +1555,7 @@ final class SigningSessionStore {
     }
 
     func resolveOutputLocation() -> (directory: URL, stem: String) {
-        let fallback = Self.outputDirectoryURL()
+        let fallback = settingsStore.outputDirectory
         let originalName = sourceURL?.deletingPathExtension().lastPathComponent ?? "dokument"
         let stem = "\(originalName)_podpisane"
         if let scoped = resolvedSourceURL() {
@@ -1580,9 +1579,5 @@ final class SigningSessionStore {
             }
         }
         return sourceURL
-    }
-
-    static func outputDirectoryURL() -> URL {
-        ProductIdentity.applicationSupportDirectory().appendingPathComponent("Output", isDirectory: true)
     }
 }

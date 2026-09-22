@@ -53,13 +53,19 @@ let package = Package(
             name: "webbridge-probe",
             dependencies: ["Chevron7WebBridge"]
         ),
+        // Shared by both test targets: the guard that keeps tests out of the user's real data.
+        .target(
+            name: "Chevron7TestSupport",
+            dependencies: ["Chevron7Identity"],
+            path: "Tests/Chevron7TestSupport"
+        ),
         .testTarget(
             name: "Chevron7KitTests",
-            dependencies: ["Chevron7Kit", "Chevron7Identity", "Chevron7WebBridge"]
+            dependencies: ["Chevron7Kit", "Chevron7Identity", "Chevron7WebBridge", "Chevron7TestSupport"]
         ),
         .testTarget(
             name: "Chevron7AppTests",
-            dependencies: ["Chevron7App"]
+            dependencies: ["Chevron7App", "Chevron7TestSupport"]
         )
     ]
 )

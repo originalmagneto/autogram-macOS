@@ -81,7 +81,7 @@ final class ZakoReviewNavigationTests: XCTestCase {
             (a4, { ctx, size in TestPDFBuilderApp.text("Strana jeden", at: CGPoint(x: 60, y: size.height - 90), size: 16)(ctx, size) }),
             (a4, { ctx, size in TestPDFBuilderApp.text("Strana dva", at: CGPoint(x: 60, y: size.height - 90), size: 16)(ctx, size) })
         ])
-        let settingsStore = AppSettingsStore()
+        let settingsStore = makeSettingsStore()
         let original = settingsStore.settings
         addTeardownBlock { await MainActor.run { settingsStore.settings = original } }
         settingsStore.settings.learnFromReviews = false
