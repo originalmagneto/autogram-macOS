@@ -66,7 +66,7 @@ Nothing below starts until the user confirms each line in chat. Record the answe
 - [x] GitHub: rename `originalmagneto/autogram-macOS` to `originalmagneto/chevron7`, no placeholder repository under the old name (confirmed 2026-09-22).
 - [x] Package folder `Autogram/` becomes `Chevron7/` (confirmed 2026-09-22).
 - [x] Execution: subagent-driven (confirmed 2026-09-22).
-- [ ] The user accepts that Keychain items (EZZK password, AI provider API keys) and app settings do not carry over and are re-entered by hand.
+- [x] The user accepts that Keychain items (EZZK password, AI provider API keys) and app settings do not carry over and are re-entered by hand (confirmed 2026-09-22).
 
 If the bundle id changes, replace `app.slovensko.chevron7` in Global Constraints and in every task before starting; nothing else changes.
 
