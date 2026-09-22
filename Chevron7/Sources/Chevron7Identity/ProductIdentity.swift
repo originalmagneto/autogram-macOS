@@ -7,8 +7,9 @@ import Foundation
 ///
 /// `build_app.sh`, `scripts/install-webbridge-agent.sh`, `scripts/safari-spike.sh`
 /// and `WebExtension/dist/background.js` repeat these literals because they cannot
-/// import Swift; `ProductIdentityTests` pins the values so a change here shows up
-/// as a failing test until the scripts follow.
+/// import Swift; `ProductIdentityTests` pins the Swift values and
+/// `scripts/check-rename-boundary.sh --strict` catches old names, so a changed
+/// value here must be changed there by hand.
 public enum ProductIdentity {
     public static let name = "Chevron7"
     public static let bundleIdentifier = "app.slovensko.chevron7"

@@ -1,7 +1,7 @@
 # Rename Autogram macOS to Chevron7
 
 Date: 2026-09-22
-Status: design, approved in outline, not yet planned
+Status: approved; planned in Chevron7/docs/superpowers/plans/2026-09-22-chevron7-rename.md; Phase A (repository) implemented on branch rename/chevron7
 
 ## Why
 

@@ -328,7 +328,7 @@ DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" ./build_app.sh --rele
 ./scripts/safari-spike.sh
 ```
 
-`build_app.sh install` rozšírenie v systéme zaregistruje; ak Safari počas inštalácie beží, pripomenie jeho reštart. V zozname rozšírení sa volá **Chevron7** a nesie ikonu aplikácie, takže sa nedá zameniť s oficiálnym rozšírením „Autogram na štátnych weboch” ani s D.Bridge 2. Safari ho vypíše až potom, ako aplikácia aspoň raz bežala: appex enumeruje cez svoju nosnú aplikáciu. Pri bežnej prevádzke to nevadí, lebo launchd agent spustí Chevron7 sám pri prvej požiadavke z portálu. `safari-spike.sh` overí všetko, čo sa overiť dá bez Safari: prítomnosť appexu, jeho entitlement, registráciu agenta a spojenie s aplikáciou. Potom vypíše tri kroky, ktoré treba spraviť v Safari ručne.
+`build_app.sh install` rozšírenie v systéme zaregistruje; ak Safari počas inštalácie beží, pripomenie jeho reštart. V zozname rozšírení sa volá **Chevron7** a nesie ikonu aplikácie, takže sa nedá zameniť s oficiálnym rozšírením „Autogram na štátnych weboch“ ani s D.Bridge 2. Safari ho vypíše až potom, ako aplikácia aspoň raz bežala: appex enumeruje cez svoju nosnú aplikáciu. Pri bežnej prevádzke to nevadí, lebo launchd agent spustí Chevron7 sám pri prvej požiadavke z portálu. `safari-spike.sh` overí všetko, čo sa overiť dá bez Safari: prítomnosť appexu, jeho entitlement, registráciu agenta a spojenie s aplikáciou. Potom vypíše tri kroky, ktoré treba spraviť v Safari ručne.
 
 Podpis bez Safari sa dá vyskúšať priamo:
 

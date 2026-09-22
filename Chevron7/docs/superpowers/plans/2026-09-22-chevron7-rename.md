@@ -1447,7 +1447,7 @@ Every task here changes the system or publishes. Before each one, show the user 
 
 ### Task 12: Tear down the old install
 
-- [ ] **Step 1: Ask the user to quit Safari (⌘Q) and the running app.** Confirm with `pgrep -x Safari; pgrep -x Autogram` printing nothing.
+- [ ] **Step 1: Ask the user to quit Safari (⌘Q) and the running app.** Confirm with `pgrep -x Safari; pgrep -f "/Applications/Autogram macOS.app/"` printing nothing. Match by path, not by process name: the official `/Applications/Autogram.app` (bundle `digital.slovensko.autogram`) also runs an executable named `Autogram`, and `pgrep -x Autogram` would match it too. The official apps may keep running; only our own `Autogram macOS.app` needs to be quit here.
 
 - [ ] **Step 2: Back up the old settings (non-destructive)**
 
@@ -1459,6 +1459,8 @@ ls -l "$BACKUP"
 ```
 
 - [ ] **Step 3: Remove the agent, extension and app (to the Trash, not deleted)**
+
+`/Applications` also holds the official `Autogram.app` (`digital.slovensko.autogram`) and `Autogram na štátnych weboch.app` (slovensko.digital). Only our own `Autogram macOS.app` (`sk.autogram.Autogram`) goes to the Trash below; leave the other two in place.
 
 ```bash
 LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
@@ -1476,7 +1478,7 @@ mv "$HOME/Library/Services/Autogram Finder Quick Action.workflow" "$HOME/.Trash/
 ```bash
 mdfind 'kMDItemCFBundleIdentifier == "sk.autogram.Autogram"'
 ```
-For each path printed (typically build products under `.build/.../Autogram.app`), run `"$LSREGISTER" -u "<path>"` and, if it is a build product, remove that `.app` folder. Ask the user before touching any path outside this repository.
+For each path printed, run `"$LSREGISTER" -u "<path>"`; then, only for a regenerable build product, remove that `.app` folder. Known stale registrations as of this review: the build products `Chevron7/.build/out/Products/{Debug,Release}/Autogram.app` and `Chevron7/.build/arm64-apple-macosx/{debug,release}/Autogram.app` (unregister and delete, they are regenerable); the release artifact `Chevron7/.build/releases/v0.4.0/staging/Autogram macOS.app` (unregister only, do not delete); and a copy under `/private/var/folders/.../T/autogram-before-ui-merge-*/Autogram macOS.app` (unregister only; ask the user before deleting anything outside this repository). Use `"$LSREGISTER" -dump | grep -B5 sk.autogram.Autogram` to find any further paths.
 
 - [ ] **Step 5: Verify nothing old remains**
 
@@ -1495,13 +1497,14 @@ Expected: `Could not find service`; no pluginkit output; a count of `0` (if not 
 OLD="$HOME/Library/Application Support/Autogram"
 OLD_VS="$HOME/Library/Application Support/Autogram macOS/Visual Signatures"
 NEW="$HOME/Library/Application Support/Chevron7"
-if [ -e "$NEW" ]; then
-  echo "Chevron7 already exists, stop and ask the user"
+if [ -n "$(find "$NEW" -type f 2>/dev/null | head -1)" ]; then
+  echo "Chevron7 already has files, stop and ask the user"
 else
   ditto "$OLD" "$NEW"
   if [ -d "$OLD_VS" ]; then ditto "$OLD_VS" "$NEW/Visual Signatures"; fi
 fi
 ```
+The guard checks for any regular file under `$NEW`, not just its existence: `swift test` already creates an empty `~/Library/Application Support/Chevron7/Evidence` folder (and files under `~/Library/Caches/Chevron7`) because app tests construct their stores against the real Application Support folder rather than a temporary one (deferred follow-up: inject a temp folder for tests). `ditto` merges into an existing empty folder without complaint, so an empty `$NEW` should not stop this step. Do not run `swift test` between this task and Task 15, or its Evidence writes could be mistaken for real data.
 
 - [ ] **Step 2: Verify byte for byte**
 
@@ -1529,7 +1532,7 @@ open /Applications/Chevron7.app
 
 - [ ] **Step 2: Hand the Safari steps to the user**
 
-Tell the user: open Safari, Develop > Allow Unsigned Extensions, Settings > Extensions > enable "Chevron7", then re-enter the EZZK password and any AI provider API keys in Chevron7 Settings.
+Tell the user: open Safari, Develop > Allow Unsigned Extensions, Settings > Extensions > enable "Chevron7", then re-enter the EZZK password and any AI provider API keys in Chevron7 Settings. Also tell the user to disable the official Safari extension "Autogram na štátnych weboch" (`digital.slovensko.autogram.autogram-extension`), at least on the state portals: it also defines a non-configurable `window.ditec`, and whichever content script runs first wins. Ditec D.Bridge 2 can conflict the same way (see memory note safari-signing-env-conflicts).
 
 ### Task 15: Verification
 
@@ -1562,7 +1565,7 @@ Expected: a QR link on `autogram.slovensko.digital`; the user signs on the phone
 
 - [ ] **Step 2: Checks only the user can do**
 
-- In Safari on `https://www.slovensko.sk/`, console: `await window.chevron7.status()` returns `{ ok: true, ready: true, version: "0.4.0" }`, and `window.ditec.isAutogram === true`.
+- In Safari on `https://www.slovensko.sk/`, console: `await window.chevron7.status()` returns `{ ok: true, ready: true, version: "0.4.0" }`, and `window.ditec.isChevron7 === true` (the official extension also sets `isAutogram`, so that flag alone would not distinguish ours).
 - In Chevron7, Register konverzií lists every record it listed before the rename.
 - Drag a PDF onto Podpisovanie and sign it: the signed copy lands next to the original (the fix from `db1b76df`).
 - Finder Quick Action "Podpísať s QES + QTS (Chevron7)" appears for a PDF.
@@ -1582,6 +1585,8 @@ git fetch origin && git status -sb | head -1
 ```
 
 Do not create a placeholder repository under the old name. GitHub redirects the old URL to the renamed repository only while no repository takes the old name; a placeholder would end those redirects, which is the opposite of what the spec intends. The spec's step 4 is corrected here on purpose.
+
+- [ ] **Step 4: Update the README links that still point at the old repository slug**, after the rename: the release badge link and image near line 8 and the download link near line 404, all `originalmagneto/autogram-macOS` to `originalmagneto/chevron7`. Commit and push after the user's yes.
 
 ### Task 17 (optional, user decides): Local folder and Claude memory
 
