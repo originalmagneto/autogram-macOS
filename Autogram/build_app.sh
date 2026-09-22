@@ -37,7 +37,7 @@ CONTENTS="$APP_DIR/Contents"
 rm -rf "$APP_DIR"
 mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources"
 
-cp "$BIN_DIR/Autogram" "$CONTENTS/MacOS/Autogram"
+cp "$BIN_DIR/Chevron7" "$CONTENTS/MacOS/Autogram"
 if [[ -x "$BIN_DIR/pkcs11-helper" ]]; then
     cp "$BIN_DIR/pkcs11-helper" "$CONTENTS/MacOS/pkcs11-helper"
 fi
@@ -231,13 +231,13 @@ PKG
 # launchd agent that owns the Mach service name. A GUI app cannot publish one:
 # launchd hands the receive right only to the process it launches for the name.
 # The agent is a rendezvous point, no document ever passes through it.
-AGENT_BIN="$BIN_DIR/autogram-webbridge-agent"
+AGENT_BIN="$BIN_DIR/chevron7-webbridge-agent"
 if [[ -x "$AGENT_BIN" ]]; then
-    cp "$AGENT_BIN" "$CONTENTS/Helpers/autogram-webbridge-agent" 2>/dev/null \
-        || { mkdir -p "$CONTENTS/Helpers" && cp "$AGENT_BIN" "$CONTENTS/Helpers/autogram-webbridge-agent"; }
+    cp "$AGENT_BIN" "$CONTENTS/Helpers/chevron7-webbridge-agent" 2>/dev/null \
+        || { mkdir -p "$CONTENTS/Helpers" && cp "$AGENT_BIN" "$CONTENTS/Helpers/chevron7-webbridge-agent"; }
 fi
 
-EXTENSION_BIN="$BIN_DIR/AutogramWebExtensionHandler"
+EXTENSION_BIN="$BIN_DIR/Chevron7WebExtensionHandler"
 if [[ -x "$EXTENSION_BIN" ]]; then
     APPEX="$CONTENTS/PlugIns/AutogramWebExtension.appex"
     rm -rf "$APPEX"
@@ -287,7 +287,7 @@ if [[ -x "$EXTENSION_BIN" ]]; then
         <key>NSExtensionPointIdentifier</key>
         <string>com.apple.Safari.web-extension</string>
         <key>NSExtensionPrincipalClass</key>
-        <string>AutogramWebExtensionHandler</string>
+        <string>Chevron7WebExtensionHandler</string>
     </dict>
 </dict>
 APPEXPLIST

@@ -1,5 +1,5 @@
 import Foundation
-import AutogramWebBridge
+import Chevron7WebBridge
 
 // Connects to the Mach service the running app publishes and calls status.
 // Proves the app half of the Safari bridge without Safari, which is the only

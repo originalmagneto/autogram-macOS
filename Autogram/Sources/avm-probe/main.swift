@@ -2,7 +2,7 @@ import Foundation
 import AppKit
 import ImageIO
 import UniformTypeIdentifiers
-import AutogramKit
+import Chevron7Kit
 
 // Usage: avm-probe <file.pdf|file.asice> [--level PAdES_BASELINE_B] [--container ASiC-E] [--base-url <url>] [--out <dir>] [--timeout <seconds>]
 //        avm-probe --make-zako-sample <file.pdf> [--out <dir>]

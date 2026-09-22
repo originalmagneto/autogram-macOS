@@ -39,7 +39,7 @@ step "3. Sedí principal class a extension point?"
 POINT=$(/usr/libexec/PlistBuddy -c "Print :NSExtension:NSExtensionPointIdentifier" "$APPEX/Contents/Info.plist" 2>/dev/null || echo "")
 CLASS=$(/usr/libexec/PlistBuddy -c "Print :NSExtension:NSExtensionPrincipalClass" "$APPEX/Contents/Info.plist" 2>/dev/null || echo "")
 [[ "$POINT" == "com.apple.Safari.web-extension" ]] && ok "extension point: $POINT" || bad "extension point: '$POINT'"
-[[ "$CLASS" == "AutogramWebExtensionHandler" ]] && ok "principal class: $CLASS" || bad "principal class: '$CLASS'"
+[[ "$CLASS" == "Chevron7WebExtensionHandler" ]] && ok "principal class: $CLASS" || bad "principal class: '$CLASS'"
 
 step "4. Sú web časti rozšírenia v Resources?"
 for file in manifest.json background.js content.js inject.js; do

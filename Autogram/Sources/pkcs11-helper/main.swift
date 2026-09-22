@@ -1,6 +1,6 @@
 import Foundation
 import CryptoKit
-import AutogramKit
+import Chevron7Kit
 
 struct Request: Codable {
     var cmd: String

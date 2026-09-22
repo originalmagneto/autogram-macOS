@@ -2,60 +2,60 @@
 import PackageDescription
 
 let package = Package(
-    name: "Autogram",
+    name: "Chevron7",
     platforms: [.macOS("27.0")],
     products: [
-        .executable(name: "Autogram", targets: ["AutogramApp"]),
-        .library(name: "AutogramKit", targets: ["AutogramKit"])
+        .executable(name: "Chevron7", targets: ["Chevron7App"]),
+        .library(name: "Chevron7Kit", targets: ["Chevron7Kit"])
     ],
     targets: [
         .target(
-            name: "AutogramWebBridge",
+            name: "Chevron7WebBridge",
             dependencies: []
         ),
         .target(
-            name: "AutogramKit",
-            dependencies: ["AutogramWebBridge"]
+            name: "Chevron7Kit",
+            dependencies: ["Chevron7WebBridge"]
         ),
         .executableTarget(
-            name: "AutogramApp",
-            dependencies: ["AutogramKit"]
+            name: "Chevron7App",
+            dependencies: ["Chevron7Kit"]
         ),
         .executableTarget(
             name: "pkcs11-helper",
-            dependencies: ["AutogramKit"]
+            dependencies: ["Chevron7Kit"]
         ),
         .executableTarget(
             name: "vision-eval",
-            dependencies: ["AutogramKit"]
+            dependencies: ["Chevron7Kit"]
         ),
         .executableTarget(
             name: "avm-probe",
-            dependencies: ["AutogramKit"]
+            dependencies: ["Chevron7Kit"]
         ),
         .executableTarget(
             name: "ezzk-probe",
-            dependencies: ["AutogramKit"]
+            dependencies: ["Chevron7Kit"]
         ),
         .executableTarget(
-            name: "AutogramWebExtensionHandler",
-            dependencies: ["AutogramWebBridge"]
+            name: "Chevron7WebExtensionHandler",
+            dependencies: ["Chevron7WebBridge"]
         ),
         .executableTarget(
-            name: "autogram-webbridge-agent",
-            dependencies: ["AutogramWebBridge"]
+            name: "chevron7-webbridge-agent",
+            dependencies: ["Chevron7WebBridge"]
         ),
         .executableTarget(
             name: "webbridge-probe",
-            dependencies: ["AutogramWebBridge"]
+            dependencies: ["Chevron7WebBridge"]
         ),
         .testTarget(
-            name: "AutogramKitTests",
-            dependencies: ["AutogramKit"]
+            name: "Chevron7KitTests",
+            dependencies: ["Chevron7Kit"]
         ),
         .testTarget(
-            name: "AutogramAppTests",
-            dependencies: ["AutogramApp"]
+            name: "Chevron7AppTests",
+            dependencies: ["Chevron7App"]
         )
     ]
 )

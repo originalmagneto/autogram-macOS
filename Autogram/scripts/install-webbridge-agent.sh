@@ -6,7 +6,7 @@ set -euo pipefail
 
 APP="${1:-/Applications/Autogram macOS.app}"
 LABEL="sk.autogram.Autogram.webbridge"
-AGENT="$APP/Contents/Helpers/autogram-webbridge-agent"
+AGENT="$APP/Contents/Helpers/chevron7-webbridge-agent"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 
 [[ -x "$AGENT" ]] || { echo "Agent chýba: $AGENT" >&2; exit 1; }

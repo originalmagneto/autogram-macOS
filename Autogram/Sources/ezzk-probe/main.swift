@@ -1,5 +1,5 @@
 import Foundation
-import AutogramKit
+import Chevron7Kit
 
 // Usage: ezzk-probe <login|time|numbers|consume|lookup> [evidence number]
 //                   [--env test|production] [--name <person name>] [--ico <IČO>] [--at <ISO 8601 time>]
