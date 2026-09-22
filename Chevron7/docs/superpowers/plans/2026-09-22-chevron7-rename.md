@@ -1572,11 +1572,11 @@ Expected: a QR link on `autogram.slovensko.digital`; the user signs on the phone
 
 ### Task 16: Merge, push and rename on GitHub
 
-- [ ] **Step 1: Merge** using superpowers:finishing-a-development-branch (merge `rename/chevron7` into `main`).
+- [x] **Step 1: Merge** using superpowers:finishing-a-development-branch (merge `rename/chevron7` into `main`).
 
-- [ ] **Step 2: Push** `main` to `origin` after the user's yes.
+- [x] **Step 2: Push** `main` to `origin` after the user's yes.
 
-- [ ] **Step 3: Rename the repository** after the user's yes:
+- [x] **Step 3: Rename the repository** after the user's yes:
 
 ```bash
 gh repo rename chevron7 --repo originalmagneto/autogram-macOS --yes
@@ -1586,7 +1586,7 @@ git fetch origin && git status -sb | head -1
 
 Do not create a placeholder repository under the old name. GitHub redirects the old URL to the renamed repository only while no repository takes the old name; a placeholder would end those redirects, which is the opposite of what the spec intends. The spec's step 4 is corrected here on purpose.
 
-- [ ] **Step 4: Update the README links that still point at the old repository slug**, after the rename: the release badge link and image near line 8 and the download link near line 404, all `originalmagneto/autogram-macOS` to `originalmagneto/chevron7`. Commit and push after the user's yes.
+- [x] **Step 4: Update the README links that still point at the old repository slug**, after the rename: the release badge link and image near line 8 and the download link near line 404, all `originalmagneto/autogram-macOS` to `originalmagneto/chevron7`. Commit and push after the user's yes.
 
 ### Task 17 (optional, user decides): Local folder and Claude memory
 
