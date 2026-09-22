@@ -76,7 +76,7 @@ Zvyšok sa bez teba spraviť nedá. Tri kroky v Safari:
   2. Safari > Develop > Allow Unsigned Extensions
      Pozor: Safari to zabudne pri každom štarte, musíš to zapnúť znova.
 
-  3. Safari > Settings > Extensions > zapni "Autogram macOS na štátnych weboch"
+  3. Safari > Settings > Extensions > zapni "Autogram macOS"
 
 Potom otvor https://www.slovensko.sk/ a vo web inspectore konzoly spusti:
 

@@ -247,7 +247,7 @@ Podrobnosti: [pravidlá tréningového datasetu](Autogram/docs/security-element-
 
 ## Podpisovanie
 
-1. Otvorte PDF cez `⌘O`, drag and drop alebo Finder Quick Action.
+1. Otvorte PDF cez `⌘O`, drag and drop alebo Finder Quick Action. Podpísaný súbor sa ukladá vedľa pôvodného pod jeho menom s príponou `_podpisane`, nech ste ho otvorili ktorýmkoľvek z týchto spôsobov; do vlastného priečinka aplikácie spadne len vtedy, keď pôvodný priečinok nie je zapisovateľný alebo keď dokument prišiel bez súboru (napríklad obrázok pretiahnutý z inej aplikácie).
 2. Pri viacerých dokumentoch vyberte **Pripraviť dávku podpisov**.
 3. Prejdite preflight kontrolou vstupov a nastavení.
 4. Vyberte formát, certifikát a voliteľný vizuálny podpis alebo QTS.
@@ -321,7 +321,7 @@ DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" ./build_app.sh --rele
 ./scripts/safari-spike.sh
 ```
 
-`build_app.sh install` rozšírenie v systéme zaregistruje, takže sa v Safari zobrazí aj bez spustenia aplikácie; ak Safari počas inštalácie beží, pripomenie jeho reštart. `safari-spike.sh` overí všetko, čo sa overiť dá bez Safari: prítomnosť appexu, jeho entitlement, registráciu agenta a spojenie s aplikáciou. Potom vypíše tri kroky, ktoré treba spraviť v Safari ručne.
+`build_app.sh install` rozšírenie v systéme zaregistruje; ak Safari počas inštalácie beží, pripomenie jeho reštart. V zozname rozšírení sa volá **Autogram macOS** a nesie ikonu aplikácie, takže sa nedá zameniť s oficiálnym rozšírením „Autogram na štátnych weboch“ ani s D.Bridge 2. Safari ho vypíše až potom, ako aplikácia aspoň raz bežala: appex enumeruje cez svoju nosnú aplikáciu. Pri bežnej prevádzke to nevadí, lebo launchd agent Autogram macOS spustí sám pri prvej požiadavke z portálu. `safari-spike.sh` overí všetko, čo sa overiť dá bez Safari: prítomnosť appexu, jeho entitlement, registráciu agenta a spojenie s aplikáciou. Potom vypíše tri kroky, ktoré treba spraviť v Safari ručne.
 
 Podpis bez Safari sa dá vyskúšať priamo:
 
@@ -434,6 +434,8 @@ xattr -d com.apple.quarantine "/Applications/Autogram macOS.app"
 <li>16 druhov bezpečnostných prvkov, fyzická kontrola originálu a výslovné potvrdenie dokumentu bez prvkov.</li>
 <li>Oddelené učenie z výrezov a export kompletne skontrolovaných strán s rozdelením podľa dokumentov.</li>
 <li>Opravená normalizácia PDF/A v pribalenom engine a aktualizované diagramy.</li>
+<li>Pretiahnutý dokument si drží svoj priečinok aj meno, takže podpis už nekončí v dočasnom priečinku pod vygenerovaným menom.</li>
+<li>Safari rozšírenie sa v zozname volá <strong>Autogram macOS</strong> a nesie ikonu aplikácie.</li>
 </ul>
 <p>Po nainštalovaní aplikácie možno Safari bridge zaregistrovať spustením <code>Install Safari Bridge.command</code> z DMG. Rozšírenie vyžaduje zapnuté <strong>Develop &gt; Allow Unsigned Extensions</strong> v Safari.</p>
 </details>

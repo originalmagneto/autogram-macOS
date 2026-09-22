@@ -256,9 +256,9 @@ if [[ -x "$EXTENSION_BIN" ]]; then
 <plist version="1.0">
 <dict>
     <key>CFBundleName</key>
-    <string>Autogram na štátnych weboch</string>
+    <string>Autogram macOS</string>
     <key>CFBundleDisplayName</key>
-    <string>Autogram na štátnych weboch</string>
+    <string>Autogram macOS</string>
     <key>CFBundleIdentifier</key>
     <string>sk.autogram.Autogram.WebExtension</string>
     <key>CFBundleExecutable</key>
