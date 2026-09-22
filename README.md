@@ -223,7 +223,7 @@ swift run vision-eval ~/AutogramEval [--builtin-only] [--no-fm] [--bank <dir>] [
 
 Sekcia bezpečnostných prvkov XML záznamu používa overenú štruktúru record 1.0 s textovým opisom, umiestnením a číslami strán/listu. Overenie tejto sekcie nepotvrdzuje súlad celého formulára; formulárový balík zostáva pilotný.
 
-Podrobnosti: [pravidlá tréningového datasetu](Autogram/docs/security-element-training.md) a [oficiálne formulárové podklady](Autogram/docs/reference/security-elements/FINDINGS.md).
+Podrobnosti: [pravidlá tréningového datasetu](Chevron7/docs/security-element-training.md) a [oficiálne formulárové podklady](Chevron7/docs/reference/security-elements/FINDINGS.md).
 
 
 <table>
@@ -245,7 +245,7 @@ Podrobnosti: [pravidlá tréningového datasetu](Autogram/docs/security-element-
 
 <p><strong>Čo funguje kde:</strong> na Teste prihlásenie, čas servera, pridelenie a spotrebovanie evidenčných čísel aj overenie záznamu. Na Produkcii zatiaľ len prihlásenie, čas servera a verejné overenie záznamu; pridelenie čísla a odoslanie záznamu sú zámerne zamknuté, kým nebude hotový podpísaný záznam v ASiC a jeho odoslanie cez <code>ReceiveConversionRecord</code>. Bez evidenčného čísla aplikácia nepovolí autorizáciu, a číslo z iného dňa alebo z iného režimu odmietne ešte pred podpisom, lebo EZZK nepoužité čísla o polnoci spotrebuje.</p>
 
-<p>Podrobne: <a href="Autogram/docs/EZZK-INTEGRATION.md">Autogram/docs/EZZK-INTEGRATION.md</a>.</p>
+<p>Podrobne: <a href="Chevron7/docs/EZZK-INTEGRATION.md">Chevron7/docs/EZZK-INTEGRATION.md</a>.</p>
 </details>
 
 <p align="center">
@@ -452,7 +452,7 @@ xattr -d com.apple.quarantine "/Applications/Chevron7.app"
 <ul>
 <li>DMG obsahuje Java podpisový engine (DSS, PKCS#11, machine protokol v1/v2) s vlastným jlink runtime; kvalifikovaný podpis eID a advokátskym preukazom funguje bez inštalácie Javy a sidebar už nepadá do režimu DEMO.</li>
 <li>Finder Quick Action podpisuje cez zabalené helpery <code>AutogramCLI-arm64</code> a <code>AutogramQuickActionRunner-arm64</code>.</li>
-<li>Zdroje enginu sú v repozitári (<code>engine/</code>, EUPL 1.2) a zostavujú sa skriptom <code>Autogram/scripts/build-engine.sh</code>.</li>
+<li>Zdroje enginu sú v repozitári (<code>engine/</code>, EUPL 1.2) a zostavujú sa skriptom <code>Chevron7/scripts/build-engine.sh</code>.</li>
 </ul>
 </details>
 
@@ -561,7 +561,7 @@ Aktuálny ZaKo profil je implementačný P2E pilot s PDF/A-2b. Lokálny `PDFAVal
 <tr><td><strong>vision-eval</strong></td><td>Samostatný CLI target na meranie presnosti detekcie; nie je súčasťou aplikácie.</td></tr>
 </table>
 
-Kompletná implementačná dokumentácia je v [`docs/PHASES.md`](docs/PHASES.md); návrh podpisu mobilom v [`docs/superpowers/specs/2026-09-11-avm-mobile-signing-design.md`](docs/superpowers/specs/2026-09-11-avm-mobile-signing-design.md); návrh podpisovania na štátnych weboch v [`Autogram/docs/superpowers/specs/2026-09-11-safari-extension-design.md`](Autogram/docs/superpowers/specs/2026-09-11-safari-extension-design.md) a jeho spúšťania na pozadí v [`Autogram/docs/superpowers/specs/2026-09-16-web-signing-background-design.md`](Autogram/docs/superpowers/specs/2026-09-16-web-signing-background-design.md); zistenia z ladenia podpisovania na nove.slovensko.sk kartou I.CA, eID a mobilom v [`Autogram/docs/WEB-SIGNING-FINDINGS-2026-09-16.md`](Autogram/docs/WEB-SIGNING-FINDINGS-2026-09-16.md); integrácia EZZK cez SOAP, jej nastavenie, overený kontrakt a údržba v [`Autogram/docs/EZZK-INTEGRATION.md`](Autogram/docs/EZZK-INTEGRATION.md) a technický register zistení v [`Autogram/docs/P2E-EZZK-FINDINGS.md`](Autogram/docs/P2E-EZZK-FINDINGS.md); návrh vrstvenej detekcie v [`Autogram/docs/superpowers/specs/2026-09-05-layered-security-element-detection-design.md`](Autogram/docs/superpowers/specs/2026-09-05-layered-security-element-detection-design.md).
+Kompletná implementačná dokumentácia je v [`docs/PHASES.md`](docs/PHASES.md); návrh podpisu mobilom v [`docs/superpowers/specs/2026-09-11-avm-mobile-signing-design.md`](docs/superpowers/specs/2026-09-11-avm-mobile-signing-design.md); návrh podpisovania na štátnych weboch v [`Chevron7/docs/superpowers/specs/2026-09-11-safari-extension-design.md`](Chevron7/docs/superpowers/specs/2026-09-11-safari-extension-design.md) a jeho spúšťania na pozadí v [`Chevron7/docs/superpowers/specs/2026-09-16-web-signing-background-design.md`](Chevron7/docs/superpowers/specs/2026-09-16-web-signing-background-design.md); zistenia z ladenia podpisovania na nove.slovensko.sk kartou I.CA, eID a mobilom v [`Chevron7/docs/WEB-SIGNING-FINDINGS-2026-09-16.md`](Chevron7/docs/WEB-SIGNING-FINDINGS-2026-09-16.md); integrácia EZZK cez SOAP, jej nastavenie, overený kontrakt a údržba v [`Chevron7/docs/EZZK-INTEGRATION.md`](Chevron7/docs/EZZK-INTEGRATION.md) a technický register zistení v [`Chevron7/docs/P2E-EZZK-FINDINGS.md`](Chevron7/docs/P2E-EZZK-FINDINGS.md); návrh vrstvenej detekcie v [`Chevron7/docs/superpowers/specs/2026-09-05-layered-security-element-detection-design.md`](Chevron7/docs/superpowers/specs/2026-09-05-layered-security-element-detection-design.md).
 
 ## Podporiť vývoj
 

@@ -5,7 +5,7 @@
 # Action run: the Java fork in ../engine (machine protocol v1/v2 over DSS), an
 # arm64 jlink runtime, the C launcher and the Swift Quick Action runner.
 #
-# Output: Autogram/.build/engine/Contents/{Helpers,app,runtime}, which
+# Output: Chevron7/.build/engine/Contents/{Helpers,app,runtime}, which
 # build_app.sh bundles into Chevron7.app.
 #
 # Requirements: an arm64 JDK 25 that ships JavaFX jmods (Azul Zulu FX 25).
