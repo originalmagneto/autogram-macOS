@@ -19,45 +19,93 @@ console.log("[Chevron7] content script beží na", location.href);
 const CHANNEL_REQUEST = "chevron7-request";
 const CHANNEL_RESPONSE = "chevron7-response";
 
-// ditec.js must land before the page script runs, so it is injected first and
-// synchronously; inject.js only adds the direct window.chevron7 surface.
-for (const file of ["ditec.js", "inject.js"]) {
-  const script = document.createElement("script");
-  script.src = browser.runtime.getURL(file);
-  script.async = false;
-  (document.head || document.documentElement).appendChild(script);
-  script.remove();
+// The per-site switch. The popup stores it in browser.storage, which is async,
+// but the choice has to be made before ditec.js defines window.ditec: that
+// property is non-configurable, so a portal's own D.Signer (or D.Bridge 2) can
+// never replace it later. A copy of the flag therefore lives in the page
+// origin's localStorage, which this script can read synchronously at
+// document_start. The page can edit that copy, but the most it gains is opting
+// itself out; signing requests are checked against browser.storage below.
+const STORAGE_KEY = "siteDisabled:" + location.host;
+const MIRROR_KEY = "chevron7.siteDisabled";
+
+function readMirror() {
+  try {
+    return window.localStorage.getItem(MIRROR_KEY) === "true";
+  } catch (error) {
+    // Sandboxed frames have no localStorage. Treat them as enabled.
+    return false;
+  }
 }
 
-// The per-site switch. Storage is async and the shim must win the race for
-// window.ditec at document_start, so it always installs first and hands control
-// back here if this site is switched off.
-(async () => {
+function writeMirror(disabled) {
   try {
-    const key = "siteDisabled:" + location.host;
-    const stored = await browser.storage.local.get(key);
-    const disabled = stored && stored[key] === true;
-    window.dispatchEvent(new CustomEvent("chevron7-set-enabled", {
-      detail: { enabled: !disabled }
-    }));
     if (disabled) {
-      console.log("[Chevron7] na tejto stránke vypnuté, ponechávam pôvodný D.Signer");
+      window.localStorage.setItem(MIRROR_KEY, "true");
+    } else {
+      window.localStorage.removeItem(MIRROR_KEY);
     }
   } catch (error) {
+    console.warn("[Chevron7] nastavenie stránky sa nepodarilo uložiť do localStorage", error);
+  }
+}
+
+const disabledAtLoad = readMirror();
+
+if (disabledAtLoad) {
+  console.log("[Chevron7] na tejto stránke vypnuté, ponechávam pôvodný D.Signer");
+} else {
+  // ditec.js must land before the page script runs, so it is injected first and
+  // synchronously; inject.js only adds the direct window.chevron7 surface.
+  for (const file of ["ditec.js", "inject.js"]) {
+    const script = document.createElement("script");
+    script.src = browser.runtime.getURL(file);
+    script.async = false;
+    (document.head || document.documentElement).appendChild(script);
+    script.remove();
+  }
+}
+
+// browser.storage is the authority. It brings the copy up to date for the next
+// load, for instance after the page's site data was cleared.
+const siteDisabled = (async () => {
+  try {
+    const stored = await browser.storage.local.get(STORAGE_KEY);
+    const disabled = stored && stored[STORAGE_KEY] === true;
+    if (disabled !== disabledAtLoad) {
+      writeMirror(disabled);
+      console.log("[Chevron7] nastavenie stránky sa zmenilo, prejaví sa po obnovení stránky");
+    }
+    return disabled;
+  } catch (error) {
     console.error("[Chevron7] nepodarilo sa načítať nastavenie stránky", error);
+    return disabledAtLoad;
   }
 })();
 
+// The popup updates the copy before it reloads the tab, so the reload already
+// makes the new choice. Every frame of the tab gets the message; only frames on
+// the host the popup switched act on it.
 browser.runtime.onMessage.addListener((message) => {
   if (message?.kind !== "site-enabled-changed") return;
-  window.dispatchEvent(new CustomEvent("chevron7-set-enabled", {
-    detail: { enabled: message.enabled }
-  }));
+  if (message.host !== location.host) return;
+  writeMirror(message.enabled !== true);
   return Promise.resolve({ ok: true });
 });
 
 window.addEventListener(CHANNEL_REQUEST, async (event) => {
   const detail = event.detail || {};
+  // A page on a switched-off site can still reach this channel, for instance
+  // after it removed the localStorage copy. It gets no new signature.
+  if ((detail.kind === "sign" || detail.kind === "sign-begin") && await siteDisabled) {
+    window.dispatchEvent(new CustomEvent(CHANNEL_RESPONSE, {
+      detail: {
+        id: detail.id,
+        reply: { ok: false, error: "Chevron7 je na tejto stránke vypnutý. Obnovte stránku." }
+      }
+    }));
+    return;
+  }
   // Safari may have ended the background worker, which rejects the message or
   // answers undefined. The page always gets an answer so it can retry.
   // The page builds the request, so it could claim any origin. The host is set

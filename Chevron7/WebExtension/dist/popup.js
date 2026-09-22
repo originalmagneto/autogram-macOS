@@ -3,7 +3,8 @@
 
 // Per-site switch. Turning this off hands the page back to whatever D.Signer it
 // would have used on its own, typically Ditec D.Bridge 2, without disabling the
-// whole extension.
+// whole extension. The shim defines window.ditec for good once it is in the
+// page, so the switch takes effect on the next load and the popup reloads the tab.
 
 const hostLabel = document.getElementById("host");
 const toggle = document.getElementById("enabled");
@@ -20,7 +21,7 @@ function keyFor(host) {
 function renderNote() {
   note.textContent = toggle.checked
     ? "Podpisovanie na tejto stránke preberá Chevron7."
-    : "Stránka použije svoj pôvodný D.Signer (napríklad D.Bridge 2). Zmena platí hneď, bez obnovenia stránky.";
+    : "Stránka použije svoj pôvodný D.Signer (napríklad D.Bridge 2).";
 }
 
 async function load() {
@@ -49,15 +50,26 @@ toggle.addEventListener("change", async () => {
   const disabled = !toggle.checked;
   await browser.storage.local.set({ [keyFor(currentHost)]: disabled });
   renderNote();
+  // The content script keeps a copy of the flag the reloaded page reads before
+  // anything else runs. Without it the reload would still use the old choice.
+  let copied = false;
   try {
-    await browser.tabs.sendMessage(currentTab.id, {
+    const reply = await browser.tabs.sendMessage(currentTab.id, {
       kind: "site-enabled-changed",
+      host: currentHost,
       enabled: !disabled
     });
-    status.textContent = "";
+    copied = reply?.ok === true;
   } catch (error) {
-    // The content script is not there, for instance right after switching a
-    // site back on. A reload picks it up.
+    // No content script in the tab, for instance a page opened before the
+    // extension was turned on. The reloaded page catches up on the load after.
+  }
+  status.textContent = copied
+    ? "Stránka sa obnoví, aby sa zmena prejavila."
+    : "Stránka sa obnoví. Ak sa zmena neprejaví, obnovte ju ešte raz.";
+  try {
+    await browser.tabs.reload(currentTab.id);
+  } catch (error) {
     status.textContent = "Obnovte stránku, aby sa zmena prejavila.";
   }
 });
