@@ -5,7 +5,7 @@
 <h1 align="center">Chevron7</h1>
 
 <p align="center">
-  <a href="https://github.com/originalmagneto/autogram-macOS/releases/latest"><img src="https://img.shields.io/github/v/release/originalmagneto/autogram-macOS?display_name=tag&style=flat-square&color=eb6c36" alt="Aktuálne vydanie"></a>
+  <a href="https://github.com/originalmagneto/chevron7/releases/latest"><img src="https://img.shields.io/github/v/release/originalmagneto/chevron7?display_name=tag&style=flat-square&color=ffb23e" alt="Aktuálne vydanie"></a>
   <img src="https://img.shields.io/badge/macOS-27%2B-2d3142?style=flat-square" alt="macOS 27 alebo novší">
   <img src="https://img.shields.io/badge/Swift-6-f05138?style=flat-square" alt="Swift 6">
   <img src="https://img.shields.io/badge/AI-vstavan%C3%A1%20on--device-2e5aa8?style=flat-square" alt="Vstavaná AI beží na zariadení">
@@ -204,9 +204,9 @@ Vstavaná detekcia beží na zariadení a skladá sa z troch vrstiev. Voliteľn�
 <p>Každá zmena detektora sa dokladá číslami na vašich vlastných skenoch, nie na syntetických fixtúrach. Exportovaný dataset (mimo repozitára) sa vyhodnotí príkazom:</p>
 
 ```bash
-cd Autogram
+cd Chevron7
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
-swift run vision-eval ~/AutogramEval [--builtin-only] [--no-fm] [--bank <dir>] [--iou 0.4] [--json]
+swift run vision-eval ~/Chevron7Eval [--builtin-only] [--no-fm] [--bank <dir>] [--iou 0.4] [--json]
 ```
 
 <p>Výstup obsahuje presnosť, úplnosť a F1 pre každý druh prvku, priemerný čas na stranu a počet volaní on-device modelu. Bez <code>--bank</code> sa použije prázdny dočasný dataset, nie ten používateľský, aby boli čísla porovnateľné medzi commitmi.</p>
@@ -344,7 +344,7 @@ Podpis bez Safari sa dá vyskúšať priamo:
 <tr>
 <td width="50%" valign="top">
 <ul>
-<li><a href="docs/diagrams/autogram-visual-guide.html">AI Vision, architektúra a batch preflight</a> (HTML)</li>
+<li><a href="docs/diagrams/visual-guide.html">AI Vision, architektúra a batch preflight</a> (HTML)</li>
 <li><a href="docs/diagrams/architecture.html">Architektúra aplikácie</a> (HTML) · <a href="docs/diagrams/architecture.svg">SVG</a></li>
 <li><a href="docs/gallery.html">Diagramová galéria</a></li>
 <li><a href="docs/diagrams/process-zako.svg">Proces zaručenej konverzie</a></li>
@@ -401,7 +401,7 @@ Podpis bez Safari sa dá vyskúšať priamo:
 
 ### Stiahnutie
 
-Aktuálny macOS build je v [GitHub Releases](https://github.com/originalmagneto/autogram-macOS/releases/latest) ako DMG.
+Aktuálny macOS build je v [GitHub Releases](https://github.com/originalmagneto/chevron7/releases/latest) ako DMG.
 
 <details open>
 <summary><strong>Prvé spustenie (aplikácia nie je notarizovaná)</strong></summary>
@@ -421,7 +421,7 @@ Aktuálny macOS build je v [GitHub Releases](https://github.com/originalmagneto/
 xattr -d com.apple.quarantine "/Applications/Chevron7.app"
 ```
 
-<p>Overenie stiahnutého DMG: v poznámkach k vydaniu je SHA-256 odtlačok; porovnajte ho s výstupom <code>shasum -a 256 Autogram-macOS-v0.4.0.dmg</code>.</p>
+<p>Overenie stiahnutého DMG: v poznámkach k vydaniu je SHA-256 odtlačok; porovnajte ho s výstupom <code>shasum -a 256 &lt;stiahnutý súbor&gt;.dmg</code>. Vydania do v0.4.0 vrátane vyšli ešte pod názvom Autogram macOS.</p>
 </details>
 
 <details>
@@ -475,7 +475,7 @@ Podpisový engine (Java fork Autogramu s DSS, machine protokol v1/v2, Finder Qui
 Aplikácia sa zostavuje finálnym Xcode 27 v `/Applications/Xcode.app`. Build z beta SDK padal hneď pri štarte na chýbajúcom symbole FoundationModels, preto beta Xcode nepoužívajte.
 
 ```bash
-cd Autogram
+cd Chevron7
 scripts/build-engine.sh
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./build_app.sh --release install
 ```
@@ -487,7 +487,7 @@ Aplikácia sa nainštaluje do `/Applications/Chevron7.app`.
 ### Testy
 
 ```bash
-cd Autogram
+cd Chevron7
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test
 ```
 

@@ -1604,8 +1604,8 @@ Then update the `chevron7-rename` memory to say the rename shipped, and open the
 
 - The engine still writes `Producer: Autogram macOS` into PDF/A output it normalizes when the source has no producer, and its Quick Action runner says "Pomocný program Autogram macOS". Changing either means editing `engine/`, which the boundary forbids; a later upstream-style patch can make the producer a parameter.
 - `PDFAValidator` looks for `Autogram PDFBox`, a producer nothing writes any more. It is a record-format check and stays until someone confirms no stored document carries it.
-- The application icon (`Chevron7.icns`) is the old artwork under a new file name. The spec requires an original icon; that is a design task of its own.
-- `Assets/AppIcon.iconset` is unused by any build step.
+- Resolved 2026-09-23: `Chevron7.icns` is now the original icon (concept A: midnight glass, amber chevron, point of origin), a full-bleed opaque square that macOS masks itself; a transparent inset squircle was put in the grey legacy frame on macOS 27.
+- `Assets/AppIcon.iconset` is unused by any build step; it is the source `Chevron7.icns` is made from (`iconutil -c icns`).
 
 ## Out of scope
 

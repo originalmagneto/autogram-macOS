@@ -63,10 +63,10 @@
     "default_popup": "popup.html",
     "default_title": "Chevron7",
     "default_icon": {
-      "16": "icons/icon-16.png",
-      "32": "icons/icon-32.png",
-      "48": "icons/icon-48.png",
-      "128": "icons/icon-128.png"
+      "16": "icons/toolbar-16.png",
+      "32": "icons/toolbar-32.png",
+      "48": "icons/toolbar-48.png",
+      "128": "icons/toolbar-128.png"
     }
   }
 }
