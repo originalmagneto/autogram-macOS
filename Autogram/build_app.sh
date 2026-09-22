@@ -239,10 +239,10 @@ fi
 
 EXTENSION_BIN="$BIN_DIR/Chevron7WebExtensionHandler"
 if [[ -x "$EXTENSION_BIN" ]]; then
-    APPEX="$CONTENTS/PlugIns/AutogramWebExtension.appex"
+    APPEX="$CONTENTS/PlugIns/Chevron7WebExtension.appex"
     rm -rf "$APPEX"
     mkdir -p "$APPEX/Contents/MacOS" "$APPEX/Contents/Resources"
-    cp "$EXTENSION_BIN" "$APPEX/Contents/MacOS/AutogramWebExtension"
+    cp "$EXTENSION_BIN" "$APPEX/Contents/MacOS/Chevron7WebExtension"
 
     if [[ -d "WebExtension/dist" ]]; then
         ditto "WebExtension/dist" "$APPEX/Contents/Resources"
@@ -256,13 +256,13 @@ if [[ -x "$EXTENSION_BIN" ]]; then
 <plist version="1.0">
 <dict>
     <key>CFBundleName</key>
-    <string>Autogram macOS</string>
+    <string>Chevron7</string>
     <key>CFBundleDisplayName</key>
-    <string>Autogram macOS</string>
+    <string>Chevron7</string>
     <key>CFBundleIdentifier</key>
-    <string>sk.autogram.Autogram.WebExtension</string>
+    <string>app.slovensko.chevron7.WebExtension</string>
     <key>CFBundleExecutable</key>
-    <string>AutogramWebExtension</string>
+    <string>Chevron7WebExtension</string>
     <key>CFBundlePackageType</key>
     <string>XPC!</string>
     <key>CFBundleShortVersionString</key>
@@ -293,7 +293,7 @@ if [[ -x "$EXTENSION_BIN" ]]; then
 APPEXPLIST
     echo '</plist>' >> "$APPEX/Contents/Info.plist"
 
-    APPEX_ENTITLEMENTS="$(mktemp -t autogram-appex-entitlements).plist"
+    APPEX_ENTITLEMENTS="$(mktemp -t chevron7-appex-entitlements).plist"
     cat > "$APPEX_ENTITLEMENTS" <<'ENTPLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -303,7 +303,7 @@ APPEXPLIST
     <true/>
     <key>com.apple.security.temporary-exception.mach-lookup.global-name</key>
     <array>
-        <string>sk.autogram.Autogram.webbridge</string>
+        <string>app.slovensko.chevron7.webbridge</string>
     </array>
 </dict>
 </plist>
@@ -331,12 +331,12 @@ if [[ "$INSTALL" == true ]]; then
     LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
     "$LSREGISTER" -u "$APP_DIR" >/dev/null 2>&1 || true
     "$LSREGISTER" -f "$INSTALL_DIR" >/dev/null 2>&1 || true
-    INSTALLED_APPEX="$INSTALL_DIR/Contents/PlugIns/AutogramWebExtension.appex"
+    INSTALLED_APPEX="$INSTALL_DIR/Contents/PlugIns/Chevron7WebExtension.appex"
     if [[ -d "$INSTALLED_APPEX" ]]; then
         # pluginkit accepts the appex right after lsregister but may not list it yet.
         for _ in 1 2 3 4 5; do
             pluginkit -a "$INSTALLED_APPEX" >/dev/null 2>&1 || true
-            if pluginkit -m -i sk.autogram.Autogram.WebExtension 2>/dev/null | grep -q WebExtension; then
+            if pluginkit -m -i app.slovensko.chevron7.WebExtension 2>/dev/null | grep -q WebExtension; then
                 echo "▸ Safari rozšírenie zaregistrované"
                 break
             fi

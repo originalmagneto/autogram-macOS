@@ -12,9 +12,9 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-APP="/Applications/Autogram macOS.app"
-APPEX="$APP/Contents/PlugIns/AutogramWebExtension.appex"
-SERVICE="sk.autogram.Autogram.webbridge"
+APP="/Applications/Chevron7.app"
+APPEX="$APP/Contents/PlugIns/Chevron7WebExtension.appex"
+SERVICE="app.slovensko.chevron7.webbridge"
 
 step() { printf '\n\033[1m▸ %s\033[0m\n' "$1"; }
 ok()   { printf '  \033[32m✔\033[0m %s\n' "$1"; }
@@ -47,14 +47,14 @@ for file in manifest.json background.js content.js inject.js; do
 done
 
 step "5. Je launchd agent zaregistrovaný?"
-if launchctl print "gui/$(id -u)/sk.autogram.Autogram.webbridge" >/dev/null 2>&1; then
-    ok "agent sk.autogram.Autogram.webbridge je v launchd"
+if launchctl print "gui/$(id -u)/$SERVICE" >/dev/null 2>&1; then
+    ok "agent $SERVICE je v launchd"
 else
     bad "agent chýba - spusti: ./scripts/install-webbridge-agent.sh"
 fi
 
 step "6. Beží aplikácia a je dosiahnuteľná cez agenta?"
-if ! pgrep -x "Autogram" >/dev/null 2>&1; then
+if ! pgrep -x "Chevron7" >/dev/null 2>&1; then
     echo "  Aplikácia nebeží, spúšťam ju..."
     open "$APP"
     sleep 4
@@ -62,7 +62,7 @@ fi
 if "$(swift build --show-bin-path 2>/dev/null)/webbridge-probe" 2>&1 | sed 's/^/  /'; then
     ok "XPC transport funguje (appková polovica je overená)"
 else
-    bad "XPC spojenie zlyhalo - pozri log: log show --last 2m --predicate 'subsystem == \"sk.autogram.Autogram\"'"
+    bad "XPC spojenie zlyhalo - pozri log: log show --last 2m --predicate 'subsystem == \"app.slovensko.chevron7\"'"
 fi
 
 cat <<'MANUAL'
@@ -76,11 +76,11 @@ Zvyšok sa bez teba spraviť nedá. Tri kroky v Safari:
   2. Safari > Develop > Allow Unsigned Extensions
      Pozor: Safari to zabudne pri každom štarte, musíš to zapnúť znova.
 
-  3. Safari > Settings > Extensions > zapni "Autogram macOS"
+  3. Safari > Settings > Extensions > zapni "Chevron7"
 
 Potom otvor https://www.slovensko.sk/ a vo web inspectore konzoly spusti:
 
-     await window.autogramMacOS.status()
+     await window.chevron7.status()
 
   Očakávaný výsledok:  { ok: true, ready: true, version: "0.4.0" }
   (presne to už vracia sonda v kroku 6 bez Safari)
@@ -88,7 +88,7 @@ Potom otvor https://www.slovensko.sk/ a vo web inspectore konzoly spusti:
   ready:true znamená, že podpisový handler je pripravený. Samotný podpis
   ešte vyžaduje potvrdenie používateľom a kartu alebo mobil.
 
-  Ak dostaneš { ok:false, error:"Autogram macOS nebeží..." }, appex sa načítal,
+  Ak dostaneš { ok:false, error:"Chevron7 nebeží..." }, appex sa načítal,
   ale spojenie s aplikáciou zlyhalo. Skontroluj registráciu agenta,
   mach-lookup entitlement a výsledok XPC sondy vyššie.
 ──────────────────────────────────────────────────────────────────────────

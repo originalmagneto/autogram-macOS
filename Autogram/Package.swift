@@ -10,16 +10,20 @@ let package = Package(
     ],
     targets: [
         .target(
-            name: "Chevron7WebBridge",
+            name: "Chevron7Identity",
             dependencies: []
         ),
         .target(
+            name: "Chevron7WebBridge",
+            dependencies: ["Chevron7Identity"]
+        ),
+        .target(
             name: "Chevron7Kit",
-            dependencies: ["Chevron7WebBridge"]
+            dependencies: ["Chevron7WebBridge", "Chevron7Identity"]
         ),
         .executableTarget(
             name: "Chevron7App",
-            dependencies: ["Chevron7Kit"]
+            dependencies: ["Chevron7Kit", "Chevron7Identity"]
         ),
         .executableTarget(
             name: "pkcs11-helper",
@@ -43,7 +47,7 @@ let package = Package(
         ),
         .executableTarget(
             name: "chevron7-webbridge-agent",
-            dependencies: ["Chevron7WebBridge"]
+            dependencies: ["Chevron7WebBridge", "Chevron7Identity"]
         ),
         .executableTarget(
             name: "webbridge-probe",
@@ -51,7 +55,7 @@ let package = Package(
         ),
         .testTarget(
             name: "Chevron7KitTests",
-            dependencies: ["Chevron7Kit"]
+            dependencies: ["Chevron7Kit", "Chevron7Identity", "Chevron7WebBridge"]
         ),
         .testTarget(
             name: "Chevron7AppTests",

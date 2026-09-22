@@ -5,7 +5,7 @@
 // reach the signer only through this worker and only for the sites the manifest
 // allows.
 
-const NATIVE_APP = "sk.autogram.Autogram.WebExtension";
+const NATIVE_APP = "app.slovensko.chevron7.WebExtension";
 
 // A status request starts Autogram when it is not running. macOS then registers
 // the app again, and the extension manager ends this extension's native handler in

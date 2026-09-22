@@ -1,4 +1,5 @@
 import Foundation
+import Chevron7Identity
 
 /// eForm and XML Data Container attributes for a state-portal signing request.
 ///
@@ -64,10 +65,10 @@ public enum WebSigningBridge {
     /// Mach service the app publishes and the extension looks up. The extension
     /// carries `com.apple.security.temporary-exception.mach-lookup.global-name`
     /// for exactly this name, which needs neither a Team ID nor an app group.
-    public static let machServiceName = "sk.autogram.Autogram.webbridge"
+    public static let machServiceName = ProductIdentity.webBridgeServiceName
 
     /// Label of the launchd agent that owns ``machServiceName``.
-    public static let agentLabel = "sk.autogram.Autogram.webbridge"
+    public static let agentLabel = ProductIdentity.webBridgeServiceName
 
     /// Documents travel inline. Measured on 2026-09-11: 16 MB crosses the page,
     /// the extension, the appex, the agent and the app in 151 ms with no ceiling

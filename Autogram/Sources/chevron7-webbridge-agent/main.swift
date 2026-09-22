@@ -1,6 +1,7 @@
 import Foundation
 import AppKit
 import Chevron7WebBridge
+import Chevron7Identity
 
 // On-demand launchd agent that owns the Mach service name.
 //
@@ -71,7 +72,7 @@ final class Rendezvous: NSObject, NSXPCListenerDelegate, WebBridgeRendezvousProt
             configuration.arguments = ["--web-signing"]
             workspace.openApplication(at: url, configuration: configuration)
         } else {
-            FileHandle.standardError.write(Data("Autogram bundle not found\n".utf8))
+            FileHandle.standardError.write(Data("Chevron7 bundle not found\n".utf8))
         }
     }
 
@@ -83,15 +84,15 @@ final class Rendezvous: NSObject, NSXPCListenerDelegate, WebBridgeRendezvousProt
         let candidate = binary
             .deletingLastPathComponent()   // Helpers
             .deletingLastPathComponent()   // Contents
-            .deletingLastPathComponent()   // Autogram macOS.app
+            .deletingLastPathComponent()   // Chevron7.app
         if candidate.pathExtension == "app", FileManager.default.fileExists(atPath: candidate.path) {
             return candidate
         }
-        return NSWorkspace.shared.urlForApplication(withBundleIdentifier: "sk.autogram.Autogram")
+        return NSWorkspace.shared.urlForApplication(withBundleIdentifier: ProductIdentity.bundleIdentifier)
     }
 
     private static func appIsRunning() -> Bool {
-        !NSRunningApplication.runningApplications(withBundleIdentifier: "sk.autogram.Autogram").isEmpty
+        !NSRunningApplication.runningApplications(withBundleIdentifier: ProductIdentity.bundleIdentifier).isEmpty
     }
 
     private func waitForRegistration(reply: @escaping (NSXPCListenerEndpoint?) -> Void) {

@@ -4,8 +4,8 @@ set -euo pipefail
 # Registers the launchd agent that owns the web bridge Mach service.
 # Needed because launchd, not the app, decides who may publish a service name.
 
-APP="${1:-/Applications/Autogram macOS.app}"
-LABEL="sk.autogram.Autogram.webbridge"
+APP="${1:-/Applications/Chevron7.app}"
+LABEL="app.slovensko.chevron7.webbridge"
 AGENT="$APP/Contents/Helpers/chevron7-webbridge-agent"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 
