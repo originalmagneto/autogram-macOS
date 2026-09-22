@@ -1,4 +1,6 @@
 #!/bin/bash
+# SPDX-FileCopyrightText: 2026 Marián Čuprík
+# SPDX-License-Identifier: EUPL-1.2
 set -euo pipefail
 
 # Guards the line the Chevron7 rename stops at: Autogram is a dependency and an

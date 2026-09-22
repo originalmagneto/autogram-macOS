@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Marián Čuprík
+// SPDX-License-Identifier: EUPL-1.2
+
 // Background worker. The only place in the extension that talks to the native
 // app: content scripts and injected page code never call sendNativeMessage.
 //

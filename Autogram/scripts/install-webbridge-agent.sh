@@ -1,4 +1,6 @@
 #!/bin/bash
+# SPDX-FileCopyrightText: 2026 Marián Čuprík
+# SPDX-License-Identifier: EUPL-1.2
 set -euo pipefail
 
 # Registers the launchd agent that owns the web bridge Mach service.

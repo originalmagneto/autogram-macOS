@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Marián Čuprík
+// SPDX-License-Identifier: EUPL-1.2
+
 // Providers in these tests render at 380 px: the frozen heuristic's mask passes
 // scale super-linearly with pixel count and take tens of seconds per page in a
 // debug build at the production 760 px, which only tests the compiler.

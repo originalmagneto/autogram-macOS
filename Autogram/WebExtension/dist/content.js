@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Marián Čuprík
+// SPDX-License-Identifier: EUPL-1.2
+
 // Content script. Injects the page-context shim and relays its requests to the
 // background worker, which is the only caller of native messaging.
 //

@@ -1,4 +1,6 @@
 #!/bin/bash
+# SPDX-FileCopyrightText: 2026 Marián Čuprík
+# SPDX-License-Identifier: EUPL-1.2
 set -euo pipefail
 
 # Answers the three unknowns behind the Safari extension in one run:

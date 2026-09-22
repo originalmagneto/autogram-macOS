@@ -1,4 +1,6 @@
 #!/bin/bash
+# SPDX-FileCopyrightText: 2026 Marián Čuprík
+# SPDX-License-Identifier: EUPL-1.2
 set -euo pipefail
 
 # Chevron7.app build script - assembly of a macOS app bundle.
@@ -206,7 +208,7 @@ cat > "$CONTENTS/Info.plist" <<'PLIST'
         </dict>
     </dict>
     <key>NSHumanReadableCopyright</key>
-    <string>Zaručená konverzia podľa § 35–39 zákona č. 305/2013 Z. z.</string>
+    <string>© 2026 Marián Čuprík, EUPL-1.2. Podpisový engine: fork slovensko-digital/autogram.</string>
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
 </dict>

@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 Marián Čuprík
+# SPDX-License-Identifier: EUPL-1.2
 # Builds the bundled signing engine that AutogramCLI-arm64 and the Finder Quick
 # Action run: the Java fork in ../engine (machine protocol v1/v2 over DSS), an
 # arm64 jlink runtime, the C launcher and the Swift Quick Action runner.

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Marián Čuprík
+// SPDX-License-Identifier: EUPL-1.2
+
 import XCTest
 import CryptoKit
 import Chevron7Kit

@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Marián Čuprík
+// SPDX-FileCopyrightText: Slovensko.Digital and contributors to autogram-extension
+// SPDX-License-Identifier: EUPL-1.2
+
 // Page-context shim.
 //
 // State portals drive signing through the Ditec D.Signer object at

@@ -1,0 +1,22 @@
+Chevron7
+Copyright 2026 Marián Čuprík
+
+Licensed under the European Union Public Licence v. 1.2 (EUPL-1.2), see LICENSE.
+
+This repository holds two works under the same licence:
+
+- Chevron7/ (the macOS application, its web extension and scripts):
+  copyright Marián Čuprík, EUPL-1.2.
+- engine/ (the signing engine): a fork of slovensko-digital/autogram,
+  copyright its authors, EUPL-1.2, see engine/LICENSE. It runs as a separate
+  process with its own Java runtime and talks to the application over the
+  Autogram machine protocol.
+
+Chevron7/WebExtension/dist/ditec.js and inject.js port parts of
+slovensko-digital/autogram-extension (EUPL-1.2).
+
+Signing with a phone over NFC uses the Autogram v mobile application and the
+relay at autogram.slovensko.digital, both run by Slovensko.Digital.
+
+Chevron7 is not affiliated with or endorsed by Slovensko.Digital, and not
+affiliated with Chevron Corporation.

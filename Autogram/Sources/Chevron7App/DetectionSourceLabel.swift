@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Marián Čuprík
+// SPDX-License-Identifier: EUPL-1.2
+
 import Foundation
 
 /// Turns the technical `detectionSource` audit string into something a notary

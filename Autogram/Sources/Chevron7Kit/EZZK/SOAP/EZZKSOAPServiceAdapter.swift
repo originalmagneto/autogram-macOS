@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Marián Čuprík
+// SPDX-License-Identifier: EUPL-1.2
+
 import Foundation
 
 /// `EZZKServicing` for ZaKo on top of the SOAP client. Built per use with a snapshot of

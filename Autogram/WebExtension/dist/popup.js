@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Marián Čuprík
+// SPDX-License-Identifier: EUPL-1.2
+
 // Per-site switch. Turning this off hands the page back to whatever D.Signer it
 // would have used on its own, typically Ditec D.Bridge 2, without disabling the
 // whole extension.
