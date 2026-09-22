@@ -94,10 +94,10 @@ A later refactor then cannot quietly break phone signing.
 | Layer | From | To |
 | --- | --- | --- |
 | Product | Autogram macOS | Chevron7 |
-| Bundle identifiers (12) | `sk.autogram.*` | `app.chevron7.*` |
-| Mach service, LaunchAgent label | `sk.autogram.Autogram.webbridge` | `app.chevron7.Chevron7.webbridge` |
+| Bundle identifiers (12) | `sk.autogram.*` | `app.slovensko.chevron7.*` |
+| Mach service, LaunchAgent label | `sk.autogram.Autogram.webbridge` | `app.slovensko.chevron7.webbridge` |
 | URL scheme | `autogram://` | `chevron7://` |
-| Keychain services, UserDefaults keys | `sk.autogram.*` | `app.chevron7.*` |
+| Keychain services, UserDefaults keys | `sk.autogram.*` | `app.slovensko.chevron7.*` |
 | Application Support folder | `~/Library/Application Support/Autogram` | `.../Chevron7` |
 | Swift modules | `AutogramApp`, `AutogramKit`, `AutogramWebBridge`, `AutogramWebExtensionHandler`, `autogram-webbridge-agent` | `Chevron7*` |
 | Installed bundle | `/Applications/Autogram macOS.app` | `/Applications/Chevron7.app` |
@@ -109,10 +109,22 @@ Quick Action and the documentation.
 The `sk.` prefix goes regardless: the premise of the rename is that this is no
 longer a Slovak-only application.
 
-**Open decision.** The reverse-DNS prefix `app.chevron7` assumes
-`chevron7.app` is obtainable. Confirm at a registrar before execution, together
-with `chevron7.eu` and the GitHub namespace. Changing the prefix afterwards
-costs the same as performing this rename again.
+**Decided 2026-09-22: `app.slovensko.chevron7`.** It is the reverse of
+`chevron7.slovensko.app`, a subdomain of `slovensko.app`, which the author owns
+(managed through Squarespace and Cloudflare). `chevron7.app` and `chevron7.eu`
+were unregistered that day and were knowingly not bought. The trade-off was
+accepted: "slovensko" returns to every identifier, and once a bundle identifier
+is registered with the Apple Developer Program it is permanent. Changing the
+prefix afterwards costs the same as performing this rename again.
+
+The subdomain already names the product, so the application's bundle identifier
+is the reversed domain itself, `app.slovensko.chevron7`, without a second
+`Chevron7` segment; the web extension, Mach service, Keychain services and
+UserDefaults keys hang below it (`app.slovensko.chevron7.WebExtension`,
+`app.slovensko.chevron7.webbridge`, `app.slovensko.chevron7.ezzk.soap`,
+`app.slovensko.chevron7.settings.v1`). The product website will live at
+`chevron7.slovensko.app`; mobile signing does not depend on it and must never
+point at it.
 
 ## Migration
 
@@ -189,13 +201,14 @@ session on 2026-09-22.
 2. **Move the data folder** to `.../Chevron7`.
 3. **Rename in the repository**: modules, identifiers, strings, scripts, docs,
    honouring the boundary above.
-4. **Rename on GitHub**, create an empty placeholder repository under the old
-   name to protect the redirects, update local remotes.
+4. **Rename on GitHub** and update local remotes. No placeholder repository
+   under the old name (decided 2026-09-22): GitHub redirects the old URL only
+   while no repository takes that name, so a placeholder would end the redirects.
 5. **Rebuild, reinstall, re-register the agent, re-enter the EZZK credentials.**
 
 ## Verification
 
-- `pluginkit -m -i app.chevron7.Chevron7.WebExtension -vvv`. The `-vvv` is
+- `pluginkit -m -i app.slovensko.chevron7.WebExtension -vvv`. The `-vvv` is
   required: without it the check passes while resolving to a wrong path, which
   produced a false verification on 2026-09-22
 - LaunchServices resolves the new bundle identifier to the new bundle and
