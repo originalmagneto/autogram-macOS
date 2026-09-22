@@ -1,3 +1,4 @@
+import Chevron7Identity
 import Foundation
 import SwiftUI
 
@@ -11,7 +12,7 @@ final class RecentDocumentStore {
         let lastOpenedAt: Date
     }
 
-    private static let storageKey = "sk.autogram.recentDocuments.v1"
+    private static let storageKey = "\(ProductIdentity.bundleIdentifier).recentDocuments.v1"
     private static let maximumEntries = 8
 
     private let settingsStore: AppSettingsStore

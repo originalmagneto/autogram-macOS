@@ -1,3 +1,4 @@
+import Chevron7Identity
 import Foundation
 import Security
 
@@ -30,7 +31,7 @@ public protocol EZZKKeychainAdapter: Sendable {
 }
 
 public struct EZZKTokenStore: EZZKTokenStoring, Sendable {
-    static let keychainService = "sk.autogram.Autogram.ezzk.oauth.tokens"
+    static let keychainService = "\(ProductIdentity.bundleIdentifier).ezzk.oauth.tokens"
 
     private let adapter: any EZZKKeychainAdapter
 

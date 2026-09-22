@@ -118,11 +118,11 @@ final class EZZKEnvironmentTests: XCTestCase {
 
     func testOAuthCallbackParserRejectsMissingDuplicateAndMismatchedValues() {
         let cases: [(String, EZZKOAuthCallbackError)] = [
-            ("autogram://ezzk/callback?state=state-1", .missingCode),
-            ("autogram://ezzk/callback?code=abc", .missingState),
-            ("autogram://ezzk/callback?code=abc&state=state-2", .stateMismatch),
-            ("autogram://ezzk/callback?code=abc&state=wrong", .stateMismatch),
-            ("autogram://ezzk/callback?code=&state=state-1", .malformedParameter)
+            ("chevron7://ezzk/callback?state=state-1", .missingCode),
+            ("chevron7://ezzk/callback?code=abc", .missingState),
+            ("chevron7://ezzk/callback?code=abc&state=state-2", .stateMismatch),
+            ("chevron7://ezzk/callback?code=abc&state=wrong", .stateMismatch),
+            ("chevron7://ezzk/callback?code=&state=state-1", .malformedParameter)
         ]
 
         for (urlString, expectedError) in cases {
@@ -140,7 +140,7 @@ final class EZZKEnvironmentTests: XCTestCase {
     func testOAuthErrorCallbackMapsToTypedErrorWithoutReturningCode() {
         XCTAssertThrowsError(
             try EZZKOAuthCallback.parse(
-                url: URL(string: "autogram://ezzk/callback?error=access_denied&state=state-1")!,
+                url: URL(string: "chevron7://ezzk/callback?error=access_denied&state=state-1")!,
                 expectedState: "state-1"
             )
         ) { error in
@@ -149,7 +149,7 @@ final class EZZKEnvironmentTests: XCTestCase {
 
         XCTAssertThrowsError(
             try EZZKOAuthCallback.parse(
-                url: URL(string: "autogram://ezzk/callback?error=server_error&state=state-1")!,
+                url: URL(string: "chevron7://ezzk/callback?error=server_error&state=state-1")!,
                 expectedState: "state-1"
             )
         ) { error in

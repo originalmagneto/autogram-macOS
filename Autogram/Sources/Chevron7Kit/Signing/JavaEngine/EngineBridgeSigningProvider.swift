@@ -1,3 +1,4 @@
+import Chevron7Identity
 import Foundation
 import PDFKit
 @preconcurrency import AppKit
@@ -26,7 +27,7 @@ public final class EngineBridgeSigningProvider: QualifiedSigningProviding, @unch
     private let identityCacheTTL: TimeInterval = 6
     private let driverProbeCache = OSAllocatedUnfairLock<(fingerprint: String, names: [String], at: Date)?>(initialState: nil)
     private let lastResolveErrorLock = OSAllocatedUnfairLock<String?>(initialState: nil)
-    private let logger = Logger(subsystem: "sk.autogram.macos", category: "EngineBridge")
+    private let logger = Logger(subsystem: ProductIdentity.bundleIdentifier, category: "EngineBridge")
 
     init(engine: AutogramCLIEngine = AutogramCLIEngine(),
          renderer: VisibleSignatureRenderer = VisibleSignatureRenderer()) {
@@ -747,7 +748,7 @@ public final class EngineBridgeSigningProvider: QualifiedSigningProviding, @unch
     static func makeWorkspace(fileManager: FileManager = .default) throws -> URL {
         let temporary = EnginePaths.canonical(URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true))
         let directory = temporary
-            .appendingPathComponent("autogram-engine", isDirectory: true)
+            .appendingPathComponent("chevron7-engine", isDirectory: true)
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
         return directory

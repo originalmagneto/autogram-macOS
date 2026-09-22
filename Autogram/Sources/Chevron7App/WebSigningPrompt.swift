@@ -1,4 +1,5 @@
 import AppKit
+import Chevron7Identity
 import SwiftUI
 import os
 
@@ -32,7 +33,7 @@ final class WebSigningPrompt {
     private var panel: NSPanel?
     private var delegate: WebSigningPanelDelegate?
     private var middlewareInputDepth = 0
-    private let log = Logger(subsystem: "sk.autogram.Autogram", category: "web-signing")
+    private let log = Logger(subsystem: ProductIdentity.bundleIdentifier, category: "web-signing")
     private var keyboardHandoff: Task<Void, Never>?
 
     func show(coordinator: WebSigningCoordinator) {

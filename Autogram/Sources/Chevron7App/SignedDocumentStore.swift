@@ -1,3 +1,4 @@
+import Chevron7Identity
 import Foundation
 import SwiftUI
 
@@ -69,7 +70,7 @@ final class SignedDocumentStore {
         var url: URL? { path.map { URL(fileURLWithPath: $0) } }
     }
 
-    private static let storageKey = "sk.autogram.signedDocuments.v1"
+    private static let storageKey = "\(ProductIdentity.bundleIdentifier).signedDocuments.v1"
     /// Enough history for retention to find old copies; the sidebar shows only a few.
     private static let maximumEntries = 200
 

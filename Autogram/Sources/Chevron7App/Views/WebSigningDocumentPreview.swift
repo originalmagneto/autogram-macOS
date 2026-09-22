@@ -61,7 +61,7 @@ final class WebSigningQuickLook: NSObject, QLPreviewPanelDataSource {
     private var previewURL: URL?
 
     func show(document: PDFDocument, filename: String) {
-        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("AutogramWebPreview", isDirectory: true)
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("Chevron7WebPreview", isDirectory: true)
         try? FileManager.default.removeItem(at: folder)
         do {
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)

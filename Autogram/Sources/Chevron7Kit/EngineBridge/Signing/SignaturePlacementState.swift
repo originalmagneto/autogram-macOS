@@ -1,4 +1,5 @@
 import AppKit
+import Chevron7Identity
 import PDFKit
 import Foundation
 import Observation
@@ -189,5 +190,5 @@ public final class SignaturePlacementState {
         let assetID: UUID?
     }
 
-    static let preferencesKey = "sk.autogram.macos.visibleSignature"
+    static let preferencesKey = "\(ProductIdentity.bundleIdentifier).visibleSignature"
 }

@@ -1,3 +1,4 @@
+import Chevron7Identity
 import Foundation
 
 public enum BankLabel: Codable, Hashable, Sendable {
@@ -65,8 +66,7 @@ public actor ExampleBank {
     public init(directory: URL) { self.directory = directory }
 
     public static var defaultDirectory: URL {
-        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        return base.appendingPathComponent("Autogram/VisionBank", isDirectory: true)
+        ProductIdentity.applicationSupportDirectory().appendingPathComponent("VisionBank", isDirectory: true)
     }
 
     public var indexURL: URL { directory.appendingPathComponent("bank.json") }

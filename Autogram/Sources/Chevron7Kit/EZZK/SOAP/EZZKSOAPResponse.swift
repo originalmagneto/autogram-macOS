@@ -1,3 +1,4 @@
+import Chevron7Identity
 import Foundation
 import os
 
@@ -51,7 +52,7 @@ enum EZZKSOAPResponseParser {
     /// malformed or mismatched request), never a normal user-facing condition, so they are
     /// logged for diagnosis. Only the fault subcode (public) and reason text (private) are
     /// logged, never the fault detail or a stack trace.
-    private static let logger = Logger(subsystem: "sk.autogram.macos", category: "EZZK")
+    private static let logger = Logger(subsystem: ProductIdentity.bundleIdentifier, category: "EZZK")
 
     static func reply(data: Data, statusCode: Int) throws -> EZZKSOAPReply {
         guard let document = try? XMLDocument(data: data, options: [.nodeLoadExternalEntitiesNever]) else {

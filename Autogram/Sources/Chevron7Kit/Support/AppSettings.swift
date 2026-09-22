@@ -1,8 +1,9 @@
+import Chevron7Identity
 import Foundation
 import Security
 
 public enum KeychainStore {
-    static let service = "sk.autogram.Autogram"
+    static let service = ProductIdentity.bundleIdentifier
 
     public static func save(secret: String, account: String) -> Bool {
         let data = Data(secret.utf8)
@@ -310,5 +311,5 @@ public struct AppSettings: Codable, Sendable {
         }
     }
 
-    static let storageKey = "sk.autogram.settings.v1"
+    static let storageKey = "\(ProductIdentity.bundleIdentifier).settings.v1"
 }

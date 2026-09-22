@@ -152,7 +152,7 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
             throw SigningFailure.engine("The signing helper returned an invalid embedded document name.")
         }
         let directory = FileManager.default.temporaryDirectory
-            .appending(path: "Autogram-EmbeddedPreviews", directoryHint: .isDirectory)
+            .appending(path: "Chevron7-EmbeddedPreviews", directoryHint: .isDirectory)
             .appending(path: UUID().uuidString, directoryHint: .isDirectory)
         do {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)

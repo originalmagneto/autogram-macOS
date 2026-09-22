@@ -15,7 +15,7 @@ final class EZZKSOAPCredentialStoreTests: XCTestCase {
 
         XCTAssertEqual(try store.load(environment: .sandbox), test)
         XCTAssertEqual(try store.load(environment: .production), production)
-        XCTAssertEqual(keychain.services, ["sk.autogram.Autogram.ezzk.soap"])
+        XCTAssertEqual(keychain.services, ["app.slovensko.chevron7.ezzk.soap"])
         XCTAssertEqual(Set(keychain.items.keys), ["test", "production"])
     }
 

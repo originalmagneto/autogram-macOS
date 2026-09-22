@@ -1,6 +1,7 @@
 import Foundation
 import PDFKit
 import SwiftUI
+import Chevron7Identity
 import Chevron7Kit
 
 @MainActor
@@ -1579,7 +1580,6 @@ final class SigningSessionStore {
     }
 
     static func outputDirectoryURL() -> URL {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-            .appendingPathComponent("Autogram/Output", isDirectory: true)
+        ProductIdentity.applicationSupportDirectory().appendingPathComponent("Output", isDirectory: true)
     }
 }

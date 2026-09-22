@@ -1,3 +1,4 @@
+import Chevron7Identity
 import Foundation
 import Security
 
@@ -22,7 +23,7 @@ public protocol EZZKSOAPCredentialStoring: Sendable {
 
 /// The advocate's EZZK name and password, one Keychain item per environment.
 public struct EZZKSOAPCredentialStore: EZZKSOAPCredentialStoring {
-    static let keychainService = "sk.autogram.Autogram.ezzk.soap"
+    static let keychainService = "\(ProductIdentity.bundleIdentifier).ezzk.soap"
 
     private let adapter: any EZZKKeychainAdapter
 

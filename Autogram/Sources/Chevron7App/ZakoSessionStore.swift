@@ -1,6 +1,7 @@
 import Foundation
 import PDFKit
 import SwiftUI
+import Chevron7Identity
 import Chevron7Kit
 
 @MainActor
@@ -1471,13 +1472,11 @@ func resetSession(keepingProfile: Bool) {
     }
 
     static func outputDirectoryURL() -> URL {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-            .appendingPathComponent("Autogram/Output", isDirectory: true)
+        ProductIdentity.applicationSupportDirectory().appendingPathComponent("Output", isDirectory: true)
     }
 
     static func templatesDirectory() -> URL {
-        let url = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-            .appendingPathComponent("Autogram/Templates", isDirectory: true)
+        let url = ProductIdentity.applicationSupportDirectory().appendingPathComponent("Templates", isDirectory: true)
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return url
     }

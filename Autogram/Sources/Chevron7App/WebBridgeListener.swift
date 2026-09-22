@@ -1,4 +1,5 @@
 import Foundation
+import Chevron7Identity
 import Chevron7Kit
 import Chevron7WebBridge
 import os
@@ -11,7 +12,7 @@ import os
 final class WebBridgeListener: NSObject, NSXPCListenerDelegate, @unchecked Sendable {
     static let shared = WebBridgeListener()
 
-    private let log = Logger(subsystem: "sk.autogram.Autogram", category: "web-bridge")
+    private let log = Logger(subsystem: ProductIdentity.bundleIdentifier, category: "web-bridge")
     private var listener: NSXPCListener?
     private var rendezvous: NSXPCConnection?
     private let lock = NSLock()

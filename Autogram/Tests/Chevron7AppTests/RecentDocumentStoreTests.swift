@@ -17,7 +17,7 @@ final class RecentDocumentStoreTests: XCTestCase {
 
         XCTAssertFalse(store.isEnabled)
         XCTAssertTrue(store.entries.isEmpty)
-        XCTAssertNil(defaults.data(forKey: "sk.autogram.recentDocuments.v1"))
+        XCTAssertNil(defaults.data(forKey: "app.slovensko.chevron7.recentDocuments.v1"))
     }
     func testSigningStoreRecordsOnlyNewlyAcceptedDocuments() async {
         let settingsStore = AppSettingsStore()
@@ -77,7 +77,7 @@ final class RecentDocumentStoreTests: XCTestCase {
         XCTAssertEqual(store.entries[0].displayName, "enabled.pdf")
         XCTAssertNotNil(store.entries[0].lastOpenedAt)
 
-        let persisted = try XCTUnwrap(defaults.data(forKey: "sk.autogram.recentDocuments.v1"))
+        let persisted = try XCTUnwrap(defaults.data(forKey: "app.slovensko.chevron7.recentDocuments.v1"))
         let raw = try XCTUnwrap(JSONSerialization.jsonObject(with: persisted) as? [[String: Any]])
         XCTAssertEqual(raw.count, 1)
         XCTAssertEqual(Set(raw[0].keys), ["id", "bookmarkData", "displayName", "lastOpenedAt"])
@@ -186,7 +186,7 @@ final class RecentDocumentStoreTests: XCTestCase {
             bookmarkData: bookmarkData,
             displayName: "stale-original.pdf",
             lastOpenedAt: Date())
-        defaults.set(try JSONEncoder().encode([entry]), forKey: "sk.autogram.recentDocuments.v1")
+        defaults.set(try JSONEncoder().encode([entry]), forKey: "app.slovensko.chevron7.recentDocuments.v1")
         let store = RecentDocumentStore(settingsStore: settingsStore, defaults: defaults)
 
         let resolved = store.resolve(entry)
@@ -206,7 +206,7 @@ final class RecentDocumentStoreTests: XCTestCase {
             displayName: "missing.pdf",
             lastOpenedAt: Date())
         let encoded = try JSONEncoder().encode([missing])
-        defaults.set(encoded, forKey: "sk.autogram.recentDocuments.v1")
+        defaults.set(encoded, forKey: "app.slovensko.chevron7.recentDocuments.v1")
         let store = RecentDocumentStore(settingsStore: settingsStore, defaults: defaults)
 
         XCTAssertNil(store.resolve(missing))
@@ -228,7 +228,7 @@ final class RecentDocumentStoreTests: XCTestCase {
         store.clear()
 
         XCTAssertTrue(store.entries.isEmpty)
-        XCTAssertNil(defaults.data(forKey: "sk.autogram.recentDocuments.v1"))
+        XCTAssertNil(defaults.data(forKey: "app.slovensko.chevron7.recentDocuments.v1"))
     }
 
     func testRetainRecentDocumentsDefaultsToFalseWhenMissingFromEncodedSettings() throws {

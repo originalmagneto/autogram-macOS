@@ -1,3 +1,4 @@
+import Chevron7Identity
 import Foundation
 import AppKit
 
@@ -12,8 +13,7 @@ enum VisualSignatureStore {
     }
 
     static func directory() -> URL {
-        let url = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-            .appendingPathComponent("Autogram/Signatures", isDirectory: true)
+        let url = ProductIdentity.applicationSupportDirectory().appendingPathComponent("Signatures", isDirectory: true)
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return url
     }

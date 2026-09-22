@@ -34,4 +34,22 @@ final class ProductIdentityTests: XCTestCase {
         XCTAssertEqual(JavaEngineLocator.defaultRoots, ["/Applications/Chevron7.app/Contents"])
         XCTAssertEqual(JavaEngineLocator.environmentKey, "CHEVRON7_JAVA_ENGINE_ROOT")
     }
+
+    @MainActor
+    func testStoredStateLivesUnderTheIdentity() {
+        let root = ProductIdentity.applicationSupportDirectory()
+        XCTAssertEqual(ExampleBank.defaultDirectory, root.appendingPathComponent("VisionBank", isDirectory: true))
+        XCTAssertEqual(EZZKSOAPCredentialStore.keychainService, "app.slovensko.chevron7.ezzk.soap")
+        XCTAssertEqual(EZZKTokenStore.keychainService, "app.slovensko.chevron7.ezzk.oauth.tokens")
+        XCTAssertEqual(KeychainStore.service, "app.slovensko.chevron7")
+        XCTAssertEqual(AppSettings.storageKey, "app.slovensko.chevron7.settings.v1")
+        XCTAssertEqual(SignaturePlacementState.preferencesKey, "app.slovensko.chevron7.visibleSignature")
+    }
+
+    func testSignatureArtworkSharesTheDataRoot() {
+        let work = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let store = SignatureAssetStore(applicationSupportRoot: work)
+        XCTAssertEqual(store.assetsDirectory.standardizedFileURL.path,
+                       work.appendingPathComponent("Chevron7/Visual Signatures").standardizedFileURL.path)
+    }
 }

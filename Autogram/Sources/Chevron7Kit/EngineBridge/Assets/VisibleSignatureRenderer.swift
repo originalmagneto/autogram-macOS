@@ -1,4 +1,5 @@
 import AppKit
+import Chevron7Identity
 import Foundation
 
 public enum VisibleSignatureRendererError: Error {
@@ -54,7 +55,7 @@ public struct VisibleSignatureRenderer {
             isPreview: isPreview
         )
         let rotated = try rotatedImage(card, degrees: rotationDegrees)
-        let directory = cacheRoot.appending(path: "Autogram macOS/Visual Signatures", directoryHint: .isDirectory)
+        let directory = cacheRoot.appending(path: "\(ProductIdentity.name)/Visual Signatures", directoryHint: .isDirectory)
         try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
         let output = directory.appending(path: UUID().uuidString).appendingPathExtension("png")
         guard let tiff = rotated.tiffRepresentation,

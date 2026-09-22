@@ -1,6 +1,7 @@
 import Foundation
 import AppKit
 import PDFKit
+import Chevron7Identity
 import Chevron7Kit
 import Chevron7WebBridge
 import Observation
@@ -77,7 +78,7 @@ final class WebSigningCoordinator {
         identities.contains { $0.id.hasPrefix(EngineBridgeSigningProvider.certificateIdentityPrefix) }
     }
 
-    private let log = Logger(subsystem: "sk.autogram.Autogram", category: "web-signing")
+    private let log = Logger(subsystem: ProductIdentity.bundleIdentifier, category: "web-signing")
 
     /// Portals ask for Baseline B, which carries no timestamp, and the phone
     /// then offers only the handwritten-equivalent signature. Turning this on

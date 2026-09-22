@@ -1,3 +1,4 @@
+import Chevron7Identity
 import Foundation
 
 public struct EvidenceRecord: Codable, Identifiable, Sendable {
@@ -118,13 +119,12 @@ public struct EvidenceRecord: Codable, Identifiable, Sendable {
 
 public final class LocalEvidenceStore: @unchecked Sendable {
     private let fileURL: URL
-    private let queue = DispatchQueue(label: "sk.autogram.evidence")
+    private let queue = DispatchQueue(label: "\(ProductIdentity.bundleIdentifier).evidence")
     public private(set) var records: [EvidenceRecord] = []
 
     public init(directory: URL? = nil) {
-        let base = directory ?? FileManager.default.urls(
-            for: .applicationSupportDirectory, in: .userDomainMask).first!
-            .appendingPathComponent("Autogram/Evidence", isDirectory: true)
+        let base = directory ?? ProductIdentity.applicationSupportDirectory()
+            .appendingPathComponent("Evidence", isDirectory: true)
         try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
         self.fileURL = base.appendingPathComponent("register.json")
 

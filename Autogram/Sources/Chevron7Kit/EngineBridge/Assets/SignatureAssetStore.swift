@@ -1,4 +1,5 @@
 import AppKit
+import Chevron7Identity
 import CoreGraphics
 import Foundation
 import ImageIO
@@ -30,7 +31,7 @@ public struct SignatureAssetStore {
 
     public var assetsDirectory: URL {
         applicationSupportRoot
-            .appending(path: "Autogram macOS", directoryHint: .isDirectory)
+            .appending(path: ProductIdentity.name, directoryHint: .isDirectory)
             .appending(path: "Visual Signatures", directoryHint: .isDirectory)
     }
 
