@@ -65,24 +65,55 @@ struct SigningFlowView: View {
             ? UTType.pdf.identifier
             : (asiceProvider != nil ? asiceType.identifier : (imageProvider?.identifier ?? UTType.png.identifier))
         let provider = (pdfProvider ?? asiceProvider ?? providers.first)!
+        let store = self.store
 
-        provider.loadDataRepresentation(forTypeIdentifier: typeIdentifier) { data, _ in
-            guard let data else { return }
-            Task { @MainActor in
-                let tempURL = FileManager.default.temporaryDirectory
-                    .appendingPathComponent("sign-import-\(UUID().uuidString).pdf")
+        // A dropped file keeps its own folder and its own name, so the signed
+        // output lands beside the original instead of in a temporary directory
+        // under a generated name. Only a drop that carries no file falls back to
+        // bytes, and that output stays beside the temporary file.
+        guard isPDF, provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) else {
+            importDroppedBytes(from: provider, typeIdentifier: typeIdentifier, isPDF: isPDF) { url in
+                Task { @MainActor in await store.loadDocument(at: url) }
+            }
+            return true
+        }
 
-                if isPDF || data.starts(with: Data("%PDF".utf8)) {
-                    try? data.write(to: tempURL)
-                } else if let converted = ImageToPDFConverter.pdf(fromImageData: data) {
-                    try? converted.write(to: tempURL)
-                } else {
-                    return
+        provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
+            guard let sourceURL = DroppedFileURL.resolve(from: item) else {
+                importDroppedBytes(from: provider, typeIdentifier: typeIdentifier, isPDF: isPDF) { url in
+                    Task { @MainActor in await store.loadDocument(at: url) }
                 }
-                await store.loadDocument(at: tempURL)
+                return
+            }
+            let path = sourceURL.path
+            Task { @MainActor in
+                await store.loadDocument(at: URL(fileURLWithPath: path))
             }
         }
         return true
+    }
+}
+
+/// Writes a drop that carries no file to a temporary PDF, converting an image
+/// when needed. Nonisolated so the fallback can also run from the item
+/// provider's own callback.
+private func importDroppedBytes(from provider: NSItemProvider,
+                                typeIdentifier: String,
+                                isPDF: Bool,
+                                completion: @escaping @Sendable (URL) -> Void) {
+    provider.loadDataRepresentation(forTypeIdentifier: typeIdentifier) { data, _ in
+        guard let data else { return }
+        let tempURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("sign-import-\(UUID().uuidString).pdf")
+
+        if isPDF || data.starts(with: Data("%PDF".utf8)) {
+            try? data.write(to: tempURL)
+        } else if let converted = ImageToPDFConverter.pdf(fromImageData: data) {
+            try? converted.write(to: tempURL)
+        } else {
+            return
+        }
+        completion(tempURL)
     }
 }
 
