@@ -6,7 +6,7 @@
 # arm64 jlink runtime, the C launcher and the Swift Quick Action runner.
 #
 # Output: Autogram/.build/engine/Contents/{Helpers,app,runtime}, which
-# build_app.sh bundles into Autogram macOS.app.
+# build_app.sh bundles into Chevron7.app.
 #
 # Requirements: an arm64 JDK 25 that ships JavaFX jmods (Azul Zulu FX 25).
 # Set AUTOGRAM_JAVA_HOME or JAVA_HOME, or install it under ~/Library/Java.
