@@ -146,7 +146,7 @@ struct IntakeView: View {
                 Text("Pretiahnite naskenovaný papierový dokument")
                     .font(.title2.weight(.bold))
 
-                Text("Originál alebo úradne osvedčená kópia vo formáte PDF. Autogram automaticky analyzuje strany, listy a bezpečnostné prvky podľa § 35-39 zákona č. 305/2013 Z. z.")
+                Text("Originál alebo úradne osvedčená kópia vo formáte PDF. Chevron7 automaticky analyzuje strany, listy a bezpečnostné prvky podľa § 35-39 zákona č. 305/2013 Z. z.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)

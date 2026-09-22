@@ -48,7 +48,7 @@ enum EZZKSOAPResponseParser {
     static let unauthorizedResultCode = 101
     static let serviceNotInitializedReason = "service implementation object was not initialized"
 
-    /// `DeserializationFailed` and `ActionMismatch` are application defects (Autogram sent a
+    /// `DeserializationFailed` and `ActionMismatch` are application defects (Chevron7 sent a
     /// malformed or mismatched request), never a normal user-facing condition, so they are
     /// logged for diagnosis. Only the fault subcode (public) and reason text (private) are
     /// logged, never the fault detail or a stack trace.

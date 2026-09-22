@@ -135,7 +135,7 @@ struct SigningIntakeView: View {
                 Text("Pretiahnite dokument na podpísanie")
                     .font(.title2.weight(.bold))
 
-                Text("Podporované formáty: PDF, JPEG, PNG, TIFF. Autogram dokument podpíše kvalifikovaným elektronickým podpisom (KEP) s voliteľnou časovou pečiatkou.")
+                Text("Podporované formáty: PDF, JPEG, PNG, TIFF. Chevron7 dokument podpíše kvalifikovaným elektronickým podpisom (KEP) s voliteľnou časovou pečiatkou.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -1749,7 +1749,7 @@ struct SigningBatchView: View {
         panel.allowedContentTypes = [.plainText]
         panel.allowsOtherFileTypes = false
         panel.canCreateDirectories = true
-        panel.nameFieldStringValue = "autogram-davka.txt"
+        panel.nameFieldStringValue = "chevron7-davka.txt"
         panel.message = "Vyberte miesto na uloženie protokolu dávky."
         panel.begin { response in
             guard response == .OK, let url = panel.url else { return }
@@ -1766,7 +1766,7 @@ struct SigningBatchView: View {
 
     private func batchLog() -> String {
         var lines = [
-            "Autogram: protokol podpisovania dávky",
+            "Chevron7: protokol podpisovania dávky",
             "Stav: \(headerTitle)",
             "Úspešné: \(completedCount)",
             "Neúspešné: \(failedCount)",

@@ -42,7 +42,7 @@ final class Chevron7WebExtensionHandler: NSObject, NSExtensionRequestHandling {
         // Only one reply may ever be delivered: the sandbox turns a missing app
         // into an interruption rather than an error, so both paths land here.
         let replied = Replied()
-        let unavailable = ["ok": false, "error": "Autogram macOS nebeží alebo nie je dostupný."] as [String: Any]
+        let unavailable = ["ok": false, "error": "Chevron7 nebeží alebo nie je dostupný."] as [String: Any]
         var appConnection: NSXPCConnection?
         let finish: ([String: Any]) -> Void = { payload in
             guard replied.claim() else { return }
@@ -55,7 +55,7 @@ final class Chevron7WebExtensionHandler: NSObject, NSExtensionRequestHandling {
         agent.invalidationHandler = { finish(unavailable) }
 
         guard let rendezvous = agent.remoteObjectProxyWithErrorHandler({ error in
-            finish(["ok": false, "error": "Služba Autogramu nie je dostupná: \(error.localizedDescription)"])
+            finish(["ok": false, "error": "Služba aplikácie Chevron7 nie je dostupná: \(error.localizedDescription)"])
         }) as? WebBridgeRendezvousProtocol else {
             finish(unavailable)
             return
@@ -74,7 +74,7 @@ final class Chevron7WebExtensionHandler: NSObject, NSExtensionRequestHandling {
             connection.invalidationHandler = { finish(unavailable) }
 
             guard let proxy = connection.remoteObjectProxyWithErrorHandler({ error in
-                finish(["ok": false, "error": "Spojenie s Autogramom zlyhalo: \(error.localizedDescription)"])
+                finish(["ok": false, "error": "Spojenie s aplikáciou Chevron7 zlyhalo: \(error.localizedDescription)"])
             }) as? WebSigningBridgeProtocol else {
                 finish(unavailable)
                 return
@@ -103,7 +103,7 @@ final class Chevron7WebExtensionHandler: NSObject, NSExtensionRequestHandling {
                     return
                 }
                 guard let response, let text = String(data: response, encoding: .utf8) else {
-                    finish(["ok": false, "error": "Autogram vrátil prázdnu odpoveď."])
+                    finish(["ok": false, "error": "Chevron7 vrátil prázdnu odpoveď."])
                     return
                 }
                 finish(["ok": true, "response": text])
@@ -116,7 +116,7 @@ final class Chevron7WebExtensionHandler: NSObject, NSExtensionRequestHandling {
             }
             proxy.beginSign(request: data) { jobID, error in
                 guard let jobID else {
-                    finish(["ok": false, "error": error ?? "Autogram požiadavku na podpis neprijal."])
+                    finish(["ok": false, "error": error ?? "Chevron7 požiadavku na podpis neprijal."])
                     return
                 }
                 finish(["ok": true, "jobID": jobID])
@@ -136,7 +136,7 @@ final class Chevron7WebExtensionHandler: NSObject, NSExtensionRequestHandling {
                     return
                 }
                 guard let response, let text = String(data: response, encoding: .utf8) else {
-                    finish(["ok": false, "done": true, "error": "Autogram vrátil prázdnu odpoveď."])
+                    finish(["ok": false, "done": true, "error": "Chevron7 vrátil prázdnu odpoveď."])
                     return
                 }
                 finish(["ok": true, "done": true, "response": text])

@@ -174,7 +174,7 @@ enum AppLinks {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillFinishLaunching(_ notification: Notification) {
         // A portal request started the app: no Dock icon and no menu bar until the
-        // person opens Autogram themselves.
+        // person opens Chevron7 themselves.
         if AppLaunchMode.current == .webSigning {
             NSApp.setActivationPolicy(.accessory)
         }

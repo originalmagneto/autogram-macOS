@@ -4,7 +4,7 @@ import XCTest
 
 /// The agent used to keep the app's endpoint after the app quit, so every later
 /// request got a dead endpoint instead of a launch, and signing from Safari only
-/// worked while Autogram was already open.
+/// worked while Chevron7 was already open.
 final class WebBridgeEndpointRegistryTests: XCTestCase {
     func testRegisteredEndpointIsReturnedWhileTheAppIsConnected() {
         let registry = WebBridgeEndpointRegistry()

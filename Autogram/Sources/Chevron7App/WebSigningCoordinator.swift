@@ -38,7 +38,7 @@ final class WebSigningCoordinator {
         var errorDescription: String? {
             switch self {
             case .busy:
-                return "Autogram už spracúva inú požiadavku na podpis."
+                return "Chevron7 už spracúva inú požiadavku na podpis."
             case .cancelled:
                 return "Podpisovanie ste zrušili."
             case .tooLarge(let bytes):

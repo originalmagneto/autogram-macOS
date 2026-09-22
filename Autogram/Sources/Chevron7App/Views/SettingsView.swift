@@ -595,7 +595,7 @@ struct SettingsView: View {
             }
             do {
                 let reply = try await RFC3161TimestampClient()
-                    .requestToken(for: Data("autogram-tsa-connectivity-test".utf8), tsaURL: url)
+                    .requestToken(for: Data("chevron7-tsa-connectivity-test".utf8), tsaURL: url)
                 if let time = reply.genTime {
                     tsaTestStatus = "✓ Pečiatka prijatá (\(AttestationClauseGenerator.isoFormatter.string(from: time)))"
                 } else {
@@ -980,7 +980,7 @@ struct SettingsView: View {
                 .font(.callout)
                 .foregroundStyle(.secondary)
 
-            Text("Autogram zatiaľ nevytvára samostatný podpísaný záznam, ktorý EZZK prijíma. Záznamy ostávajú v Registri konverzií vo fronte odoslania.")
+            Text("Chevron7 zatiaľ nevytvára samostatný podpísaný záznam, ktorý EZZK prijíma. Záznamy ostávajú v Registri konverzií vo fronte odoslania.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -1028,7 +1028,7 @@ struct SettingsView: View {
                     .font(.headline)
 
                 Text(
-                    "Quick Action je samostatné Automator workflow. Spúšťa starý Autogram CLI helper v pozadí, takže hlavné okno aplikácie sa pri podpise neotvorí."
+                    "Quick Action je samostatné Automator workflow. Spúšťa pomocný program podpisového enginu v pozadí, takže hlavné okno aplikácie sa pri podpise neotvorí."
                 )
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -1075,19 +1075,19 @@ struct SettingsView: View {
 
                 Text(
                     """
-                    1. Nainštalujte Autogram do priečinka /Applications.
-                    2. Kliknite na Nainštalovať Quick Action vyššie. Autogram ju uloží do ~/Library/Services.
+                    1. Nainštalujte Chevron7 do priečinka /Applications.
+                    2. Kliknite na Nainštalovať Quick Action vyššie. Chevron7 ju uloží do ~/Library/Services.
                     3. Vo Findere otvorte Quick Actions → Customize... a zaškrtnite \(FinderQuickActionService.menuTitle).
                     4. Vo Findere označte jeden alebo viac PDF súborov.
                     5. Kliknite pravým tlačidlom myši a zvoľte Quick Actions → \(FinderQuickActionService.menuTitle).
-                    6. Autogram vyberie dostupný podpisový certifikát, pričom mandátny certifikát uprednostní. PIN alebo BOK zadáte iba počas podpisu.
+                    6. Chevron7 vyberie dostupný podpisový certifikát, pričom mandátny certifikát uprednostní. PIN alebo BOK zadáte iba počas podpisu.
                     """
                 )
                 .font(.caption)
                 .fixedSize(horizontal: false, vertical: true)
 
                 Text(
-                    "Ak položka nie je ani v Customize..., ukončite a znova spustite Autogram, kliknite na Obnoviť služby a reštartujte Finder. Workflow prijíma iba PDF súbory, nie ASiC-E kontajnery. PIN sa nikdy neukladá do nastavení."
+                    "Ak položka nie je ani v Customize..., ukončite a znova spustite Chevron7, kliknite na Obnoviť služby a reštartujte Finder. Workflow prijíma iba PDF súbory, nie ASiC-E kontajnery. PIN sa nikdy neukladá do nastavení."
                 )
                 .font(.caption2)
                 .foregroundStyle(.secondary)

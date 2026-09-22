@@ -313,7 +313,7 @@ struct RootView: View {
 
             }
             .listStyle(.sidebar)
-            .navigationTitle("Autogram")
+            .navigationTitle("Chevron7")
             .navigationSplitViewColumnWidth(min: 220, ideal: 250, max: 320)
             .safeAreaInset(edge: .bottom) {
                 // An opaque bar: without it the list scrolled underneath and the

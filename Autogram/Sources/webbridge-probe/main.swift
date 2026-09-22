@@ -37,7 +37,7 @@ guard let rendezvous = agent.remoteObjectProxyWithErrorHandler({ error in
 
 rendezvous.appEndpoint { endpoint in
     guard let endpoint else {
-        FileHandle.standardError.write(Data("Agent beží, ale Autogram sa nepodarilo spustiť ani po 20 s.\n".utf8))
+        FileHandle.standardError.write(Data("Agent beží, ale Chevron7 sa nepodarilo spustiť ani po 20 s.\n".utf8))
         semaphore.signal()
         return
     }
@@ -114,7 +114,7 @@ rendezvous.appEndpoint { endpoint in
 
     proxy.status { ready, version in
         print("Mach service : \(WebSigningBridge.machServiceName) (launchd agent)")
-        print("Autogram     : \(version)")
+        print("Chevron7     : \(version)")
         print("Ready to sign: \(ready ? "áno" : "nie (sign handler nie je zapojený)")")
         print("")
         print("Transport funguje: agent našiel aplikáciu a tá odpovedala cez XPC.")

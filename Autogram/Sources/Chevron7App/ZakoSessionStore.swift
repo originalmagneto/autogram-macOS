@@ -475,7 +475,7 @@ final class ZakoSessionStore {
         data.nonEmptyPageCount = analysis.nonEmptyPages
         data.originalDocumentTypeLabel = "Iný dokument"
         data.newDocumentFormatLabel = "PDF/A-2"
-        data.usedDeviceDescription = "Skenovanie / import do aplikácie Autogram"
+        data.usedDeviceDescription = "Skenovanie / import do aplikácie Chevron7"
         var breakdown: [AttestationData.PaperSizeGroup] = []
         for (sizeClass, pages) in analysis.paperSizeSummary.sorted(by: { $0.key.rawValue < $1.key.rawValue }) {
             breakdown.append(.init(sizeClass: sizeClass, sheets: Int(ceil(Double(pages) / 2.0))))

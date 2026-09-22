@@ -25,7 +25,7 @@ public struct PAdESSigner: Sendable {
     public func sign(pdf: Data,
                      certificateDER: Data,
                      signer: RawSigner,
-                     reason: String = "Autorizácia dokumentu — Autogram",
+                     reason: String = "Autorizácia dokumentu - Chevron7",
                      includeTimestamp: Bool,
                      tsaURL: URL?,
                      stamp: VisualStampSpec? = nil) async throws -> Data {

@@ -52,7 +52,7 @@ final class Rendezvous: NSObject, NSXPCListenerDelegate, WebBridgeRendezvousProt
             return
         }
         registry.forget()
-        // Nobody has registered, so Autogram is not running. Start it and wait:
+        // Nobody has registered, so Chevron7 is not running. Start it and wait:
         // otherwise every signature would need the person to launch the app
         // first, and the page would only ever hear that nothing is available.
         // The app can do nothing on its own with this - it raises a prompt that

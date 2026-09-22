@@ -141,7 +141,7 @@ extension WebBridgeListener: WebSigningBridgeProtocol {
         case .finished(let response, let error):
             reply(true, response, error)
         case .unknown:
-            reply(true, nil, "Požiadavka na podpis sa v Autograme nenašla. Skúste podpísať znova.")
+            reply(true, nil, "Požiadavka na podpis sa v aplikácii Chevron7 nenašla. Skúste podpísať znova.")
         }
     }
 

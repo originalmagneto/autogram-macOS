@@ -1513,7 +1513,7 @@ final class SigningSessionStore {
            identity.label != "DEMO podpis (vývojový režim)" {
             return identity.label
         }
-        return "Elektronický podpis Autogram"
+        return "Elektronický podpis Chevron7"
     }
 
     func addCustomTSA(_ raw: String) {

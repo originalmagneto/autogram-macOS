@@ -23,7 +23,7 @@ final class AttestationXMLTests: XCTestCase {
             conversionExecutionDateTime: Date(timeIntervalSince1970: 1_700_000_000),
             evidenceNumber: "1563-231114-42",
             performingPerson: profile,
-            usedDeviceDescription: "Skenovanie / import do aplikácie Autogram")
+            usedDeviceDescription: "Skenovanie / import do aplikácie Chevron7")
         let elements = [
             SecurityElement(kind: .officialStamp, pageIndex: 0,
                             boundingBox: NormalizedRect(x: 0.7, y: 0.1, width: 0.2, height: 0.2),
@@ -69,7 +69,7 @@ final class AttestationXMLTests: XCTestCase {
                        "<LegalSubject>",
                        "<Name>Advokátska kancelária Test</Name>",
                        "<IdentifierValue>ico://sk/35764102</IdentifierValue>",
-                       "<UsedDevice>Skenovanie / import do aplikácie Autogram</UsedDevice>",
+                       "<UsedDevice>Skenovanie / import do aplikácie Chevron7</UsedDevice>",
                        "<ConversionExecutionDateTime>",
                        "<ConversionRecordEvidenceNumber>https://data.gov.sk/id/egov/conversion-record/1563-231114-42</ConversionRecordEvidenceNumber>",
                        "</ConversionRecord>"] {

@@ -30,7 +30,7 @@ public enum PDFAError: LocalizedError, Equatable, Sendable {
         case .catalogNotFound(let num): return "Katalógová objekt #\(num) sa nepodarilo načítať."
         case .serializationFailed: return "Serializácia PDF zlyhala."
         case .normalizerUnavailable:
-            return "PDF/A normalizácia nie je dostupná. Skontrolujte inštaláciu Autogram engine a skúste znova."
+            return "PDF/A normalizácia nie je dostupná. Skontrolujte inštaláciu aplikácie Chevron7 a skúste znova."
         case .normalizedOutputInvalid(let issues):
             return "Výsledný dokument neprešiel kontrolou PDF/A: \(issues.joined(separator: "; "))"
         }
@@ -40,7 +40,7 @@ public enum PDFAError: LocalizedError, Equatable, Sendable {
 public struct PDFAConverter: Sendable {
     public var producer: String
 
-    public init(producer: String = "Autogram ZaKo 1.0") {
+    public init(producer: String = "Chevron7 ZaKo 1.0") {
         self.producer = producer
     }
 

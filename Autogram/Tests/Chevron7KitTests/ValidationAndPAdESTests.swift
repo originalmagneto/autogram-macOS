@@ -24,7 +24,7 @@ final class ValidationAndPAdESTests: XCTestCase {
             conversionExecutionDateTime: Date(timeIntervalSince1970: 1_700_000_000),
             evidenceNumber: "1563-231114-42",
             performingPerson: profile,
-            usedDeviceDescription: "Skenovanie / import do aplikácie Autogram")
+            usedDeviceDescription: "Skenovanie / import do aplikácie Chevron7")
         let elements = [
             SecurityElement(kind: .officialStamp, pageIndex: 0,
                             boundingBox: NormalizedRect(x: 0.75, y: 0.1, width: 0.15, height: 0.15),
@@ -131,7 +131,7 @@ final class ValidationAndPAdESTests: XCTestCase {
             context: .init(fingerprintSHA256Hex: fingerprint, securityElementCount: elements.count))
         XCTAssertTrue(evidenceIssues.contains { $0.contains("ConversionRecordEvidenceNumber") })
 
-        if let range = xml.range(of: "<UsedDevice>Skenovanie / import do aplikácie Autogram</UsedDevice>") {
+        if let range = xml.range(of: "<UsedDevice>Skenovanie / import do aplikácie Chevron7</UsedDevice>") {
             xml.replaceSubrange(range, with: "<UsedDevice></UsedDevice>")
         }
         let deviceIssues = AttestationXMLValidator().validate(

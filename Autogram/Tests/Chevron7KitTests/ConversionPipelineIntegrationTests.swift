@@ -33,7 +33,7 @@ final class ConversionPipelineIntegrationTests: XCTestCase {
             newDocumentName: "Zmluva o dielo.pdf",
             newDocumentFormatLabel: "PDF/A-2",
             performingPerson: profile,
-            usedDeviceDescription: "Skenovanie / import do aplikácie Autogram")
+            usedDeviceDescription: "Skenovanie / import do aplikácie Chevron7")
         attestation.evidenceNumber = "1563-231114-777"
 
         let converter = PDFAConverter()

@@ -358,7 +358,7 @@ public final class DemoSigningProvider: QualifiedSigningProviding, @unchecked Se
         result.append(SigningIdentityInfo(
             id: "demo",
             label: "DEMO podpis (vývojový režim)",
-            issuerSummary: "Autogram Demo CA",
+            issuerSummary: "Chevron7 Demo CA",
             validUntil: Calendar.current.date(byAdding: .year, value: 1, to: Date()),
             isMandateCertificate: false,
             isQualified: false))
@@ -387,7 +387,7 @@ public final class DemoSigningProvider: QualifiedSigningProviding, @unchecked Se
         let digest = SHA256.hash(data: request.pdfData).map { String(format: "%02x", $0) }.joined()
         let manifest = """
         {
-          "type": "autogram-demo-signature",
+          "type": "chevron7-demo-signature",
           "legallyBinding": false,
           "note": "Vývojový podpis: nenahrádza KEP s mandátnym certifikátom.",
           "sequence": \(n),

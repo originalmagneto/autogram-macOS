@@ -87,7 +87,7 @@ public enum EZZKError: LocalizedError, Equatable, Sendable {
         case .serviceRejected(let code, let message):
             return "EZZK odmietlo požiadavku (kód \(code)): \(message)"
         case .invalidRequest(let detail):
-            return "EZZK nerozumie požiadavke Autogramu (\(detail)). Ide o chybu aplikácie."
+            return "EZZK nerozumie požiadavke aplikácie Chevron7 (\(detail)). Ide o chybu aplikácie."
         case .untrustedCertificate:
             return "Certifikát testovacieho prostredia EZZK sa zmenil. Aktualizujte odtlačok v aplikácii."
         case .productionAllocationDisabled:

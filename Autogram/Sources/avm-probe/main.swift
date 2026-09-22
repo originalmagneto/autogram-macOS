@@ -22,7 +22,7 @@ if let flag = args.firstIndex(of: "--make-zako-sample"), flag + 1 < args.count {
     let pdf = try Data(contentsOf: pdfURL)
     let clause = """
     <?xml version="1.0" encoding="UTF-8"?>
-    <OsvedcovaciaDolozka xmlns="urn:autogram:avm-probe:sample">
+    <OsvedcovaciaDolozka xmlns="urn:chevron7:avm-probe:sample">
       <Poznamka>Vzorová doložka pre test podpisu kontajnera cez Autogram v mobile.</Poznamka>
     </OsvedcovaciaDolozka>
     """
