@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="docs/diagrams/hero.svg" alt="Autogram macOS: podpisovanie a zaručená konverzia" width="100%">
+  <img src="docs/diagrams/hero.svg" alt="Chevron7: podpisovanie a zaručená konverzia" width="100%">
 </p>
 
-<h1 align="center">Autogram macOS</h1>
+<h1 align="center">Chevron7</h1>
 
 <p align="center">
   <a href="https://github.com/originalmagneto/autogram-macOS/releases/latest"><img src="https://img.shields.io/github/v/release/originalmagneto/autogram-macOS?display_name=tag&style=flat-square&color=eb6c36" alt="Aktuálne vydanie"></a>
@@ -28,6 +28,12 @@
 </p>
 
 Natívna macOS aplikácia v SwiftUI pre kvalifikované elektronické podpisovanie, zaručenú konverziu podľa zákona č. 305/2013 Z. z. a lokálnu evidenciu právnych dokumentov. Žiadny obsah dokumentu neopúšťa Mac, pokiaľ to výslovne nezvolíte.
+
+## Pôvod a poďakovanie
+
+Chevron7 je natívna macOS aplikácia na kvalifikovaný elektronický podpis a zaručenú konverziu. Podpisový engine v priečinku `engine/` je fork projektu [slovensko-digital/autogram](https://github.com/slovensko-digital/autogram) pod licenciou EUPL 1.2. Podpisovanie mobilom cez NFC používa aplikáciu Autogram v mobile a server autogram.slovensko.digital, ktoré prevádzkuje Slovensko.Digital. Rozšírenie pre Safari preberá časti [slovensko-digital/autogram-extension](https://github.com/slovensko-digital/autogram-extension).
+
+Chevron7 nie je spojený so Slovensko.Digital ani ním podporovaný a nemá nič spoločné so spoločnosťou Chevron Corporation. Licencia: EUPL 1.2, pozri `LICENSE` a `NOTICE`.
 
 ## Prehľad
 
@@ -166,7 +172,7 @@ Vstavaná detekcia beží na zariadení a skladá sa z troch vrstiev. Voliteľn�
 </tr>
 </table>
 
-<p>Dataset žije v <code>~/Library/Application Support/Autogram/VisionBank</code>, obsahuje náhľady strán dokumentov, ktorých prvky ste posúdili, a nikdy sa neodosiela. V Nastaveniach sa dá učenie vypnúť a dataset vymazať.</p>
+<p>Dataset žije v <code>~/Library/Application Support/Chevron7/VisionBank</code>, obsahuje náhľady strán dokumentov, ktorých prvky ste posúdili, a nikdy sa neodosiela. V Nastaveniach sa dá učenie vypnúť a dataset vymazať.</p>
 </details>
 
 <details>
@@ -233,7 +239,7 @@ Podrobnosti: [pravidlá tréningového datasetu](Autogram/docs/security-element-
 <details open>
 <summary><strong>Stav EZZK a produkčného odoslania</strong></summary>
 
-<p><strong>Autogram komunikuje s EZZK cez SOAP rozhranie Ditec, s prihlasovacím menom a heslom, ktoré advokát dostal pri registrácii.</strong> Portálové REST rozhranie cez OAuth2/PKCE by vyžadovalo, aby MIRRI SR zaregistrovalo natívny callback pre Autogram; podľa integrátorov sa to nestane, lebo EZZK sa už nerozvíja. Pôvodný OAuth kód v projekte ostáva, ale nie je zapojený, a čaká na budúce prihlasovanie cez slovensko.sk.</p>
+<p><strong>Chevron7 komunikuje s EZZK cez SOAP rozhranie Ditec, s prihlasovacím menom a heslom, ktoré advokát dostal pri registrácii.</strong> Portálové REST rozhranie cez OAuth2/PKCE by vyžadovalo, aby MIRRI SR zaregistrovalo natívny callback pre Chevron7; podľa integrátorov sa to nestane, lebo EZZK sa už nerozvíja. Pôvodný OAuth kód v projekte ostáva, ale nie je zapojený, a čaká na budúce prihlasovanie cez slovensko.sk.</p>
 
 <p>Prihlasovacie údaje sa zadávajú v <strong>Nastaveniach, karta EZZK</strong>, pre zvolené prostredie: Demo (lokálne), Test alebo Produkcia. Heslo sa uloží do Keychainu až vtedy, keď ho EZZK prijme; prihlasovací token existuje len v pamäti aplikácie. Testovacie prostredie má vlastný certifikát, ktorému aplikácia dôveruje len podľa pripnutého odtlačku.</p>
 
@@ -293,7 +299,7 @@ Bez čítačky kariet podpíšete dokument občianskym preukazom s NFC a iPhonom
 
 ## Podpisovanie na štátnych weboch
 
-Rozšírenie do Safari podpisuje priamo na slovensko.sk, financnasprava.sk, sluzby.orsr.sk, socpoist a obcan.justice.sk. Portál volá svoje obvyklé rozhranie D.Signer a Autogram macOS ho obslúži namiesto pôvodného podpisovača. Dokumenty necestujú cez žiadny otvorený port: rozšírenie hovorí s aplikáciou natívnou správou.
+Rozšírenie do Safari podpisuje priamo na slovensko.sk, financnasprava.sk, sluzby.orsr.sk, socpoist a obcan.justice.sk. Portál volá svoje obvyklé rozhranie D.Signer a Chevron7 ho obslúži namiesto pôvodného podpisovača. Dokumenty necestujú cez žiadny otvorený port: rozšírenie hovorí s aplikáciou natívnou správou.
 
 <table>
 <tr>
@@ -301,7 +307,7 @@ Rozšírenie do Safari podpisuje priamo na slovensko.sk, financnasprava.sk, sluz
 <th align="left">Detail</th>
 </tr>
 <tr><td>Transport</td><td>Natívny messaging, žiadny HTTP server a žiaden počúvajúci port. Meno Mach služby vlastní malý launchd agent, ktorý slúži len ako miesto stretnutia; aplikácia uňho zaregistruje anonymný endpoint a rozšírenie sa naň pripojí priamo. Cez agenta neprejde ani jeden dokument.</td></tr>
-<tr><td>Spustenie</td><td>Autogram macOS netreba mať otvorený. Pri požiadavke ho launchd agent spustí na pozadí, bez ikony v Docku a bez hlavného okna, a zobrazí sa iba okno podpisu vycentrované nad oknom Safari. Po otvorení Autogramu z Docku alebo Findera sa z neho stane bežná aplikácia s hlavným oknom.</td></tr>
+<tr><td>Spustenie</td><td>Chevron7 netreba mať otvorený. Pri požiadavke ho launchd agent spustí na pozadí, bez ikony v Docku a bez hlavného okna, a zobrazí sa iba okno podpisu vycentrované nad oknom Safari. Po otvorení Chevron7 z Docku alebo Findera sa z neho stane bežná aplikácia s hlavným oknom.</td></tr>
 <tr><td>Potvrdenie</td><td>Stránka nepodpíše nič ticho. Každá požiadavka otvorí plávajúce okno nad prehliadačom: vľavo všetky strany PDF a tlačidlo <strong>Otvoriť náhľad</strong> (Quick Look), vpravo mobil a karta. Naraz sa spracúva jedna požiadavka.</td></tr>
 <tr><td>Karty</td><td>Karta I.CA: po vložení dostane zameranie pole PIN, Enter načíta certifikáty a oba sa zobrazia pod sebou s označením mandátny, QCP alebo komerčný. Občiansky preukaz: certifikáty sa vopred nečítajú, engine použije jediný podpisový kľúč na karte a BOK sa zadáva dvakrát v okne eID klienta (prihlásenie a potvrdenie podpisu); okno podpisu ostane viditeľné pod ním.</td></tr>
 <tr><td>Mobil</td><td>Podpísať sa dá aj občianskym preukazom cez NFC. Relay prijíma tie isté eForm atribúty ako lokálny engine, takže mobilom sa dá podpísať aj elektronický formulár, nielen PDF.</td></tr>
@@ -310,7 +316,7 @@ Rozšírenie do Safari podpisuje priamo na slovensko.sk, financnasprava.sk, sluz
 <tr><td>Časová pečiatka</td><td>Portály pýtajú úroveň Baseline B, teda bez pečiatky, a aplikácia im pošle presne to. Na slovensko.sk sa prepínač pečiatky neponúka vôbec, lebo nove.slovensko.sk podpis s nevyžiadanou pečiatkou odmietne (overené porovnaním s oficiálnym Autogramom). Na ostatných weboch prepínač úroveň povýši na Baseline T a pri každej požiadavke začína vypnutý. Autogram v mobile ponúkne pri Baseline B vlastnoručný podpis, pri Baseline T osvedčený.</td></tr>
 <tr><td>Ukladanie</td><td>Podpis z prehliadača sa vracia stránke. Kópiu si aplikácia predvolene odkladá do vlastného priečinka, ktorý sa dá zmeniť alebo ukladanie vypnúť; v nastaveniach sa dá zapnúť presun kópií do Koša po 7, 30 alebo 90 dňoch.</td></tr>
 <tr><td>Návrat k pôvodnému</td><td>Prepínač v rozšírení vráti konkrétnu stránku jej pôvodnému podpisovaču, napríklad D.Bridge 2, bez vypínania celého rozšírenia a bez obnovenia stránky.</td></tr>
-<tr><td>Hranice</td><td>Rozšírenie nie je podpísané Developer ID, takže Safari ho načíta len pri zapnutom <strong>Develop &gt; Allow Unsigned Extensions</strong>, a to po každom štarte. Po reinštalácii aplikácie treba Safari ukončiť (⌘Q) a otvoriť znova. Autogram macOS a oficiálny Autogram si nárokujú rovnaký odkaz <code>autogram://</code>, takže portál v režime „Autogram“ otvorí Autogram macOS. Podporované sú zatiaľ formuláre XAdES s XML Data Containerom a PDF; ostatné typy objektov hlásia nepodporovaný typ.</td></tr>
+<tr><td>Hranice</td><td>Rozšírenie nie je podpísané Developer ID, takže Safari ho načíta len pri zapnutom <strong>Develop &gt; Allow Unsigned Extensions</strong>, a to po každom štarte. Po reinštalácii aplikácie treba Safari ukončiť (⌘Q) a otvoriť znova. Podporované sú zatiaľ formuláre XAdES s XML Data Containerom a PDF; ostatné typy objektov hlásia nepodporovaný typ.</td></tr>
 </table>
 
 <details>
@@ -322,7 +328,7 @@ DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" ./build_app.sh --rele
 ./scripts/safari-spike.sh
 ```
 
-`build_app.sh install` rozšírenie v systéme zaregistruje; ak Safari počas inštalácie beží, pripomenie jeho reštart. V zozname rozšírení sa volá **Autogram macOS** a nesie ikonu aplikácie, takže sa nedá zameniť s oficiálnym rozšírením „Autogram na štátnych weboch“ ani s D.Bridge 2. Safari ho vypíše až potom, ako aplikácia aspoň raz bežala: appex enumeruje cez svoju nosnú aplikáciu. Pri bežnej prevádzke to nevadí, lebo launchd agent Autogram macOS spustí sám pri prvej požiadavke z portálu. `safari-spike.sh` overí všetko, čo sa overiť dá bez Safari: prítomnosť appexu, jeho entitlement, registráciu agenta a spojenie s aplikáciou. Potom vypíše tri kroky, ktoré treba spraviť v Safari ručne.
+`build_app.sh install` rozšírenie v systéme zaregistruje; ak Safari počas inštalácie beží, pripomenie jeho reštart. V zozname rozšírení sa volá **Chevron7** a nesie ikonu aplikácie, takže sa nedá zameniť s oficiálnym rozšírením „Autogram na štátnych weboch” ani s D.Bridge 2. Safari ho vypíše až potom, ako aplikácia aspoň raz bežala: appex enumeruje cez svoju nosnú aplikáciu. Pri bežnej prevádzke to nevadí, lebo launchd agent spustí Chevron7 sám pri prvej požiadavke z portálu. `safari-spike.sh` overí všetko, čo sa overiť dá bez Safari: prítomnosť appexu, jeho entitlement, registráciu agenta a spojenie s aplikáciou. Potom vypíše tri kroky, ktoré treba spraviť v Safari ručne.
 
 Podpis bez Safari sa dá vyskúšať priamo:
 
@@ -360,8 +366,8 @@ Podpis bez Safari sa dá vyskúšať priamo:
 <summary><strong>Ďalšie diagramy</strong></summary>
 
 <h3>Architektúra aplikácie</h3>
-<p>Tri zóny: povrchy (SwiftUI, Safari WebBridge, Autogram v mobile), jadro (session stores, AutogramKit, Java engine) a dôvera (evidencia, EZZK, PKCS#11 karty). Dokument neopúšťa Mac, kým to výslovne nezvolíte.</p>
-<p align="center"><img src="docs/diagrams/architecture.svg" alt="Architektúra Autogram macOS: povrchy, jadro a dôvera" width="100%"></p>
+<p>Tri zóny: povrchy (SwiftUI, Safari WebBridge, Autogram v mobile), jadro (session stores, Chevron7Kit, Java engine) a dôvera (evidencia, EZZK, PKCS#11 karty). Dokument neopúšťa Mac, kým to výslovne nezvolíte.</p>
+<p align="center"><img src="docs/diagrams/architecture.svg" alt="Architektúra Chevron7: povrchy, jadro a dôvera" width="100%"></p>
 
 <h3>PDF/A pipeline</h3>
 <p>Vloženie metadát a príloh, XMP profil, výpočet fingerprintu a kontrola, že exportovaný artefakt spĺňa požadovaný formát.</p>
@@ -403,16 +409,16 @@ Aktuálny macOS build je v [GitHub Releases](https://github.com/originalmagneto/
 <p>Build je podpísaný lokálne, nie Apple Developer ID, takže Gatekeeper ho pri prvom spustení zastaví. Toto je štandardný postup, žiadne nastavenia sa nemenia natrvalo:</p>
 
 <ol>
-<li>Otvorte DMG a presuňte <code>Autogram macOS.app</code> do priečinka <strong>Applications</strong>.</li>
+<li>Otvorte DMG a presuňte <code>Chevron7.app</code> do priečinka <strong>Applications</strong>.</li>
 <li>Spustite aplikáciu. macOS ohlási, že ju nemôže overiť, a ponúkne len "Presunúť do koša" alebo "Hotovo". Zvoľte <strong>Hotovo</strong>.</li>
-<li>Otvorte <strong>Systémové nastavenia ▸ Súkromie a bezpečnosť</strong>, zrolujte nadol k hláseniu o Autograme a kliknite na <strong>Aj tak otvoriť</strong>. Potvrďte heslom alebo Touch ID.</li>
+<li>Otvorte <strong>Systémové nastavenia ▸ Súkromie a bezpečnosť</strong>, zrolujte nadol k hláseniu o aplikácii Chevron7 a kliknite na <strong>Aj tak otvoriť</strong>. Potvrďte heslom alebo Touch ID.</li>
 <li>Od tejto chvíle sa aplikácia spúšťa normálne.</li>
 </ol>
 
 <p>Alternatíva z Terminálu, ktorá zruší karanténny príznak stiahnutého súboru:</p>
 
 ```bash
-xattr -d com.apple.quarantine "/Applications/Autogram macOS.app"
+xattr -d com.apple.quarantine "/Applications/Chevron7.app"
 ```
 
 <p>Overenie stiahnutého DMG: v poznámkach k vydaniu je SHA-256 odtlačok; porovnajte ho s výstupom <code>shasum -a 256 Autogram-macOS-v0.4.0.dmg</code>.</p>
@@ -436,7 +442,7 @@ xattr -d com.apple.quarantine "/Applications/Autogram macOS.app"
 <li>Oddelené učenie z výrezov a export kompletne skontrolovaných strán s rozdelením podľa dokumentov.</li>
 <li>Opravená normalizácia PDF/A v pribalenom engine a aktualizované diagramy.</li>
 <li>Pretiahnutý dokument si drží svoj priečinok aj meno, takže podpis už nekončí v dočasnom priečinku pod vygenerovaným menom.</li>
-<li>Safari rozšírenie sa v zozname volá <strong>Autogram macOS</strong> a nesie ikonu aplikácie.</li>
+<li>Safari rozšírenie sa v zozname volá <strong>Chevron7</strong> a nesie ikonu aplikácie.</li>
 </ul>
 <p>Po nainštalovaní aplikácie možno Safari bridge zaregistrovať spustením <code>Install Safari Bridge.command</code> z DMG. Rozšírenie vyžaduje zapnuté <strong>Develop &gt; Allow Unsigned Extensions</strong> v Safari.</p>
 </details>
@@ -476,7 +482,7 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./build_app.sh --releas
 
 `build-engine.sh` zostaví `autogram.jar` a závislosti cez Maven, vytvorí jlink runtime, skompiluje launcher `AutogramCLI-arm64` a runner `AutogramQuickActionRunner-arm64` a overí engine cez `CAPABILITIES`. `build_app.sh` potom všetko zabalí do `Contents/{Helpers,app,runtime}`; bez enginu aplikácia beží, ale podpis padá na Keychain alebo DEMO a Finder Quick Action nepodpisuje.
 
-Aplikácia sa nainštaluje do `/Applications/Autogram macOS.app`.
+Aplikácia sa nainštaluje do `/Applications/Chevron7.app`.
 
 ### Testy
 
@@ -493,7 +499,7 @@ Na niektorých strojoch `SecurityElementsDetectorTests` prekročí 60-sekundový
 <p>Java DSS engine (vyžaduje nainštalovaný engine):</p>
 
 ```bash
-AUTOGRAM_ENGINE_LIVE_TEST=1 \
+CHEVRON7_ENGINE_LIVE_TEST=1 \
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
 swift test --filter JavaEngineLiveProcessTests
 ```
@@ -529,10 +535,10 @@ swift run ezzk-probe <login|time|numbers|consume|lookup> [číslo] [--env test|p
 <th align="left" width="30%">Čo</th>
 <th align="left">Kde a ako</th>
 </tr>
-<tr><td>Podpísané a konvertované súbory</td><td>Prednostne vedľa zdrojového dokumentu, inak <code>~/Library/Application Support/Autogram/Output</code>. Existujúce súbory sa neprepíšu (<code>dokument (2).pdf</code>).</td></tr>
-<tr><td>Register konverzií</td><td><code>~/Library/Application Support/Autogram/Evidence/register.json</code>, bez obsahu dokumentov.</td></tr>
-<tr><td>Dataset AI Vision</td><td><code>~/Library/Application Support/Autogram/VisionBank</code>: náhľady strán, výrezy a feature printy posúdených prvkov. Lokálne, vymazateľné.</td></tr>
-<tr><td>Tajomstvá</td><td>Keychain: API kľúče a heslo do EZZK (položka <code>sk.autogram.Autogram.ezzk.soap</code>, zvlášť pre Test a Produkciu). Prihlasovací token do EZZK len v pamäti. Security-scoped bookmarks pre prístup k súborom.</td></tr>
+<tr><td>Podpísané a konvertované súbory</td><td>Prednostne vedľa zdrojového dokumentu, inak <code>~/Library/Application Support/Chevron7/Output</code>. Existujúce súbory sa neprepíšu (<code>dokument (2).pdf</code>).</td></tr>
+<tr><td>Register konverzií</td><td><code>~/Library/Application Support/Chevron7/Evidence/register.json</code>, bez obsahu dokumentov.</td></tr>
+<tr><td>Dataset AI Vision</td><td><code>~/Library/Application Support/Chevron7/VisionBank</code>: náhľady strán, výrezy a feature printy posúdených prvkov. Lokálne, vymazateľné.</td></tr>
+<tr><td>Tajomstvá</td><td>Keychain: API kľúče a heslo do EZZK (položka <code>app.slovensko.chevron7.ezzk.soap</code>, zvlášť pre Test a Produkciu). Prihlasovací token do EZZK len v pamäti. Security-scoped bookmarks pre prístup k súborom.</td></tr>
 <tr><td>Podpis mobilom</td><td>Dokument dočasne na <code>autogram.slovensko.digital</code>, zašifrovaný kľúčom z tohto Macu, zmazaný po podpise alebo do 24 hodín. Bez registrácie a bez API kľúča.</td></tr>
 </table>
 
@@ -545,12 +551,12 @@ Aktuálny ZaKo profil je implementačný P2E pilot s PDF/A-2b. Lokálny `PDFAVal
 <th align="left" width="24%">Vrstva</th>
 <th align="left">Zodpovednosť</th>
 </tr>
-<tr><td><strong>AutogramApp</strong></td><td>SwiftUI views, menu commands, Settings, drag and drop, Finder routing a lifecycle.</td></tr>
+<tr><td><strong>Chevron7App</strong></td><td>SwiftUI views, menu commands, Settings, drag and drop, Finder routing a lifecycle.</td></tr>
 <tr><td><strong>Session stores</strong></td><td><code>SigningSessionStore</code>, <code>ZakoSessionStore</code>, <code>RecentDocumentStore</code> a <code>SignedDocumentStore</code> riadia workflow, stav a históriu podpisov.</td></tr>
-<tr><td><strong>AutogramKit</strong></td><td>PDF analýza, <code>LayeredDetectionProvider</code> (kandidáti, klasifikácia, učenie, segmentácia), XML doložka, PDF/A, podpisovanie, ASiC-E a evidencia.</td></tr>
+<tr><td><strong>Chevron7Kit</strong></td><td>PDF analýza, <code>LayeredDetectionProvider</code> (kandidáti, klasifikácia, učenie, segmentácia), XML doložka, PDF/A, podpisovanie, ASiC-E a evidencia.</td></tr>
 <tr><td><strong>EngineBridge</strong></td><td>Persistentný machine session helper pre Java/DSS, PDFBox a PKCS#11 integrácie.</td></tr>
 <tr><td><strong>Signing/AVM</strong></td><td><code>AVMClient</code>, <code>AVMSigningSession</code> a <code>MobileSigningCoordinator</code>: podpis mobilom cez relay Autogram v mobile (upload, QR kód, polling, mapovanie výsledku, kontrola mandátu). <code>avm-probe</code> overuje protokol proti reálnemu serveru.</td></tr>
-<tr><td><strong>WebBridge</strong></td><td><code>AutogramWebBridge</code> nesie kontrakt medzi rozšírením a aplikáciou, <code>autogram-webbridge-agent</code> je launchd rendezvous vlastniaci meno Mach služby, <code>AutogramWebExtensionHandler</code> je appex v <code>Contents/PlugIns</code> a <code>WebExtension/</code> samotné rozšírenie. <code>webbridge-probe</code> otestuje celú appkovú polovicu bez Safari.</td></tr>
+<tr><td><strong>WebBridge</strong></td><td><code>Chevron7WebBridge</code> nesie kontrakt medzi rozšírením a aplikáciou, <code>chevron7-webbridge-agent</code> je launchd rendezvous vlastniaci meno Mach služby, <code>Chevron7WebExtensionHandler</code> je appex v <code>Contents/PlugIns</code> a <code>WebExtension/</code> samotné rozšírenie. <code>webbridge-probe</code> otestuje celú appkovú polovicu bez Safari.</td></tr>
 <tr><td><strong>EZZK</strong></td><td><code>EZZK/SOAP/</code> nesie celú komunikáciu s registrom: stavbu SOAP požiadaviek overenú voči uloženej WSDL a XSD snímke, parser odpovedí, prenos s pripnutým testovacím certifikátom, heslo v Keychaine, aktéra klienta s jedným bezpečným opakovaním prihlásenia a adaptér pre ZaKo. <code>EZZKAccountController</code> drží stav účtu pre Nastavenia a ZaKo, <code>ezzk-probe</code> overí službu z príkazového riadka.</td></tr>
 <tr><td><strong>vision-eval</strong></td><td>Samostatný CLI target na meranie presnosti detekcie; nie je súčasťou aplikácie.</td></tr>
 </table>
@@ -570,4 +576,4 @@ načíta bez tohto kroku a inštalácia nevyžaduje obchádzanie Gatekeepera.
 
 ## Právne a bezpečnostné upozornenie
 
-Autogram je technický nástroj. Nenahrádza právne posúdenie konkrétneho dokumentu ani povinnosť advokáta skontrolovať originál, bezpečnostné prvky, certifikát a výsledný artefakt. AI nálezy sú návrhy; bez potvrdenia advokátom sa do osvedčovacej doložky nedostanú.
+Chevron7 je technický nástroj. Nenahrádza právne posúdenie konkrétneho dokumentu ani povinnosť advokáta skontrolovať originál, bezpečnostné prvky, certifikát a výsledný artefakt. AI nálezy sú návrhy; bez potvrdenia advokátom sa do osvedčovacej doložky nedostanú.

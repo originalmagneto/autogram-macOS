@@ -1,6 +1,6 @@
 # EZZK integration
 
-How Autogram talks to EZZK (the central register of records about guaranteed
+How Chevron7 talks to EZZK (the central register of records about guaranteed
 conversion, CEZZK) and what an operator has to know to run, test and maintain it.
 
 Companion documents:
@@ -14,8 +14,8 @@ Companion documents:
 
 Part A, which is what ships today:
 
-- The advocate signs in with their own EZZK name and password and Autogram verifies it against EZZK.
-- Autogram reads the EZZK server time, allocates and consumes evidence numbers (test environment only), and looks records up.
+- The advocate signs in with their own EZZK name and password and Chevron7 verifies it against EZZK.
+- Chevron7 reads the EZZK server time, allocates and consumes evidence numbers (test environment only), and looks records up.
 - Production is read only: sign in, server time and public record lookup. Nothing allocates, consumes or submits there.
 - `ezzk-probe` exercises the same service from the command line.
 
@@ -28,7 +28,7 @@ and brings record form version 1.2, which takes effect on 2027-01-01.
 ## Why SOAP and not the portal API
 
 The portal REST API behind Keycloak needs MIRRI to register a native redirect URI
-for Autogram, and on the 2026-09-17 call the podpisuj.sk team confirmed that will
+for Chevron7, and on the 2026-09-17 call the podpisuj.sk team confirmed that will
 not happen: EZZK is not maintained, MIRRI has no administrative access to it, and
 even creating a user requires a paid change request to Ditec. The SOAP service is
 what every integrator has used since 2019 and it authenticates the advocate's own
@@ -57,7 +57,7 @@ and `ezzk-probe` itself. `EZZKSOAPServiceAdapter.submit` always throws
 
 1. Nastavenia, tab EZZK, card Prostredie: pick Demo, Test or Produkcia. The SOAP addresses of the chosen environment are shown read only.
 2. Card Účet: enter Prihlasovacie meno and Heslo (the credentials EZZK sent by email after registration), Názov osoby exactly as it appears in the conversion clause, and IČO.
-3. Press Prihlásiť a overiť. Autogram calls `LogIn` and only saves the credentials in the Keychain after EZZK accepts them. The card then shows the account name EZZK returned and the time of the check. Odhlásiť deletes the Keychain item and drops the token.
+3. Press Prihlásiť a overiť. Chevron7 calls `LogIn` and only saves the credentials in the Keychain after EZZK accepts them. The card then shows the account name EZZK returned and the time of the check. Odhlásiť deletes the Keychain item and drops the token.
 4. Card Overenie záznamu works without signing in, on test and on production.
 5. Card Evidenčné čísla is test only. On production it shows a locked label instead of a button.
 
@@ -75,8 +75,8 @@ MIRRI manual and the live service disagree, the live service wins.
 - Fields inherited from a base type, and the shared object elements (`Class`, `Encoding`, `Id`, `IsSigned`, `Mimetype`, `Data`), live in `http://schemas.datacontract.org/2004/07/Ditec.IOM.EZZK.Dol`. `Container` fields live in the operation namespace. The manual puts the `ZiadostVypis` fields in the operation namespace and the service rejects that with `DeserializationFailed`. The element is `Mimetype`, not `MimeType`.
 - `LogIn` uses `ApplicationId` `EZZK`. Success returns a `TokenDescriptor` and the account name; failure returns an `ErrorCode` such as `CORE-003` (wrong name or password) or `CORE-018` (locked account).
 - Every authenticated call sends `Cookie: IamTokenDescriptor=<token>`. The same token in an HTTP header is ignored. Without the cookie the service answers HTTP 500 with the fault "The service implementation object was not initialized or is not available."; with an invalid token it answers HTTP 200 with `Result/Code` 101.
-- The load balancer sets a `SERVERID` cookie and alternates nodes. A token works on any node, so Autogram never sends that cookie back.
-- The manual states no token lifetime. Autogram keeps the token in memory only, logs in lazily, and on 101 or the uninitialized-service fault logs in once more and repeats the call once. A second failure is `authenticationFailed`.
+- The load balancer sets a `SERVERID` cookie and alternates nodes. A token works on any node, so Chevron7 never sends that cookie back.
+- The manual states no token lifetime. Chevron7 keeps the token in memory only, logs in lazily, and on 101 or the uninitialized-service fault logs in once more and repeats the call once. A second failure is `authenticationFailed`.
 
 ### Operations used
 
@@ -97,7 +97,7 @@ another person.
 ## Evidence numbers
 
 - EZZK returns every unconsumed number of the person and allocates new ones only when fewer than the configured amount remain. The test sample account returned ten in one call.
-- Test numbers look like `260917-dD9DbFE4f7`, production numbers like `1563-260824-1`. Autogram treats a number as an opaque string.
+- Test numbers look like `260917-dD9DbFE4f7`, production numbers like `1563-260824-1`. Chevron7 treats a number as an opaque string.
 - EZZK consumes an unused number automatically at midnight of the day it was allocated. `AttestationData.evidenceNumberAllocatedAt` records the server time of the allocation and `EZZKEvidenceNumberPolicy.isUsable` refuses to sign with a number from another calendar day in `Europe/Bratislava`.
 - `AttestationData.evidenceNumberMode` records the mode the number came from, and signing is refused if the current mode differs, so a demo or test number cannot end up in a clause signed on production. Both checks run before anything is signed or written.
 - The adapter drops numbers that a local record in `LocalEvidenceStore` already uses before handing one to ZaKo.
@@ -125,7 +125,7 @@ that case the outcome is known.
 
 ## Security
 
-- The password lives only in the Keychain, in a generic password item with service `sk.autogram.Autogram.ezzk.soap` and account `test` or `production`. It is never written to `AppSettings`, logs, probe output or the repository.
+- The password lives only in the Keychain, in a generic password item with service `app.slovensko.chevron7.ezzk.soap` and account `test` or `production`. It is never written to `AppSettings`, logs, probe output or the repository.
 - The token lives only in memory, inside the client actor. Nothing can read it out, and the probe never prints it.
 - The session uses an ephemeral configuration with no cookie storage and no cache, and refuses every redirect, so the password body and the token cookie cannot leave the EZZK host.
 - The test environment trusts exactly one pinned certificate; production uses system trust. There is no global TLS bypass.
@@ -135,17 +135,17 @@ that case the outcome is known.
 
 | File | Responsibility |
 | --- | --- |
-| `Sources/AutogramKit/EZZK/EZZKEnvironment.swift` | Environments, SOAP URLs, the certificate pin. |
-| `Sources/AutogramKit/EZZK/SOAP/EZZKSOAPEnvelope.swift` | Namespaces, XML escaping, the SOAP 1.2 envelope with WS-Addressing, date formatting. |
-| `Sources/AutogramKit/EZZK/SOAP/EZZKSOAPRequest.swift` | `EZZKPerson`, request values and one builder per operation. |
-| `Sources/AutogramKit/EZZK/SOAP/EZZKSOAPResponse.swift` | Fault and result parsing with `XMLDocument`, matched by local name. |
-| `Sources/AutogramKit/EZZK/SOAP/URLSessionEZZKSOAPTransport.swift` | The pinned, redirect-refusing transport. |
-| `Sources/AutogramKit/EZZK/SOAP/EZZKSOAPCredentialStore.swift` | The Keychain item. |
-| `Sources/AutogramKit/EZZK/SOAP/EZZKSOAPClient.swift` | The actor: lazy login, token cookie, one safe re-login, no repeat of consequential calls. |
-| `Sources/AutogramKit/EZZK/SOAP/EZZKSOAPServiceAdapter.swift` | `EZZKServicing` for the app: filters used numbers, refuses production allocation and submission. |
-| `Sources/AutogramKit/EZZK/EZZKEvidenceNumberPolicy.swift` | The day rule, the mode rule and the clause identity check. |
-| `Sources/AutogramApp/EZZK/EZZKAccountController.swift` | Account state for Settings and ZaKo, one transport and one client per environment. |
-| `Sources/AutogramApp/Views/SettingsView.swift` | The EZZK tab. |
+| `Sources/Chevron7Kit/EZZK/EZZKEnvironment.swift` | Environments, SOAP URLs, the certificate pin. |
+| `Sources/Chevron7Kit/EZZK/SOAP/EZZKSOAPEnvelope.swift` | Namespaces, XML escaping, the SOAP 1.2 envelope with WS-Addressing, date formatting. |
+| `Sources/Chevron7Kit/EZZK/SOAP/EZZKSOAPRequest.swift` | `EZZKPerson`, request values and one builder per operation. |
+| `Sources/Chevron7Kit/EZZK/SOAP/EZZKSOAPResponse.swift` | Fault and result parsing with `XMLDocument`, matched by local name. |
+| `Sources/Chevron7Kit/EZZK/SOAP/URLSessionEZZKSOAPTransport.swift` | The pinned, redirect-refusing transport. |
+| `Sources/Chevron7Kit/EZZK/SOAP/EZZKSOAPCredentialStore.swift` | The Keychain item. |
+| `Sources/Chevron7Kit/EZZK/SOAP/EZZKSOAPClient.swift` | The actor: lazy login, token cookie, one safe re-login, no repeat of consequential calls. |
+| `Sources/Chevron7Kit/EZZK/SOAP/EZZKSOAPServiceAdapter.swift` | `EZZKServicing` for the app: filters used numbers, refuses production allocation and submission. |
+| `Sources/Chevron7Kit/EZZK/EZZKEvidenceNumberPolicy.swift` | The day rule, the mode rule and the clause identity check. |
+| `Sources/Chevron7App/EZZK/EZZKAccountController.swift` | Account state for Settings and ZaKo, one transport and one client per environment. |
+| `Sources/Chevron7App/Views/SettingsView.swift` | The EZZK tab. |
 | `Sources/ezzk-probe/main.swift` | The command line probe. |
 
 ## Probe
@@ -175,6 +175,6 @@ prints only the account name.
   echo | openssl s_client -connect ezzk-test.iomo.sk:443 -servername ezzk-test.iomo.sk 2>/dev/null | openssl x509 -outform DER | shasum -a 256
   ```
 
-- Production uses a public RapidSSL certificate for `*.iomo.sk`. The one observed on 2026-09-17 expires on 2026-09-21; if it lapses, EZZK fails for every integrator, which is not an Autogram defect.
+- Production uses a public RapidSSL certificate for `*.iomo.sk`. The one observed on 2026-09-17 expires on 2026-09-21; if it lapses, EZZK fails for every integrator, which is not a Chevron7 defect.
 - The WSDL and XSD snapshot is dated. Refresh it when the service changes and rerun the request tests.
 - Gaps deliberately left open in part A are listed at the end of `docs/P2E-EZZK-FINDINGS.md`.
