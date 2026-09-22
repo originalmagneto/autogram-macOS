@@ -23,8 +23,10 @@ source_file() {
 }
 
 must_keep() {
-    local file="$1" literal="$2"
-    if [[ -n "$file" && -f "$file" ]] && grep -qF -- "$literal" "$file"; then
+    local file="$1" literal="$2" label="$3"
+    if [[ -z "$file" || ! -f "$file" ]]; then
+        fail "${label:-source file} not found, looking for ${literal}"
+    elif grep -qF -- "$literal" "$file"; then
         ok "${file#"${repo_root}/"} keeps ${literal}"
     else
         fail "${file#"${repo_root}/"} lost ${literal}"
@@ -32,7 +34,9 @@ must_keep() {
 }
 
 echo "▸ Nothing of ours inside the upstream engine"
-if leaks="$(grep -rIil 'chevron7' "${repo_root}/engine" --exclude-dir=target 2>/dev/null)"; then
+if [[ ! -d "${repo_root}/engine" ]]; then
+    fail "engine/ not found"
+elif leaks="$(grep -rIil 'chevron7' "${repo_root}/engine" --exclude-dir=target 2>/dev/null)"; then
     fail "chevron7 in engine/: ${leaks//$'\n'/, }"
 else
     ok "engine/ carries no chevron7"
@@ -40,19 +44,21 @@ fi
 
 echo "▸ Autogram names we depend on"
 avm_client="$(source_file AVMClient.swift)"
-must_keep "$avm_client" 'URL(string: "https://autogram.slovensko.digital/api/v1")'
-must_keep "$avm_client" '/qr-code?guid='
-must_keep "$avm_client" 'forHTTPHeaderField: "X-Encryption-Key"'
-if [[ -n "$avm_client" ]] && grep -rIil 'chevron7' "$(dirname "$avm_client")" >/dev/null 2>&1; then
+must_keep "$avm_client" 'URL(string: "https://autogram.slovensko.digital/api/v1")' 'AVMClient.swift'
+must_keep "$avm_client" '/qr-code?guid=' 'AVMClient.swift'
+must_keep "$avm_client" 'forHTTPHeaderField: "X-Encryption-Key"' 'AVMClient.swift'
+if [[ -z "$avm_client" ]]; then
+    fail "AVMClient.swift not found"
+elif grep -rIil 'chevron7' "$(dirname "$avm_client")" >/dev/null 2>&1; then
     fail "chevron7 in the AVM sources"
 else
     ok "AVM sources carry no chevron7"
 fi
-must_keep "${package_root}/build_app.sh" '<string>org.autogram.asice</string>'
-must_keep "$(source_file SigningFlowViews.swift)" 'UTType(importedAs: "org.autogram.asice"'
-must_keep "$(source_file ditec.js)" 'isAutogram: true'
-must_keep "$(source_file FormPack.swift)" 'autogram-p2e-legacy-swift-1.0'
-must_keep "$(source_file UserPreferences.swift)" 'digital.slovensko.autogram.timestamp-provider'
+must_keep "${package_root}/build_app.sh" '<string>org.autogram.asice</string>' 'build_app.sh'
+must_keep "$(source_file SigningFlowViews.swift)" 'UTType(importedAs: "org.autogram.asice"' 'SigningFlowViews.swift'
+must_keep "$(source_file ditec.js)" 'isAutogram: true' 'ditec.js'
+must_keep "$(source_file FormPack.swift)" 'autogram-p2e-legacy-swift-1.0' 'FormPack.swift'
+must_keep "$(source_file UserPreferences.swift)" 'digital.slovensko.autogram.timestamp-provider' 'UserPreferences.swift'
 
 if $strict; then
     echo "▸ No old product names left (strict)"
