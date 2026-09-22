@@ -1,9 +1,9 @@
 import Foundation
 
 enum FinderQuickActionService {
-    static let menuTitle = "Podpísať s QES + QTS (Autogram)"
-    static let workflowResourceName = "Autogram Finder Quick Action"
-    static let workflowInstallName = "Autogram Finder Quick Action.workflow"
+    static let menuTitle = "Podpísať s QES + QTS (Chevron7)"
+    static let workflowResourceName = "Chevron7 Finder Quick Action"
+    static let workflowInstallName = "Chevron7 Finder Quick Action.workflow"
 
     @discardableResult
     static func installQuickAction() -> Bool {

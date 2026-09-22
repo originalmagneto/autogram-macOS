@@ -35,8 +35,8 @@
 					<key>COMMAND_STRING</key>
 					<dict>
 						<key>default value</key>
-						<string>workflow_resources="$HOME/Library/Services/Autogram Finder Quick Action.workflow/Contents/Resources"
-exec "${workflow_resources}/autogram-quick-action.sh" "$@"</string>
+						<string>workflow_resources="$HOME/Library/Services/Chevron7 Finder Quick Action.workflow/Contents/Resources"
+exec "${workflow_resources}/chevron7-quick-action.sh" "$@"</string>
 					</dict>
 					<key>CheckedForUserDefaultShell</key>
 					<dict/>
@@ -63,8 +63,8 @@ exec "${workflow_resources}/autogram-quick-action.sh" "$@"</string>
 				<key>ActionParameters</key>
 				<dict>
 					<key>COMMAND_STRING</key>
-					<string>workflow_resources="$HOME/Library/Services/Autogram Finder Quick Action.workflow/Contents/Resources"
-exec "${workflow_resources}/autogram-quick-action.sh" "$@"</string>
+					<string>workflow_resources="$HOME/Library/Services/Chevron7 Finder Quick Action.workflow/Contents/Resources"
+exec "${workflow_resources}/chevron7-quick-action.sh" "$@"</string>
 					<key>CheckedForUserDefaultShell</key>
 					<true/>
 					<key>inputMethod</key>

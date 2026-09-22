@@ -42,7 +42,7 @@ if [[ -x "$BIN_DIR/pkcs11-helper" ]]; then
     cp "$BIN_DIR/pkcs11-helper" "$CONTENTS/MacOS/pkcs11-helper"
 fi
 cp "Assets/Chevron7.icns" "$CONTENTS/Resources/Chevron7.icns"
-ditto "Assets/Autogram Finder Quick Action.workflow" "$CONTENTS/Resources/Autogram Finder Quick Action.workflow"
+ditto "Assets/Chevron7 Finder Quick Action.workflow" "$CONTENTS/Resources/Chevron7 Finder Quick Action.workflow"
 
 # Preferred source of the signing engine: the in-repo Java fork built by
 # scripts/build-engine.sh. A legacy app bundle is only a fallback.

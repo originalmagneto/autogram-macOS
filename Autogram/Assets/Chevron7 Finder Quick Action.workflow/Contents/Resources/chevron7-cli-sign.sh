@@ -8,13 +8,13 @@ has_arm64_slice() {
 resolve_runner() {
   local helper runner bundle
   local -a helpers=(
-    "/Applications/Autogram macOS.app/Contents/Helpers/AutogramCLI-arm64"
-    "$HOME/Applications/Autogram macOS.app/Contents/Helpers/AutogramCLI-arm64"
+    "/Applications/Chevron7.app/Contents/Helpers/AutogramCLI-arm64"
+    "$HOME/Applications/Chevron7.app/Contents/Helpers/AutogramCLI-arm64"
   )
 
   while IFS= read -r bundle; do
     helpers+=("$bundle/Contents/Helpers/AutogramCLI-arm64")
-  done < <(/usr/bin/mdfind 'kMDItemCFBundleIdentifier == "sk.autogram.Autogram"' 2>/dev/null || true)
+  done < <(/usr/bin/mdfind 'kMDItemCFBundleIdentifier == "app.slovensko.chevron7"' 2>/dev/null || true)
 
   for helper in "${helpers[@]}"; do
     runner="$(dirname "$helper")/AutogramQuickActionRunner-arm64"
@@ -38,7 +38,7 @@ absolute_path() {
 usage() {
   cat <<'EOF'
 Usage:
-  autogram-cli-sign.sh [options] <PDF>
+  chevron7-cli-sign.sh [options] <PDF>
 
 Required for signing:
   --driver NAME --key SERIAL --pin-stdin --target PATH --tsa-server URL
@@ -46,7 +46,7 @@ Required for signing:
 Other options:
   --list-keys --pdf-level LEVEL
 
-Autogram macOS and an arm64-capable PKCS#11 driver are required.
+Chevron7 and an arm64-capable PKCS#11 driver are required.
 EOF
 }
 
@@ -75,7 +75,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 runner="$(resolve_runner || true)"
-[[ -n "$runner" ]] || { echo "Autogram macOS ARM64 helper was not found." >&2; exit 69; }
+[[ -n "$runner" ]] || { echo "Chevron7 ARM64 helper was not found." >&2; exit 69; }
 [[ "$pin_stdin" -eq 1 ]] || { echo "--pin-stdin is required." >&2; exit 64; }
 [[ -n "$driver" ]] || { echo "--driver is required." >&2; exit 64; }
 

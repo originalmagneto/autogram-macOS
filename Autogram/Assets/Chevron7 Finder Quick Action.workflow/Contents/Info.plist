@@ -12,7 +12,7 @@
             <key>NSMenuItem</key>
             <dict>
                 <key>default</key>
-                <string>Podpísať s QES + QTS (Autogram)</string>
+                <string>Podpísať s QES + QTS (Chevron7)</string>
             </dict>
             <key>NSMessage</key>
             <string>runWorkflowAsService</string>

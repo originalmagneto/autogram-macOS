@@ -2,7 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-CLI_SCRIPT="$SCRIPT_DIR/autogram-cli-sign.sh"
+CLI_SCRIPT="$SCRIPT_DIR/chevron7-cli-sign.sh"
 QUALIFIED_TSA_URL="http://timestamp.sectigo.com/qualified"
 
 show_alert() {
@@ -20,7 +20,7 @@ choose_driver() {
   /usr/bin/osascript <<'OSA'
 set driverChoices to {"I.CA SecureStore", "Občiansky preukaz (eID klient)"}
 set selectedDriver to choose from list driverChoices ¬
-  with title "Autogram: CLI podpis PDF" ¬
+  with title "Chevron7: CLI podpis PDF" ¬
   with prompt "Vyberte úložisko podpisového certifikátu." ¬
   default items {"I.CA SecureStore"} ¬
   OK button name "Pokračovať" ¬
@@ -39,7 +39,7 @@ choose_key_label() {
   /usr/bin/osascript - "$@" <<'OSA'
 on run argv
   set selectedKey to choose from list argv ¬
-    with title "Autogram: podpisový certifikát" ¬
+    with title "Chevron7: podpisový certifikát" ¬
     with prompt "Vyberte certifikát, ktorým sa má PDF podpísať." ¬
     OK button name "Vybrať" ¬
     cancel button name "Zrušiť" ¬
@@ -58,7 +58,7 @@ ask_pin() {
   /usr/bin/osascript <<'OSA'
 try
   set pinDialog to display dialog "Zadajte podpisový PIN alebo heslo k certifikátu." ¬
-    with title "Autogram: podpisový PIN" ¬
+    with title "Chevron7: podpisový PIN" ¬
     default answer "" ¬
     with hidden answer ¬
     buttons {"Zrušiť", "Podpísať"} ¬
@@ -127,7 +127,7 @@ driver_shortname() {
 }
 
 if [[ $# -eq 0 ]]; then
-  show_alert "Autogram" "Neboli odovzdané žiadne súbory."
+  show_alert "Chevron7" "Neboli odovzdané žiadne súbory."
   exit 0
 fi
 
@@ -137,7 +137,7 @@ while IFS= read -r -d '' pdf; do
 done < <(collect_pdfs "$@")
 
 if [[ ${#pdfs[@]} -eq 0 ]]; then
-  show_alert "Autogram" "Vo výbere sa nenašli žiadne PDF súbory."
+  show_alert "Chevron7" "Vo výbere sa nenašli žiadne PDF súbory."
   exit 0
 fi
 
@@ -148,11 +148,11 @@ fi
 
 driver_name_arg="$(driver_shortname "$driver_name" || true)"
 if [[ -z "$driver_name_arg" ]]; then
-  show_alert "Autogram" "Neznáme úložisko certifikátu: $driver_name"
+  show_alert "Chevron7" "Neznáme úložisko certifikátu: $driver_name"
   exit 1
 fi
 
-tmp_dir="$(mktemp -d -t autogram-quick-action)"
+tmp_dir="$(mktemp -d -t chevron7-quick-action)"
 trap 'rm -rf "$tmp_dir"' EXIT
 
 pin="$(ask_pin)"
@@ -175,7 +175,7 @@ if [[ "$key_status" -ne 0 ]] && ! /usr/bin/grep -q $'^AUTOGRAM_KEY\t' "$key_outp
   key_message="$(printf '%s\n\n%s' \
     'Nepodarilo sa načítať podpisové certifikáty. Skontrolujte pripojené úložisko a PIN.' \
     "$key_details")"
-  show_alert "Autogram" "$key_message"
+  show_alert "Chevron7" "$key_message"
   exit 1
 fi
 
@@ -189,7 +189,7 @@ while IFS=$'\t' read -r record_type selector label; do
 done < "$key_output"
 
 if [[ ${#key_selectors[@]} -eq 0 ]]; then
-  show_alert "Autogram" "V zvolenom úložisku sa nenašiel žiadny podpisový certifikát."
+  show_alert "Chevron7" "V zvolenom úložisku sa nenašiel žiadny podpisový certifikát."
   exit 1
 fi
 
@@ -210,7 +210,7 @@ else
   done
 
   if [[ -z "$key_selector" ]]; then
-    show_alert "Autogram" "Nepodarilo sa vybrať podpisový certifikát."
+    show_alert "Chevron7" "Nepodarilo sa vybrať podpisový certifikát."
     exit 1
   fi
 fi
@@ -233,10 +233,10 @@ for index in "${!pdfs[@]}"; do
     sign_details="$(cli_error_details "$log_file")"
     sign_message="$(printf 'Podpisovanie zlyhalo pri súbore: %s\n\n%s' \
       "${pdfs[$index]}" "$sign_details")"
-    show_alert "Autogram" "$sign_message"
+    show_alert "Chevron7" "$sign_message"
     exit 1
   fi
 done
 
 success_message="$(printf 'Podpísaných PDF: %s\nPoužitý podpis: PAdES Baseline T\nKvalifikovaná časová pečiatka: Sectigo qualified TSA' "${#pdfs[@]}")"
-show_alert "Autogram" "$success_message"
+show_alert "Chevron7" "$success_message"
