@@ -2,7 +2,7 @@
 
 WSDL and XSD files of the EZZK SOAP service as published on 2026-09-17, used by
 `EZZKSOAPRequestTests` to validate the request bodies Autogram builds. Design:
-`Autogram/docs/superpowers/specs/2026-09-17-ezzk-soap-design.md`.
+`Chevron7/docs/superpowers/specs/2026-09-17-ezzk-soap-design.md`.
 
 ## Sources
 
