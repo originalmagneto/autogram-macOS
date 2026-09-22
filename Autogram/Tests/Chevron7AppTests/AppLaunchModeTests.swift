@@ -3,11 +3,11 @@ import XCTest
 
 final class AppLaunchModeTests: XCTestCase {
     func testWebSigningArgumentSelectsBackgroundMode() {
-        XCTAssertEqual(AppLaunchMode.from(arguments: ["/Applications/Autogram macOS.app/Contents/MacOS/Autogram", "--web-signing"]), .webSigning)
+        XCTAssertEqual(AppLaunchMode.from(arguments: ["/Applications/Chevron7.app/Contents/MacOS/Chevron7", "--web-signing"]), .webSigning)
     }
 
     func testOrdinaryLaunchIsNormal() {
-        XCTAssertEqual(AppLaunchMode.from(arguments: ["/Applications/Autogram macOS.app/Contents/MacOS/Autogram"]), .normal)
-        XCTAssertEqual(AppLaunchMode.from(arguments: ["Autogram", "-NSDocumentRevisionsDebugMode", "YES"]), .normal)
+        XCTAssertEqual(AppLaunchMode.from(arguments: ["/Applications/Chevron7.app/Contents/MacOS/Chevron7"]), .normal)
+        XCTAssertEqual(AppLaunchMode.from(arguments: ["Chevron7", "-NSDocumentRevisionsDebugMode", "YES"]), .normal)
     }
 }

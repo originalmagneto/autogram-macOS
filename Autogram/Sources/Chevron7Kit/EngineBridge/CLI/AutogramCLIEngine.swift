@@ -706,7 +706,7 @@ private actor CLIHelperOperationGate {
 private extension ProcessConfiguration {
     static var production: ProcessConfiguration {
         var candidates: [String] = []
-        if let override = ProcessInfo.processInfo.environment["AUTOGRAM_CLI_HELPER"],
+        if let override = ProcessInfo.processInfo.environment["CHEVRON7_CLI_HELPER"],
            !override.isEmpty {
             candidates.append(override)
         }

@@ -2,12 +2,12 @@ import XCTest
 import PDFKit
 @testable import Chevron7Kit
 
-/// End-to-end check against a real scan, gated on `AUTOGRAM_DIAG_PDF` so CI without
+/// End-to-end check against a real scan, gated on `CHEVRON7_DIAG_PDF` so CI without
 /// the file simply skips it. The document is a two page power of attorney: page 0 is a
 /// ruled form of printed text with no security element, page 1 carries the signatures.
 final class RealScanSmokeTests: XCTestCase {
     func testRealScanHasNoSignaturesOnTheFormPage() throws {
-        guard let path = ProcessInfo.processInfo.environment["AUTOGRAM_DIAG_PDF"],
+        guard let path = ProcessInfo.processInfo.environment["CHEVRON7_DIAG_PDF"],
               let document = PDFDocument(url: URL(fileURLWithPath: path)) else { throw XCTSkip("no pdf") }
         let analysis = PDFAnalysisEngine().analyze(document: document)
         let bank = ExampleBank(directory: FileManager.default.temporaryDirectory.appendingPathComponent("diag-\(UUID())"))

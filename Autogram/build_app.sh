@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-# Autogram.app build script - assembly of a macOS app bundle.
+# Chevron7.app build script - assembly of a macOS app bundle.
 #
 # Usage:
 #   ./build_app.sh                    # debug build (fast)
@@ -31,22 +31,22 @@ swift build -c "$MODE"
 # Ask SwiftPM where it put the products: Xcode 27 toolchains use .build/out/Products/<Mode>,
 # older ones .build/arm64-apple-macosx/<mode>.
 BIN_DIR="$(swift build -c "$MODE" --show-bin-path)"
-APP_DIR="$BIN_DIR/Autogram.app"
+APP_DIR="$BIN_DIR/Chevron7.app"
 CONTENTS="$APP_DIR/Contents"
 
 rm -rf "$APP_DIR"
 mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources"
 
-cp "$BIN_DIR/Chevron7" "$CONTENTS/MacOS/Autogram"
+cp "$BIN_DIR/Chevron7" "$CONTENTS/MacOS/Chevron7"
 if [[ -x "$BIN_DIR/pkcs11-helper" ]]; then
     cp "$BIN_DIR/pkcs11-helper" "$CONTENTS/MacOS/pkcs11-helper"
 fi
-cp "Assets/Autogram.icns" "$CONTENTS/Resources/Autogram.icns"
+cp "Assets/Chevron7.icns" "$CONTENTS/Resources/Chevron7.icns"
 ditto "Assets/Autogram Finder Quick Action.workflow" "$CONTENTS/Resources/Autogram Finder Quick Action.workflow"
 
 # Preferred source of the signing engine: the in-repo Java fork built by
 # scripts/build-engine.sh. A legacy app bundle is only a fallback.
-LEGACY_CONTENTS="${AUTOGRAM_LEGACY_APP_ROOT:-}"
+LEGACY_CONTENTS="${CHEVRON7_LEGACY_APP_ROOT:-}"
 ENGINE_BUILD=".build/engine/Contents"
 if [[ -z "$LEGACY_CONTENTS" && -x "$ENGINE_BUILD/Helpers/AutogramCLI-arm64" && -f "$ENGINE_BUILD/app/autogram.jar" ]]; then
     LEGACY_CONTENTS="$ENGINE_BUILD"
@@ -106,21 +106,21 @@ cat > "$CONTENTS/Info.plist" <<'PLIST'
         </dict>
     </array>
     <key>CFBundleIconFile</key>
-    <string>Autogram</string>
+    <string>Chevron7</string>
     <key>CFBundleName</key>
-    <string>Autogram</string>
+    <string>Chevron7</string>
     <key>CFBundleDisplayName</key>
-    <string>Autogram</string>
+    <string>Chevron7</string>
     <key>CFBundleIdentifier</key>
-    <string>sk.autogram.Autogram</string>
+    <string>app.slovensko.chevron7</string>
     <key>CFBundleURLTypes</key>
     <array>
         <dict>
             <key>CFBundleURLName</key>
-            <string>sk.autogram.Autogram.ezzk</string>
+            <string>app.slovensko.chevron7.ezzk</string>
             <key>CFBundleURLSchemes</key>
             <array>
-                <string>autogram</string>
+                <string>chevron7</string>
             </array>
         </dict>
     </array>
@@ -131,7 +131,7 @@ cat > "$CONTENTS/Info.plist" <<'PLIST'
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleExecutable</key>
-    <string>Autogram</string>
+    <string>Chevron7</string>
     <key>LSMinimumSystemVersion</key>
     <string>27.0</string>
     <key>CFBundleDocumentTypes</key>
@@ -156,12 +156,12 @@ cat > "$CONTENTS/Info.plist" <<'PLIST'
             <key>NSMenuItem</key>
             <dict>
                 <key>default</key>
-                <string>Autogram Signing Bridge</string>
+                <string>Chevron7 Signing Bridge</string>
             </dict>
             <key>NSMessage</key>
             <string>signFiles</string>
             <key>NSPortName</key>
-            <string>Autogram</string>
+            <string>Chevron7</string>
             <key>NSSendFileTypes</key>
             <array>
                 <string>com.adobe.pdf</string>
@@ -321,7 +321,7 @@ echo "✔ Hotovo: $APP_DIR"
 echo "  Spustenie: open \"$APP_DIR\""
 
 if [[ "$INSTALL" == true ]]; then
-    INSTALL_DIR="/Applications/Autogram macOS.app"
+    INSTALL_DIR="/Applications/Chevron7.app"
     rm -rf "$INSTALL_DIR"
     ditto --rsrc --extattr --acl "$APP_DIR" "$INSTALL_DIR"
 

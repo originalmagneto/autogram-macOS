@@ -1,4 +1,5 @@
 import Foundation
+import Chevron7Identity
 
 public struct JavaEngineInstallation: Sendable, Equatable {
     public let javaExecutableURL: URL
@@ -22,9 +23,9 @@ public struct JavaEngineInstallation: Sendable, Equatable {
 }
 
 public struct JavaEngineLocator: Sendable {
-    public static let environmentKey = "AUTOGRAM_JAVA_ENGINE_ROOT"
+    public static let environmentKey = "CHEVRON7_JAVA_ENGINE_ROOT"
     public static let defaultRoots = [
-        "/Applications/Autogram macOS.app/Contents"
+        ProductIdentity.installedAppURL.appendingPathComponent("Contents").path
     ]
 
     public let candidateRoots: [String]

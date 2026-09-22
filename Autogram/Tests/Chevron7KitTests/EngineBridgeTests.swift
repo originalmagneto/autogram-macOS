@@ -437,12 +437,12 @@ final class EngineInspectionContractTests: XCTestCase {
 
 final class JavaEngineLiveProcessTests: XCTestCase {
     private var liveTestEnabled: Bool {
-        ProcessInfo.processInfo.environment["AUTOGRAM_ENGINE_LIVE_TEST"] == "1"
+        ProcessInfo.processInfo.environment["CHEVRON7_ENGINE_LIVE_TEST"] == "1"
     }
 
     func testCapabilitiesRoundtripAgainstRealEngineHelper() async throws {
         guard liveTestEnabled else {
-            throw XCTSkip("Live test vyžaduje AUTOGRAM_ENGINE_LIVE_TEST=1.")
+            throw XCTSkip("Live test vyžaduje CHEVRON7_ENGINE_LIVE_TEST=1.")
         }
         guard JavaEngineLocator().locate() != nil else {
             throw XCTSkip("Java engine nie je nainštalovaný.")
@@ -459,11 +459,11 @@ final class JavaEngineLiveProcessTests: XCTestCase {
 
 final class EngineBridgeLiveSignTests: XCTestCase {
     private var liveTestEnabled: Bool {
-        ProcessInfo.processInfo.environment["AUTOGRAM_ENGINE_LIVE_TEST"] == "1"
+        ProcessInfo.processInfo.environment["CHEVRON7_ENGINE_LIVE_TEST"] == "1"
     }
 
     func testV1SignRequestPassesProtocolValidation() async throws {
-        guard liveTestEnabled else { throw XCTSkip("Vyžaduje AUTOGRAM_ENGINE_LIVE_TEST=1.") }
+        guard liveTestEnabled else { throw XCTSkip("Vyžaduje CHEVRON7_ENGINE_LIVE_TEST=1.") }
         guard JavaEngineLocator().locate() != nil else { throw XCTSkip("Engine nie je nainštalovaný.") }
 
         let engine = AutogramCLIEngine()
@@ -502,7 +502,7 @@ final class EngineBridgeLiveSignTests: XCTestCase {
     }
 
     func testV2VisibleSignRequestPassesProtocolValidation() async throws {
-        guard liveTestEnabled else { throw XCTSkip("Vyžaduje AUTOGRAM_ENGINE_LIVE_TEST=1.") }
+        guard liveTestEnabled else { throw XCTSkip("Vyžaduje CHEVRON7_ENGINE_LIVE_TEST=1.") }
         guard JavaEngineLocator().locate() != nil else { throw XCTSkip("Engine nie je nainštalovaný.") }
 
         let engine = AutogramCLIEngine()

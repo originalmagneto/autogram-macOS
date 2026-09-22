@@ -4,8 +4,8 @@ import XCTest
 
 final class LiveEngineInspectionTests: XCTestCase {
     func testProviderInspectionDoesNotRequireTrustedList() async throws {
-        guard ProcessInfo.processInfo.environment["AUTOGRAM_ENGINE_LIVE_TEST"] == "1" else {
-            throw XCTSkip("Vyžaduje AUTOGRAM_ENGINE_LIVE_TEST=1.")
+        guard ProcessInfo.processInfo.environment["CHEVRON7_ENGINE_LIVE_TEST"] == "1" else {
+            throw XCTSkip("Vyžaduje CHEVRON7_ENGINE_LIVE_TEST=1.")
         }
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("live-engine-inspection-\(UUID().uuidString).pdf")

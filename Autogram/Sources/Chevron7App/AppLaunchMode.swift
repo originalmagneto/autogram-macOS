@@ -1,7 +1,7 @@
 import Foundation
 
 /// How this process was started. The web bridge agent passes `--web-signing` when a
-/// portal request finds Autogram not running; that launch shows only the signing panel.
+/// portal request finds Chevron7 not running; that launch shows only the signing panel.
 enum AppLaunchMode: Equatable {
     case normal
     case webSigning

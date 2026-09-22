@@ -1,4 +1,5 @@
 import Foundation
+import Chevron7Identity
 
 public enum EZZKOAuthConfigurationError: Error, Equatable, Sendable {
     case invalidIssuerURL
@@ -7,8 +8,8 @@ public enum EZZKOAuthConfigurationError: Error, Equatable, Sendable {
 public struct EZZKOAuthConfiguration: Sendable, Equatable {
     private static let fixedIssuerURL = URL(string: "https://ezzk.iomo.sk/sso/auth/realms/ezzk")!
     private static let observedWebRedirect = URL(string: "https://ezzk.iomo.sk/portal")!
-    public static let nativeRedirectURI = URL(string: "autogram://ezzk/callback")!
-    public static let nativeCallbackScheme = "autogram"
+    public static let nativeRedirectURI = URL(string: "\(ProductIdentity.urlScheme)://ezzk/callback")!
+    public static let nativeCallbackScheme = ProductIdentity.urlScheme
     public let issuerURL: URL
     public let clientID: String
     public let redirectURI: URL?

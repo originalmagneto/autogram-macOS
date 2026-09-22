@@ -48,14 +48,14 @@ final class EZZKEnvironmentTests: XCTestCase {
 
     func testOAuthConfigurationRequiresBothNativeCallbackParts() throws {
         let redirectOnly = try EZZKOAuthConfiguration(
-            redirectURI: URL(string: "autogram://ezzk/callback"),
+            redirectURI: URL(string: "chevron7://ezzk/callback"),
             callbackScheme: nil)
         let schemeOnly = try EZZKOAuthConfiguration(
             redirectURI: nil,
-            callbackScheme: "autogram")
+            callbackScheme: "chevron7")
         let configured = try EZZKOAuthConfiguration(
-            redirectURI: URL(string: "autogram://ezzk/callback"),
-            callbackScheme: "autogram")
+            redirectURI: URL(string: "chevron7://ezzk/callback"),
+            callbackScheme: "chevron7")
 
         XCTAssertFalse(redirectOnly.isNativeCallbackConfigured)
         XCTAssertFalse(schemeOnly.isNativeCallbackConfigured)
@@ -66,7 +66,7 @@ final class EZZKEnvironmentTests: XCTestCase {
             redirectURI: URL(string: "https://ezzk.iomo.sk/portal"),
             callbackScheme: "https")
         let mismatchedScheme = try EZZKOAuthConfiguration(
-            redirectURI: URL(string: "autogram://ezzk/callback"),
+            redirectURI: URL(string: "chevron7://ezzk/callback"),
             callbackScheme: "other")
 
         XCTAssertFalse(observedWebRedirect.isNativeCallbackConfigured)
@@ -108,7 +108,7 @@ final class EZZKEnvironmentTests: XCTestCase {
 
     func testOAuthCallbackParserRequiresCodeAndMatchingState() throws {
         let callback = try EZZKOAuthCallback.parse(
-            url: URL(string: "autogram://ezzk/callback?code=abc%2F123&state=state-1")!,
+            url: URL(string: "chevron7://ezzk/callback?code=abc%2F123&state=state-1")!,
             expectedState: "state-1"
         )
 

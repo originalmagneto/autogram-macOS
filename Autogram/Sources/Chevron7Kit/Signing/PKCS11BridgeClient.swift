@@ -1,5 +1,6 @@
 import Foundation
 import CryptoKit
+import Chevron7Identity
 
 public struct PKCS11RemoteIdentity: Sendable {
     public var certificateDER: Data
@@ -61,7 +62,7 @@ public enum PKCS11BridgeClient {
     public static func helperURL() -> URL? {
         var candidates: [URL] = [
             Bundle.main.bundleURL.appendingPathComponent("Contents/MacOS/pkcs11-helper"),
-            URL(fileURLWithPath: "/Applications/Autogram macOS.app/Contents/MacOS/pkcs11-helper")
+            ProductIdentity.installedAppURL.appendingPathComponent("Contents/MacOS/pkcs11-helper")
         ]
         if let executable = Bundle.main.executableURL {
             candidates.append(executable.deletingLastPathComponent()
