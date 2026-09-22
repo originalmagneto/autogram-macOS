@@ -1,7 +1,7 @@
 // D.Signer / D.Bridge JS surface.
 //
 // State portals drive signing through `window.ditec`. This file owns that object
-// and translates the calls into one request for Autogram macOS.
+// and translates the calls into one request for Chevron7.
 //
 // Ported from slovensko-digital/autogram-extension (EUPL-1.2), which is the
 // reference for what the portals actually call. Written in plain JavaScript so
@@ -14,8 +14,8 @@
 (function () {
   "use strict";
 
-  var CHANNEL_REQUEST = "autogram-macos-request";
-  var CHANNEL_RESPONSE = "autogram-macos-response";
+  var CHANNEL_REQUEST = "chevron7-request";
+  var CHANNEL_RESPONSE = "chevron7-response";
   var XDC_XMLNS = "http://data.gov.sk/def/container/xmldatacontainer+xml/1.1";
 
   var counter = 0;
@@ -30,7 +30,7 @@
   });
 
   function call(kind, request) {
-    var id = "autogram-" + Date.now() + "-" + counter++;
+    var id = "chevron7-" + Date.now() + "-" + counter++;
     return new Promise(function (resolve) {
       pending.set(id, resolve);
       window.dispatchEvent(new CustomEvent(CHANNEL_REQUEST, {
@@ -206,7 +206,7 @@
         if (!reply) {
           missingReplies += 1;
           if (missingReplies > MISSING_REPLY_LIMIT) {
-            fail("Spojenie s Autogramom sa prerušilo. Skúste podpísať znova.");
+            fail("Spojenie s aplikáciou Chevron7 sa prerušilo. Skúste podpísať znova.");
             return;
           }
           setTimeout(function () { poll(jobID); }, POLL_INTERVAL_MS);
@@ -234,7 +234,7 @@
         if (!reply) {
           missingReplies += 1;
           if (missingReplies > MISSING_REPLY_LIMIT) {
-            fail("Autogram macOS neodpovedal. Skontrolujte, či je rozšírenie zapnuté.");
+            fail("Chevron7 neodpovedal. Skontrolujte, či je rozšírenie zapnuté.");
             return;
           }
           setTimeout(begin, POLL_INTERVAL_MS);
@@ -275,7 +275,7 @@
         if (reply && reply.ok) {
           if (callback && callback.onSuccess) callback.onSuccess();
         } else if (callback && callback.onError) {
-          callback.onError((reply && reply.error) || "Autogram macOS nie je dostupný.");
+          callback.onError((reply && reply.error) || "Chevron7 nie je dostupný.");
         }
       });
     },
@@ -436,7 +436,7 @@
 
   var ditec = {
     isAutogram: true,
-    isAutogramMacOS: true,
+    isChevron7: true,
     config: { downloadPage: { url: "", title: "" } },
     utils: {
       ERROR_CANCELLED: 1,

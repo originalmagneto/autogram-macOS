@@ -11,8 +11,8 @@
 // src/dbridge_js/ditecx are the reference to port from.
 
 (function () {
-  const CHANNEL_REQUEST = "autogram-macos-request";
-  const CHANNEL_RESPONSE = "autogram-macos-response";
+  const CHANNEL_REQUEST = "chevron7-request";
+  const CHANNEL_RESPONSE = "chevron7-response";
 
   let counter = 0;
   const pending = new Map();
@@ -26,7 +26,7 @@
   });
 
   function call(kind, request) {
-    const id = `autogram-${Date.now()}-${counter++}`;
+    const id = `chevron7-${Date.now()}-${counter++}`;
     return new Promise((resolve) => {
       pending.set(id, resolve);
       window.dispatchEvent(new CustomEvent(CHANNEL_REQUEST, {
@@ -35,10 +35,10 @@
     });
   }
 
-  const autogram = {
-    isAutogram: true,
+  const chevron7 = {
+    isChevron7: true,
 
-    /** Whether Autogram macOS is running and ready to sign. */
+    /** Whether Chevron7 is running and ready to sign. */
     async status() {
       return call("status", null);
     },
@@ -56,8 +56,8 @@
 
   // Exposed for the spike and for pages that integrate directly rather than
   // through the D.Signer surface.
-  Object.defineProperty(window, "autogramMacOS", {
-    value: Object.freeze(autogram),
+  Object.defineProperty(window, "chevron7", {
+    value: Object.freeze(chevron7),
     writable: false,
     configurable: false
   });

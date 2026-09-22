@@ -7,7 +7,7 @@
 
 const NATIVE_APP = "app.slovensko.chevron7.WebExtension";
 
-// A status request starts Autogram when it is not running. macOS then registers
+// A status request starts Chevron7 when it is not running. macOS then registers
 // the app again, and the extension manager ends this extension's native handler in
 // the middle of the request (SFErrorDomain error 3). The status request changes
 // nothing, so it is sent again once the app is up. Signing requests are never
@@ -26,7 +26,7 @@ async function callNative(message) {
     try {
       const reply = await browser.runtime.sendNativeMessage(NATIVE_APP, message);
       if (!reply) {
-        return { ok: false, error: "Autogram macOS neodpovedal." };
+        return { ok: false, error: "Chevron7 neodpovedal." };
       }
       return reply;
     } catch (error) {

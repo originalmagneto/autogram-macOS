@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Autogram macOS",
+  "name": "Chevron7",
   "version": "0.1.0",
   "icons": {
     "16": "icons/icon-16.png",
@@ -11,7 +11,7 @@
     "128": "icons/icon-128.png",
     "256": "icons/icon-256.png"
   },
-  "description": "Podpisovanie na štátnych weboch cez Autogram macOS. Komunikuje výhradne natívnou správou s aplikáciou, neotvára žiadny port.",
+  "description": "Podpisovanie na štátnych weboch cez Chevron7. Komunikuje výhradne natívnou správou s aplikáciou, neotvára žiadny port.",
   "default_locale": "sk",
   "permissions": [
     "nativeMessaging",
@@ -61,7 +61,7 @@
   ],
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Autogram macOS",
+    "default_title": "Chevron7",
     "default_icon": {
       "16": "icons/icon-16.png",
       "32": "icons/icon-32.png",

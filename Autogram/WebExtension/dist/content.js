@@ -2,22 +2,22 @@
 // background worker, which is the only caller of native messaging.
 //
 // Safari injects content scripts again into pages that are already open when the
-// extension is reloaded, for instance after Autogram is reinstalled. A second copy
+// extension is reloaded, for instance after Chevron7 is reinstalled. A second copy
 // in the same isolated world failed on its `const` declarations, so the whole
 // script runs once per frame.
 (() => {
-if (globalThis.__autogramMacOSContentScript) {
+if (globalThis.__chevron7ContentScript) {
   return;
 }
-globalThis.__autogramMacOSContentScript = true;
+globalThis.__chevron7ContentScript = true;
 
-console.log("[Autogram macOS] content script beží na", location.href);
+console.log("[Chevron7] content script beží na", location.href);
 
-const CHANNEL_REQUEST = "autogram-macos-request";
-const CHANNEL_RESPONSE = "autogram-macos-response";
+const CHANNEL_REQUEST = "chevron7-request";
+const CHANNEL_RESPONSE = "chevron7-response";
 
 // ditec.js must land before the page script runs, so it is injected first and
-// synchronously; inject.js only adds the direct window.autogramMacOS surface.
+// synchronously; inject.js only adds the direct window.chevron7 surface.
 for (const file of ["ditec.js", "inject.js"]) {
   const script = document.createElement("script");
   script.src = browser.runtime.getURL(file);
@@ -34,20 +34,20 @@ for (const file of ["ditec.js", "inject.js"]) {
     const key = "siteDisabled:" + location.host;
     const stored = await browser.storage.local.get(key);
     const disabled = stored && stored[key] === true;
-    window.dispatchEvent(new CustomEvent("autogram-macos-set-enabled", {
+    window.dispatchEvent(new CustomEvent("chevron7-set-enabled", {
       detail: { enabled: !disabled }
     }));
     if (disabled) {
-      console.log("[Autogram macOS] na tejto stránke vypnuté, ponechávam pôvodný D.Signer");
+      console.log("[Chevron7] na tejto stránke vypnuté, ponechávam pôvodný D.Signer");
     }
   } catch (error) {
-    console.error("[Autogram macOS] nepodarilo sa načítať nastavenie stránky", error);
+    console.error("[Chevron7] nepodarilo sa načítať nastavenie stránky", error);
   }
 })();
 
 browser.runtime.onMessage.addListener((message) => {
   if (message?.kind !== "site-enabled-changed") return;
-  window.dispatchEvent(new CustomEvent("autogram-macos-set-enabled", {
+  window.dispatchEvent(new CustomEvent("chevron7-set-enabled", {
     detail: { enabled: message.enabled }
   }));
   return Promise.resolve({ ok: true });
@@ -66,7 +66,7 @@ window.addEventListener(CHANNEL_REQUEST, async (event) => {
       parsed.pageHost = location.hostname;
       request = JSON.stringify(parsed);
     } catch (error) {
-      console.warn("[Autogram macOS] požiadavku na podpis sa nepodarilo doplniť o adresu stránky", error);
+      console.warn("[Chevron7] požiadavku na podpis sa nepodarilo doplniť o adresu stránky", error);
     }
   }
   let reply;
@@ -76,7 +76,7 @@ window.addEventListener(CHANNEL_REQUEST, async (event) => {
       request: request
     });
   } catch (error) {
-    console.warn("[Autogram macOS] správa pre pozadie rozšírenia zlyhala", error);
+    console.warn("[Chevron7] správa pre pozadie rozšírenia zlyhala", error);
     reply = undefined;
   }
   window.dispatchEvent(new CustomEvent(CHANNEL_RESPONSE, {

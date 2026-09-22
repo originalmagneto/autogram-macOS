@@ -16,7 +16,7 @@ function keyFor(host) {
 
 function renderNote() {
   note.textContent = toggle.checked
-    ? "Podpisovanie na tejto stránke preberá Autogram macOS."
+    ? "Podpisovanie na tejto stránke preberá Chevron7."
     : "Stránka použije svoj pôvodný D.Signer (napríklad D.Bridge 2). Zmena platí hneď, bez obnovenia stránky.";
 }
 
