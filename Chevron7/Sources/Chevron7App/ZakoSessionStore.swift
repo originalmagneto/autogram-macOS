@@ -98,8 +98,11 @@ final class ZakoSessionStore {
     static let mobileMandateRefusalMessage =
         "Podpis z mobilu nebol vytvorený mandátnym certifikátom. Zaručená konverzia vyžaduje mandátny certifikát advokáta, konverzia nebola autorizovaná a do evidencie sa nič nezapísalo."
 
+    static let mobileOutsideDemoMessage =
+        "Zaručenú konverziu s EZZK podpisujte kartou SAK. Podpis z mobilu je zatiaľ dostupný iba v režime Demo."
+
     var isMobileSigningAvailable: Bool {
-        settings.mobileSigningEnabled && !signingProviderIsDemo
+        settings.mobileSigningEnabled && !signingProviderIsDemo && settingsStore.ezzkAccountController.isDemoMode
     }
 
     /// Preflight for the mobile path: the certificate is known only after the phone
@@ -1077,6 +1080,10 @@ final class ZakoSessionStore {
         lastError = nil
         validationErrors = []
         preparePreflight()
+        if viaMobile, !settingsStore.ezzkAccountController.isDemoMode {
+            lastError = Self.mobileOutsideDemoMessage
+            return
+        }
         // Local precondition before any EZZK call: a number from another EZZK mode (a demo
         // number on Produkcia, for example) was never allocated there, so nothing is signed.
         if let modeError = evidenceNumberModeError {
