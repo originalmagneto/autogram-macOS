@@ -1,6 +1,6 @@
 # EZZK part B: correct clause, signed record, submission, production
 
-Date: 2026-09-23. Revision 3, after two independent reviews and after reading an accepted record back from EZZK. Status: approved by the owner on 2026-09-23 (conditional on the second review, which approved with the changes now applied).
+Date: 2026-09-23. Revision 4 (facts found while planning B1 added), after two independent reviews and after reading an accepted record back from EZZK. Status: approved by the owner on 2026-09-23 (conditional on the second review, which approved with the changes now applied).
 Builds on: `2026-09-17-ezzk-soap-design.md` (part A). Background: `Chevron7/docs/EZZK-INTEGRATION.md`, `Chevron7/docs/P2E-EZZK-FINDINGS.md`.
 
 ## Goal
@@ -29,7 +29,10 @@ On 2026-09-23 `ezzk-probe record 1563-260824-1 --env production` (`GetConversion
 - **Today's record would not validate or match EZZK's sample:** codelist elements inside `MandatoryStringType` fields (`:105, :126, :129`); `OriginalDocumentOrder` before `OriginalDocumentName` (`:85-86`); `OriginalDocumentType` omitted when empty (`:88`) although required; the tail order is person, device, time, number instead of number, device, time, person (`:135-145`); the evidence number is written as a URI (`ZakoCodelists.conversionRecordURI`, `ZakoCodelists.swift:49-53`).
 - **Today's `.xml.xdcf` is bare form XML,** not an `XMLDataContainer`.
 - **The card-signed ZaKo container nests.** `ZakoSessionStore.swift:1196-1241` packs PDF and `.xdcf` into an unsigned `kontajner.asice` (`ASiCEPackager.zakoContainer`) and sends it as one file. DSS treats an ASiC without a signature file as one data object and wraps it again (`WEB-SIGNING-FINDINGS-2026-09-16.md` finding 6, same mechanism, fixed there for web signing only). Podpisuj's client containers in `EXAMPLES/` instead carry one signature with two references, one to the PDF and one to the clause `.xdcf`.
-- The engine's single-file route already produces the record's container shape: an `.xdcf` source with `XAdES_BASELINE_T` goes through `buildForASiCWithXAdES` (`engine/.../MachineSigningService.java:645-647`) and yields a one-file ASiC-E with the XDC MIME in `DataObjectFormat`. One machine sign request carries one signature level and one eForm for all its files (`MachineV2RequestValidator.java:28-61`).
+- **Fingerprint and embedding.** In Podpisuj's client container `Musinkova_diplom.pdf.pdf.asice` the clause's `ElectronicFingerprintValue` equals the SHA-256 of the delivered PDF, and that PDF has no embedded files. Chevron7 hashes the PDF/A, then embeds the XML as `osvedcovacia-dolozka.xml` and normalises again (`ZakoSessionStore.swift:1129-1167`), so the delivered PDF no longer matches the fingerprint in its own clause. B1 stops embedding and hashes the final delivered bytes.
+- **Clause 1.3 value rules found while planning B1:** the clause's `ConversionRecordEvidenceNumber` is a URI (`https://data.gov.sk/id/egov/conversion-record/<number>`, schema documentation; Podpisuj's clause does the same) while the record carries the plain number; `IdentifierValue` must match `https://data.gov.sk/id/legal-subject/\d{8,12}` (today `ico://sk/<IČO>`); location code for the page centre is `Mid` (today `Center`); paper sizes outside A1-C7 use `Iny` with `PaperSizeOther`; `OriginalDocumentSecurityElementsLocation` accepts only codelist 11 items, so physical-original elements need a codelist choice instead of free text; `PhysicalPerson` and `LegalSubject` are both required.
+- The engine accepts only a PDF or an ASiC as a machine sign source (`MachineSigningService.isSupportedSource`, `:404-406`), so a bare record `.xdcf` is refused today; B2 must add that route and pin it with an engine test.
+- The engine's single-file route would produce the record's container shape once the source is accepted: an `.xdcf` source with `XAdES_BASELINE_T` goes through `buildForASiCWithXAdES` (`engine/.../MachineSigningService.java:645-647`) and yields a one-file ASiC-E with the XDC MIME in `DataObjectFormat`. One machine sign request carries one signature level and one eForm for all its files (`MachineV2RequestValidator.java:28-61`).
 - The timestamp switch `includeQualifiedTimestamp` is a mutable property (`ZakoSessionStore.swift:65`). The engine reports `qualifiedTimestampValid` per signature through inspection (`AutogramCLIEngine.swift:631`, `InspectionModels.swift:47`).
 - The mobile (AVM) ZaKo path uploads only the PDF (`ZakoSessionStore.swift:1212-1224`), so it produces neither a clause container nor a record.
 - The PIN for I.CA cards is typed into Chevron7's own field (`SigningIdentityInfo.requiresPIN`, `SigningProvider.swift:20`), so the app can pass it to two sign requests.
@@ -84,7 +87,7 @@ The renderer test pins this table.
 1. The evidence number is allocated in the attestation form as today; the same-day and same-mode rules still apply.
 2. Chevron7 reads the EZZK server time as the conversion time and builds `ConversionFormModel`.
 3. Clause and record are rendered, wrapped in XDC and validated against the official schemas. Invalid output is never signed and the number is not used.
-4. PDF/A is produced with the clause (not the record) as its embedded associated file.
+4. PDF/A is produced and normalised for delivery; the SHA-256 of these final bytes is the fingerprint in clause and record. Nothing is embedded afterwards.
 5. Engine request 1 signs PDF/A plus clause `.xdcf` into the client container; request 2 signs the record into its container. One PIN entry.
 6. Both signatures are inspected for a qualified timestamp.
 7. Outputs and the register row are saved, and the record is submitted at once.
@@ -125,7 +128,7 @@ Left open, not blocking part B: the whole-certificate test pin (gap 1, expires 2
 
 Each part gets its own implementation plan and merges on its own.
 
-- **B1: correct client output.** Form resources, `ConversionFormModel`, clause renderer, XDC builder, engine multi-document ASiC-E, PDF/A embedding the clause, `P2EConformanceValidator` run on the real ZaKo output in a test, mobile ZaKo limited to Demo. No EZZK behaviour changes. Fixes a defect users have today, so it ships first.
+- **B1: correct client output.** Form resources, `ConversionFormModel`, clause renderer, XDC builder, engine multi-document ASiC-E, the PDF/A no longer embedding XML (fingerprint over the delivered bytes), the location codelist for physical-original elements, `P2EConformanceValidator` run on the real ZaKo output in a test, mobile ZaKo limited to Demo. No EZZK behaviour changes. Fixes a defect users have today, so it ships first.
 - **B2: record and submission.** Record renderer, record container, signing orchestration and timestamp check, submission, register states and fields, gaps 2, 5, 6, 7 and the dashboard bug, `ezzk-probe record`. Live verification on test EZZK. The B2 implementation plan is written only after live items 3 and 4 below are answered: if `ReceiveConversionRecord` does not consume the number, B2 adds a Consume call (its place in the flow, its outcome-unknown handling, its entry in `EZZKProductionPolicy`), and the "Oneskorený" send depends on the same answer. These live checks need only `ezzk-probe` and a hand-built record, not the B2 code.
 - **B3: production.** `EZZKProductionPolicy`, owner switch, first live conversion, then enabling production for everyone.
 
