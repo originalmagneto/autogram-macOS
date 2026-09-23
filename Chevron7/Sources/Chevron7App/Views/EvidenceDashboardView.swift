@@ -406,11 +406,13 @@ struct RecordDetailView: View {
         if let record {
             content(record)
         } else {
-            ContentUnavailableView("Záznam sa v Registri nenašiel", systemImage: "archivebox")
-                .frame(minWidth: 320, minHeight: 200)
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) { Button("Zavrieť") { onClose() } }
-                }
+            VStack {
+                ContentUnavailableView("Záznam sa v Registri nenašiel", systemImage: "archivebox")
+                Button("Zavrieť") { onClose() }
+                    .keyboardShortcut(.defaultAction)
+            }
+            .padding(22)
+            .frame(minWidth: 320, minHeight: 200)
         }
     }
 

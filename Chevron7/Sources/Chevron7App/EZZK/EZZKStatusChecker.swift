@@ -277,7 +277,8 @@ final class EZZKStatusChecker {
         guard evidenceStore.record(id: id) != nil else { return updated }
         evidenceStore.upsert(updated)
         changeCount += 1
-        if updated.status == .acceptedForProcessing || updated.status == .processed,
+        if updated.status != record.status,
+           updated.status == .acceptedForProcessing || updated.status == .processed,
            let number = updated.evidenceNumber {
             // EZZK consumed the number with the record, so it is never offered again.
             numberPool.remove(number)
