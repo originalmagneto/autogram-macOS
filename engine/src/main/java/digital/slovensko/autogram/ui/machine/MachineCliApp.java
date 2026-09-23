@@ -204,7 +204,7 @@ public final class MachineCliApp {
         QualifiedTimestampRequest timestamp = null;
         try {
             timestamp = requiredTimestamp(payload.getAsJsonObject("timestamp"));
-            var files = requiredInspectionRequest(filesPayload(payload.get("files"))).files();
+            var files = requiredSignFiles(payload.get("files"));
             return new SignRequest(payload.get("driver").getAsString(), payload.get("certificateSerial").getAsString(),
                     pin, payload.get("signatureLevel").getAsString(), timestamp, files);
         } catch (Throwable exception) {
@@ -216,10 +216,49 @@ public final class MachineCliApp {
         }
     }
 
-    private static JsonObject filesPayload(JsonElement files) {
-        var payload = new JsonObject();
-        payload.add("files", files);
-        return payload;
+    private static List<MachineFile> requiredSignFiles(JsonElement filesElement) {
+        if (filesElement == null || !filesElement.isJsonArray() || filesElement.getAsJsonArray().isEmpty()) {
+            throw new MachineProtocolException("PROTOCOL_INVALID_REQUEST");
+        }
+        var files = new ArrayList<MachineFile>();
+        for (var element : filesElement.getAsJsonArray()) {
+            if (!element.isJsonObject()) {
+                throw new MachineProtocolException("PROTOCOL_INVALID_REQUEST");
+            }
+            var file = element.getAsJsonObject();
+            var hasAttachments = file.has("attachments");
+            if (file.size() != (hasAttachments ? 4 : 3) || !file.has("id") || !file.has("source") || !file.has("target")
+                    || !isNonBlankString(file.get("id")) || !isNonBlankString(file.get("source"))
+                    || !isNonBlankString(file.get("target"))) {
+                throw new MachineProtocolException("PROTOCOL_INVALID_REQUEST");
+            }
+            var attachments = new ArrayList<String>();
+            if (hasAttachments) {
+                var value = file.get("attachments");
+                if (!value.isJsonArray() || value.getAsJsonArray().isEmpty() || value.getAsJsonArray().size() > 8) {
+                    throw new MachineProtocolException("PROTOCOL_INVALID_REQUEST");
+                }
+                for (var attachment : value.getAsJsonArray()) {
+                    if (!isNonBlankString(attachment)) {
+                        throw new MachineProtocolException("PROTOCOL_INVALID_REQUEST");
+                    }
+                    attachments.add(attachment.getAsString());
+                }
+            }
+            var source = file.get("source").getAsString();
+            var target = file.get("target").getAsString();
+            try {
+                java.nio.file.Path.of(source);
+                java.nio.file.Path.of(target);
+                for (var attachment : attachments) {
+                    java.nio.file.Path.of(attachment);
+                }
+            } catch (java.nio.file.InvalidPathException exception) {
+                throw new MachineProtocolException("PROTOCOL_INVALID_REQUEST", exception);
+            }
+            files.add(new MachineFile(file.get("id").getAsString(), source, target, null, attachments));
+        }
+        return List.copyOf(files);
     }
 
     private static QualifiedTimestampRequest requiredTimestamp(JsonObject timestamp) {

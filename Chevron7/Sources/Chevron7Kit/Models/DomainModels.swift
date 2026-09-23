@@ -204,17 +204,19 @@ public struct SecurityElement: Codable, Hashable, Identifiable, Sendable {
         case ..<0.67: horizontal = "center"
         default: horizontal = "right"
         }
+        let code: String
         switch (vertical, horizontal) {
-        case ("down", "left"): return ZakoCodelistItem(code: "Left down", skName: "Dole vľavo")
-        case ("down", "center"): return ZakoCodelistItem(code: "Down", skName: "Dole")
-        case ("down", "right"): return ZakoCodelistItem(code: "Right down", skName: "Dole vpravo")
-        case ("middle", "left"): return ZakoCodelistItem(code: "Left", skName: "Vľavo")
-        case ("middle", "center"): return ZakoCodelistItem(code: "Center", skName: "V strede")
-        case ("middle", "right"): return ZakoCodelistItem(code: "Right", skName: "Vpravo")
-        case ("up", "left"): return ZakoCodelistItem(code: "Left up", skName: "Hore vľavo")
-        case ("up", "center"): return ZakoCodelistItem(code: "Up", skName: "Hore")
-        default: return ZakoCodelistItem(code: "Right up", skName: "Hore vpravo")
+        case ("down", "left"): code = "Left down"
+        case ("down", "center"): code = "Down"
+        case ("down", "right"): code = "Right down"
+        case ("middle", "left"): code = "Left"
+        case ("middle", "center"): code = "Mid"
+        case ("middle", "right"): code = "Right"
+        case ("up", "left"): code = "Left up"
+        case ("up", "center"): code = "Up"
+        default: code = "Right up"
         }
+        return ZakoCodelists.locationItem(code: code)!
     }
 
     public func sheetNumber(sheetMethod: SheetCountingMethod) -> Int {

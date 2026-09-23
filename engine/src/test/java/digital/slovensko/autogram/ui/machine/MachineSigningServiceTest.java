@@ -3,6 +3,7 @@ package digital.slovensko.autogram.ui.machine;
 import com.google.gson.JsonParser;
 import digital.slovensko.autogram.core.PasswordManager;
 import digital.slovensko.autogram.core.SignedDocument;
+import digital.slovensko.autogram.core.SigningKey;
 import digital.slovensko.autogram.core.errors.PINIncorrectException;
 import digital.slovensko.autogram.drivers.TokenDriver;
 import digital.slovensko.autogram.ui.machine.v2.VisibleSignatureAppearance;
@@ -18,6 +19,7 @@ import eu.europa.esig.dss.token.Pkcs12SignatureToken;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.io.ByteArrayInputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.math.BigInteger;
@@ -26,10 +28,13 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.security.KeyStore;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.zip.ZipInputStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -718,6 +723,243 @@ class MachineSigningServiceTest {
         }
     }
 
+    /// ZaKo hands the PDF/A and the clause XDC as two documents. They must become two data
+    /// objects of one ASiC-E, never a container nested inside another.
+    @Test
+    void attachmentsAreSignedAsDataObjectsOfOneContainer() throws Exception {
+        var pdf = Files.readAllBytes(Path.of(MachineSigningServiceTest.class
+                .getResource("/digital/slovensko/autogram/sample.pdf").getFile()));
+        var xdcf = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><XMLDataContainer xmlns=\"http://data.gov.sk/def/container/xmldatacontainer+xml/1.1\"/>"
+                .getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        var retained = new MemoryRetainedFile();
+        var responder = new MachineFileResponder(retained, () -> { });
+        var settings = new MachineSettings(true);
+        settings.setSignatureLevel(SignatureLevel.XAdES_BASELINE_B);
+
+        var job = MachineSigningService.DefaultSigningSession.signingJob(pdf, "/tmp/dokument.pdf", responder, settings,
+                null, List.of(new MachineSigningService.AttachmentContent("dokument.xml.xdcf", xdcf)));
+        var token = new Pkcs12SignatureToken(
+                Objects.requireNonNull(MachineSigningServiceTest.class
+                        .getResource("/digital/slovensko/autogram/test.keystore")).getFile(),
+                new KeyStore.PasswordProtection("".toCharArray()));
+        job.signWithKeyAndRespond(new SigningKey(token, token.getKeys().get(0)));
+
+        var names = new ArrayList<String>();
+        String manifest = null;
+        String signature = null;
+        try (var zip = new ZipInputStream(new ByteArrayInputStream(retained.readAll()))) {
+            for (var entry = zip.getNextEntry(); entry != null; entry = zip.getNextEntry()) {
+                names.add(entry.getName());
+                var content = new String(zip.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+                if (entry.getName().equals("META-INF/manifest.xml")) manifest = content;
+                if (entry.getName().startsWith("META-INF/signatures")) signature = content;
+            }
+        }
+        assertTrue(names.contains("dokument.pdf"), names.toString());
+        assertTrue(names.contains("dokument.xml.xdcf"), names.toString());
+        assertTrue(names.stream().noneMatch(name -> name.endsWith(".asice")), names.toString());
+        assertTrue(manifest.contains("manifest:full-path=\"dokument.xml.xdcf\" manifest:media-type=\"application/vnd.gov.sk.xmldatacontainer+xml\""), manifest);
+        assertTrue(signature.contains("URI=\"dokument.pdf\""), signature);
+        assertTrue(signature.contains("URI=\"dokument.xml.xdcf\""), signature);
+    }
+
+    /// A real advocate names a source with a space and a diacritic. The ZIP entry names and the
+    /// signature's references must survive that exactly, whatever percent-encoding DSS applies.
+    @Test
+    void attachmentsWithSpaceAndDiacriticAreSignedAsDataObjectsOfOneContainer() throws Exception {
+        var pdf = Files.readAllBytes(Path.of(MachineSigningServiceTest.class
+                .getResource("/digital/slovensko/autogram/sample.pdf").getFile()));
+        var xdcf = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><XMLDataContainer xmlns=\"http://data.gov.sk/def/container/xmldatacontainer+xml/1.1\"/>"
+                .getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        var retained = new MemoryRetainedFile();
+        var responder = new MachineFileResponder(retained, () -> { });
+        var settings = new MachineSettings(true);
+        settings.setSignatureLevel(SignatureLevel.XAdES_BASELINE_B);
+
+        var sourceName = "Zmluva o dielo č. 3.pdf";
+        var attachmentName = "Zmluva o dielo č. 3.xml.xdcf";
+        var job = MachineSigningService.DefaultSigningSession.signingJob(pdf, "/tmp/" + sourceName, responder, settings,
+                null, List.of(new MachineSigningService.AttachmentContent(attachmentName, xdcf)));
+        var token = new Pkcs12SignatureToken(
+                Objects.requireNonNull(MachineSigningServiceTest.class
+                        .getResource("/digital/slovensko/autogram/test.keystore")).getFile(),
+                new KeyStore.PasswordProtection("".toCharArray()));
+        job.signWithKeyAndRespond(new SigningKey(token, token.getKeys().get(0)));
+
+        var names = new ArrayList<String>();
+        String signature = null;
+        try (var zip = new ZipInputStream(new ByteArrayInputStream(retained.readAll()))) {
+            for (var entry = zip.getNextEntry(); entry != null; entry = zip.getNextEntry()) {
+                names.add(java.text.Normalizer.normalize(entry.getName(), java.text.Normalizer.Form.NFC));
+                var content = new String(zip.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+                if (entry.getName().startsWith("META-INF/signatures")) signature = content;
+            }
+        }
+        var normalizedSourceName = java.text.Normalizer.normalize(sourceName, java.text.Normalizer.Form.NFC);
+        var normalizedAttachmentName = java.text.Normalizer.normalize(attachmentName, java.text.Normalizer.Form.NFC);
+        assertTrue(names.contains(normalizedSourceName), names.toString());
+        assertTrue(names.contains(normalizedAttachmentName), names.toString());
+        assertTrue(names.stream().noneMatch(name -> name.endsWith(".asice")), names.toString());
+        assertTrue(referencesFile(signature, sourceName), signature);
+        assertTrue(referencesFile(signature, attachmentName), signature);
+    }
+
+    /// True when `signatureXml` carries a `dsig:Reference` URI for `fileName`, whether DSS wrote
+    /// it plain or percent-encoded; both forms are normalised to NFC before comparison because a
+    /// diacritic can be composed differently depending on the encoding step.
+    private static boolean referencesFile(String signatureXml, String fileName) {
+        var normalizedName = java.text.Normalizer.normalize(fileName, java.text.Normalizer.Form.NFC);
+        var normalizedXml = java.text.Normalizer.normalize(signatureXml, java.text.Normalizer.Form.NFC);
+        if (normalizedXml.contains("URI=\"" + normalizedName + "\"")) return true;
+        var decodedXml = java.text.Normalizer.normalize(
+                java.net.URLDecoder.decode(signatureXml, java.nio.charset.StandardCharsets.UTF_8),
+                java.text.Normalizer.Form.NFC);
+        return decodedXml.contains("URI=\"" + normalizedName + "\"");
+    }
+
+    /// The whole path Task 8 drives: validation, reading the attachment, a real signature, the
+    /// output check of the two-object container and publishing it.
+    @Test
+    void signsAndPublishesASourceWithItsAttachmentThroughTheService() throws Exception {
+        var writer = new RecordingWriter();
+        var source = Files.copy(Path.of(MachineSigningServiceTest.class
+                .getResource("/digital/slovensko/autogram/sample.pdf").getFile()),
+                temporaryDirectory.resolve("dokument.pdf")).toRealPath();
+        var attachment = Files.writeString(temporaryDirectory.resolve("dokument.xml.xdcf"),
+                "<?xml version=\"1.0\" encoding=\"UTF-8\"?><XMLDataContainer xmlns=\"http://data.gov.sk/def/container/xmldatacontainer+xml/1.1\"/>")
+                .toRealPath();
+        var target = target("dokument.asice");
+        var settings = new MachineSettings(true);
+        settings.setSignatureLevel(SignatureLevel.XAdES_BASELINE_B);
+        var token = new Pkcs12SignatureToken(
+                Objects.requireNonNull(MachineSigningServiceTest.class
+                        .getResource("/digital/slovensko/autogram/test.keystore")).getFile(),
+                new KeyStore.PasswordProtection("".toCharArray()));
+        var key = new SigningKey(token, token.getKeys().get(0));
+        var service = new MachineSigningService(writer.writer(), request -> new FakeSession((input, completed) ->
+                MachineSigningService.DefaultSigningSession.signingJob(input.sourceContent(), input.file().source(),
+                        new MachineFileResponder(input.staging(), completed), settings, null, input.attachments())
+                        .signWithKeyAndRespond(key)),
+                new MachineSigningService.PdfOutputValidator(new MachineInspectionService()));
+
+        service.sign("request-1", new SignRequest("fake", "123", "1234".toCharArray(), "XAdES_BASELINE_B",
+                new QualifiedTimestampRequest(false, List.of()),
+                List.of(new MachineFile("one", source.toString(), target.toString(), null, List.of(attachment.toString())))));
+
+        assertEquals(List.of("session.started", "file.signingStarted", "file.completed", "session.completed"),
+                writer.lifecycleEventTypes());
+        var names = new ArrayList<String>();
+        try (var zip = new ZipInputStream(Files.newInputStream(target))) {
+            for (var entry = zip.getNextEntry(); entry != null; entry = zip.getNextEntry()) {
+                names.add(entry.getName());
+            }
+        }
+        assertTrue(names.containsAll(List.of("dokument.pdf", "dokument.xml.xdcf")), names.toString());
+        assertTrue(names.stream().noneMatch(name -> name.endsWith(".asice")), names.toString());
+    }
+
+    /// DSS only extends an existing container when it signs a single document; with attachments
+    /// an existing ASiC would end up nested inside the new one.
+    @Test
+    void signingJobRefusesAnExistingContainerWithAttachments() throws Exception {
+        var settings = new MachineSettings(true);
+        settings.setSignatureLevel(SignatureLevel.XAdES_BASELINE_T);
+        var container = Files.readAllBytes(Path.of(MachineSigningServiceTest.class
+                .getResource("/digital/slovensko/autogram/FUPS_signed.asice").getFile()));
+
+        assertThrows(java.io.IOException.class, () -> MachineSigningService.DefaultSigningSession.signingJob(container,
+                "/tmp/podpisany.asice", new MachineFileResponder(new MemoryRetainedFile(), () -> { }), settings, null,
+                List.of(new MachineSigningService.AttachmentContent("a.xml.xdcf", "<a/>".getBytes()))));
+    }
+
+    @Test
+    void signingJobRefusesAContainerAsAnAttachment() throws Exception {
+        var settings = new MachineSettings(true);
+        settings.setSignatureLevel(SignatureLevel.XAdES_BASELINE_B);
+        var pdf = Files.readAllBytes(Path.of(MachineSigningServiceTest.class
+                .getResource("/digital/slovensko/autogram/sample.pdf").getFile()));
+        var container = Files.readAllBytes(Path.of(MachineSigningServiceTest.class
+                .getResource("/digital/slovensko/autogram/FUPS_signed.asice").getFile()));
+
+        assertThrows(java.io.IOException.class, () -> MachineSigningService.DefaultSigningSession.signingJob(pdf,
+                "/tmp/dokument.pdf", new MachineFileResponder(new MemoryRetainedFile(), () -> { }), settings, null,
+                List.of(new MachineSigningService.AttachmentContent("dokument.xml.xdcf", container))));
+    }
+
+    /// The validator only sees the name; a ZIP hiding behind an `.xdcf` name is caught when the
+    /// attachment is read, before the token opens.
+    @Test
+    void refusesAZipAttachmentBeforeTokenWork() throws Exception {
+        var writer = new RecordingWriter();
+        var source = Files.copy(Path.of(MachineSigningServiceTest.class
+                .getResource("/digital/slovensko/autogram/sample.pdf").getFile()),
+                temporaryDirectory.resolve("dokument.pdf")).toRealPath();
+        var attachment = Files.copy(Path.of(MachineSigningServiceTest.class
+                .getResource("/digital/slovensko/autogram/FUPS_signed.asice").getFile()),
+                temporaryDirectory.resolve("dokument.xml.xdcf")).toRealPath();
+        var target = target("zip-attachment.asice");
+        var tokenOpened = new AtomicBoolean();
+        var service = new MachineSigningService(writer.writer(), request -> {
+            tokenOpened.set(true);
+            throw new AssertionError("Token must not open for a container attachment");
+        }, content -> true);
+
+        service.sign("request-1", new SignRequest("fake", "123", "1234".toCharArray(), "XAdES_BASELINE_B",
+                new QualifiedTimestampRequest(false, List.of()),
+                List.of(new MachineFile("one", source.toString(), target.toString(), null, List.of(attachment.toString())))));
+
+        assertFalse(tokenOpened.get());
+        assertFalse(Files.exists(target));
+        assertEquals(List.of("session.started", "file.signingStarted", "file.failed", "session.failed"),
+                writer.lifecycleEventTypes());
+    }
+
+    /// Attachments are read through the same retained, no-follow handle as the source, never by
+    /// path a second time after validation.
+    @Test
+    void readsAttachmentsThroughTheRetainedSourceHandle() throws Exception {
+        var writer = new RecordingWriter();
+        var source = Files.writeString(temporaryDirectory.resolve("dokument.pdf"), "%PDF-1.7\nsource\n%%EOF").toRealPath();
+        var attachment = Files.writeString(temporaryDirectory.resolve("dokument.xml.xdcf"), "<on-disk/>").toRealPath();
+        var fileSystem = new TrackingFileSystem();
+        var retainedAttachment = new MemoryRetainedFile("<retained/>".getBytes()) {
+            boolean closed;
+
+            @Override
+            public void close() {
+                closed = true;
+            }
+        };
+        fileSystem.retained.put(attachment, retainedAttachment);
+        var signed = new AtomicReference<MachineSigningService.SigningInput>();
+        var service = new MachineSigningService(writer.writer(), request -> new FakeSession((input, completed) -> {
+            signed.set(input);
+            input.writeSignedContent("PK".getBytes());
+            completed.run();
+        }), content -> true, () -> { }, fileSystem);
+
+        service.sign("request-1", new SignRequest("fake", "123", "1234".toCharArray(), "XAdES_BASELINE_B",
+                new QualifiedTimestampRequest(false, List.of()),
+                List.of(new MachineFile("one", source.toString(), target("retained.asice").toString(), null,
+                        List.of(attachment.toString())))));
+
+        assertEquals("<retained/>", new String(signed.get().attachments().getFirst().content()));
+        assertTrue(retainedAttachment.closed);
+    }
+
+    @Test
+    void attachmentsNeedAnAsicESignature() {
+        var settings = new MachineSettings(true);
+        settings.setSignatureLevel(SignatureLevel.PAdES_BASELINE_T);
+        settings.setTsaServer("https://tsa.example.test");
+        settings.setTsaEnabled(true);
+        assertThrows(java.io.IOException.class, () -> MachineSigningService.DefaultSigningSession.signingJob(
+                Files.readAllBytes(Path.of(MachineSigningServiceTest.class
+                        .getResource("/digital/slovensko/autogram/sample.pdf").getFile())),
+                "/tmp/dokument.pdf", new MachineFileResponder(new MemoryRetainedFile(), () -> { }), settings, null,
+                List.of(new MachineSigningService.AttachmentContent("a.xml.xdcf", new byte[] { '<', 'a', '/', '>' }))));
+    }
+
     @Test
     void signingJobWithoutEFormAttributesStillTreatsPdfAsPades() throws Exception {
         var source = Path.of(MachineSigningServiceTest.class
@@ -1030,11 +1272,12 @@ class MachineSigningServiceTest {
     private static final class TrackingFileSystem implements MachineSigningFileSystem {
         private final MemoryRetainedFile source = new MemoryRetainedFile("%PDF-1.7\nsource\n%%EOF".getBytes());
         private final MemoryRetainedFile staging = new MemoryRetainedFile();
+        private final java.util.Map<Path, RetainedFile> retained = new java.util.HashMap<>();
         private Error cleanupFailure;
 
         @Override
         public RetainedFile openSource(Path source) {
-            return this.source;
+            return retained.getOrDefault(source, this.source);
         }
 
         @Override

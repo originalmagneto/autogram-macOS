@@ -14,6 +14,8 @@ public enum AttestationGenerationError: LocalizedError, Equatable, Sendable {
     case invalidFingerprint
     case incompletePhysicalSecurityElement
     case invalidSecurityElementPage
+    case missingEvidenceNumber
+    case invalidOriginalLocation
 
     public var errorDescription: String? {
         switch self {
@@ -23,6 +25,10 @@ public enum AttestationGenerationError: LocalizedError, Equatable, Sendable {
             return "Prvok skontrolovaný na origináli musí mať uvedené miesto na origináli a stranu v novom dokumente."
         case .invalidSecurityElementPage:
             return "Bezpečnostný prvok nemá platné číslo strany alebo nie je na uvedenej neprázdnej strane originálu."
+        case .missingEvidenceNumber:
+            return "Chýba evidenčné číslo záznamu z EZZK."
+        case .invalidOriginalLocation:
+            return "Pri prvku skontrolovanom na origináli vyberte umiestnenie zo zoznamu."
         }
     }
 }
@@ -148,8 +154,8 @@ public struct AttestationClauseGenerator: Sendable {
         return xml
     }
 
-    private static func securityElementPages(_ element: SecurityElement,
-                                             originalNonEmptyPageIndices: [Int]?) throws -> (original: Int, new: Int) {
+    static func securityElementPages(_ element: SecurityElement,
+                                     originalNonEmptyPageIndices: [Int]?) throws -> (original: Int, new: Int) {
         let newPageIndex: Int
         if element.observation == .physicalOriginal {
             guard !element.originalLocation.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,

@@ -20,6 +20,11 @@ public final class MachineRequestValidator {
             "PAdES_BASELINE_T", "XAdES_BASELINE_T");
     private static final Set<String> SUPPORTED_SIGNATURE_LEVELS = Set.of(
             "PAdES_BASELINE_T", "XAdES_BASELINE_T", "PAdES_BASELINE_B", "XAdES_BASELINE_B");
+    /// Extensions of ASiC containers. With attachments DSS builds a new container, so an existing
+    /// one would end up nested inside it instead of being extended.
+    private static final Set<String> CONTAINER_EXTENSIONS = Set.of(".asice", ".asics", ".sce", ".scs");
+    /// Entry names the container itself uses.
+    private static final Set<String> RESERVED_ENTRY_NAMES = Set.of("mimetype", "meta-inf");
 
     private MachineRequestValidator() {
     }
@@ -64,6 +69,10 @@ public final class MachineRequestValidator {
         if (request.signatureLevel().endsWith("_T")) {
             validateTimestamp(request.timestamp());
         }
+        var hasAttachments = request.files().stream().anyMatch(file -> file != null && !file.attachments().isEmpty());
+        if (hasAttachments && (request.eform() != null || !request.signatureLevel().startsWith("XAdES_"))) {
+            throw invalidRequest();
+        }
         return new ValidatedSignRequest(request, validateFiles(request.files()));
     }
 
@@ -90,9 +99,35 @@ public final class MachineRequestValidator {
                     || !targets.add(normalizeTarget(target))) {
                 throw invalidRequest();
             }
-            validated.add(new ValidatedMachineFile(file, source, target));
+            validated.add(new ValidatedMachineFile(file, source, target, validateAttachments(source, file.attachments())));
         }
         return List.copyOf(validated);
+    }
+
+    /// Each attachment becomes a data object of one new ASiC-E next to the source, as a ZIP entry
+    /// named after its file. So no document may be a container itself, and the entry names must
+    /// be distinct (compared the way the target names are) and not the container's own.
+    private static List<Path> validateAttachments(Path source, List<String> values) {
+        if (values.isEmpty()) {
+            return List.of();
+        }
+        var entryNames = new HashSet<String>();
+        requireDataObjectEntry(source, entryNames);
+        var attachments = new ArrayList<Path>();
+        for (var value : values) {
+            var attachment = canonicalSource(value);
+            requireDataObjectEntry(attachment, entryNames);
+            attachments.add(attachment);
+        }
+        return List.copyOf(attachments);
+    }
+
+    private static void requireDataObjectEntry(Path document, Set<String> entryNames) {
+        var name = normalizeTarget(document.getFileName());
+        if (RESERVED_ENTRY_NAMES.contains(name) || CONTAINER_EXTENSIONS.stream().anyMatch(name::endsWith)
+                || !entryNames.add(name)) {
+            throw invalidRequest();
+        }
     }
 
     private static Path canonicalSource(String value) {
@@ -173,5 +208,8 @@ public final class MachineRequestValidator {
 record ValidatedSignRequest(SignRequest request, List<ValidatedMachineFile> files) {
 }
 
-record ValidatedMachineFile(MachineFile file, Path source, Path target) {
+record ValidatedMachineFile(MachineFile file, Path source, Path target, List<Path> attachments) {
+    ValidatedMachineFile(MachineFile file, Path source, Path target) {
+        this(file, source, target, List.of());
+    }
 }

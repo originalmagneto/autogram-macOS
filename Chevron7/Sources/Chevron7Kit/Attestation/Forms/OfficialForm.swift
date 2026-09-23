@@ -1,0 +1,43 @@
+// SPDX-FileCopyrightText: 2026 Marián Čuprík
+// SPDX-License-Identifier: EUPL-1.2
+
+import Foundation
+
+/// An official slovensko.sk form as an XMLDataContainer references it. The files and their
+/// digests come from `docs/reference/forms` through `scripts/embed-official-forms.sh`.
+public struct OfficialForm: Sendable, Equatable {
+    public let identifier: String
+    public let namespace: String
+    public let version: String
+    public let schema: Data
+    public let presentation: Data
+    /// `MediaDestinationTypeDescription` of the signer presentation (`TXT` or `HTML`).
+    public let presentationMediaDestination: String
+    public let schemaDigestBase64: String
+    public let presentationDigestBase64: String
+
+    public var schemaURI: String { namespace + "/form.xsd" }
+    public var presentationURI: String { namespace + "/form.xslt" }
+
+    /// Záznam o vykonanej zaručenej konverzii 1.0, the form EZZK receives.
+    public static let record_1_0 = OfficialForm(
+        identifier: "http://data.gov.sk/doc/eform/50349287.ConversionRecordOfPaperToElectronicDocument.sk/1.0",
+        namespace: "https://data.gov.sk/id/egov/eform/50349287.ConversionRecordOfPaperToElectronicDocument.sk/1.0",
+        version: "1.0",
+        schema: OfficialFormFiles.recordSchema,
+        presentation: OfficialFormFiles.recordPresentation,
+        presentationMediaDestination: "TXT",
+        schemaDigestBase64: OfficialFormFiles.recordSchemaDigest,
+        presentationDigestBase64: OfficialFormFiles.recordPresentationDigest)
+
+    /// Osvedčovacia doložka 1.3, attached to the converted document.
+    public static let clause_1_3 = OfficialForm(
+        identifier: "http://data.gov.sk/doc/eform/50349287.ConversionCertificateOfPaperToElectronicDocument.sk/1.3",
+        namespace: "http://schemas.gov.sk/form/50349287.ConversionCertificateOfPaperToElectronicDocument.sk/1.3",
+        version: "1.3",
+        schema: OfficialFormFiles.clauseSchema,
+        presentation: OfficialFormFiles.clausePresentation,
+        presentationMediaDestination: "HTML",
+        schemaDigestBase64: OfficialFormFiles.clauseSchemaDigest,
+        presentationDigestBase64: OfficialFormFiles.clausePresentationDigest)
+}

@@ -23,6 +23,7 @@ import eu.europa.esig.dss.enumerations.SignatureLevel;
 import eu.europa.esig.dss.enumerations.SignaturePackaging;
 import eu.europa.esig.dss.enumerations.MimeType;
 import digital.slovensko.autogram.core.AutogramMimeType;
+import eu.europa.esig.dss.model.DSSDocument;
 import eu.europa.esig.dss.model.InMemoryDocument;
 import eu.europa.esig.dss.token.AbstractKeyStoreTokenConnection;
 import eu.europa.esig.dss.token.DSSPrivateKeyEntry;
@@ -280,18 +281,20 @@ public final class MachineSigningService {
         private final MachineSigningFileSystem.RetainedFile staging;
         private final MachineSigningFileSystem.Workspace workspace;
         private final byte[] sourceContent;
+        private final List<AttachmentContent> attachments;
         private Set<String> previousSignatureIds;
         private boolean cleaned;
 
         private PreparedFile(MachineFile file, Path target, MachineSigningFileSystem.RetainedFile source,
                 MachineSigningFileSystem.RetainedFile staging, MachineSigningFileSystem.Workspace workspace,
-                byte[] sourceContent) {
+                byte[] sourceContent, List<AttachmentContent> attachments) {
             this.file = file;
             this.target = target;
             this.source = source;
             this.staging = staging;
             this.workspace = workspace;
             this.sourceContent = sourceContent;
+            this.attachments = attachments;
         }
 
         private static PreparedFile prepare(ValidatedMachineFile validated, MachineSigningFileSystem fileSystem)
@@ -305,9 +308,23 @@ public final class MachineSigningService {
                 if (!isSupportedSource(file.source(), sourceContent)) {
                     throw new IOException("Source is not a supported document");
                 }
+                var attachments = new ArrayList<AttachmentContent>();
+                for (var path : validated.attachments()) {
+                    try (var retained = fileSystem.openSource(path)) {
+                        var content = retained.readAll();
+                        if (isZip(content)) {
+                            throw new IOException("An attachment may not be a container");
+                        }
+                        attachments.add(new AttachmentContent(path.getFileName().toString(), content));
+                    }
+                }
+                if (!attachments.isEmpty() && !hasPdfHeader(sourceContent)) {
+                    throw new IOException("Attachments are signed next to a PDF, never into an existing container");
+                }
                 workspace = fileSystem.createWorkspace(validated.target().getParent());
                 var staging = workspace.createStagingFile();
-                return new PreparedFile(file, validated.target(), source, staging, workspace, sourceContent);
+                return new PreparedFile(file, validated.target(), source, staging, workspace, sourceContent,
+                        List.copyOf(attachments));
             } catch (Throwable exception) {
                 boolean cleaned = true;
                 if (workspace != null) {
@@ -351,7 +368,7 @@ public final class MachineSigningService {
         }
 
         private SigningInput signingInput() {
-            return new SigningInput(file, sourceContent.clone(), source, staging);
+            return new SigningInput(file, sourceContent.clone(), source, staging, attachments);
         }
 
         private byte[] sourceContent() {
@@ -386,10 +403,23 @@ public final class MachineSigningService {
         }
     }
 
+    /// A further document signed with the source as its own data object of one ASiC-E.
+    public record AttachmentContent(String name, byte[] content) {
+        public AttachmentContent {
+            content = content.clone();
+        }
+    }
+
     record SigningInput(MachineFile file, byte[] sourceContent, MachineSigningFileSystem.RetainedFile source,
-            MachineSigningFileSystem.RetainedFile staging) {
+            MachineSigningFileSystem.RetainedFile staging, List<AttachmentContent> attachments) {
         SigningInput {
             sourceContent = sourceContent.clone();
+            attachments = List.copyOf(attachments);
+        }
+
+        SigningInput(MachineFile file, byte[] sourceContent, MachineSigningFileSystem.RetainedFile source,
+                MachineSigningFileSystem.RetainedFile staging) {
+            this(file, sourceContent, source, staging, List.of());
         }
 
         void writeSignedContent(byte[] content) throws IOException {
@@ -432,6 +462,10 @@ public final class MachineSigningService {
         } catch (IllegalArgumentException exception) {
             throw new MachineProtocolException("PROTOCOL_INVALID_REQUEST", exception);
         }
+    }
+
+    private static boolean isZip(byte[] content) {
+        return content.length >= 4 && content[0] == 'P' && content[1] == 'K' && content[2] == 3 && content[3] == 4;
     }
 
     private static boolean isAsic(String name, byte[] content) {
@@ -591,7 +625,7 @@ public final class MachineSigningService {
         public void sign(SigningInput input, Runnable completed) throws Exception {
             var responder = new MachineFileResponder(input.staging(), completed);
             var job = signingJob(input.sourceContent(), input.file().source(), responder, settings,
-                    input.file().visibleAppearance());
+                    input.file().visibleAppearance(), input.attachments());
             job.signWithKeyAndRespond(key);
         }
 
@@ -602,6 +636,11 @@ public final class MachineSigningService {
 
         static SigningJob signingJob(byte[] source, String name, MachineFileResponder responder, MachineSettings settings,
                 VisibleSignatureAppearance.Snapshot appearance) throws Exception {
+            return signingJob(source, name, responder, settings, appearance, List.of());
+        }
+
+        static SigningJob signingJob(byte[] source, String name, MachineFileResponder responder, MachineSettings settings,
+                VisibleSignatureAppearance.Snapshot appearance, List<AttachmentContent> attachments) throws Exception {
             var filename = Path.of(name).getFileName().toString();
             var document = new InMemoryDocument(source, filename, detectMimeType(filename, source));
             var parameters = signingParameters(document, settings);
@@ -610,7 +649,28 @@ public final class MachineSigningService {
                 parameters.setVisiblePadesAppearance(appearance.pngBytes(), field.page(), field.originX(), field.originY(),
                         field.width(), field.height(), field.signingTime());
             }
-            return SigningJob.buildFromRequest(document, parameters, responder);
+            if (attachments.isEmpty()) {
+                return SigningJob.buildFromRequest(document, parameters, responder);
+            }
+            if (parameters.getContainer() != ASiCContainerType.ASiC_E || parameters.getSignatureType() != SignatureForm.XAdES) {
+                throw new IOException("Attachments need an ASiC-E XAdES signature");
+            }
+            // DSS extends an existing container only when it signs a single document; with
+            // attachments it would nest the old container inside the new one.
+            if (document.getMimeType().equals(MimeTypeEnum.ASICE) || isZip(source)) {
+                throw new IOException("Attachments are signed next to a PDF, never into an existing container");
+            }
+            var extra = new ArrayList<DSSDocument>();
+            for (var attachment : attachments) {
+                if (isZip(attachment.content())) {
+                    throw new IOException("An attachment may not be a container");
+                }
+                var mime = attachment.name().toLowerCase(java.util.Locale.ROOT).endsWith(".xdcf")
+                        ? AutogramMimeType.XML_DATACONTAINER
+                        : detectMimeType(attachment.name(), attachment.content());
+                extra.add(new InMemoryDocument(attachment.content(), attachment.name(), mime));
+            }
+            return SigningJob.buildFromRequest(document, parameters, responder, extra);
         }
 
         private static SigningParameters signingParameters(InMemoryDocument document, MachineSettings settings) throws Exception {

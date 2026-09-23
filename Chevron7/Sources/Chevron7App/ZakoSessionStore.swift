@@ -98,8 +98,18 @@ final class ZakoSessionStore {
     static let mobileMandateRefusalMessage =
         "Podpis z mobilu nebol vytvorený mandátnym certifikátom. Zaručená konverzia vyžaduje mandátny certifikát advokáta, konverzia nebola autorizovaná a do evidencie sa nič nezapísalo."
 
+    static let mobileOutsideDemoMessage =
+        "Zaručenú konverziu s EZZK podpisujte kartou SAK. Podpis z mobilu je zatiaľ dostupný iba v režime Demo."
+
     var isMobileSigningAvailable: Bool {
-        settings.mobileSigningEnabled && !signingProviderIsDemo
+        settings.mobileSigningEnabled && !signingProviderIsDemo && settingsStore.ezzkAccountController.isDemoMode
+    }
+
+    /// True when the user turned mobile signing on but the phone path is unavailable because
+    /// EZZK is outside Demo mode: the button (`isMobileSigningAvailable`) hides in that case, so
+    /// the view shows this notice instead of nothing.
+    var showsMobileOutsideDemoNotice: Bool {
+        settings.mobileSigningEnabled && !settingsStore.ezzkAccountController.isDemoMode
     }
 
     /// Preflight for the mobile path: the certificate is known only after the phone
@@ -1077,6 +1087,10 @@ final class ZakoSessionStore {
         lastError = nil
         validationErrors = []
         preparePreflight()
+        if viaMobile, !settingsStore.ezzkAccountController.isDemoMode {
+            lastError = Self.mobileOutsideDemoMessage
+            return
+        }
         // Local precondition before any EZZK call: a number from another EZZK mode (a demo
         // number on Produkcia, for example) was never allocated there, so nothing is signed.
         if let modeError = evidenceNumberModeError {
@@ -1126,46 +1140,31 @@ final class ZakoSessionStore {
                                                      mode: settings.pdfaMode,
                                                      title: attestation.newDocumentName)
 
-            let fingerprint = AttestationClauseGenerator.sha256Hex(of: pdfaData)
+            // The clause fingerprints the exact bytes the client receives, so nothing may be
+            // embedded or rewritten after this point (spec: Facts, fingerprint and embedding).
+            let finalPDF = try pdfaConverter.normalizeForDelivery(pdfaData, title: attestation.newDocumentName)
+            let pdfaCheck = PDFAValidator().validate(finalPDF, profile: selectedFormPack.outputProfile)
+            guard pdfaCheck.isValid else {
+                throw ComplianceValidationError(domain: "PDF/A-2b", issues: pdfaCheck.issues)
+            }
+            let fingerprint = AttestationClauseGenerator.sha256Hex(of: finalPDF)
+            let nonEmptyPageIndices = analysis.pageAnalyses.filter { !$0.isEmpty }.map(\.pageIndex)
+
+            analysisProgressText = "Vytváram osvedčovaciu doložku…"
+            let clause = try ZakoClauseDeliveryBuilder().build(
+                finalPDF: finalPDF,
+                attestation: attestation,
+                securityElements: confirmedElementsSnapshot,
+                originalNonEmptyPageIndices: nonEmptyPageIndices,
+                usedDevice: attestation.usedDeviceDescription)
+
+            // Record XML for the register only; part B2 replaces it with the record renderer.
             let xmlInput = AttestationClauseGenerator.Input(
                 attestation: attestation,
                 securityElements: confirmedElementsSnapshot,
                 newDocumentFingerprintSHA256Hex: fingerprint,
-                originalNonEmptyPageIndices: analysis.pageAnalyses.filter { !$0.isEmpty }.map(\.pageIndex))
-            let xml = try clauseGenerator.generateXML(input: xmlInput,
-                                                      formPack: selectedFormPack)
-
-            let xmlIssues = AttestationXMLValidator().validate(
-                xml,
-                context: .init(fingerprintSHA256Hex: fingerprint,
-                               securityElementCount: confirmedElementsSnapshot.count),
-                formPack: selectedFormPack)
-            guard xmlIssues.isEmpty else {
-                throw ComplianceValidationError(domain: "Osvedčovacia doložka", issues: xmlIssues)
-            }
-
-            analysisProgressText = "Vkladám XML doložku do dokumentu…"
-            var finalPDF = try embeddedFileService.embed(
-                .init(fileName: "osvedcovacia-dolozka.xml",
-                      mimeType: "application/xml",
-                      data: Data(xml.utf8)),
-                into: pdfaData)
-
-            // Normalize once more after adding the XML attachment. PDFBox
-            // writes a fresh page tree and preserves the attachment name tree,
-            // which is the artifact external validators actually inspect.
-            finalPDF = try pdfaConverter.normalizeForDelivery(
-                finalPDF,
-                title: attestation.newDocumentName)
-
-            // Validate the actual artifact that will be signed and written. The
-            // XML attachment is part of the final PDF/A deliverable, so checking
-            // only the pre-attachment bytes can produce a false green result.
-            let pdfaCheck = PDFAValidator().validate(finalPDF,
-                                                     profile: selectedFormPack.outputProfile)
-            guard pdfaCheck.isValid else {
-                throw ComplianceValidationError(domain: "PDF/A-2b", issues: pdfaCheck.issues)
-            }
+                originalNonEmptyPageIndices: nonEmptyPageIndices)
+            let xml = try clauseGenerator.generateXML(input: xmlInput, formPack: selectedFormPack)
 
             analysisProgressText = viaMobile ? "Čakám na podpis z mobilu…" : "Autorizujem kvalifikovaným podpisom…"
             if !viaMobile, isCertificateTypePending {
@@ -1206,14 +1205,14 @@ final class ZakoSessionStore {
             let xdcfFileName = xdcfTarget.lastPathComponent
             let containerFiles = packager.zakoContainer(pdfData: finalPDF,
                                                         pdfFileName: docFileName,
-                                                        dolozkaXML: Data(xml.utf8),
+                                                        dolozkaXML: clause.clauseXDCF,
                                                         dolozkaFileName: xdcfFileName)
             let signed: SignedConversionResult
             if viaMobile {
                 // avm-server rejects unsigned ASiC-E input (422 "Level can't be empty if document
-                // is not signed yet"), so the phone signs the final PDF/A, which already carries the
-                // clause XML as an embedded file, and the server wraps it into a fresh ASiC-E.
-                // The XDCF is still written next to the container below.
+                // is not signed yet"), so the phone signs only the final PDF/A and the server wraps
+                // it into a fresh ASiC-E. The clause XDC is not part of that container: it is written
+                // next to it below, unsigned. Carrying the clause on the mobile route is still open.
                 let upload = AVMUploadRequest(
                     filename: docFileName,
                     data: finalPDF,
@@ -1238,7 +1237,9 @@ final class ZakoSessionStore {
                     includeTimestamp: includeQualifiedTimestamp,
                     tsaURL: includeQualifiedTimestamp ? settings.selectedTSAURL : nil,
                     pin: signingPIN.isEmpty ? nil : signingPIN,
-                    extraFiles: containerFiles))
+                    extraFiles: containerFiles,
+                    filename: docFileName,
+                    signsExtraFilesAsDataObjects: true))
             }
 
             if let asic = signed.asicData {
@@ -1252,7 +1253,7 @@ final class ZakoSessionStore {
             analysisProgressText = "Ukladám a zapisujem do evidencie…"
             let pdfTarget = directory.appendingPathComponent(docFileName)
             try signed.pdfData.write(to: pdfTarget, options: [.atomic])
-            try Data(xml.utf8).write(to: xdcfTarget, options: [.atomic])
+            try clause.clauseXDCF.write(to: xdcfTarget, options: [.atomic])
             if let asic = signed.asicData {
                 let asicFileName = ConversionOutputNaming.asicFileName(pdfFileName: pdfTarget.lastPathComponent)
                 let asicTarget = ConversionOutputNaming.uniqueURL(in: directory,

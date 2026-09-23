@@ -190,7 +190,7 @@ public enum AttestationValidationError: LocalizedError, Equatable, Sendable {
         case .securityElementDescriptionRequired:
             return "Doplňte vecný opis iného bezpečnostného prvku alebo spojenia."
         case .physicalElementLocationRequired:
-            return "Doplňte umiestnenie prvku skontrolovaného na origináli."
+            return "Vyberte umiestnenie prvku skontrolovaného na origináli zo zoznamu."
         case .physicalElementOutputPageRequired:
             return "Určite stranu zachytenia prvku v novom dokumente. Ak v PDF chýba, doplňte jeho sken."
         case .noSecurityElementsConfirmed:
@@ -239,7 +239,9 @@ public enum AttestationValidator {
         for element in securityElements {
             if element.kind.requiresHumanDescription, element.verbalDescription.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { errors.append(.securityElementDescriptionRequired) }
             if element.observation == .physicalOriginal {
-                if element.originalLocation.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { errors.append(.physicalElementLocationRequired) }
+                if ZakoCodelists.locationItem(code: element.originalLocation.trimmingCharacters(in: .whitespacesAndNewlines)) == nil {
+                    errors.append(.physicalElementLocationRequired)
+                }
                 if element.newDocumentPageIndex == nil || element.newDocumentPageIndex! < 0 { errors.append(.physicalElementOutputPageRequired) }
             }
         }
