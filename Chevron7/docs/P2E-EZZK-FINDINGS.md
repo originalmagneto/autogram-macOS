@@ -334,3 +334,33 @@ Recorded from the branch reviews so they are not rediscovered later. None of the
 6. The ZaKo Done screen reads the current EZZK mode, not the mode the record was signed in, and the attestation form warns about a wrong-mode number only when signing starts.
 7. Three older ZaKo tests build `AppSettingsStore()` with the default controller, so they read the real Keychain (read only). `AppSettingsStore(ezzkAccountController:)` exists to switch them.
 8. Settings has not been checked visually in the running app, and no sign-in has been done from inside the app bundle.
+
+## Part B1 (2026-09-23)
+
+### What shipped
+
+- **Clause slot defect and fix:** the clause slot held a record (`AttestationClauseGenerator` emitted the record form 1.0, never the clause), so the delivered `.xml.xdcf` was not a clause at all; B1 renders the actual clause 1.3 through `ConversionFormModel` and `ConversionCertificateRenderer`, validates it against the official schema (`FormSchemaValidator`), and wraps it as an `XMLDataContainer` (`XMLDataContainerBuilder`), all assembled by `ZakoClauseDeliveryBuilder`.
+- **Fingerprint and embedding defect and fix:** Chevron7 hashed the PDF/A, then embedded the clause XML into it and normalised again, so the delivered PDF no longer matched the fingerprint carried in its own clause; B1 stops embedding, hashes the final delivered PDF/A bytes, and signs PDF/A and clause XDC as two data objects of one ASiC-E (`SigningRequest.signsExtraFilesAsDataObjects`, machine protocol v1 `attachments`) instead of nesting an unsigned `kontajner.asice` inside the engine's own container.
+- **Location codelist change:** `OriginalDocumentSecurityElementsLocation` now uses the official codelist 11 item codes (the page centre is `Mid`, not `Center`); physical-original security elements pick their location from the same codelist in both the add-element sheet and the inspector, instead of free text.
+- **Phone limited to Demo:** ZaKo on the phone (AVM) uploads only the PDF and produces no clause XDC, so `isMobileSigningAvailable` is true only in EZZK Demo mode; Test and Production refuse it with `ZakoSessionStore.mobileOutsideDemoMessage`.
+- **Record path unchanged:** the register XML (still rendered by `AttestationClauseGenerator`, which B2 replaces) and the EZZK submission (`ReceiveConversionRecord`) are not touched in B1; they remain part B2 work, listed under "Open work (part B)" above.
+
+Official form files (record 1.0 and clause 1.3 schema and signer XSLT) live in `Chevron7/docs/reference/forms`, embedded into `Chevron7Kit` by `scripts/embed-official-forms.sh`. Codelist fixes also cover the legal-subject URI (`https://data.gov.sk/id/legal-subject/<IČO>`) and the `Iny` paper-size fallback. Design: `Chevron7/docs/superpowers/specs/2026-09-23-ezzk-part-b-design.md`.
+
+### Live check with a SAK card
+
+Live check with a SAK card: pending (owner). This session could not run it (no SAK card). The owner runs one ZaKo conversion of a synthetic document in Demo mode with the SAK card, then:
+
+```bash
+cd <output folder>
+unzip -l *.asice
+```
+Expected: `mimetype`, `<name>.pdf`, `<number>.xml.xdcf`, `META-INF/manifest.xml`, `META-INF/signatures001.xml`, and no `.asice` inside.
+
+```bash
+unzip -p *.asice '*.pdf' | openssl dgst -sha256 -binary | base64
+unzip -p *.asice '*.xdcf' | grep -o '<ElectronicFingerprintValue>[^<]*'
+```
+Expected: the two values are equal.
+
+Result: not yet run.
