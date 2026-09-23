@@ -763,6 +763,47 @@ class MachineSigningServiceTest {
         assertTrue(signature.contains("URI=\"dokument.xml.xdcf\""), signature);
     }
 
+    /// The whole path Task 8 drives: validation, reading the attachment, a real signature, the
+    /// output check of the two-object container and publishing it.
+    @Test
+    void signsAndPublishesASourceWithItsAttachmentThroughTheService() throws Exception {
+        var writer = new RecordingWriter();
+        var source = Files.copy(Path.of(MachineSigningServiceTest.class
+                .getResource("/digital/slovensko/autogram/sample.pdf").getFile()),
+                temporaryDirectory.resolve("dokument.pdf")).toRealPath();
+        var attachment = Files.writeString(temporaryDirectory.resolve("dokument.xml.xdcf"),
+                "<?xml version=\"1.0\" encoding=\"UTF-8\"?><XMLDataContainer xmlns=\"http://data.gov.sk/def/container/xmldatacontainer+xml/1.1\"/>")
+                .toRealPath();
+        var target = target("dokument.asice");
+        var settings = new MachineSettings(true);
+        settings.setSignatureLevel(SignatureLevel.XAdES_BASELINE_B);
+        var token = new Pkcs12SignatureToken(
+                Objects.requireNonNull(MachineSigningServiceTest.class
+                        .getResource("/digital/slovensko/autogram/test.keystore")).getFile(),
+                new KeyStore.PasswordProtection("".toCharArray()));
+        var key = new SigningKey(token, token.getKeys().get(0));
+        var service = new MachineSigningService(writer.writer(), request -> new FakeSession((input, completed) ->
+                MachineSigningService.DefaultSigningSession.signingJob(input.sourceContent(), input.file().source(),
+                        new MachineFileResponder(input.staging(), completed), settings, null, input.attachments())
+                        .signWithKeyAndRespond(key)),
+                new MachineSigningService.PdfOutputValidator(new MachineInspectionService()));
+
+        service.sign("request-1", new SignRequest("fake", "123", "1234".toCharArray(), "XAdES_BASELINE_B",
+                new QualifiedTimestampRequest(false, List.of()),
+                List.of(new MachineFile("one", source.toString(), target.toString(), null, List.of(attachment.toString())))));
+
+        assertEquals(List.of("session.started", "file.signingStarted", "file.completed", "session.completed"),
+                writer.lifecycleEventTypes());
+        var names = new ArrayList<String>();
+        try (var zip = new ZipInputStream(Files.newInputStream(target))) {
+            for (var entry = zip.getNextEntry(); entry != null; entry = zip.getNextEntry()) {
+                names.add(entry.getName());
+            }
+        }
+        assertTrue(names.containsAll(List.of("dokument.pdf", "dokument.xml.xdcf")), names.toString());
+        assertTrue(names.stream().noneMatch(name -> name.endsWith(".asice")), names.toString());
+    }
+
     @Test
     void attachmentsNeedAnAsicESignature() {
         var settings = new MachineSettings(true);
