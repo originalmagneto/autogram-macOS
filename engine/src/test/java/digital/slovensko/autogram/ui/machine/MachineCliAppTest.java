@@ -211,6 +211,81 @@ class MachineCliAppTest {
         assertEquals(0, code, stdout.toString());
     }
 
+    /// ZaKo signs the PDF/A together with its clause XDC: the SIGN file carries the XDC as an attachment.
+    @Test
+    void parsesSignAttachmentsAndHandsThemToTheSigningSession() throws Exception {
+        var source = Files.writeString(temporaryDirectory.resolve("dokument.pdf"), "%PDF-1.7\nsource\n%%EOF").toRealPath();
+        var attachment = Files.writeString(temporaryDirectory.resolve("dokument.xml.xdcf"), "<XMLDataContainer/>")
+                .toRealPath();
+        var target = temporaryDirectory.toRealPath().resolve("dokument.asice");
+        var input = "{\"protocolVersion\":1,\"requestId\":\"request-1\",\"operation\":\"SIGN\",\"payload\":{"
+                + "\"driver\":\"fake\",\"certificateSerial\":\"123\",\"pin\":\"1234\","
+                + "\"signatureLevel\":\"XAdES_BASELINE_B\",\"timestamp\":{\"required\":false,\"servers\":[]},"
+                + "\"files\":[{\"id\":\"one\",\"source\":\"" + source + "\",\"target\":\"" + target
+                + "\",\"attachments\":[\"" + attachment + "\"]}]}}";
+        var signed = new java.util.concurrent.atomic.AtomicReference<MachineSigningService.SigningInput>();
+        var signingFactory = (MachineCliApp.SigningServiceFactory) (writer, ignoredInspection, ignoredTrust) ->
+                new MachineSigningService(writer, request -> new MachineSigningService.SigningSession() {
+                    @Override
+                    public void sign(MachineSigningService.SigningInput input, Runnable completed) {
+                        signed.set(input);
+                    }
+
+                    @Override
+                    public void close() {
+                    }
+                }, new MachineSigningService.PdfOutputValidator(ignoredInspection), ignoredTrust);
+
+        MachineCliApp.start(commandLine("SIGN"), new StringReader(input), new PrintWriter(new StringWriter()),
+                new PrintWriter(new StringWriter()), new MachineDriverService(),
+                new MachineInspectionService(path -> { throw new AssertionError("not used"); }, content -> qualifiedReport()),
+                () -> { }, signingFactory);
+
+        assertTrue(signed.get() != null, "the signing session never received the file");
+        assertEquals(List.of(attachment.toString()), signed.get().file().attachments());
+        assertEquals(1, signed.get().attachments().size());
+        assertEquals("dokument.xml.xdcf", signed.get().attachments().getFirst().name());
+        assertEquals("<XMLDataContainer/>",
+                new String(signed.get().attachments().getFirst().content(), java.nio.charset.StandardCharsets.UTF_8));
+    }
+
+    @Test
+    void rejectsMalformedSignAttachments() throws Exception {
+        var nine = String.join(",", java.util.Collections.nCopies(9, "\"/tmp/a.xml.xdcf\""));
+        for (var attachments : List.of("[]", "[" + nine + "]", "[1]", "[\"\"]", "\"/tmp/a.xml.xdcf\"")) {
+            var stdout = new StringWriter();
+            var input = "{\"protocolVersion\":1,\"requestId\":\"r\",\"operation\":\"SIGN\",\"payload\":{"
+                    + "\"driver\":\"fake\",\"certificateSerial\":\"123\",\"pin\":\"1234\","
+                    + "\"signatureLevel\":\"XAdES_BASELINE_B\",\"timestamp\":{\"required\":false,\"servers\":[]},"
+                    + "\"files\":[{\"id\":\"one\",\"source\":\"/tmp/a.pdf\",\"target\":\"/tmp/a.asice\","
+                    + "\"attachments\":" + attachments + "}]}}";
+
+            var code = MachineCliApp.start(commandLine("SIGN"), new StringReader(input), new PrintWriter(stdout),
+                    new PrintWriter(new StringWriter()));
+
+            assertEquals(64, code, attachments);
+            assertEquals("PROTOCOL_INVALID_REQUEST", JsonParser.parseString(stdout.toString()).getAsJsonObject()
+                    .getAsJsonObject("payload").get("code").getAsString(), attachments);
+        }
+    }
+
+    /// Attachments belong to signing only; inspection keeps its three-field file object.
+    @Test
+    void rejectsAttachmentsOnAnInspectFile() throws Exception {
+        var source = Files.writeString(temporaryDirectory.resolve("inspect.pdf"), "%PDF-1.7\nsource\n%%EOF").toRealPath();
+        var stdout = new StringWriter();
+        var input = "{\"protocolVersion\":1,\"requestId\":\"r\",\"operation\":\"INSPECT\",\"payload\":{"
+                + "\"files\":[{\"id\":\"one\",\"source\":\"" + source + "\",\"target\":\"" + source
+                + "\",\"attachments\":[\"" + source + "\"]}]}}";
+
+        var code = MachineCliApp.start(commandLine("INSPECT"), new StringReader(input), new PrintWriter(stdout),
+                new PrintWriter(new StringWriter()));
+
+        assertEquals(64, code);
+        assertEquals("PROTOCOL_INVALID_REQUEST", JsonParser.parseString(stdout.toString()).getAsJsonObject()
+                .getAsJsonObject("payload").get("code").getAsString());
+    }
+
     private static SimpleReport qualifiedReport(String... ids) {
         var report = mock(SimpleReport.class);
         when(report.getSignatureIdList()).thenReturn(List.of(ids));

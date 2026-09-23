@@ -1,6 +1,8 @@
 package digital.slovensko.autogram.core;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
 
 import digital.slovensko.autogram.core.eforms.EFormUtils;
 import digital.slovensko.autogram.core.eforms.xdc.XDCBuilder;
@@ -27,11 +29,14 @@ public class SigningJob {
     private final Responder responder;
     private final DSSDocument document;
     private final SigningParameters parameters;
+    private final List<DSSDocument> extraDocuments;
 
-    private SigningJob(DSSDocument document, SigningParameters parameters, Responder responder) {
+    private SigningJob(DSSDocument document, SigningParameters parameters, Responder responder,
+            List<DSSDocument> extraDocuments) {
         this.document = document;
         this.parameters = parameters;
         this.responder = responder;
+        this.extraDocuments = List.copyOf(extraDocuments);
     }
 
     public DSSDocument getDocument() {
@@ -92,10 +97,17 @@ public class SigningJob {
         if (signatureParameters.getSignatureLevel().equals(SignatureLevel.XAdES_BASELINE_T))
             service.setTspSource(getParameters().getTspSource());
 
-        var dataToSign = service.getDataToSign(getDocument(), signatureParameters);
+        if (extraDocuments.isEmpty()) {
+            var dataToSign = service.getDataToSign(getDocument(), signatureParameters);
+            var signatureValue = key.sign(dataToSign, getParameters().getDigestAlgorithm());
+            return service.signDocument(getDocument(), signatureParameters, signatureValue);
+        }
+        var documents = new ArrayList<DSSDocument>();
+        documents.add(getDocument());
+        documents.addAll(extraDocuments);
+        var dataToSign = service.getDataToSign(documents, signatureParameters);
         var signatureValue = key.sign(dataToSign, getParameters().getDigestAlgorithm());
-
-        return service.signDocument(getDocument(), signatureParameters, signatureValue);
+        return service.signDocument(documents, signatureParameters, signatureValue);
     }
 
     private DSSDocument signDocumentAsXAdeS(SigningKey key) {
@@ -169,7 +181,8 @@ public class SigningJob {
         return fileDocument;
     }
 
-    private static SigningJob build(DSSDocument document, SigningParameters params, Responder responder) {
+    private static SigningJob build(DSSDocument document, SigningParameters params, Responder responder,
+            List<DSSDocument> extraDocuments) {
         if (params.shouldCreateXdc() && !isXDC(document.getMimeType()) && !isAsice(document.getMimeType()))
             document = XDCBuilder.transform(params, document.getName(), EFormUtils.getXmlFromDocument(document));
 
@@ -181,17 +194,22 @@ public class SigningJob {
             document.setName(getXdcfFilename(document.getName()));
         }
 
-        return new SigningJob(document, params, responder);
+        return new SigningJob(document, params, responder, extraDocuments);
     }
 
     public static SigningJob buildFromRequest(DSSDocument document, SigningParameters params, Responder responder) {
-        return build(document, params, responder);
+        return build(document, params, responder, List.of());
+    }
+
+    public static SigningJob buildFromRequest(DSSDocument document, SigningParameters params, Responder responder,
+            List<DSSDocument> extraDocuments) {
+        return build(document, params, responder, extraDocuments);
     }
 
     public static SigningJob buildFromFile(File file, Responder responder, boolean checkPDFACompliance, SignatureLevel signatureType, boolean isEn319132, TSPSource tspSource, boolean plainXmlEnabled) {
         var document = createDSSFileDocumentFromFile(file);
         var parameters = getParametersForFile(document, checkPDFACompliance, signatureType, isEn319132, tspSource, plainXmlEnabled);
-        return build(document, parameters, responder);
+        return build(document, parameters, responder, List.of());
     }
 
     private static SigningParameters getParametersForFile(FileDocument document, boolean checkPDFACompliance, SignatureLevel signatureType, boolean isEn319132, TSPSource tspSource, boolean plainXmlEnabled) {

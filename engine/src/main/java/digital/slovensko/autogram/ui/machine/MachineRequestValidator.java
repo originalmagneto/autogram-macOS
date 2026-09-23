@@ -64,6 +64,10 @@ public final class MachineRequestValidator {
         if (request.signatureLevel().endsWith("_T")) {
             validateTimestamp(request.timestamp());
         }
+        var hasAttachments = request.files().stream().anyMatch(file -> file != null && !file.attachments().isEmpty());
+        if (hasAttachments && (request.eform() != null || !request.signatureLevel().startsWith("XAdES_"))) {
+            throw invalidRequest();
+        }
         return new ValidatedSignRequest(request, validateFiles(request.files()));
     }
 
@@ -90,7 +94,17 @@ public final class MachineRequestValidator {
                     || !targets.add(normalizeTarget(target))) {
                 throw invalidRequest();
             }
-            validated.add(new ValidatedMachineFile(file, source, target));
+            var seen = new HashSet<Path>();
+            seen.add(source);
+            var attachments = new ArrayList<Path>();
+            for (var attachment : file.attachments()) {
+                var path = canonicalSource(attachment);
+                if (!seen.add(path)) {
+                    throw invalidRequest();
+                }
+                attachments.add(path);
+            }
+            validated.add(new ValidatedMachineFile(file, source, target, List.copyOf(attachments)));
         }
         return List.copyOf(validated);
     }
@@ -173,5 +187,8 @@ public final class MachineRequestValidator {
 record ValidatedSignRequest(SignRequest request, List<ValidatedMachineFile> files) {
 }
 
-record ValidatedMachineFile(MachineFile file, Path source, Path target) {
+record ValidatedMachineFile(MachineFile file, Path source, Path target, List<Path> attachments) {
+    ValidatedMachineFile(MachineFile file, Path source, Path target) {
+        this(file, source, target, List.of());
+    }
 }

@@ -3,6 +3,7 @@ package digital.slovensko.autogram.ui.machine;
 import com.google.gson.JsonParser;
 import digital.slovensko.autogram.core.PasswordManager;
 import digital.slovensko.autogram.core.SignedDocument;
+import digital.slovensko.autogram.core.SigningKey;
 import digital.slovensko.autogram.core.errors.PINIncorrectException;
 import digital.slovensko.autogram.drivers.TokenDriver;
 import digital.slovensko.autogram.ui.machine.v2.VisibleSignatureAppearance;
@@ -18,6 +19,7 @@ import eu.europa.esig.dss.token.Pkcs12SignatureToken;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.io.ByteArrayInputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.math.BigInteger;
@@ -26,10 +28,13 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.security.KeyStore;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.zip.ZipInputStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -716,6 +721,59 @@ class MachineSigningServiceTest {
             assertTrue(content.contains("UsedXSDEmbedded"), "expected the schema to be embedded");
             assertTrue(content.contains("<Meno>Test</Meno>"), "expected the form payload to survive");
         }
+    }
+
+    /// ZaKo hands the PDF/A and the clause XDC as two documents. They must become two data
+    /// objects of one ASiC-E, never a container nested inside another.
+    @Test
+    void attachmentsAreSignedAsDataObjectsOfOneContainer() throws Exception {
+        var pdf = Files.readAllBytes(Path.of(MachineSigningServiceTest.class
+                .getResource("/digital/slovensko/autogram/sample.pdf").getFile()));
+        var xdcf = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><XMLDataContainer xmlns=\"http://data.gov.sk/def/container/xmldatacontainer+xml/1.1\"/>"
+                .getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        var retained = new MemoryRetainedFile();
+        var responder = new MachineFileResponder(retained, () -> { });
+        var settings = new MachineSettings(true);
+        settings.setSignatureLevel(SignatureLevel.XAdES_BASELINE_B);
+
+        var job = MachineSigningService.DefaultSigningSession.signingJob(pdf, "/tmp/dokument.pdf", responder, settings,
+                null, List.of(new MachineSigningService.AttachmentContent("dokument.xml.xdcf", xdcf)));
+        var token = new Pkcs12SignatureToken(
+                Objects.requireNonNull(MachineSigningServiceTest.class
+                        .getResource("/digital/slovensko/autogram/test.keystore")).getFile(),
+                new KeyStore.PasswordProtection("".toCharArray()));
+        job.signWithKeyAndRespond(new SigningKey(token, token.getKeys().get(0)));
+
+        var names = new ArrayList<String>();
+        String manifest = null;
+        String signature = null;
+        try (var zip = new ZipInputStream(new ByteArrayInputStream(retained.readAll()))) {
+            for (var entry = zip.getNextEntry(); entry != null; entry = zip.getNextEntry()) {
+                names.add(entry.getName());
+                var content = new String(zip.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+                if (entry.getName().equals("META-INF/manifest.xml")) manifest = content;
+                if (entry.getName().startsWith("META-INF/signatures")) signature = content;
+            }
+        }
+        assertTrue(names.contains("dokument.pdf"), names.toString());
+        assertTrue(names.contains("dokument.xml.xdcf"), names.toString());
+        assertTrue(names.stream().noneMatch(name -> name.endsWith(".asice")), names.toString());
+        assertTrue(manifest.contains("manifest:full-path=\"dokument.xml.xdcf\" manifest:media-type=\"application/vnd.gov.sk.xmldatacontainer+xml\""), manifest);
+        assertTrue(signature.contains("URI=\"dokument.pdf\""), signature);
+        assertTrue(signature.contains("URI=\"dokument.xml.xdcf\""), signature);
+    }
+
+    @Test
+    void attachmentsNeedAnAsicESignature() {
+        var settings = new MachineSettings(true);
+        settings.setSignatureLevel(SignatureLevel.PAdES_BASELINE_T);
+        settings.setTsaServer("https://tsa.example.test");
+        settings.setTsaEnabled(true);
+        assertThrows(java.io.IOException.class, () -> MachineSigningService.DefaultSigningSession.signingJob(
+                Files.readAllBytes(Path.of(MachineSigningServiceTest.class
+                        .getResource("/digital/slovensko/autogram/sample.pdf").getFile())),
+                "/tmp/dokument.pdf", new MachineFileResponder(new MemoryRetainedFile(), () -> { }), settings, null,
+                List.of(new MachineSigningService.AttachmentContent("a.xml.xdcf", new byte[] { '<', 'a', '/', '>' }))));
     }
 
     @Test
