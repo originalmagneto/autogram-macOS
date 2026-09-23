@@ -4,15 +4,18 @@
 import Foundation
 import Chevron7Kit
 
-// Usage: ezzk-probe <login|time|numbers|consume|lookup> [evidence number]
+// Usage: ezzk-probe <login|time|numbers|consume|lookup|record> [evidence number]
 //                   [--env test|production] [--name <person name>] [--ico <IČO>] [--at <ISO 8601 time>]
+//                   [--purpose original|xml] [--out <file>]
 // Credentials come from EZZK_LOGIN and EZZK_PASSWORD, otherwise from the Keychain item that
 // Settings saved for the environment. They are never printed.
 // numbers and consume allocate or consume evidence numbers, so they refuse production.
+// record reads one of the signed-in person's own records (GetConversionRecord) and writes the
+// returned object to --out; it changes nothing in EZZK.
 
 setlinebuf(stdout)
 
-let usage = "usage: ezzk-probe <login|time|numbers|consume|lookup> [number] [--env test|production] [--name N] [--ico I] [--at ISO]\n"
+let usage = "usage: ezzk-probe <login|time|numbers|consume|lookup|record> [number] [--env test|production] [--name N] [--ico I] [--at ISO] [--purpose original|xml] [--out FILE]\n"
 let arguments = Array(CommandLine.arguments.dropFirst())
 
 func fail(_ message: String, code: Int32) -> Never {
@@ -97,6 +100,18 @@ Task.detached {
                 print("Osoba: \(info.personName ?? "-")")
                 print("Pôvodný dokument: \(info.originalDocumentName ?? "-"), formát \(info.originalDocumentFormat ?? "-"), listov \(info.originalDocumentSheets.map(String.init) ?? "-")")
                 print("Nový dokument: \(info.newDocumentName ?? "-"), formát \(info.newDocumentFormat ?? "-")")
+            }
+        case "record":
+            guard let number, let out = option("--out") else { fail(usage, code: 2) }
+            let purpose: EZZKRecordPurpose = option("--purpose") == "xml" ? .xml : .original
+            let record = try await client.record(evidenceNumber: number, purpose: purpose,
+                                                 executionTime: executionTime)
+            print(record.lookup.isProcessed ? "Záznam je spracovaný." : "Záznam je evidovaný, ale nespracovaný.")
+            if let object = record.object {
+                try object.write(to: URL(fileURLWithPath: out))
+                print("Objekt (\(object.count) B) uložený do \(out)")
+            } else {
+                print("EZZK nevrátilo žiadny objekt.")
             }
         default:
             fail(usage, code: 2)
