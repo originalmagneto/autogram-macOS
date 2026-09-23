@@ -133,8 +133,24 @@ final class EZZKStatusChecker {
 
     // MARK: - Periodic check
 
+    /// Ruling R13: the check runs in a regular Chevron7 only. Started by Safari for a
+    /// portal signature (`--web-signing`, an accessory app without a window), the app does
+    /// not talk to EZZK in the background until the advocate opens it and it turns regular.
+    nonisolated static func shouldRun(launchMode: AppLaunchMode, isRegularApp: Bool) -> Bool {
+        launchMode == .normal || isRegularApp
+    }
+
+    /// Starts the check when `shouldRun` allows it: at launch from the app model, and
+    /// again when an accessory app becomes regular (reopen, Settings).
+    func startIfAllowed(launchMode: AppLaunchMode, isRegularApp: Bool) {
+        guard Self.shouldRun(launchMode: launchMode, isRegularApp: isRegularApp) else { return }
+        start()
+    }
+
+    var isRunning: Bool { loop != nil }
+
     /// Starts the check every five minutes, after dropping pooled evidence numbers that
-    /// lapsed at an earlier midnight. Called once at launch by the app model.
+    /// lapsed at an earlier midnight. Does nothing while the check already runs.
     func start() {
         guard loop == nil else { return }
         numberPool.prune(before: now())

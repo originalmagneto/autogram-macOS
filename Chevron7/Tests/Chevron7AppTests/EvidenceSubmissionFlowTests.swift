@@ -314,6 +314,41 @@ final class EvidenceSubmissionFlowTests: XCTestCase {
         XCTAssertEqual(verified.record?.status, .processed)
     }
 
+    /// Ruling R13: a Chevron7 started by Safari for a portal signature (accessory, no
+    /// window) does not talk to EZZK in the background; the check starts once the app
+    /// becomes a regular app.
+    func testCheckerStartsOnlyInTheRegularLaunchMode() throws {
+        XCTAssertTrue(EZZKStatusChecker.shouldRun(launchMode: .normal, isRegularApp: false))
+        XCTAssertFalse(EZZKStatusChecker.shouldRun(launchMode: .webSigning, isRegularApp: false))
+        XCTAssertTrue(EZZKStatusChecker.shouldRun(launchMode: .webSigning, isRegularApp: true))
+
+        let clock = TestClock("2026-09-24T10:00:00Z")
+        let (checker, _) = makeChecker(mode: .test, submitter: ScriptedSubmitter([]), lookup: ScriptedLookup([]), clock: clock)
+        pool.add(.init(number: "1563-260923-9", mode: .test, allocatedAt: clock.now.addingTimeInterval(-24 * 3600)))
+        defer { checker.stop() }
+
+        checker.startIfAllowed(launchMode: .webSigning, isRegularApp: false)
+        XCTAssertFalse(checker.isRunning)
+        XCTAssertTrue(try poolFileText().contains("1563-260923-9"), "not started, so nothing was pruned")
+
+        checker.startIfAllowed(launchMode: .webSigning, isRegularApp: true)
+        XCTAssertTrue(checker.isRunning)
+        XCTAssertFalse(try poolFileText().contains("1563-260923-9"))
+    }
+
+    func testStartIsIdempotent() throws {
+        let clock = TestClock("2026-09-24T10:00:00Z")
+        let (checker, _) = makeChecker(mode: .test, submitter: ScriptedSubmitter([]), lookup: ScriptedLookup([]), clock: clock)
+        defer { checker.stop() }
+        checker.start()
+        pool.add(.init(number: "1563-260923-8", mode: .test, allocatedAt: clock.now.addingTimeInterval(-24 * 3600)))
+
+        checker.start()
+
+        XCTAssertTrue(checker.isRunning)
+        XCTAssertTrue(try poolFileText().contains("1563-260923-8"), "a second start neither prunes nor starts a second loop")
+    }
+
     // MARK: - Fixtures
 
     private var storeRoot: URL!
@@ -333,6 +368,11 @@ final class EvidenceSubmissionFlowTests: XCTestCase {
             makeCoordinator: { EZZKSubmissionCoordinator(submitter: submitter, lookup: lookup, now: now) },
             now: now)
         return (checker, store)
+    }
+
+    private func poolFileText() throws -> String {
+        let data = try Data(contentsOf: storeRoot.appendingPathComponent("Evidence/allocated-numbers.json"))
+        return String(decoding: data, as: UTF8.self)
     }
 
     @discardableResult
