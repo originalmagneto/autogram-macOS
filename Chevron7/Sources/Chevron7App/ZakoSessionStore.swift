@@ -94,7 +94,11 @@ final class ZakoSessionStore {
     var validationErrors: [AttestationValidationError] = []
     var preflightErrors: [AttestationValidationError] = []
     var result: SignedConversionResult?
+    /// The row state `lastError` describes (the last send, verify or signing outcome).
     var submissionStatus: EvidenceRecord.Status?
+    /// The record container could not be copied next to the outputs. Stays true when the
+    /// row later changes, unlike the submission part of `lastError`.
+    private(set) var archiveCopyError: String?
     var outputDirectory: URL?
     var lastError: String?
     let mobileSigning: MobileSigningCoordinator
@@ -1129,6 +1133,7 @@ final class ZakoSessionStore {
         }
 
         lastError = nil
+        archiveCopyError = nil
         validationErrors = []
         preparePreflight()
         if viaMobile, !settingsStore.ezzkAccountController.isDemoMode {
@@ -1399,6 +1404,7 @@ final class ZakoSessionStore {
             if let outputCopyError {
                 // The submission's own message stays: both matter to the advocate.
                 let copyMessage = "Záznam o konverzii je uložený v Registri, ale jeho kópiu sa nepodarilo uložiť k výstupom: \(outputCopyError.localizedDescription)"
+                archiveCopyError = copyMessage
                 lastError = [lastError, copyMessage].compactMap { $0 }.joined(separator: "\n")
             }
 
@@ -1539,6 +1545,7 @@ func resetSession(keepingProfile: Bool) {
         preflightErrors = []
         validationErrors = []
         submissionStatus = nil
+        archiveCopyError = nil
         result = nil
         outputDirectory = nil
         outputDirectoryOverride = nil
