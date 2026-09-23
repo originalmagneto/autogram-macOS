@@ -51,4 +51,50 @@ public enum ZakoCodelists {
         guard !trimmed.isEmpty else { return "" }
         return "https://data.gov.sk/id/egov/conversion-record/\(trimmed)"
     }
+
+    /// Codelist 11 (security element location) in the order of the official form.
+    public static let locationItems: [ZakoCodelistItem] = [
+        ZakoCodelistItem(code: "Down", skName: "Dole"),
+        ZakoCodelistItem(code: "Up", skName: "Hore"),
+        ZakoCodelistItem(code: "Down edge", skName: "Dolný okraj"),
+        ZakoCodelistItem(code: "Up edge", skName: "Horný okraj"),
+        ZakoCodelistItem(code: "Left edge", skName: "Ľavý okraj"),
+        ZakoCodelistItem(code: "Right edge", skName: "Pravý okraj"),
+        ZakoCodelistItem(code: "Mid", skName: "Uprostred"),
+        ZakoCodelistItem(code: "Left", skName: "Vľavo"),
+        ZakoCodelistItem(code: "Left down", skName: "Vľavo dole"),
+        ZakoCodelistItem(code: "Left up", skName: "Vľavo hore"),
+        ZakoCodelistItem(code: "Right", skName: "Vpravo"),
+        ZakoCodelistItem(code: "Right down", skName: "Vpravo dole"),
+        ZakoCodelistItem(code: "Right up", skName: "Vpravo hore"),
+    ]
+
+    public static func locationItem(code: String) -> ZakoCodelistItem? {
+        locationItems.first { $0.code == code }
+    }
+
+    /// Codelist 12 item for sizes outside A1 to C7; `PaperSizeOther` names the size.
+    public static let otherPaperSizeItem = ZakoCodelistItem(code: "Iny", skName: "Iný")
+
+    public static func clausePaperSize(for classification: PaperClassification) -> (item: ZakoCodelistItem, other: String?) {
+        switch classification {
+        case .letterPortrait, .letterLandscape: return (otherPaperSizeItem, "Letter")
+        case .unknown: return (otherPaperSizeItem, "neurčený")
+        default: return (paperSizeItem(for: classification)!, nil)
+        }
+    }
+
+    /// Codelist 15 items whose meaning is carried by `OriginalDocumentSecurityElementsDescriptionOther`.
+    public static let descriptionCodesNeedingOtherText: Set<String> = [
+        "iný manuálny vstup", "trvale spojenie dokumentu - iné"
+    ]
+
+    /// Person identifier the clause schema accepts (`https://data.gov.sk/id/legal-subject/\d{8,12}`).
+    public static func legalSubjectURI(ico: String) -> String? {
+        let cleaned = ico.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard (8...12).contains(cleaned.count), cleaned.allSatisfy(\.isASCII), cleaned.allSatisfy(\.isNumber) else {
+            return nil
+        }
+        return "https://data.gov.sk/id/legal-subject/\(cleaned)"
+    }
 }

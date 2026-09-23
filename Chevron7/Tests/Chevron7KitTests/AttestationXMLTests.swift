@@ -57,7 +57,7 @@ final class AttestationXMLTests: XCTestCase {
                        "<OriginalDocumentSecurityElementsSheet>1</OriginalDocumentSecurityElementsSheet>",
                        "<OriginalDocumentSecurityElementsPage>5</OriginalDocumentSecurityElementsPage>",
                        "<OriginalDocumentSecurityElementsSheet>3</OriginalDocumentSecurityElementsSheet>",
-                       "<OriginalDocumentSecurityElementsLocation>Dole vpravo</OriginalDocumentSecurityElementsLocation>",
+                       "<OriginalDocumentSecurityElementsLocation>Vpravo dole</OriginalDocumentSecurityElementsLocation>",
                        "<NewDocumentInfo>",
                        "<NewDocumentName>Zmluva o dielo.pdf</NewDocumentName>",
                        "<CodelistCode>53</CodelistCode>",
@@ -103,7 +103,7 @@ final class AttestationXMLTests: XCTestCase {
             "OriginalDocumentSecurityElementsPage", "OriginalDocumentSecurityElementsSheet",
             "OriginalDocumentSecurityElementsLocation", "NewDocumentSecurityElementsPage"])
         XCTAssertEqual(children[0].stringValue, "Trikolóra / viazacia šnúrka: Červená šnúrka & uzol <zachované>")
-        XCTAssertEqual(children[3].stringValue, "Dole vpravo")
+        XCTAssertEqual(children[3].stringValue, "Vpravo dole")
         XCTAssertTrue(children.allSatisfy { !($0.children ?? []).contains { $0 is XMLElement } })
         XCTAssertFalse(xml.contains("SecurityElementVerbalDescription"))
         XCTAssertTrue(validate(xml, input: input).isEmpty)
