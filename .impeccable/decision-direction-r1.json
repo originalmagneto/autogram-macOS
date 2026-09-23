@@ -1,0 +1,110 @@
+{
+  "title": "Vizuálny svet webu Chevron7 · odvážnejšie",
+  "question": "Odvážnejšia sada: tri cudzie formy, každá spojená s produktom a so siedmou krokvou ako bodom pôvodu. Vybrať, alebo hodiť znova.",
+  "options": [
+    {
+      "id": "challenger-hatch",
+      "label": "Sedem ťahov lisu",
+      "kicker": "THE ROLL",
+      "lineage": "Hatch Show Print: drevené písmo, plagát v pásoch, každý ťah farby mierne mimo sútlač",
+      "thesis": "Web ako plagát tlačený na sedem ťahov lisu; každý ťah zamkne krokvu a siedmy, červený, vytlačí bod pôvodu: váš Mac.",
+      "palette": ["#F3C316", "#111111", "#B8261F", "#1D3A8A"],
+      "materials": ["drevené písmo cez celú šírku", "farebný plagátový kartón namiesto krémového", "pretlač cez mix-blend-mode", "ťah mimo sútlače = nezamknutý krok"],
+      "viewport": "Pásy písma cez celú šírku: KVALIFIKOVANÝ PODPIS, NATÍVNE NA MACU, rad siedmich krokiev, červený pás BOD PÔVODU JE VÁŠ MAC, blok Stiahnuť pre macOS.",
+      "risk": "Plagát na koncert môže pôsobiť ako podujatie, nie softvér; krémový kartón plagátu som zámerne nahradil sýtou žltou.",
+      "raised": [
+        {"from": "challenger-centre-rail", "raise": "Každé tvrdenie má na okraji kľúč k zdroju (eIDAS, poznámky k vydaniu), vysádzaný presne ako aparát."},
+        {"from": "challenger-cloud-quarry", "raise": "Kópia na mobilnom relé sa viditeľne a predvídateľne rozplynie do 24 hodín, tak ako to robí server."},
+        {"from": "challenger-glaze", "raise": "Každý výstup (PAdES, ASiC-E, XDCF) je vytlačený spolu so svojím receptom: formát, úroveň, pečiatka."}
+      ],
+      "comp": ".impeccable/mocks/decision/r1/leader.png",
+      "hero": "https://impeccable.style/worlds/cards/posters-covers-sleeves-hatch-show-print-hero.webp",
+      "board": "https://impeccable.style/worlds/cards/posters-covers-sleeves-hatch-show-print.webp"
+    },
+    {
+      "id": "challenger-sequencer",
+      "label": "Sekvencer",
+      "verdict": "competitive",
+      "lineage": "Rytmický automat zo začiatku 80. rokov: rad krokov, bežiace svetlo, segmentový displej",
+      "thesis": "Podpis ako vytáčanie: sedem krokových tlačidiel, bežiace svetlo ich zamyká jedno po druhom a siedme je bod pôvodu.",
+      "palette": ["#1E1F22", "#E0352B", "#F28C28", "#F6D23C", "#F2F2EE"],
+      "materials": ["uhlový panel prístroja", "sieťotlačové popisy", "LED ako jediná žiara", "segmentový displej času"],
+      "viewport": "Titulok vľavo hore, vpravo červený displej s časovou pečiatkou; cez celú šírku rad siedmich tlačidiel s krokvou, svetlo práve dobieha na siedme; červené tlačidlo Stiahnuť.",
+      "case": "Vyhráva zrozumiteľnosťou: web sa dá doslova vytočiť ako podpis. V identifikácii publika je nerozhodne s plagátom.",
+      "risk": "Farebné tlačidlá môžu pôsobiť hravo až hračkársky vedľa právnej váhy podpisu.",
+      "comp": ".impeccable/mocks/decision/r1/challenger-sequencer.png",
+      "hero": "https://impeccable.style/worlds/cards/signals-instruments-drum-machine-step-row-hero.webp",
+      "board": "https://impeccable.style/worlds/cards/signals-instruments-drum-machine-step-row.webp"
+    },
+    {
+      "id": "challenger-datamatics",
+      "label": "Datamatika",
+      "verdict": "competitive",
+      "lineage": "Dátové inštalácie v čistej čiernej a bielej: čiarové polia, sínusové mriežky, inverzia celého rámu",
+      "thesis": "Ukazuje, čím podpis naozaj je: odtlačok dokumentu viazaný na certifikát; pri siedmej krokve sa celé pole invertuje.",
+      "palette": ["#000000", "#FFFFFF"],
+      "materials": ["čiarové pole z hashu na canvase", "sínusová krivka", "monospace dáta", "inverzia rámu ako horizont udalostí"],
+      "viewport": "Vľavo stena čiar generovaná z SHA-256 so siedmimi pásmi, siedme invertované; vpravo titulok a Stiahnuť; dole dátový riadok s bodom pôvodu.",
+      "case": "Vyhráva pravdivosťou mechanizmu a ukážkou moderného webu; prehráva identifikáciu bežného používateľa.",
+      "risk": "Pre bežného človeka s eID môže byť chladná a abstraktná; blikanie musí byť pod kontrolou.",
+      "comp": ".impeccable/mocks/decision/r1/challenger-datamatics.png",
+      "hero": "https://impeccable.style/worlds/cards/ikeda-datamatics-hero.webp",
+      "board": "https://impeccable.style/worlds/cards/ikeda-datamatics.webp"
+    },
+    {
+      "id": "challenger-centre-rail",
+      "label": "Stredová koľajnica",
+      "verdict": "declined",
+      "lineage": "Sadzba s aparátom: dva stĺpce okolo stredovej lišty kľúčov, široký okraj s poznámkami",
+      "thesis": "Podpis ako komentované vydanie: čo robíte vy, čo robí appka, a sedem kľúčov medzi tým.",
+      "palette": ["#141414", "#C8341C", "#EFE8DA"],
+      "materials": ["kostený papier", "vlasové linky"],
+      "viewport": "Dva úzke stĺpce okolo červenej koľajnice siedmich kľúčov.",
+      "case": "Kostený papier a knižná sadzba sú presne suchý papierový dojem, ktorý si vylúčil.",
+      "risk": "Pôsobí ako advokátska kancelária.",
+      "kept": "Každé tvrdenie s kľúčom k zdroju na okraji.",
+      "hero": "https://impeccable.style/worlds/cards/rw-centre-rail-reference-setting-hero.webp"
+    },
+    {
+      "id": "challenger-cloud-quarry",
+      "label": "Lom na oblaky",
+      "verdict": "declined",
+      "lineage": "Surreálny lom, kde sa režú bloky počasia",
+      "thesis": "Dočasné stavby z oblakov, ktoré sa predvídateľne rozplynú.",
+      "palette": ["#F4F6F8", "#6FA8DC", "#5A6168", "#C0C6CC"],
+      "materials": ["kumulus", "strieborná píla"],
+      "viewport": "Oblačný útes s vyrezanými blokmi.",
+      "case": "Snové a vzdialené; podpis potrebuje presnosť, nie počasie.",
+      "risk": "Nečitateľný produkt.",
+      "kept": "Predvídateľné rozplynutie: kópia na relé zmizne do 24 hodín.",
+      "hero": "https://impeccable.style/worlds/cards/dream-surreal-impossible-worlds-cloud-quarry-hero.webp"
+    },
+    {
+      "id": "challenger-glaze",
+      "label": "Glazúrová polica",
+      "verdict": "declined",
+      "lineage": "Vzorky glazúr na polici pece, stekajúci kobalt",
+      "thesis": "Každá vzorka so svojím receptom a výsledkom.",
+      "palette": ["#F2F0EB", "#1F4FA3", "#0E2F6B"],
+      "materials": ["kriedová polica", "kobaltová glazúra"],
+      "viewport": "Rad šálok so stekajúcou glazúrou.",
+      "case": "Keramika nemá s podpisom na Macu nič spoločné.",
+      "risk": "Úplne mimo publika.",
+      "kept": "Výstup vždy spolu s receptom.",
+      "hero": "https://impeccable.style/worlds/cards/clay-ceramics-fracture-glaze-river-shelf-hero.webp"
+    }
+  ],
+  "reroll": {"registers": ["safer", "bolder"]},
+  "buildPath": {"value": "comp", "toggle": true},
+  "canon": true,
+  "canonCard": {
+    "label": "Štandard kategórie",
+    "thesis": "Produktová stránka macOS appky, ako ju robí každý, len dokonale.",
+    "palette": ["#FFFFFF", "#1D1D1F", "#0071E3", "#F5F5F7"],
+    "materials": ["čistá mriežka", "screenshot v okne Macu"],
+    "viewport": "Veľký titulok, pod ním okno appky, mriežka funkcií, tlačidlo Stiahnuť.",
+    "risk": "Na nerozoznanie od konkurencie, z princípu.",
+    "comp": ".impeccable/mocks/decision/canon.png"
+  },
+  "steer": true
+}

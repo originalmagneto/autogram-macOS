@@ -1,0 +1,22 @@
+import { spawn } from 'node:child_process';
+import { writeFile, mkdtemp } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+const [url, prefix, w='1440', h='900'] = process.argv.slice(2);
+const port = 9700 + Math.floor(Math.random()*90);
+const profile = await mkdtemp(join(tmpdir(), 'cdp-'));
+const chrome = spawn('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', ['--headless=new', `--remote-debugging-port=${port}`, `--user-data-dir=${profile}`, '--hide-scrollbars', '--mute-audio', 'about:blank'], { stdio: 'ignore' });
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+let ws; for (let i=0;i<50;i++){ try{ const l=await (await fetch(`http://127.0.0.1:${port}/json`)).json(); const p=l.find(t=>t.type==='page'); if(p){ws=new WebSocket(p.webSocketDebuggerUrl);break;} }catch{} await sleep(200); }
+await new Promise(r=>ws.addEventListener('open',r)); let id=0; const pend=new Map();
+ws.addEventListener('message',e=>{const m=JSON.parse(e.data); if(m.id&&pend.has(m.id)){pend.get(m.id)(m);pend.delete(m.id);}});
+const send=(method,params={})=>new Promise(r=>{const i=++id;pend.set(i,r);ws.send(JSON.stringify({id:i,method,params}));});
+const shot=async(n)=>{const s=await send('Page.captureScreenshot',{format:'png'}); await writeFile(`${prefix}-${n}.png`,Buffer.from(s.result.data,'base64'));};
+const ev=async(x)=>(await send('Runtime.evaluate',{expression:x,returnByValue:true,awaitPromise:true})).result.result.value;
+await send('Page.enable'); await send('Emulation.setDeviceMetricsOverride',{width:+w,height:+h,deviceScaleFactor:1,mobile:+w<700});
+await send('Page.navigate',{url}); await sleep(4500);
+await ev(`document.querySelector('[data-flows] .stage-area').scrollIntoView({block:'center'})`);
+await sleep(700); await shot('flow-a'); await sleep(1300); await shot('flow-b'); await sleep(1600); await shot('flow-c');
+await ev(`document.querySelectorAll('[data-flows] [role=tab]')[1].click()`); await sleep(1800); await shot('flow-phone');
+await ev(`document.querySelectorAll('[data-flows] [role=tab]')[2].click()`); await sleep(1800); await shot('flow-safari');
+ws.close(); chrome.kill();

@@ -1,0 +1,12 @@
+A realistic flatbed scan of one A4 paper page, portrait, as a scanner sees it: slightly off-white paper, faint scanner shadow at the edges, true scan colours. A clearly fictional sample document in Slovak for software demonstration, different layout from a typical letter.
+
+Content:
+- Top right small grey caps text: "UKÁŽKOVÝ DOKUMENT".
+- Title left-aligned in black: "ZÁPISNICA Z ODOVZDANIA" and below "Vzorové družstvo, Košice".
+- A short typed paragraph and a small typed table with three rows (položka, množstvo) in black.
+- Bottom left: a round rubber stamp impression in blue ink, ring text "VZOROVÉ DRUŽSTVO • KOŠICE •" with a small key symbol in the centre, and over it a handwritten signature in black ink with typed "predseda" below.
+- Bottom right: a second handwritten signature in blue ink over a line with typed "prevzal".
+- In the bottom left corner the page is bound with a twisted tricolour cord in white, blue and red threaded through two punched holes near the lower left margin; the cord ends are fixed under a round green paper seal sticker with an embossed relief.
+- A small blue handwritten initial (paraph) in the top left margin.
+
+No real coat of arms, no real authority names. Natural scan look, sharp text, 1024x1536.

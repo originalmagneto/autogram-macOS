@@ -1,0 +1,8 @@
+{
+  "prompt": "A macOS 27 app icon, presented alone and centered on a plain soft neutral grey background, the standard macOS rounded-square (squircle) icon shape at about 80% of the frame, Apple Liquid Glass icon style: layered translucent glass, real refraction, subtle specular edge highlights, soft contact shadow under the icon, extremely clean, no text, no letters, no numbers, no rings, no hieroglyphs, no pyramids, no triangles closed at the base. The app is Chevron7, a native Mac app for qualified electronic signatures. The mark is ONE original symbol: a bold open chevron pointing upward (an inverted V shape, like a caret ^) that is lit as if it just locked into place, and a single small glowing sphere floating just above the chevron apex, the point of origin.\n\nVariant C: rich indigo glass background layer; SEVEN thin chevrons stacked vertically and nested like a column, the lower six dim and quiet in smoky glass, only the topmost seventh chevron lit in bright warm amber light, with the small glowing sphere just above its apex. Sense of a sequence completing.\n",
+  "createdAt": "2026-09-22T21:23:56.893Z",
+  "tool": "impeccable generate-image",
+  "model": "gpt-image-2.5-flare",
+  "background": "opaque",
+  "outputFormat": "png"
+}

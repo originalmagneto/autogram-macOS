@@ -1,0 +1,37 @@
+{
+  "title": "Domovská stránka Chevron7 · kompozícia",
+  "question": "Tri kompozície tej istej prvej obrazovky v štýle Apple s novou ikonou. Ktorá ide do stavby? Do poznámky napíš, čo z ostatných prevziať a čo pôsobí falošne.",
+  "options": [
+    {
+      "id": "comp-1-centered",
+      "label": "1 · Klasika v strede",
+      "thesis": "Ikona, titulok a akcie v strede, okno appky sa dvíha zdola; jedna ohnisková vec: okno.",
+      "palette": ["#0B1020", "#FFB23E", "#F5F3EE"],
+      "materials": ["tmavá polnoc", "jantárové svetlo krokvy", "skutočné okno appky"],
+      "viewport": "Veľká žiariaca ikona, dvojriadkový titulok, Stiahnuť a GitHub vedľa seba, okno appky orezané spodnou hranou.",
+      "risk": "Najbližšie k bežnej produktovej stránke; výraz nesie hlavne ikona.",
+      "comp": ".impeccable/mocks/comp-1-centered.png"
+    },
+    {
+      "id": "comp-2-split",
+      "label": "2 · Svetlo, podpis kdekoľvek",
+      "thesis": "Svetlá stránka ako Things: vľavo text, vpravo appka, panel zo Safari a iPhone vo vrstvách.",
+      "palette": ["#FFFFFF", "#F4F5F7", "#0B1020", "#FFB23E"],
+      "materials": ["biela a svetlosivá", "vrstvené reálne povrchy", "jantár iba na akcii"],
+      "viewport": "Titulok vľavo, tri vstupy (Finder, Safari, iPhone) ako čipy; vpravo okno appky, v druhej sekcii plávajúci panel Safari a iPhone s QR.",
+      "risk": "Svetlá stránka stráca nočné svetlo ikony; druhá sekcia ukazuje vymyslený text, ktorý treba prepísať.",
+      "comp": ".impeccable/mocks/comp-2-split.png"
+    },
+    {
+      "id": "comp-3-lock",
+      "label": "3 · Moment zamknutia",
+      "thesis": "Filmový moment: sklenená ikona svieti na naklonené okno appky, pod ním sedem krokiev a siedma zamknutá.",
+      "palette": ["#070A14", "#FFB23E", "#F5F3EE"],
+      "materials": ["takmer čierna", "3D sklenená ikona ako zdroj svetla", "tichý rad siedmich krokiev"],
+      "viewport": "Titulok vľavo, vpravo hore ikona ako svetlo, pod ňou naklonené okno; pod hero rad siedmich krokiev s vetou Siedma krokva zamknutá. Dokument podpísaný.",
+      "risk": "Najviac dramatické; tlačidlo Podpísať v okne musí ostať jantárové, nie modré ako vo vzore.",
+      "comp": ".impeccable/mocks/comp-3-lock.png"
+    }
+  ],
+  "steer": true
+}

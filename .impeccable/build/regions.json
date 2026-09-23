@@ -1,0 +1,273 @@
+{
+ "regions": [
+  {
+   "id": "nav-icon",
+   "kind": "image",
+   "note": "small Chevron7 app icon in the nav: midnight glass squircle with amber chevron and white point",
+   "box": {
+    "x": 0.0586,
+    "y": 0.0137,
+    "w": 0.0403,
+    "h": 0.0566
+   },
+   "plate": "website/public/plates/nav-icon.png"
+  },
+  {
+   "id": "nav-wordmark",
+   "kind": "text",
+   "note": "wordmark Chevron7 in white grotesque",
+   "box": {
+    "x": 0.0957,
+    "y": 0.0195,
+    "w": 0.0892,
+    "h": 0.0468
+   }
+  },
+  {
+   "id": "nav-links",
+   "kind": "text",
+   "note": "nav links Podpisovanie, Statne weby, Mobilom, Zarucena konverzia in light grey",
+   "box": {
+    "x": 0.3112,
+    "y": 0.0215,
+    "w": 0.3385,
+    "h": 0.039
+   }
+  },
+  {
+   "id": "nav-lang",
+   "kind": "text",
+   "note": "language switch SK / EN",
+   "box": {
+    "x": 0.8047,
+    "y": 0.0254,
+    "w": 0.0495,
+    "h": 0.0332
+   }
+  },
+  {
+   "id": "nav-cta",
+   "kind": "control",
+   "note": "white pill button Stiahnut",
+   "box": {
+    "x": 0.8646,
+    "y": 0.0137,
+    "w": 0.0807,
+    "h": 0.0566
+   }
+  },
+  {
+   "id": "headline",
+   "kind": "text",
+   "note": "two-line white bold headline Kvalifikovany podpis. Nativne na Macu.",
+   "box": {
+    "x": 0.0573,
+    "y": 0.1953,
+    "w": 0.4375,
+    "h": 0.1601
+   }
+  },
+  {
+   "id": "subline",
+   "kind": "text",
+   "note": "two-line light grey subline about signing PDF with eID, I.CA or iPhone",
+   "box": {
+    "x": 0.0573,
+    "y": 0.3692,
+    "w": 0.3515,
+    "h": 0.0722
+   }
+  },
+  {
+   "id": "cta-download",
+   "kind": "control",
+   "note": "white pill primary button Stiahnut pre macOS",
+   "box": {
+    "x": 0.0573,
+    "y": 0.459,
+    "w": 0.1608,
+    "h": 0.0722
+   }
+  },
+  {
+   "id": "cta-github",
+   "kind": "control",
+   "note": "outlined pill button with GitHub mark Zdrojovy kod na GitHube",
+   "box": {
+    "x": 0.2168,
+    "y": 0.459,
+    "w": 0.1745,
+    "h": 0.0703
+   }
+  },
+  {
+   "id": "spec-line",
+   "kind": "text",
+   "note": "small grey spec line macOS 27, Apple Silicon, zadarmo, EUPL-1.2",
+   "box": {
+    "x": 0.0573,
+    "y": 0.5371,
+    "w": 0.2239,
+    "h": 0.0351
+   }
+  },
+  {
+   "id": "app-window",
+   "kind": "image",
+   "note": "tilted dark Chevron7 app window in perspective showing the signing view: sidebar, contract PDF page with a signature, inspector with Format, Certifikat, Vizualny podpis, Casova peciatka and a Podpisat KEP button, warm amber floor glow beneath",
+   "box": {
+    "x": 0.4427,
+    "y": 0.2676,
+    "w": 0.5065,
+    "h": 0.5263
+   },
+   "plate": "website/public/plates/app-window.png"
+  },
+  {
+   "id": "pips",
+   "kind": "chrome",
+   "note": "row of seven small chevron marks, six grey, the seventh amber",
+   "box": {
+    "x": 0.4245,
+    "y": 0.75,
+    "w": 0.151,
+    "h": 0.0234
+   }
+  },
+  {
+   "id": "pips-caption",
+   "kind": "text",
+   "note": "small grey caption Siedma krokva zamknuta. Dokument podpisany.",
+   "box": {
+    "x": 0.3939,
+    "y": 0.7715,
+    "w": 0.2129,
+    "h": 0.0371
+   }
+  },
+  {
+   "id": "divider",
+   "kind": "chrome",
+   "note": "hairline separating the hero from the next section",
+   "box": {
+    "x": 0.0,
+    "y": 0.832,
+    "w": 1.0,
+    "h": 0.0078
+   }
+  },
+  {
+   "id": "kartou-rule",
+   "kind": "chrome",
+   "note": "short grey rule above the column title",
+   "box": {
+    "x": 0.0638,
+    "y": 0.8906,
+    "w": 0.0326,
+    "h": 0.0098
+   }
+  },
+  {
+   "id": "kartou-title",
+   "kind": "text",
+   "note": "column title Kartou in white bold",
+   "box": {
+    "x": 0.0573,
+    "y": 0.9004,
+    "w": 0.1028,
+    "h": 0.0605
+   }
+  },
+  {
+   "id": "kartou-sub",
+   "kind": "text",
+   "note": "column subline in grey",
+   "box": {
+    "x": 0.0586,
+    "y": 0.9551,
+    "w": 0.1601,
+    "h": 0.041
+   }
+  },
+  {
+   "id": "mobilom-rule",
+   "kind": "chrome",
+   "note": "short grey rule above the column title",
+   "box": {
+    "x": 0.3717,
+    "y": 0.8906,
+    "w": 0.0234,
+    "h": 0.0098
+   }
+  },
+  {
+   "id": "mobilom-title",
+   "kind": "text",
+   "note": "column title Mobilom in white bold",
+   "box": {
+    "x": 0.3652,
+    "y": 0.9004,
+    "w": 0.1243,
+    "h": 0.0605
+   }
+  },
+  {
+   "id": "mobilom-sub",
+   "kind": "text",
+   "note": "column subline in grey",
+   "box": {
+    "x": 0.3659,
+    "y": 0.9551,
+    "w": 0.1458,
+    "h": 0.041
+   }
+  },
+  {
+   "id": "safari-rule",
+   "kind": "chrome",
+   "note": "short grey rule above the column title",
+   "box": {
+    "x": 0.6888,
+    "y": 0.8906,
+    "w": 0.0221,
+    "h": 0.0098
+   }
+  },
+  {
+   "id": "safari-title",
+   "kind": "text",
+   "note": "column title V Safari in white bold",
+   "box": {
+    "x": 0.6823,
+    "y": 0.9004,
+    "w": 0.1159,
+    "h": 0.0605
+   }
+  },
+  {
+   "id": "safari-sub",
+   "kind": "text",
+   "note": "column subline in grey",
+   "box": {
+    "x": 0.6843,
+    "y": 0.9551,
+    "w": 0.1634,
+    "h": 0.041
+   }
+  },
+  {
+   "id": "icon-light",
+   "kind": "plate",
+   "bleed": true,
+   "note": "large 3D glass app icon object (midnight squircle, glowing molten amber upward chevron, white-hot point above it) with its soft amber halo and the warm light rays it casts downward onto the window below; isolated on transparency",
+   "box": {
+    "x": 0.5729,
+    "y": 0.0684,
+    "w": 0.2148,
+    "h": 0.3711
+   },
+   "plate": "website/public/plates/icon-light.png"
+  }
+ ],
+ "allowUncovered": true
+}

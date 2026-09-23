@@ -26,3 +26,15 @@ EXAMPLES/
 # Java engine build output
 engine/target/
 Chevron7/.build/
+
+# Raw app captures (may contain personal data before blurring)
+.impeccable/capture/
+
+# The website has its own repository: originalmagneto/chevron7-website
+website/
+# Impeccable working files that stay local (screenshots, critic packs, loop videos)
+.impeccable/review/
+.impeccable/mocks/decision/
+.impeccable/loop/*
+!.impeccable/loop/bar.md
+!.impeccable/loop/*.mjs

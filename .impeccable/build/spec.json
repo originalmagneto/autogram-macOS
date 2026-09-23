@@ -1,0 +1,1519 @@
+{
+  "tool": "comp-spec",
+  "version": 1,
+  "createdAt": "2026-09-22T21:31:27.628Z",
+  "comp": ".impeccable/mocks/comp-3-lock.png",
+  "warnings": [
+    "region icon-light: \"bleed\": true set in the regions file (the clipped-artwork refusal is overridden: the page crops it there)"
+  ],
+  "uncoveredInkCells": [
+    "A0",
+    "J0",
+    "A2",
+    "A3",
+    "A4",
+    "B4",
+    "C4",
+    "D4",
+    "A9",
+    "D9"
+  ],
+  "compSize": {
+    "width": 1536,
+    "height": 1024
+  },
+  "aspect": 1.5,
+  "orientation": "landscape",
+  "palette": [
+    {
+      "hex": "#0a0b1a",
+      "coverage": 0.8588
+    },
+    {
+      "hex": "#efeff1",
+      "coverage": 0.0874
+    },
+    {
+      "hex": "#33211b",
+      "coverage": 0.0326
+    },
+    {
+      "hex": "#151839",
+      "coverage": 0.0142
+    },
+    {
+      "hex": "#5e3b1e",
+      "coverage": 0.007
+    }
+  ],
+  "bands": [
+    {
+      "y": 0.0353,
+      "strength": 0.3212
+    },
+    {
+      "y": 0.0588,
+      "strength": 0.229
+    },
+    {
+      "y": 0.2235,
+      "strength": 0.4835
+    },
+    {
+      "y": 0.2588,
+      "strength": 0.4073
+    },
+    {
+      "y": 0.2941,
+      "strength": 0.2976
+    },
+    {
+      "y": 0.3412,
+      "strength": 0.6342
+    },
+    {
+      "y": 0.3647,
+      "strength": 0.2483
+    },
+    {
+      "y": 0.4,
+      "strength": 0.2695
+    },
+    {
+      "y": 0.4706,
+      "strength": 0.4086
+    },
+    {
+      "y": 0.5176,
+      "strength": 0.2883
+    },
+    {
+      "y": 0.6588,
+      "strength": 0.3122
+    },
+    {
+      "y": 0.9176,
+      "strength": 0.3665
+    },
+    {
+      "y": 0.9529,
+      "strength": 0.2854
+    },
+    {
+      "y": 0.9882,
+      "strength": 0.2446
+    }
+  ],
+  "regions": [
+    {
+      "id": "nav-icon",
+      "kind": "image",
+      "note": "small Chevron7 app icon in the nav: midnight glass squircle with amber chevron and white point",
+      "grid": null,
+      "box": {
+        "x": 0.0586,
+        "y": 0.0137,
+        "w": 0.0403,
+        "h": 0.0566
+      },
+      "px": {
+        "x": 90,
+        "y": 14,
+        "w": 62,
+        "h": 58
+      },
+      "aspect": 1.069,
+      "palette": [
+        {
+          "hex": "#0a0919",
+          "coverage": 0.8455
+        },
+        {
+          "hex": "#371f1a",
+          "coverage": 0.059
+        },
+        {
+          "hex": "#132144",
+          "coverage": 0.0506
+        },
+        {
+          "hex": "#602e12",
+          "coverage": 0.0225
+        },
+        {
+          "hex": "#4c78b4",
+          "coverage": 0.0225
+        }
+      ],
+      "detail": {
+        "energy": 9.1639
+      },
+      "medium": "raster",
+      "plate": "website/public/plates/nav-icon.png",
+      "text": null
+    },
+    {
+      "id": "nav-wordmark",
+      "kind": "text",
+      "note": "wordmark Chevron7 in white grotesque",
+      "grid": null,
+      "box": {
+        "x": 0.0957,
+        "y": 0.0195,
+        "w": 0.0892,
+        "h": 0.0468
+      },
+      "px": {
+        "x": 147,
+        "y": 20,
+        "w": 137,
+        "h": 48
+      },
+      "aspect": 2.8542,
+      "palette": [
+        {
+          "hex": "#080817",
+          "coverage": 0.8524
+        },
+        {
+          "hex": "#f6f6f6",
+          "coverage": 0.069
+        },
+        {
+          "hex": "#3a3e4c",
+          "coverage": 0.0414
+        },
+        {
+          "hex": "#a8acb4",
+          "coverage": 0.0207
+        },
+        {
+          "hex": "#cdd0d8",
+          "coverage": 0.0166
+        }
+      ],
+      "detail": {
+        "energy": 27.0396
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "type": {
+        "comp": {
+          "lines": 1,
+          "glyphs": 6,
+          "capHeightPx": 20.2,
+          "inkIsDark": false,
+          "allCaps": false,
+          "advance": 0.7559,
+          "advTall": 0.6444,
+          "advX": 1.0905,
+          "gap": 0.0991,
+          "xRatio": 0.7095,
+          "stemW": 0.1687,
+          "contrast": 1.0842,
+          "serif": 0.965,
+          "densTall": 0.4452,
+          "densX": 0.5392,
+          "weight": 0.4452
+        },
+        "widthClass": "wide",
+        "weightClass": "regular"
+      }
+    },
+    {
+      "id": "nav-links",
+      "kind": "text",
+      "note": "nav links Podpisovanie, Statne weby, Mobilom, Zarucena konverzia in light grey",
+      "grid": null,
+      "box": {
+        "x": 0.3112,
+        "y": 0.0215,
+        "w": 0.3385,
+        "h": 0.039
+      },
+      "px": {
+        "x": 478,
+        "y": 22,
+        "w": 520,
+        "h": 40
+      },
+      "aspect": 13,
+      "palette": [
+        {
+          "hex": "#080918",
+          "coverage": 0.8978
+        },
+        {
+          "hex": "#d6dbe5",
+          "coverage": 0.0598
+        },
+        {
+          "hex": "#404455",
+          "coverage": 0.0228
+        },
+        {
+          "hex": "#9297a4",
+          "coverage": 0.0145
+        },
+        {
+          "hex": "#a3b3b7",
+          "coverage": 0.005
+        }
+      ],
+      "detail": {
+        "energy": 31.6401
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "type": {
+        "comp": {
+          "lines": 1,
+          "glyphs": 39,
+          "capHeightPx": 14.1,
+          "inkIsDark": false,
+          "allCaps": false,
+          "advance": 0.5326,
+          "advTall": 0.5681,
+          "advX": 0.5503,
+          "gap": 0.071,
+          "xRatio": 0.618,
+          "stemW": 0.1554,
+          "contrast": 1.0617,
+          "serif": null,
+          "densTall": 0.526,
+          "densX": 0.5824,
+          "weight": 0.526
+        },
+        "widthClass": "condensed",
+        "weightClass": "medium"
+      }
+    },
+    {
+      "id": "nav-lang",
+      "kind": "text",
+      "note": "language switch SK / EN",
+      "grid": null,
+      "box": {
+        "x": 0.8047,
+        "y": 0.0254,
+        "w": 0.0495,
+        "h": 0.0332
+      },
+      "px": {
+        "x": 1236,
+        "y": 26,
+        "w": 76,
+        "h": 34
+      },
+      "aspect": 2.2353,
+      "palette": [
+        {
+          "hex": "#080818",
+          "coverage": 0.9263
+        },
+        {
+          "hex": "#434a5b",
+          "coverage": 0.0321
+        },
+        {
+          "hex": "#8d93a8",
+          "coverage": 0.0321
+        },
+        {
+          "hex": "#d0d0e0",
+          "coverage": 0.0064
+        },
+        {
+          "hex": "#181838",
+          "coverage": 0.0032
+        }
+      ],
+      "detail": {
+        "energy": 9.8363
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "type": {
+        "comp": {
+          "lines": 1,
+          "glyphs": 6,
+          "capHeightPx": 10.1,
+          "inkIsDark": false,
+          "allCaps": true,
+          "advance": 0.6914,
+          "advTall": 0.6914,
+          "advX": null,
+          "gap": 0.0988,
+          "xRatio": null,
+          "stemW": 0.1984,
+          "contrast": 1.0811,
+          "serif": null,
+          "densTall": 0.5433,
+          "densX": null,
+          "weight": 0.5433
+        },
+        "widthClass": "normal",
+        "weightClass": "medium"
+      }
+    },
+    {
+      "id": "nav-cta",
+      "kind": "control",
+      "note": "white pill button Stiahnut",
+      "grid": null,
+      "box": {
+        "x": 0.8646,
+        "y": 0.0137,
+        "w": 0.0807,
+        "h": 0.0566
+      },
+      "px": {
+        "x": 1328,
+        "y": 14,
+        "w": 124,
+        "h": 58
+      },
+      "aspect": 2.1379,
+      "palette": [
+        {
+          "hex": "#090918",
+          "coverage": 0.5818
+        },
+        {
+          "hex": "#f8f8f8",
+          "coverage": 0.3823
+        },
+        {
+          "hex": "#bcbec9",
+          "coverage": 0.0239
+        },
+        {
+          "hex": "#2d2d38",
+          "coverage": 0.0072
+        },
+        {
+          "hex": "#848494",
+          "coverage": 0.0048
+        }
+      ],
+      "detail": {
+        "energy": 19.5086
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null
+    },
+    {
+      "id": "headline",
+      "kind": "text",
+      "note": "two-line white bold headline Kvalifikovany podpis. Nativne na Macu.",
+      "grid": null,
+      "box": {
+        "x": 0.0573,
+        "y": 0.1953,
+        "w": 0.4375,
+        "h": 0.1601
+      },
+      "px": {
+        "x": 88,
+        "y": 200,
+        "w": 672,
+        "h": 164
+      },
+      "aspect": 4.0976,
+      "palette": [
+        {
+          "hex": "#080918",
+          "coverage": 0.7059
+        },
+        {
+          "hex": "#f7f7f8",
+          "coverage": 0.2419
+        },
+        {
+          "hex": "#646674",
+          "coverage": 0.021
+        },
+        {
+          "hex": "#c4c6d1",
+          "coverage": 0.0205
+        },
+        {
+          "hex": "#282d3b",
+          "coverage": 0.0107
+        }
+      ],
+      "detail": {
+        "energy": 83.8859
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "type": {
+        "comp": {
+          "lines": 2,
+          "glyphs": 26,
+          "capHeightPx": 53.1,
+          "inkIsDark": false,
+          "allCaps": false,
+          "advance": 0.6753,
+          "advTall": 0.4502,
+          "advX": 0.6753,
+          "gap": 0.0565,
+          "xRatio": 0.7228,
+          "stemW": 0.2067,
+          "contrast": 1.1925,
+          "serif": 0.9893,
+          "densTall": 0.6672,
+          "densX": 0.6714,
+          "weight": 0.6672
+        },
+        "widthClass": "normal",
+        "weightClass": "black",
+        "chosen": {
+          "family": "Atkinson Hyperlegible Next",
+          "weight": 700,
+          "fontSizePx": 73,
+          "source": "index",
+          "fp": {
+            "lines": 1,
+            "glyphs": 17,
+            "capHeightPx": 53,
+            "inkIsDark": true,
+            "allCaps": false,
+            "advance": 0.6698,
+            "advTall": 0.4057,
+            "advX": 0.6792,
+            "gap": 0.0755,
+            "xRatio": 0.6981,
+            "stemW": 0.2081,
+            "contrast": 1.2404,
+            "serif": 1,
+            "densTall": 0.6018,
+            "densX": 0.634,
+            "weight": 0.6018
+          },
+          "stamp": "401798aba472"
+        }
+      }
+    },
+    {
+      "id": "subline",
+      "kind": "text",
+      "note": "two-line light grey subline about signing PDF with eID, I.CA or iPhone",
+      "grid": null,
+      "box": {
+        "x": 0.0573,
+        "y": 0.3692,
+        "w": 0.3515,
+        "h": 0.0722
+      },
+      "px": {
+        "x": 88,
+        "y": 378,
+        "w": 540,
+        "h": 74
+      },
+      "aspect": 7.2973,
+      "palette": [
+        {
+          "hex": "#080918",
+          "coverage": 0.8541
+        },
+        {
+          "hex": "#bec8dc",
+          "coverage": 0.0661
+        },
+        {
+          "hex": "#505b6d",
+          "coverage": 0.0354
+        },
+        {
+          "hex": "#8b90a5",
+          "coverage": 0.026
+        },
+        {
+          "hex": "#232d3d",
+          "coverage": 0.0184
+        }
+      ],
+      "detail": {
+        "energy": 45.6987
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "type": {
+        "comp": {
+          "lines": 2,
+          "glyphs": 63,
+          "capHeightPx": 15.8,
+          "inkIsDark": false,
+          "allCaps": false,
+          "advance": 0.6555,
+          "advTall": 0.671,
+          "advX": 0.6555,
+          "gap": 0.0959,
+          "xRatio": 0.7279,
+          "stemW": 0.1569,
+          "contrast": 1.0881,
+          "serif": 0.5707,
+          "densTall": 0.477,
+          "densX": 0.524,
+          "weight": 0.477
+        },
+        "widthClass": "normal",
+        "weightClass": "regular"
+      }
+    },
+    {
+      "id": "cta-download",
+      "kind": "control",
+      "note": "white pill primary button Stiahnut pre macOS",
+      "grid": null,
+      "box": {
+        "x": 0.0573,
+        "y": 0.459,
+        "w": 0.1608,
+        "h": 0.0722
+      },
+      "px": {
+        "x": 88,
+        "y": 470,
+        "w": 247,
+        "h": 74
+      },
+      "aspect": 3.3378,
+      "palette": [
+        {
+          "hex": "#f7f7f7",
+          "coverage": 0.5563
+        },
+        {
+          "hex": "#080818",
+          "coverage": 0.3736
+        },
+        {
+          "hex": "#85868f",
+          "coverage": 0.0414
+        },
+        {
+          "hex": "#c0c1ce",
+          "coverage": 0.0175
+        },
+        {
+          "hex": "#363845",
+          "coverage": 0.0112
+        }
+      ],
+      "detail": {
+        "energy": 32.8041
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "type": {
+        "comp": {
+          "lines": 3,
+          "glyphs": 20,
+          "capHeightPx": 12,
+          "inkIsDark": true,
+          "allCaps": false,
+          "advance": 0.5973,
+          "advTall": 0.6719,
+          "advX": 0.5973,
+          "gap": 0.112,
+          "xRatio": 0.7473,
+          "stemW": 0.162,
+          "contrast": 1.0752,
+          "serif": 0.4483,
+          "densTall": 0.5337,
+          "densX": 0.5548,
+          "weight": 0.5337
+        },
+        "widthClass": "normal",
+        "weightClass": "medium"
+      }
+    },
+    {
+      "id": "cta-github",
+      "kind": "control",
+      "note": "outlined pill button with GitHub mark Zdrojovy kod na GitHube",
+      "grid": null,
+      "box": {
+        "x": 0.2168,
+        "y": 0.459,
+        "w": 0.1745,
+        "h": 0.0703
+      },
+      "px": {
+        "x": 333,
+        "y": 470,
+        "w": 268,
+        "h": 72
+      },
+      "aspect": 3.7222,
+      "palette": [
+        {
+          "hex": "#080818",
+          "coverage": 0.8851
+        },
+        {
+          "hex": "#5f6675",
+          "coverage": 0.0766
+        },
+        {
+          "hex": "#f2f2f5",
+          "coverage": 0.0201
+        },
+        {
+          "hex": "#272e3d",
+          "coverage": 0.0098
+        },
+        {
+          "hex": "#b4b6c2",
+          "coverage": 0.0084
+        }
+      ],
+      "detail": {
+        "energy": 34.7842
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null
+    },
+    {
+      "id": "spec-line",
+      "kind": "text",
+      "note": "small grey spec line macOS 27, Apple Silicon, zadarmo, EUPL-1.2",
+      "grid": null,
+      "box": {
+        "x": 0.0573,
+        "y": 0.5371,
+        "w": 0.2239,
+        "h": 0.0351
+      },
+      "px": {
+        "x": 88,
+        "y": 550,
+        "w": 344,
+        "h": 36
+      },
+      "aspect": 9.5556,
+      "palette": [
+        {
+          "hex": "#080918",
+          "coverage": 0.9005
+        },
+        {
+          "hex": "#4f5869",
+          "coverage": 0.0373
+        },
+        {
+          "hex": "#8390a0",
+          "coverage": 0.03
+        },
+        {
+          "hex": "#293142",
+          "coverage": 0.0219
+        },
+        {
+          "hex": "#9696b6",
+          "coverage": 0.0102
+        }
+      ],
+      "detail": {
+        "energy": 25.8864
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "type": {
+        "comp": {
+          "lines": 1,
+          "glyphs": 33,
+          "capHeightPx": 10.4,
+          "inkIsDark": false,
+          "allCaps": false,
+          "advance": 0.6425,
+          "advTall": 0.6425,
+          "advX": 0.6907,
+          "gap": 0.0964,
+          "xRatio": 0.7259,
+          "stemW": 0.1921,
+          "contrast": 1.0806,
+          "serif": 0.2792,
+          "densTall": 0.5446,
+          "densX": 0.5859,
+          "weight": 0.5446
+        },
+        "widthClass": "normal",
+        "weightClass": "medium"
+      }
+    },
+    {
+      "id": "app-window",
+      "kind": "image",
+      "note": "tilted dark Chevron7 app window in perspective showing the signing view: sidebar, contract PDF page with a signature, inspector with Format, Certifikat, Vizualny podpis, Casova peciatka and a Podpisat KEP button, warm amber floor glow beneath",
+      "grid": null,
+      "box": {
+        "x": 0.4427,
+        "y": 0.2676,
+        "w": 0.5065,
+        "h": 0.5263
+      },
+      "px": {
+        "x": 680,
+        "y": 274,
+        "w": 778,
+        "h": 539
+      },
+      "aspect": 1.4434,
+      "palette": [
+        {
+          "hex": "#0d1422",
+          "coverage": 0.6189
+        },
+        {
+          "hex": "#ebebed",
+          "coverage": 0.218
+        },
+        {
+          "hex": "#2d201c",
+          "coverage": 0.0742
+        },
+        {
+          "hex": "#171a3b",
+          "coverage": 0.0456
+        },
+        {
+          "hex": "#55351e",
+          "coverage": 0.0434
+        }
+      ],
+      "detail": {
+        "energy": 17.6715
+      },
+      "medium": "raster",
+      "plate": "website/public/plates/app-window.png",
+      "text": null
+    },
+    {
+      "id": "pips",
+      "kind": "chrome",
+      "note": "row of seven small chevron marks, six grey, the seventh amber",
+      "grid": null,
+      "box": {
+        "x": 0.4245,
+        "y": 0.75,
+        "w": 0.151,
+        "h": 0.0234
+      },
+      "px": {
+        "x": 652,
+        "y": 768,
+        "w": 232,
+        "h": 24
+      },
+      "aspect": 9.6667,
+      "palette": [
+        {
+          "hex": "#1d1718",
+          "coverage": 0.7214
+        },
+        {
+          "hex": "#392718",
+          "coverage": 0.126
+        },
+        {
+          "hex": "#5d5f68",
+          "coverage": 0.1061
+        },
+        {
+          "hex": "#623918",
+          "coverage": 0.0332
+        },
+        {
+          "hex": "#f89e12",
+          "coverage": 0.0133
+        }
+      ],
+      "detail": {
+        "energy": 16.4369
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null
+    },
+    {
+      "id": "pips-caption",
+      "kind": "text",
+      "note": "small grey caption Siedma krokva zamknuta. Dokument podpisany.",
+      "grid": null,
+      "box": {
+        "x": 0.3939,
+        "y": 0.7715,
+        "w": 0.2129,
+        "h": 0.0371
+      },
+      "px": {
+        "x": 605,
+        "y": 790,
+        "w": 327,
+        "h": 38
+      },
+      "aspect": 8.6053,
+      "palette": [
+        {
+          "hex": "#0e0f19",
+          "coverage": 0.8879
+        },
+        {
+          "hex": "#3d4555",
+          "coverage": 0.0454
+        },
+        {
+          "hex": "#9199ae",
+          "coverage": 0.0369
+        },
+        {
+          "hex": "#646a7d",
+          "coverage": 0.0255
+        },
+        {
+          "hex": "#381d18",
+          "coverage": 0.0043
+        }
+      ],
+      "detail": {
+        "energy": 26.5471
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "type": {
+        "comp": {
+          "lines": 1,
+          "glyphs": 34,
+          "capHeightPx": 10.5,
+          "inkIsDark": false,
+          "allCaps": false,
+          "advance": 0.6378,
+          "advTall": 0.5899,
+          "advX": 0.6697,
+          "gap": 0.0957,
+          "xRatio": 0.7256,
+          "stemW": 0.186,
+          "contrast": 1.1376,
+          "serif": 0.6,
+          "densTall": 0.5277,
+          "densX": 0.5698,
+          "weight": 0.5277
+        },
+        "widthClass": "normal",
+        "weightClass": "medium"
+      }
+    },
+    {
+      "id": "divider",
+      "kind": "chrome",
+      "note": "hairline separating the hero from the next section",
+      "grid": null,
+      "box": {
+        "x": 0,
+        "y": 0.832,
+        "w": 1,
+        "h": 0.0078
+      },
+      "px": {
+        "x": 0,
+        "y": 852,
+        "w": 1536,
+        "h": 8
+      },
+      "aspect": 192,
+      "palette": [
+        {
+          "hex": "#080b18",
+          "coverage": 1
+        }
+      ],
+      "detail": {
+        "energy": 2.1331
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null
+    },
+    {
+      "id": "kartou-rule",
+      "kind": "chrome",
+      "note": "short grey rule above the column title",
+      "grid": null,
+      "box": {
+        "x": 0.0638,
+        "y": 0.8906,
+        "w": 0.0326,
+        "h": 0.0098
+      },
+      "px": {
+        "x": 98,
+        "y": 912,
+        "w": 50,
+        "h": 10
+      },
+      "aspect": 5,
+      "palette": [
+        {
+          "hex": "#080818",
+          "coverage": 0.7794
+        },
+        {
+          "hex": "#777c94",
+          "coverage": 0.2206
+        }
+      ],
+      "detail": {
+        "energy": 9.3959
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null
+    },
+    {
+      "id": "kartou-title",
+      "kind": "text",
+      "note": "column title Kartou in white bold",
+      "grid": null,
+      "box": {
+        "x": 0.0573,
+        "y": 0.9004,
+        "w": 0.1028,
+        "h": 0.0605
+      },
+      "px": {
+        "x": 88,
+        "y": 922,
+        "w": 158,
+        "h": 62
+      },
+      "aspect": 2.5484,
+      "palette": [
+        {
+          "hex": "#080817",
+          "coverage": 0.8024
+        },
+        {
+          "hex": "#ebeff5",
+          "coverage": 0.1514
+        },
+        {
+          "hex": "#b6b9c8",
+          "coverage": 0.0245
+        },
+        {
+          "hex": "#2f3545",
+          "coverage": 0.0145
+        },
+        {
+          "hex": "#d8d8f8",
+          "coverage": 0.0073
+        }
+      ],
+      "detail": {
+        "energy": 24.4104
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "type": {
+        "comp": {
+          "lines": 1,
+          "glyphs": 6,
+          "capHeightPx": 31,
+          "inkIsDark": false,
+          "allCaps": false,
+          "advance": 0.6616,
+          "advTall": 0.6293,
+          "advX": 0.6616,
+          "gap": 0.0645,
+          "xRatio": 0.7745,
+          "stemW": 0.1958,
+          "contrast": 1.2297,
+          "serif": null,
+          "densTall": 0.5434,
+          "densX": 0.5746,
+          "weight": 0.5434
+        },
+        "widthClass": "normal",
+        "weightClass": "medium"
+      }
+    },
+    {
+      "id": "kartou-sub",
+      "kind": "text",
+      "note": "column subline in grey",
+      "grid": null,
+      "box": {
+        "x": 0.0586,
+        "y": 0.9551,
+        "w": 0.1601,
+        "h": 0.041
+      },
+      "px": {
+        "x": 90,
+        "y": 978,
+        "w": 246,
+        "h": 42
+      },
+      "aspect": 5.8571,
+      "palette": [
+        {
+          "hex": "#080818",
+          "coverage": 0.8652
+        },
+        {
+          "hex": "#b2bbd0",
+          "coverage": 0.0678
+        },
+        {
+          "hex": "#818b9f",
+          "coverage": 0.0282
+        },
+        {
+          "hex": "#2c3146",
+          "coverage": 0.0238
+        },
+        {
+          "hex": "#515c6e",
+          "coverage": 0.015
+        }
+      ],
+      "detail": {
+        "energy": 34.8012
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "type": {
+        "comp": {
+          "lines": 1,
+          "glyphs": 21,
+          "capHeightPx": 14.4,
+          "inkIsDark": false,
+          "allCaps": false,
+          "advance": 0.6233,
+          "advTall": 0.5541,
+          "advX": 0.6233,
+          "gap": 0.1039,
+          "xRatio": 0.7149,
+          "stemW": 0.157,
+          "contrast": 1.0597,
+          "serif": null,
+          "densTall": 0.4983,
+          "densX": 0.5923,
+          "weight": 0.4983
+        },
+        "widthClass": "normal",
+        "weightClass": "medium"
+      }
+    },
+    {
+      "id": "mobilom-rule",
+      "kind": "chrome",
+      "note": "short grey rule above the column title",
+      "grid": null,
+      "box": {
+        "x": 0.3717,
+        "y": 0.8906,
+        "w": 0.0234,
+        "h": 0.0098
+      },
+      "px": {
+        "x": 571,
+        "y": 912,
+        "w": 36,
+        "h": 10
+      },
+      "aspect": 3.6,
+      "palette": [
+        {
+          "hex": "#080818",
+          "coverage": 0.7917
+        },
+        {
+          "hex": "#727d90",
+          "coverage": 0.2083
+        }
+      ],
+      "detail": {
+        "energy": 6.4711
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null
+    },
+    {
+      "id": "mobilom-title",
+      "kind": "text",
+      "note": "column title Mobilom in white bold",
+      "grid": null,
+      "box": {
+        "x": 0.3652,
+        "y": 0.9004,
+        "w": 0.1243,
+        "h": 0.0605
+      },
+      "px": {
+        "x": 561,
+        "y": 922,
+        "w": 191,
+        "h": 62
+      },
+      "aspect": 3.0806,
+      "palette": [
+        {
+          "hex": "#080816",
+          "coverage": 0.7611
+        },
+        {
+          "hex": "#f6f6f8",
+          "coverage": 0.1746
+        },
+        {
+          "hex": "#7e8090",
+          "coverage": 0.0249
+        },
+        {
+          "hex": "#313443",
+          "coverage": 0.0219
+        },
+        {
+          "hex": "#cfd0d9",
+          "coverage": 0.0174
+        }
+      ],
+      "detail": {
+        "energy": 32.9377
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "type": {
+        "comp": {
+          "lines": 1,
+          "glyphs": 7,
+          "capHeightPx": 32.5,
+          "inkIsDark": false,
+          "allCaps": false,
+          "advance": 0.7077,
+          "advTall": 0.4462,
+          "advX": 0.7077,
+          "gap": 0.0923,
+          "xRatio": 0.7385,
+          "stemW": 0.1833,
+          "contrast": 1.1029,
+          "serif": null,
+          "densTall": 0.7727,
+          "densX": 0.5749,
+          "weight": 0.7727
+        },
+        "widthClass": "normal",
+        "weightClass": "black"
+      }
+    },
+    {
+      "id": "mobilom-sub",
+      "kind": "text",
+      "note": "column subline in grey",
+      "grid": null,
+      "box": {
+        "x": 0.3659,
+        "y": 0.9551,
+        "w": 0.1458,
+        "h": 0.041
+      },
+      "px": {
+        "x": 562,
+        "y": 978,
+        "w": 224,
+        "h": 42
+      },
+      "aspect": 5.3333,
+      "palette": [
+        {
+          "hex": "#080818",
+          "coverage": 0.8606
+        },
+        {
+          "hex": "#9ea4bd",
+          "coverage": 0.0471
+        },
+        {
+          "hex": "#33384c",
+          "coverage": 0.0346
+        },
+        {
+          "hex": "#c0cbdf",
+          "coverage": 0.0298
+        },
+        {
+          "hex": "#666d81",
+          "coverage": 0.0279
+        }
+      ],
+      "detail": {
+        "energy": 31.2216
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "type": {
+        "comp": {
+          "lines": 1,
+          "glyphs": 19,
+          "capHeightPx": 14.4,
+          "inkIsDark": false,
+          "allCaps": false,
+          "advance": 0.6237,
+          "advTall": 0.6064,
+          "advX": 0.6237,
+          "gap": 0.1039,
+          "xRatio": 0.7434,
+          "stemW": 0.1574,
+          "contrast": 1.0565,
+          "serif": 0.4094,
+          "densTall": 0.4722,
+          "densX": 0.5228,
+          "weight": 0.4722
+        },
+        "widthClass": "normal",
+        "weightClass": "regular"
+      }
+    },
+    {
+      "id": "safari-rule",
+      "kind": "chrome",
+      "note": "short grey rule above the column title",
+      "grid": null,
+      "box": {
+        "x": 0.6888,
+        "y": 0.8906,
+        "w": 0.0221,
+        "h": 0.0098
+      },
+      "px": {
+        "x": 1058,
+        "y": 912,
+        "w": 34,
+        "h": 10
+      },
+      "aspect": 3.4,
+      "palette": [
+        {
+          "hex": "#080818",
+          "coverage": 0.7917
+        },
+        {
+          "hex": "#767e95",
+          "coverage": 0.2083
+        }
+      ],
+      "detail": {
+        "energy": 6.5457
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null
+    },
+    {
+      "id": "safari-title",
+      "kind": "text",
+      "note": "column title V Safari in white bold",
+      "grid": null,
+      "box": {
+        "x": 0.6823,
+        "y": 0.9004,
+        "w": 0.1159,
+        "h": 0.0605
+      },
+      "px": {
+        "x": 1048,
+        "y": 922,
+        "w": 178,
+        "h": 62
+      },
+      "aspect": 2.871,
+      "palette": [
+        {
+          "hex": "#080816",
+          "coverage": 0.7905
+        },
+        {
+          "hex": "#f6f6f8",
+          "coverage": 0.1555
+        },
+        {
+          "hex": "#c2c2cf",
+          "coverage": 0.0226
+        },
+        {
+          "hex": "#868a96",
+          "coverage": 0.0161
+        },
+        {
+          "hex": "#4d5560",
+          "coverage": 0.0153
+        }
+      ],
+      "detail": {
+        "energy": 29.7745
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "type": {
+        "comp": {
+          "lines": 1,
+          "glyphs": 7,
+          "capHeightPx": 31.6,
+          "inkIsDark": false,
+          "allCaps": false,
+          "advance": 0.6336,
+          "advTall": 0.5702,
+          "advX": 0.6336,
+          "gap": 0.0792,
+          "xRatio": 0.7603,
+          "stemW": 0.1921,
+          "contrast": 1.1359,
+          "serif": null,
+          "densTall": 0.5525,
+          "densX": 0.6811,
+          "weight": 0.5525
+        },
+        "widthClass": "normal",
+        "weightClass": "medium"
+      }
+    },
+    {
+      "id": "safari-sub",
+      "kind": "text",
+      "note": "column subline in grey",
+      "grid": null,
+      "box": {
+        "x": 0.6843,
+        "y": 0.9551,
+        "w": 0.1634,
+        "h": 0.041
+      },
+      "px": {
+        "x": 1051,
+        "y": 978,
+        "w": 251,
+        "h": 42
+      },
+      "aspect": 5.9762,
+      "palette": [
+        {
+          "hex": "#080817",
+          "coverage": 0.8576
+        },
+        {
+          "hex": "#373f52",
+          "coverage": 0.0512
+        },
+        {
+          "hex": "#acb7cd",
+          "coverage": 0.0494
+        },
+        {
+          "hex": "#6c7488",
+          "coverage": 0.0367
+        },
+        {
+          "hex": "#1d2040",
+          "coverage": 0.0051
+        }
+      ],
+      "detail": {
+        "energy": 32.5543
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "type": {
+        "comp": {
+          "lines": 1,
+          "glyphs": 19,
+          "capHeightPx": 14.5,
+          "inkIsDark": false,
+          "allCaps": false,
+          "advance": 0.6534,
+          "advTall": 0.7565,
+          "advX": 0.6534,
+          "gap": 0.1032,
+          "xRatio": 0.737,
+          "stemW": 0.1557,
+          "contrast": 1.0311,
+          "serif": 0.3947,
+          "densTall": 0.4358,
+          "densX": 0.5352,
+          "weight": 0.4358
+        },
+        "widthClass": "normal",
+        "weightClass": "regular"
+      }
+    },
+    {
+      "id": "icon-light",
+      "kind": "plate",
+      "note": "large 3D glass app icon object (midnight squircle, glowing molten amber upward chevron, white-hot point above it) with its soft amber halo and the warm light rays it casts downward onto the window below; isolated on transparency",
+      "grid": null,
+      "bleed": true,
+      "box": {
+        "x": 0.5729,
+        "y": 0.0684,
+        "w": 0.2148,
+        "h": 0.3711
+      },
+      "px": {
+        "x": 880,
+        "y": 70,
+        "w": 330,
+        "h": 380
+      },
+      "aspect": 0.8684,
+      "palette": [
+        {
+          "hex": "#17131b",
+          "coverage": 0.5197
+        },
+        {
+          "hex": "#f3f0ee",
+          "coverage": 0.1968
+        },
+        {
+          "hex": "#422a1f",
+          "coverage": 0.1732
+        },
+        {
+          "hex": "#6d4223",
+          "coverage": 0.0811
+        },
+        {
+          "hex": "#a3652d",
+          "coverage": 0.0291
+        }
+      ],
+      "detail": {
+        "energy": 17.1587
+      },
+      "medium": "raster",
+      "plate": "website/public/plates/icon-light.png",
+      "text": null
+    }
+  ]
+}

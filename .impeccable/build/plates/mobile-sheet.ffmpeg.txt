@@ -1,0 +1,1 @@
+[0]crop=778:972:940:375,format=rgba,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='255*if(lt(X,36)*lt(Y,36),lte(hypot(36-X,36-Y),36),1)*if(gt(X,W-36)*lt(Y,36),lte(hypot(X-(W-36),36-Y),36),1)*if(lt(X,36)*gt(Y,H-36),lte(hypot(36-X,Y-(H-36)),36),1)*if(gt(X,W-36)*gt(Y,H-36),lte(hypot(X-(W-36),Y-(H-36)),36),1)'

@@ -1,0 +1,11 @@
+{
+  "prompt": "Recreate the provided app icon exactly as a clean production asset: the same macOS rounded-square (squircle) Liquid Glass icon, deep midnight navy glass body, a thick glowing molten amber upward chevron (caret shape) inside clear glass, and a small white-hot glowing sphere floating just above the chevron apex, with the same specular edge highlights and the same warm inner glow. Remove the grey background and the contact shadow: the icon sits alone on genuine transparent alpha, centered, filling about 84% of the frame with even clear margins. No text, no extra objects, no restyle. Output a transparent PNG.\n",
+  "createdAt": "2026-09-22T21:32:39.568Z",
+  "tool": "impeccable generate-image",
+  "model": "gpt-image-2.5-flare",
+  "background": "transparent",
+  "outputFormat": "png",
+  "refs": [
+    ".impeccable/icon-concepts/icon-a.png"
+  ]
+}

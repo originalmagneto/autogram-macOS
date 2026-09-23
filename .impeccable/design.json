@@ -1,0 +1,424 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-22T22:47:22.868496+00:00",
+  "title": "Design System: Chevron7 website",
+  "extensions": {
+    "scope": "Website only (website/). The macOS app UI is documented in CLAUDE.md / AGENTS.md.",
+    "colorMeta": {
+      "ink-0": {
+        "role": "neutral",
+        "displayName": "Midnight",
+        "canonical": "#0a0b1a",
+        "tonalRamp": [
+          "oklch(15% 0.035 278)",
+          "oklch(25% 0.035 278)",
+          "oklch(36% 0.035 278)",
+          "oklch(47% 0.035 278)",
+          "oklch(58% 0.035 278)",
+          "oklch(70% 0.035 278)",
+          "oklch(82% 0.035 278)",
+          "oklch(95% 0.035 278)"
+        ],
+        "oklchApprox": "oklch(16.5% 0.035 278)"
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "rgb(214 219 229 / 0.14)",
+        "tonalRamp": [
+          "oklch(15% 0.012 260)",
+          "oklch(25% 0.012 260)",
+          "oklch(36% 0.012 260)",
+          "oklch(47% 0.012 260)",
+          "oklch(58% 0.012 260)",
+          "oklch(70% 0.012 260)",
+          "oklch(82% 0.012 260)",
+          "oklch(95% 0.012 260)"
+        ]
+      },
+      "line-strong": {
+        "role": "neutral",
+        "displayName": "Strong Hairline",
+        "canonical": "rgb(214 219 229 / 0.32)",
+        "tonalRamp": [
+          "oklch(15% 0.012 260)",
+          "oklch(25% 0.012 260)",
+          "oklch(36% 0.012 260)",
+          "oklch(47% 0.012 260)",
+          "oklch(58% 0.012 260)",
+          "oklch(70% 0.012 260)",
+          "oklch(82% 0.012 260)",
+          "oklch(95% 0.012 260)"
+        ]
+      },
+      "text-0": {
+        "role": "neutral",
+        "displayName": "Signal White",
+        "canonical": "#f5f5f7",
+        "tonalRamp": [
+          "oklch(15% 0.002 286)",
+          "oklch(25% 0.002 286)",
+          "oklch(36% 0.002 286)",
+          "oklch(47% 0.002 286)",
+          "oklch(58% 0.002 286)",
+          "oklch(70% 0.002 286)",
+          "oklch(82% 0.002 286)",
+          "oklch(95% 0.002 286)"
+        ],
+        "oklchApprox": "oklch(97% 0.002 286)"
+      },
+      "text-1": {
+        "role": "neutral",
+        "displayName": "Mist",
+        "canonical": "#d6dbe5",
+        "tonalRamp": [
+          "oklch(15% 0.013 262)",
+          "oklch(25% 0.013 262)",
+          "oklch(36% 0.013 262)",
+          "oklch(47% 0.013 262)",
+          "oklch(58% 0.013 262)",
+          "oklch(70% 0.013 262)",
+          "oklch(82% 0.013 262)",
+          "oklch(95% 0.013 262)"
+        ],
+        "oklchApprox": "oklch(88.7% 0.013 262)"
+      },
+      "text-2": {
+        "role": "neutral",
+        "displayName": "Haze",
+        "canonical": "#bec8dc",
+        "tonalRamp": [
+          "oklch(15% 0.025 265)",
+          "oklch(25% 0.025 265)",
+          "oklch(36% 0.025 265)",
+          "oklch(47% 0.025 265)",
+          "oklch(58% 0.025 265)",
+          "oklch(70% 0.025 265)",
+          "oklch(82% 0.025 265)",
+          "oklch(95% 0.025 265)"
+        ],
+        "oklchApprox": "oklch(82.8% 0.025 265)"
+      },
+      "text-3": {
+        "role": "neutral",
+        "displayName": "Dusk Grey",
+        "canonical": "#8d97ab",
+        "tonalRamp": [
+          "oklch(15% 0.033 264)",
+          "oklch(25% 0.033 264)",
+          "oklch(36% 0.033 264)",
+          "oklch(47% 0.033 264)",
+          "oklch(58% 0.033 264)",
+          "oklch(70% 0.033 264)",
+          "oklch(82% 0.033 264)",
+          "oklch(95% 0.033 264)"
+        ],
+        "oklchApprox": "oklch(66.3% 0.033 264)"
+      },
+      "white-hot": {
+        "role": "neutral",
+        "displayName": "Pure White",
+        "canonical": "#ffffff",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(25% 0 0)",
+          "oklch(36% 0 0)",
+          "oklch(47% 0 0)",
+          "oklch(58% 0 0)",
+          "oklch(70% 0 0)",
+          "oklch(82% 0 0)",
+          "oklch(95% 0 0)"
+        ],
+        "oklchApprox": "oklch(100% 0 0)"
+      },
+      "pip-dim": {
+        "role": "neutral",
+        "displayName": "Unlit Chevron",
+        "canonical": "#6b7080",
+        "tonalRamp": [
+          "oklch(15% 0.022 272)",
+          "oklch(25% 0.022 272)",
+          "oklch(36% 0.022 272)",
+          "oklch(47% 0.022 272)",
+          "oklch(58% 0.022 272)",
+          "oklch(70% 0.022 272)",
+          "oklch(82% 0.022 272)",
+          "oklch(95% 0.022 272)"
+        ],
+        "oklchApprox": "oklch(54.4% 0.022 272)"
+      },
+      "rule-grey": {
+        "role": "neutral",
+        "displayName": "Rule Grey",
+        "canonical": "#777c94",
+        "tonalRamp": [
+          "oklch(15% 0.035 278)",
+          "oklch(25% 0.035 278)",
+          "oklch(36% 0.035 278)",
+          "oklch(47% 0.035 278)",
+          "oklch(58% 0.035 278)",
+          "oklch(70% 0.035 278)",
+          "oklch(82% 0.035 278)",
+          "oklch(95% 0.035 278)"
+        ],
+        "oklchApprox": "oklch(58.6% 0.035 278)"
+      },
+      "amber": {
+        "role": "primary",
+        "displayName": "Seventh-Chevron Amber",
+        "canonical": "#ffb23e",
+        "tonalRamp": [
+          "oklch(15% 0.155 71)",
+          "oklch(25% 0.155 71)",
+          "oklch(36% 0.155 71)",
+          "oklch(47% 0.155 71)",
+          "oklch(58% 0.155 71)",
+          "oklch(70% 0.155 71)",
+          "oklch(82% 0.155 71)",
+          "oklch(95% 0.155 71)"
+        ],
+        "oklchApprox": "oklch(82.6% 0.155 71)"
+      },
+      "amber-hot": {
+        "role": "primary",
+        "displayName": "Filament",
+        "canonical": "#ffd27a",
+        "tonalRamp": [
+          "oklch(15% 0.12 83)",
+          "oklch(25% 0.12 83)",
+          "oklch(36% 0.12 83)",
+          "oklch(47% 0.12 83)",
+          "oklch(58% 0.12 83)",
+          "oklch(70% 0.12 83)",
+          "oklch(82% 0.12 83)",
+          "oklch(95% 0.12 83)"
+        ],
+        "oklchApprox": "oklch(89.4% 0.12 83)"
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "The one statement per page; the hero headline is a comp-measured instance of it."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Section titles, max about 16ch, balanced wrap."
+      },
+      "lead": {
+        "displayName": "Lead",
+        "purpose": "One short paragraph under a headline, in Haze."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Feature, step and stage titles."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Copy under titles, in Dusk Grey, 34 to 52ch."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Notes, captions, spec line, footer credits."
+      }
+    },
+    "shadows": [
+      {
+        "name": "capture-lift",
+        "value": "drop-shadow(0 28px 44px rgb(0 0 0 / 0.5)) drop-shadow(0 4px 10px rgb(0 0 0 / 0.35))",
+        "purpose": "filter on every real app capture below the hero."
+      },
+      {
+        "name": "hero-window",
+        "value": "drop-shadow(0 2.4cqw 3.2cqw rgb(0 0 0 / 0.55)) drop-shadow(0 1.6cqw 4cqw rgb(255 178 62 / 0.12))",
+        "purpose": "filter on the tilted hero window; the amber term is the icon's light landing."
+      },
+      {
+        "name": "pip-halo",
+        "value": "drop-shadow(0 0.1cqw 0.45cqw rgb(255 178 62 / 0.75))",
+        "purpose": "filter on the lit seventh chevron (0 0.4cqw 2cqw at 0.7 in the large scroll variant)."
+      },
+      {
+        "name": "nav-glass",
+        "value": "background: rgb(10 11 26 / 0.72); backdrop-filter: saturate(1.6) blur(18px); border-bottom: 1px solid rgb(214 219 229 / 0.08)",
+        "purpose": "fixed header, faded in over the first 140px of scroll."
+      },
+      {
+        "name": "stage-dot-cutout",
+        "value": "0 0 0 4px var(--ink-0)",
+        "purpose": "box-shadow ring that cuts a stage dot out of its hairline; not an elevation."
+      },
+      {
+        "name": "focus-ring",
+        "value": "outline: 2px solid var(--amber); outline-offset: 3px; border-radius: 6px",
+        "purpose": "global :focus-visible."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-out",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "shared easing for every state change and the load choreography."
+      },
+      {
+        "name": "link-color",
+        "value": "160ms",
+        "purpose": "nav and language link color."
+      },
+      {
+        "name": "button-state",
+        "value": "200ms",
+        "purpose": "pill background, border and press scale (0.98)."
+      },
+      {
+        "name": "pip-flash",
+        "value": "520ms ease-out, delay 240ms + index * 90ms",
+        "purpose": "six unlit chevrons flash white and settle on load."
+      },
+      {
+        "name": "pip-ignite",
+        "value": "900ms ease-out, delay 880ms",
+        "purpose": "seventh chevron rises and lights."
+      },
+      {
+        "name": "light-land",
+        "value": "1400ms to 1600ms ease-out, delay 900ms to 1000ms",
+        "purpose": "icon brightens, window warms, glow and rim fade in."
+      },
+      {
+        "name": "scroll-driven",
+        "value": "animation-timeline: view() / scroll(), behind @supports",
+        "purpose": "section rise, origin re-lock, relay track emptying, nav glass."
+      },
+      {
+        "name": "motion-gate",
+        "value": ".motion class set before first paint unless prefers-reduced-motion",
+        "purpose": "default styles are the final state; reduced motion shows the locked page."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "stage-collapse",
+        "value": "container max-width 760px",
+        "purpose": "nav, hero and signing-path columns become a single column."
+      },
+      {
+        "name": "split-collapse",
+        "value": "media max-width 900px to 1000px",
+        "purpose": "section grids collapse to one column (900 Local, 960 Phone, Portals, Zako, 1000 Signing)."
+      },
+      {
+        "name": "narrow",
+        "value": "media max-width 520px to 560px",
+        "purpose": "remaining two-column lists become one column."
+      },
+      {
+        "name": "comp-width",
+        "value": "1536px",
+        "purpose": "the reference width the first viewport's cqw values are measured against."
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Pill",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Download call to action: white pill on the midnight ground, always first in the pair.",
+      "html": "<a class=\"ds-btn-primary\" href=\"#\">Stiahnuť pre macOS</a>",
+      "css": ":root{--ink-0:#0a0b1a;--text-0:#f5f5f7;--text-1:#d6dbe5;--text-2:#bec8dc;--text-3:#8d97ab;--amber:#ffb23e;--amber-hot:#ffd27a;--line:rgb(214 219 229 / 0.14);--line-strong:rgb(214 219 229 / 0.32);--ease-out:cubic-bezier(0.16,1,0.3,1);--radius-pill:999px;}.ds-btn-primary{display:inline-flex;align-items:center;gap:8px;height:52px;padding:0 26px;border-radius:var(--radius-pill);font-size:17px;font-weight:600;text-decoration:none;transition:background-color 200ms var(--ease-out),border-color 200ms var(--ease-out),transform 200ms var(--ease-out);font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','SF Pro Text','Atkinson Hyperlegible Next','Segoe UI',sans-serif;background:var(--text-0);color:var(--ink-0);} .ds-btn-primary:hover{background:#ffffff;} .ds-btn-primary:active{transform:scale(0.98);} .ds-btn-primary:focus-visible{outline:2px solid var(--amber);outline-offset:3px;}"
+    },
+    {
+      "name": "Outline Pill",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "Secondary action beside the white pill; hairline border, optional GitHub mark.",
+      "html": "<a class=\"ds-btn-outline\" href=\"#\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 16 16\" fill=\"currentColor\" aria-hidden=\"true\"><path d=\"M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z\"/></svg>Zdrojový kód na GitHube</a>",
+      "css": ":root{--ink-0:#0a0b1a;--text-0:#f5f5f7;--text-1:#d6dbe5;--text-2:#bec8dc;--text-3:#8d97ab;--amber:#ffb23e;--amber-hot:#ffd27a;--line:rgb(214 219 229 / 0.14);--line-strong:rgb(214 219 229 / 0.32);--ease-out:cubic-bezier(0.16,1,0.3,1);--radius-pill:999px;}.ds-btn-outline{display:inline-flex;align-items:center;gap:8px;height:52px;padding:0 26px;border-radius:var(--radius-pill);font-size:17px;font-weight:600;text-decoration:none;transition:background-color 200ms var(--ease-out),border-color 200ms var(--ease-out),transform 200ms var(--ease-out);font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','SF Pro Text','Atkinson Hyperlegible Next','Segoe UI',sans-serif;background:transparent;color:var(--text-0);border:1px solid var(--line-strong);} .ds-btn-outline:hover{border-color:rgb(214 219 229 / 0.6);background:rgb(214 219 229 / 0.06);} .ds-btn-outline:active{transform:scale(0.98);} .ds-btn-outline:focus-visible{outline:2px solid var(--amber);outline-offset:3px;}"
+    },
+    {
+      "name": "Navigation Bar",
+      "kind": "nav",
+      "refersTo": "nav-link",
+      "description": "Fixed header: brand, Mist links, language switch and a small white pill; glass once scrolled.",
+      "html": "<nav class=\"ds-nav\"><a class=\"ds-nav-brand\" href=\"#\">Chevron7</a><div class=\"ds-nav-links\"><a href=\"#\">Podpisovanie</a><a href=\"#\">Štátne weby</a><a href=\"#\">Mobilom</a></div><span class=\"ds-nav-lang\"><a aria-current=\"page\" href=\"#\">SK</a> | <a href=\"#\">EN</a></span><a class=\"ds-nav-cta\" href=\"#\">Stiahnuť</a></nav>",
+      "css": ":root{--ink-0:#0a0b1a;--text-0:#f5f5f7;--text-1:#d6dbe5;--text-2:#bec8dc;--text-3:#8d97ab;--amber:#ffb23e;--amber-hot:#ffd27a;--line:rgb(214 219 229 / 0.14);--line-strong:rgb(214 219 229 / 0.32);--ease-out:cubic-bezier(0.16,1,0.3,1);--radius-pill:999px;}.ds-nav{display:flex;align-items:center;gap:32px;height:64px;padding:0 24px;background:rgb(10 11 26 / 0.72);border-bottom:1px solid rgb(214 219 229 / 0.08);backdrop-filter:saturate(1.6) blur(18px);-webkit-backdrop-filter:saturate(1.6) blur(18px);font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','SF Pro Text','Atkinson Hyperlegible Next','Segoe UI',sans-serif;} .ds-nav-brand{font-size:20px;font-weight:500;letter-spacing:-0.01em;color:var(--text-0);text-decoration:none;} .ds-nav-links{display:flex;gap:28px;} .ds-nav-links a{font-size:15px;color:var(--text-1);text-decoration:none;transition:color 160ms var(--ease-out);} .ds-nav-links a:hover{color:var(--text-0);} .ds-nav-lang{margin-left:auto;font-size:14px;color:var(--text-3);} .ds-nav-lang a{color:var(--text-3);text-decoration:none;} .ds-nav-lang a[aria-current]{color:var(--text-1);} .ds-nav-cta{display:inline-flex;align-items:center;height:34px;padding:0 16px;border-radius:var(--radius-pill);background:var(--text-0);color:var(--ink-0);font-size:14px;font-weight:600;text-decoration:none;} .ds-nav a:focus-visible{outline:2px solid var(--amber);outline-offset:3px;border-radius:6px;}"
+    },
+    {
+      "name": "Chevron Pips",
+      "kind": "custom",
+      "description": "The signature mark: seven chevrons, the seventh lit amber with its dot and halo.",
+      "html": "<ol class=\"ds-pips\" aria-label=\"Sedem krokov podpisu\"><li class=\"ds-pip\"><svg viewBox=\"0 0 20 16\" aria-hidden=\"true\"><path d=\"M2.5 13.5 10 4.5l7.5 9\"/></svg></li><li class=\"ds-pip\"><svg viewBox=\"0 0 20 16\" aria-hidden=\"true\"><path d=\"M2.5 13.5 10 4.5l7.5 9\"/></svg></li><li class=\"ds-pip\"><svg viewBox=\"0 0 20 16\" aria-hidden=\"true\"><path d=\"M2.5 13.5 10 4.5l7.5 9\"/></svg></li><li class=\"ds-pip\"><svg viewBox=\"0 0 20 16\" aria-hidden=\"true\"><path d=\"M2.5 13.5 10 4.5l7.5 9\"/></svg></li><li class=\"ds-pip\"><svg viewBox=\"0 0 20 16\" aria-hidden=\"true\"><path d=\"M2.5 13.5 10 4.5l7.5 9\"/></svg></li><li class=\"ds-pip\"><svg viewBox=\"0 0 20 16\" aria-hidden=\"true\"><path d=\"M2.5 13.5 10 4.5l7.5 9\"/></svg></li><li class=\"ds-pip ds-pip-origin\"><svg viewBox=\"0 0 20 16\" aria-hidden=\"true\"><path d=\"M2.5 13.5 10 4.5l7.5 9\"/><circle cx=\"10\" cy=\"1.6\" r=\"1.6\"/></svg></li></ol>",
+      "css": ":root{--ink-0:#0a0b1a;--text-0:#f5f5f7;--text-1:#d6dbe5;--text-2:#bec8dc;--text-3:#8d97ab;--amber:#ffb23e;--amber-hot:#ffd27a;--line:rgb(214 219 229 / 0.14);--line-strong:rgb(214 219 229 / 0.32);--ease-out:cubic-bezier(0.16,1,0.3,1);--radius-pill:999px;}.ds-pips{display:flex;gap:14px;margin:0;padding:0;list-style:none;} .ds-pip svg{display:block;width:20px;height:16px;overflow:visible;} .ds-pip path{fill:none;stroke:#6b7080;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round;transition:stroke 200ms var(--ease-out);} .ds-pip:hover path{stroke:var(--text-0);} .ds-pip-origin path,.ds-pip-origin:hover path{stroke:var(--amber);} .ds-pip circle{fill:var(--amber-hot);} .ds-pip-origin svg{filter:drop-shadow(0 1px 7px rgb(255 178 62 / 0.75));}"
+    },
+    {
+      "name": "Ruled Column Title",
+      "kind": "custom",
+      "description": "Column heading led by the short 40 by 3px grey rule; used for the three signing paths.",
+      "html": "<div class=\"ds-ruled\"><h2>Kartou</h2><p class=\"ds-ruled-sub\">Vložte eID kartu a podpíšte</p><p class=\"ds-ruled-body\">Občiansky preukaz s čipom, I.CA, Disig alebo SAK karta cez čítačku.</p></div>",
+      "css": ":root{--ink-0:#0a0b1a;--text-0:#f5f5f7;--text-1:#d6dbe5;--text-2:#bec8dc;--text-3:#8d97ab;--amber:#ffb23e;--amber-hot:#ffd27a;--line:rgb(214 219 229 / 0.14);--line-strong:rgb(214 219 229 / 0.32);--ease-out:cubic-bezier(0.16,1,0.3,1);--radius-pill:999px;}.ds-ruled{position:relative;padding-top:14px;max-width:360px;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','SF Pro Text','Atkinson Hyperlegible Next','Segoe UI',sans-serif;} .ds-ruled::before{content:'';position:absolute;top:0;left:0;width:40px;height:3px;background:#777c94;} .ds-ruled h2{margin:0;font-size:34px;line-height:38px;font-weight:700;letter-spacing:-0.02em;color:var(--text-0);} .ds-ruled-sub{margin:6px 0 0;font-size:18px;line-height:24px;color:var(--text-2);} .ds-ruled-body{margin:12px 0 0;font-size:16px;line-height:24px;color:var(--text-3);}"
+    },
+    {
+      "name": "Stage Line",
+      "kind": "custom",
+      "description": "Stages on one strong hairline, each marked by a dot cut out with a midnight ring.",
+      "html": "<ol class=\"ds-stages\"><li><h3>Import</h3><p>Listina ako PDF.</p></li><li><h3>Analýza</h3><p>Ochranné prvky.</p></li><li><h3>Kontrola</h3><p>Každá strana.</p></li></ol>",
+      "css": ":root{--ink-0:#0a0b1a;--text-0:#f5f5f7;--text-1:#d6dbe5;--text-2:#bec8dc;--text-3:#8d97ab;--amber:#ffb23e;--amber-hot:#ffd27a;--line:rgb(214 219 229 / 0.14);--line-strong:rgb(214 219 229 / 0.32);--ease-out:cubic-bezier(0.16,1,0.3,1);--radius-pill:999px;}.ds-stages{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:32px;margin:0;padding:28px 0 0;list-style:none;border-top:1px solid var(--line-strong);background:var(--ink-0);font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','SF Pro Text','Atkinson Hyperlegible Next','Segoe UI',sans-serif;} .ds-stages li{position:relative;} .ds-stages li::before{content:'';position:absolute;top:-33px;left:0;width:9px;height:9px;border-radius:50%;background:#6b7080;box-shadow:0 0 0 4px var(--ink-0);} .ds-stages h3{margin:0;font-size:19px;font-weight:700;color:var(--text-0);} .ds-stages p{margin:6px 0 0;font-size:15px;line-height:1.5;color:var(--text-3);}"
+    },
+    {
+      "name": "Real Capture",
+      "kind": "card",
+      "description": "A real app screenshot, frameless, lifted by the capture drop shadow.",
+      "html": "<figure class=\"ds-shot\"><div class=\"ds-shot-img\" role=\"img\" aria-label=\"Okno aplikácie\"></div><figcaption>Ukážka z režimu DEMO</figcaption></figure>",
+      "css": ":root{--ink-0:#0a0b1a;--text-0:#f5f5f7;--text-1:#d6dbe5;--text-2:#bec8dc;--text-3:#8d97ab;--amber:#ffb23e;--amber-hot:#ffd27a;--line:rgb(214 219 229 / 0.14);--line-strong:rgb(214 219 229 / 0.32);--ease-out:cubic-bezier(0.16,1,0.3,1);--radius-pill:999px;}.ds-shot{margin:0;max-width:420px;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','SF Pro Text','Atkinson Hyperlegible Next','Segoe UI',sans-serif;} .ds-shot-img{aspect-ratio:16/10;background:linear-gradient(180deg,#1c1d24,#141519);filter:drop-shadow(0 28px 44px rgb(0 0 0 / 0.5)) drop-shadow(0 4px 10px rgb(0 0 0 / 0.35));} .ds-shot figcaption{margin-top:14px;font-size:14px;line-height:1.45;color:var(--text-3);}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Moment the Seventh Chevron Locks",
+    "overview": "**Creative North Star: \"The Moment the Seventh Chevron Locks\"**\n\nThe site is a dark room lit by one lamp. A near-black midnight ground carries cool white type at very large sizes, and the only warm light on the page comes from the lit seventh chevron and the glass app icon, which casts amber down onto a real app window. The product is shown as itself: real captures from the app (DEMO mode, labeled), never an illustrated interface.\n\nDensity is low and the pace is Apple-product-page slow: one idea per section, big bold headlines, short leads, then a real screen. Structure comes from hairlines and short grey rules, not boxes. There are no cards, no tinted panels and no feature grid of icons; section content sits directly on the ground.\n\nMotion tells a single story. On load the six grey chevrons flash one by one, the seventh ignites amber and the icon's light lands on the window; further down, scroll-driven animation repeats the lock and empties the relay's time track. The default state is always the final, fully visible one.",
+    "keyCharacteristics": [
+      "Midnight ground, cool white type in four quiet steps, one amber light source.",
+      "Seven chevron pips as the one recurring mark; the seventh is always the lit one.",
+      "Real app windows as the product imagery, lifted by soft drop shadows.",
+      "Pill buttons in a white-primary / hairline-outline pair.",
+      "Hairline dividers and short grey rules instead of cards.",
+      "Motion that lands on the locked state and is skipped entirely under reduced motion."
+    ],
+    "rules": [
+      {
+        "name": "The One Light Rule",
+        "body": "Amber is light, not a brand fill. It appears only where the seventh chevron or its glow lands, plus focus and selection. A second accent hue, or amber on a button or background, breaks the world.",
+        "section": "colors"
+      },
+      {
+        "name": "The Quiet Steps Rule",
+        "body": "Hierarchy among text is carried by the four white steps (text-0 to text-3), never by color.",
+        "section": "colors"
+      },
+      {
+        "name": "The Size Not Style Rule",
+        "body": "Emphasis is size, weight and white step. Tracking tightens with size, from -0.01em at 19px titles to -0.035em at display; body, leads and labels stay at normal tracking and in sentence case.",
+        "section": "typography"
+      },
+      {
+        "name": "The Light Not Lift Rule",
+        "body": "Only real app captures and the lit chevron cast anything. Text and layout blocks stay flat on the ground.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** keep amber for the lit seventh chevron, its glow, focus and selection (The One Light Rule).",
+      "**Do** show the product through real app captures from DEMO mode, lifted with the capture drop shadow.",
+      "**Do** pair a white pill with a hairline pill for calls to action, white first.",
+      "**Do** separate content with 1px hairlines and the short 40 by 3px grey rule.",
+      "**Do** make the final, locked state the default and add motion only under the `.motion` class, so reduced motion shows the finished page.",
+      "**Do** use the four white steps for hierarchy: Signal White titles, Haze leads, Dusk Grey body."
+    ],
+    "donts": [
+      "**Don't** add a second accent color or fill buttons and backgrounds with amber.",
+      "**Don't** put section content in cards, tinted panels or bordered boxes; the ground carries it.",
+      "**Don't** replace real captures with illustrated or invented app interfaces.",
+      "**Don't** use more or fewer than seven chevrons, or light any chevron other than the seventh."
+    ]
+  }
+}

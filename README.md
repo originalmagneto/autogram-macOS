@@ -10,12 +10,14 @@
   <img src="https://img.shields.io/badge/Swift-6-f05138?style=flat-square" alt="Swift 6">
   <img src="https://img.shields.io/badge/AI-vstavan%C3%A1%20on--device-2e5aa8?style=flat-square" alt="Vstavaná AI beží na zariadení">
   <img src="https://img.shields.io/badge/z%C3%A1vislosti-0%20balíkov-4f5d75?style=flat-square" alt="0 Swift package závislostí">
+  <a href="https://chevron7.slovensko.app"><img src="https://img.shields.io/badge/web-chevron7.slovensko.app-0a0b1a?style=flat-square" alt="Web chevron7.slovensko.app"></a>
   <a href="https://buymeacoffee.com/chevron7"><img src="https://img.shields.io/badge/podpori%C5%A5-Buy%20Me%20a%20Coffee-ffdd00?style=flat-square&logo=buymeacoffee&logoColor=000" alt="Podporiť vývoj"></a>
 </p>
 
 <p align="center">
   <strong>Natívny pracovný stôl pre dôveryhodné právne dokumenty.</strong><br>
-  Podpis. Konverzia. Evidencia. V jednom lokálnom workflow.
+  Podpis. Konverzia. Evidencia. V jednom lokálnom workflow.<br>
+  <a href="https://chevron7.slovensko.app"><strong>chevron7.slovensko.app</strong></a> · <a href="https://chevron7.slovensko.app/en/">English</a>
 </p>
 
 <p align="center">
@@ -28,6 +30,10 @@
 </p>
 
 Natívna macOS aplikácia v SwiftUI pre kvalifikované elektronické podpisovanie, zaručenú konverziu podľa zákona č. 305/2013 Z. z. a lokálnu evidenciu právnych dokumentov. Žiadny obsah dokumentu neopúšťa Mac, pokiaľ to výslovne nezvolíte.
+
+## Web
+
+Produktový web beží na **[chevron7.slovensko.app](https://chevron7.slovensko.app)** (anglicky na [/en/](https://chevron7.slovensko.app/en/)). Je to statický web v Astro nasadený na Cloudflare a má vlastný súkromný repozitár `originalmagneto/chevron7-website`; po každom push na jeho `main` sa nasadí sám. Vizuálny systém webu popisuje [DESIGN.md](DESIGN.md), fakty o produkte, ktoré web smie tvrdiť, [PRODUCT.md](PRODUCT.md). Všetky zábery appky na webe sú skutočné nahrávky Chevron7 s ukážkovými dokumentmi.
 
 ## Pôvod a poďakovanie
 

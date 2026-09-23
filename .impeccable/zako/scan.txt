@@ -1,0 +1,12 @@
+A realistic flatbed scan of one A4 paper page, portrait, photographed flat from above as a scanner sees it: slightly off-white paper, faint scanner shadow at the edges, true scan colours. It is a clearly fictional sample document, Slovak language, for software demonstration.
+
+Content of the page:
+- Top right small grey caps text: "UKÁŽKOVÝ DOKUMENT".
+- Title centered in black: "POTVRDENIE O PREVZATÍ" and under it smaller "č. 17/2026".
+- Several paragraphs of short typed Slovak body text in black, business letter style, mentioning "Ukážková firma, s. r. o." and "Bratislava".
+- Near the bottom right: a handwritten signature in blue ballpoint ink over a thin line, with typed "konateľ" under it.
+- Overlapping the signature on its left: a round rubber stamp impression in violet-blue ink, slightly uneven, ring text "UKÁŽKOVÁ FIRMA, s. r. o. • BRATISLAVA •" with a small star in the centre.
+- In the top left corner the page is bound with a twisted tricolour cord in white, blue and red (Slovak state colours cord) threaded through two punched holes near the left margin; the two cord ends are fixed under a round red paper seal sticker with an embossed relief, on which a second small violet stamp impression partly overlaps.
+- A handwritten blue initial (paraph) at the bottom left corner.
+
+No real state coat of arms, no real authority names, nothing official except the fictional company. Natural scan look, sharp text, 1024x1536.

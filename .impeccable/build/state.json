@@ -1,0 +1,346 @@
+{
+  "tool": "build-phase",
+  "version": 2,
+  "startedAt": "2026-09-22T21:25:11.236Z",
+  "comp": ".impeccable/mocks/comp-3-lock.png",
+  "direction": "3e443e68",
+  "breakpoint": "1536x1024",
+  "artifact": "website/dist/index.html",
+  "phase": "review",
+  "phases": {
+    "comps": {
+      "status": "closed",
+      "openedAt": "2026-09-22T21:25:11.236Z",
+      "closedAt": "2026-09-22T21:27:34.929Z",
+      "attempts": 1,
+      "notes": [],
+      "gate": {
+        "ok": true,
+        "reasons": [],
+        "summary": "3 comps, 1 approved",
+        "approved": ".impeccable/mocks/comp-3-lock.png",
+        "at": "2026-09-22T21:27:34.928Z"
+      },
+      "forced": null
+    },
+    "spec": {
+      "status": "closed",
+      "openedAt": "2026-09-22T21:27:34.940Z",
+      "closedAt": "2026-09-22T21:31:18.365Z",
+      "attempts": 2,
+      "notes": [],
+      "gate": {
+        "ok": true,
+        "reasons": [],
+        "summary": "24 regions, 3 plates, 13 text regions measured",
+        "at": "2026-09-22T21:31:18.365Z"
+      },
+      "forced": null
+    },
+    "plates": {
+      "status": "closed",
+      "openedAt": "2026-09-22T21:31:18.365Z",
+      "closedAt": "2026-09-22T21:38:36.384Z",
+      "attempts": 1,
+      "notes": [],
+      "gate": {
+        "ok": true,
+        "reasons": [],
+        "summary": "3/3 plates",
+        "at": "2026-09-22T21:38:36.384Z"
+      },
+      "forced": null
+    },
+    "hero": {
+      "status": "closed",
+      "openedAt": "2026-09-22T21:38:36.384Z",
+      "closedAt": "2026-09-22T21:46:18.116Z",
+      "attempts": 3,
+      "notes": [],
+      "gate": {
+        "ok": true,
+        "reasons": [],
+        "summary": "hero 85% (match)",
+        "score": 0.8523,
+        "verdict": "match",
+        "report": ".impeccable/review/diff/hero/report.json",
+        "sideBySide": "/Users/magneto/Projects/Autogram-macOS/.impeccable/review/diff/hero/side-by-side.png",
+        "worst": [
+          "pips drift 51%",
+          "app-window drift 54%",
+          "icon-light drift 55%"
+        ],
+        "worstIds": [
+          "pips",
+          "app-window",
+          "icon-light"
+        ],
+        "worstCrops": [
+          {
+            "id": "pips",
+            "verdict": "drift",
+            "score": {
+              "overall": 0.5102,
+              "structure": 0.6531,
+              "color": 0.5794,
+              "colorIntersection": 0.3477,
+              "paletteMatch": 0.7041,
+              "detail": 0.2872,
+              "detailRaw": 0.4851,
+              "detailAdded": 0.3958,
+              "bands": 0.4333
+            },
+            "file": ".impeccable/review/diff/hero/regions/pips.png"
+          },
+          {
+            "id": "app-window",
+            "verdict": "drift",
+            "score": {
+              "overall": 0.5395,
+              "structure": 0.43,
+              "color": 0.4892,
+              "colorIntersection": 0.2187,
+              "paletteMatch": 0.6349,
+              "detail": 0.5817,
+              "detailRaw": 0.639,
+              "detailAdded": 0.1146,
+              "bands": 0.8667
+            },
+            "file": ".impeccable/review/diff/hero/regions/app-window.png"
+          },
+          {
+            "id": "icon-light",
+            "verdict": "drift",
+            "score": {
+              "overall": 0.5519,
+              "structure": 0.5196,
+              "color": 0.608,
+              "colorIntersection": 0.466,
+              "paletteMatch": 0.6844,
+              "detail": 0.5447,
+              "detailRaw": 0.6385,
+              "detailAdded": 0.1875,
+              "bands": 0.56
+            },
+            "file": ".impeccable/review/diff/hero/regions/icon-light.png"
+          }
+        ],
+        "regionVerdicts": {
+          "nav-icon": "drift",
+          "nav-wordmark": "match",
+          "nav-links": "match",
+          "nav-lang": "match",
+          "nav-cta": "match",
+          "headline": "drift",
+          "subline": "match",
+          "cta-download": "match",
+          "cta-github": "drift",
+          "spec-line": "match",
+          "app-window": "drift",
+          "pips": "drift",
+          "pips-caption": "drift",
+          "divider": "drift",
+          "kartou-rule": "match",
+          "kartou-title": "drift",
+          "kartou-sub": "drift",
+          "mobilom-rule": "drift",
+          "mobilom-title": "drift",
+          "mobilom-sub": "drift",
+          "safari-rule": "drift",
+          "safari-title": "drift",
+          "safari-sub": "drift",
+          "icon-light": "drift"
+        },
+        "at": "2026-09-22T21:46:18.116Z"
+      },
+      "forced": null,
+      "records": 8,
+      "readingsSeen": {},
+      "history": [
+        {
+          "at": "2026-09-22T21:44:55.674Z",
+          "score": 0.8374,
+          "worstIds": [
+            "icon-light",
+            "kartou-rule",
+            "safari-rule"
+          ],
+          "regionVerdicts": {
+            "nav-icon": "drift",
+            "nav-wordmark": "match",
+            "nav-links": "match",
+            "nav-lang": "match",
+            "nav-cta": "match",
+            "headline": "drift",
+            "subline": "match",
+            "cta-download": "match",
+            "cta-github": "drift",
+            "spec-line": "match",
+            "app-window": "drift",
+            "pips": "drift",
+            "pips-caption": "drift",
+            "divider": "drift",
+            "kartou-rule": "missing",
+            "kartou-title": "drift",
+            "kartou-sub": "match",
+            "mobilom-rule": "missing",
+            "mobilom-title": "drift",
+            "mobilom-sub": "match",
+            "safari-rule": "missing",
+            "safari-title": "drift",
+            "safari-sub": "match",
+            "icon-light": "drift"
+          },
+          "artifactHash": "57ed146bef17"
+        },
+        {
+          "at": "2026-09-22T21:45:43.323Z",
+          "score": 0.849,
+          "worstIds": [
+            "pips",
+            "app-window",
+            "icon-light"
+          ],
+          "regionVerdicts": {
+            "nav-icon": "drift",
+            "nav-wordmark": "match",
+            "nav-links": "match",
+            "nav-lang": "match",
+            "nav-cta": "match",
+            "headline": "drift",
+            "subline": "match",
+            "cta-download": "match",
+            "cta-github": "drift",
+            "spec-line": "match",
+            "app-window": "drift",
+            "pips": "drift",
+            "pips-caption": "drift",
+            "divider": "drift",
+            "kartou-rule": "match",
+            "kartou-title": "drift",
+            "kartou-sub": "drift",
+            "mobilom-rule": "drift",
+            "mobilom-title": "drift",
+            "mobilom-sub": "drift",
+            "safari-rule": "drift",
+            "safari-title": "drift",
+            "safari-sub": "drift",
+            "icon-light": "drift"
+          },
+          "artifactHash": "285029c1edf8"
+        },
+        {
+          "at": "2026-09-22T21:46:18.116Z",
+          "score": 0.8523,
+          "worstIds": [
+            "pips",
+            "app-window",
+            "icon-light"
+          ],
+          "regionVerdicts": {
+            "nav-icon": "drift",
+            "nav-wordmark": "match",
+            "nav-links": "match",
+            "nav-lang": "match",
+            "nav-cta": "match",
+            "headline": "drift",
+            "subline": "match",
+            "cta-download": "match",
+            "cta-github": "drift",
+            "spec-line": "match",
+            "app-window": "drift",
+            "pips": "drift",
+            "pips-caption": "drift",
+            "divider": "drift",
+            "kartou-rule": "match",
+            "kartou-title": "drift",
+            "kartou-sub": "drift",
+            "mobilom-rule": "drift",
+            "mobilom-title": "drift",
+            "mobilom-sub": "drift",
+            "safari-rule": "drift",
+            "safari-title": "drift",
+            "safari-sub": "drift",
+            "icon-light": "drift"
+          },
+          "artifactHash": "18fb5a00b9f6"
+        }
+      ]
+    },
+    "sections": {
+      "status": "closed",
+      "openedAt": "2026-09-22T21:46:18.116Z",
+      "closedAt": "2026-09-22T22:12:48.462Z",
+      "attempts": 1,
+      "notes": [],
+      "gate": {
+        "ok": true,
+        "reasons": [],
+        "summary": "no mechanical gate",
+        "at": "2026-09-22T22:12:48.462Z"
+      },
+      "forced": null
+    },
+    "motion": {
+      "status": "closed",
+      "openedAt": "2026-09-22T22:12:48.462Z",
+      "closedAt": "2026-09-22T22:17:26.129Z",
+      "attempts": 1,
+      "notes": [],
+      "gate": {
+        "ok": true,
+        "reasons": [],
+        "summary": "no mechanical gate",
+        "at": "2026-09-22T22:17:26.128Z"
+      },
+      "forced": null
+    },
+    "responsive": {
+      "status": "closed",
+      "openedAt": "2026-09-22T22:17:26.129Z",
+      "closedAt": "2026-09-22T22:18:51.168Z",
+      "attempts": 2,
+      "notes": [],
+      "gate": {
+        "ok": true,
+        "reasons": [],
+        "summary": "desktop 85% (match)",
+        "score": 0.8525,
+        "sideBySide": "/Users/magneto/Projects/Autogram-macOS/.impeccable/review/diff/desktop/side-by-side.png",
+        "at": "2026-09-22T22:18:51.168Z"
+      },
+      "forced": null
+    },
+    "review": {
+      "status": "closed",
+      "openedAt": "2026-09-22T22:18:51.168Z",
+      "closedAt": "2026-09-22T22:42:45.940Z",
+      "attempts": 0,
+      "notes": [],
+      "gate": null,
+      "forced": null
+    }
+  },
+  "finish": {
+    "disposition": "ship",
+    "at": "2026-09-22T22:42:45.940Z",
+    "phaseAtFinish": "review"
+  },
+  "plates": {
+    "nav-icon": {
+      "status": "ok",
+      "score": 0.5362,
+      "size": "128x128"
+    },
+    "app-window": {
+      "status": "ok",
+      "score": 0.5407,
+      "size": "1556x1078"
+    },
+    "icon-light": {
+      "status": "ok",
+      "score": 0.4026,
+      "size": "880x1024"
+    }
+  }
+}
