@@ -97,7 +97,9 @@ final class EZZKStatusChecker {
     @ObservationIgnored private let evidenceStore: LocalEvidenceStore
     @ObservationIgnored private let numberPool: EvidenceNumberPool
     @ObservationIgnored private let currentMode: () -> AppSettings.EZZKMode
-    @ObservationIgnored private let makeCoordinator: () -> EZZKSubmissionCoordinator
+    /// Builds the coordinator for one EZZK mode: its submitter and lookup target that
+    /// mode's environment, whatever the controller's mode is by the time they run.
+    @ObservationIgnored private let makeCoordinator: (AppSettings.EZZKMode) -> EZZKSubmissionCoordinator
     @ObservationIgnored private let now: @Sendable () -> Date
     @ObservationIgnored private var inFlight: Set<UUID> = []
     @ObservationIgnored private var automaticAttempts: [UUID: [Date]] = [:]
@@ -106,7 +108,7 @@ final class EZZKStatusChecker {
     init(evidenceStore: LocalEvidenceStore,
          numberPool: EvidenceNumberPool,
          currentMode: @escaping () -> AppSettings.EZZKMode,
-         makeCoordinator: @escaping () -> EZZKSubmissionCoordinator,
+         makeCoordinator: @escaping (AppSettings.EZZKMode) -> EZZKSubmissionCoordinator,
          now: @escaping @Sendable () -> Date = { Date() }) {
         self.evidenceStore = evidenceStore
         self.numberPool = numberPool
@@ -126,16 +128,16 @@ final class EZZKStatusChecker {
             evidenceStore: evidenceStore,
             numberPool: numberPool,
             currentMode: { controller.mode },
-            makeCoordinator: {
+            makeCoordinator: { mode in
                 let lookup: EZZKRecordLookupFunction
-                if controller.isDemoMode {
+                if mode == .demo {
                     lookup = EZZKRecordLookupFunction { _ in EZZKRecordLookup(isProcessed: true, info: nil) }
                 } else {
                     lookup = EZZKRecordLookupFunction { number in
-                        try await controller.lookUp(evidenceNumber: number)
+                        try await controller.lookUp(evidenceNumber: number, in: mode)
                     }
                 }
-                return EZZKSubmissionCoordinator(submitter: controller.service, lookup: lookup)
+                return EZZKSubmissionCoordinator(submitter: controller.service(for: mode), lookup: lookup)
             })
     }
 
@@ -180,12 +182,16 @@ final class EZZKStatusChecker {
     /// sent (at most `automaticAttemptsPerDay` a day each), and unknown or accepted rows
     /// are looked up when their next check is due. Rows without an evidence number, of
     /// another mode, without a mode, or already being handled are left alone. A row
-    /// resolved in this pass is sent in the next one at the earliest.
+    /// resolved in this pass is sent in the next one at the earliest. The coordinator
+    /// targets the pass's mode, and the pass stops when the controller's mode changes.
     func runOnce() async {
         guard evidenceStore.loadError == nil else { return }
         let mode = currentMode()
-        let coordinator = makeCoordinator()
+        let coordinator = makeCoordinator(mode)
         for snapshot in evidenceStore.records {
+            // The advocate may switch the EZZK mode while a lookup or a send of this pass
+            // waits; the rest of the pass then belongs to the old mode and stops.
+            guard currentMode() == mode else { return }
             guard Self.hasEvidenceNumber(snapshot), snapshot.ezzkMode == mode,
                   !inFlight.contains(snapshot.id) else { continue }
             switch snapshot.status {
@@ -218,7 +224,7 @@ final class EZZKStatusChecker {
     /// sent when EZZK does not know the number.
     func submit(id: UUID) async -> RowResult {
         if let refusal = refusal(for: id) { return .refused(refusal) }
-        let coordinator = makeCoordinator()
+        let coordinator = makeCoordinator(currentMode())
         let result = await perform(id) { record in
             await Self.send(record, with: coordinator, store: self.evidenceStore)
         }
@@ -230,7 +236,7 @@ final class EZZKStatusChecker {
     /// is refreshed. Nothing is sent.
     func verify(id: UUID) async -> RowResult {
         if let refusal = refusal(for: id) { return .refused(refusal) }
-        let coordinator = makeCoordinator()
+        let coordinator = makeCoordinator(currentMode())
         let result = await perform(id) { record in
             switch record.status {
             case .outcomeUnknown: return await coordinator.resolveUnknown(record)
@@ -271,7 +277,7 @@ final class EZZKStatusChecker {
 
     /// When the row's next automatic lookup is due, or nil when none is planned.
     func nextStatusCheck(for record: EvidenceRecord) -> Date? {
-        makeCoordinator().nextStatusCheck(for: record)
+        makeCoordinator(record.ezzkMode ?? currentMode()).nextStatusCheck(for: record)
     }
 
     func isBusy(_ id: UUID) -> Bool {

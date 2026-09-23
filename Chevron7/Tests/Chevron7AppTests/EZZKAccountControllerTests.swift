@@ -166,6 +166,24 @@ final class EZZKAccountControllerTests: XCTestCase {
 
     private let loginSucceeded = #"<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope"><s:Body><OutputMessageOf_LogInOutput xmlns="http://ditec/2017/06/iam/core"><Content xmlns:i="http://www.w3.org/2001/XMLSchema-instance"><ErrorCode i:nil="true"/><Account><Id>1</Id><Name>ucet-test</Name></Account><TokenDescriptor>token-1</TokenDescriptor></Content></OutputMessageOf_LogInOutput></s:Body></s:Envelope>"#
 
+    /// A register row is looked up and sent in the environment of its own mode, even
+    /// after the controller switched to another one.
+    func testLookupAndServiceTargetTheGivenModeNotTheCurrentOne() async throws {
+        let environments = EnvironmentLog()
+        let transport = ScriptedTransport([])
+        let controller = makeController(mode: .demo, store: MemoryCredentialStore(), factory: {
+            environments.append($0)
+            return transport
+        })
+
+        _ = try? await controller.lookUp(evidenceNumber: "1563-260924-1", in: .test)
+        XCTAssertEqual(environments.values, [.sandbox])
+        XCTAssertEqual(transport.requestCount, 1)
+        XCTAssertTrue(controller.service(for: .test) is EZZKSOAPServiceAdapter)
+        XCTAssertTrue(controller.service(for: .demo) is MockEZZKService)
+        XCTAssertTrue(controller.service is MockEZZKService, "the current mode is still Demo")
+    }
+
     private let loginRejected = #"<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope"><s:Body><OutputMessageOf_LogInOutput xmlns="http://ditec/2017/06/iam/core"><Content xmlns:i="http://www.w3.org/2001/XMLSchema-instance"><ErrorCode>CORE-003</ErrorCode><Account i:nil="true"/><TokenDescriptor i:nil="true"/></Content></OutputMessageOf_LogInOutput></s:Body></s:Envelope>"#
 }
 

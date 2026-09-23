@@ -374,10 +374,42 @@ final class EvidenceSubmissionFlowTests: XCTestCase {
         XCTAssertEqual(store.record(id: legacy.id)?.updatedAt, legacy.updatedAt)
     }
 
+    /// Switching the EZZK mode while a pass waits on a lookup: the rest of the pass leaves
+    /// the old mode's rows alone, and every coordinator targeted the row's own mode.
+    func testModeSwitchDuringAPassStopsTheRestOfThePass() async throws {
+        let clock = TestClock("2026-09-24T10:00:00Z")
+        let lookup = SuspendingLookup(EZZKRecordLookup(isProcessed: true, info: nil))
+        let submitter = ScriptedSubmitter([])
+        let (checker, store) = makeChecker(mode: .test, submitter: submitter, lookup: lookup, clock: clock)
+        _ = try addRow(.queuedForSubmission, number: "1563-260924-3", to: store, clock: clock)
+        var second = try addRow(.acceptedForProcessing, number: "1563-260924-2", to: store, clock: clock)
+        second.submittedAt = clock.now.addingTimeInterval(-10 * 60)
+        store.upsert(second)
+        var first = try addRow(.acceptedForProcessing, number: "1563-260924-1", to: store, clock: clock)
+        first.submittedAt = clock.now.addingTimeInterval(-10 * 60)
+        store.upsert(first)
+        XCTAssertEqual(store.records.first?.id, first.id, "the pass starts with the row whose lookup waits")
+
+        let pass = Task { await checker.runOnce() }
+        try await lookup.waitUntilLooking()
+        currentMode = .demo
+        lookup.release()
+        await pass.value
+
+        XCTAssertEqual(lookup.numbers, ["1563-260924-1"], "no lookup after the switch")
+        XCTAssertEqual(submitter.calls, 0, "no send after the switch")
+        XCTAssertEqual(store.record(id: second.id)?.lastLookupAt, nil)
+        XCTAssertEqual(Set(coordinatorModes), [.test], "every coordinator targets the row's own mode")
+    }
+
     // MARK: - Fixtures
 
     private var storeRoot: URL!
     private var pool: EvidenceNumberPool!
+    /// The controller's mode as the checker sees it; tests switch it mid-pass.
+    private var currentMode: AppSettings.EZZKMode = .test
+    /// The mode of every coordinator the checker built, in order.
+    private var coordinatorModes: [AppSettings.EZZKMode] = []
 
     private func makeChecker(mode: AppSettings.EZZKMode, submitter: any EZZKSubmissionTransport,
                              lookup: any EZZKRecordLookingUp,
@@ -385,12 +417,17 @@ final class EvidenceSubmissionFlowTests: XCTestCase {
         storeRoot = makeTemporaryDirectory("submission-flow")
         let store = LocalEvidenceStore(directory: storeRoot)
         pool = EvidenceNumberPool(directory: storeRoot)
+        currentMode = mode
+        coordinatorModes = []
         let now: @Sendable () -> Date = { clock.now }
         let checker = EZZKStatusChecker(
             evidenceStore: store,
             numberPool: pool,
-            currentMode: { mode },
-            makeCoordinator: { EZZKSubmissionCoordinator(submitter: submitter, lookup: lookup, now: now) },
+            currentMode: { [unowned self] in self.currentMode },
+            makeCoordinator: { [unowned self] rowMode in
+                self.coordinatorModes.append(rowMode)
+                return EZZKSubmissionCoordinator(submitter: submitter, lookup: lookup, now: now)
+            },
             now: now)
         return (checker, store)
     }
@@ -515,5 +552,50 @@ private final class ScriptedLookup: EZZKRecordLookingUp, @unchecked Sendable {
             return first
         }
         return try next.get()
+    }
+}
+
+/// Holds the first lookup until the test releases it; later lookups answer at once.
+private final class SuspendingLookup: EZZKRecordLookingUp, @unchecked Sendable {
+    private let lock = NSLock()
+    private let answer: EZZKRecordLookup
+    private var waiting: CheckedContinuation<Void, Never>?
+    private var held = false
+    private var asked: [String] = []
+
+    init(_ answer: EZZKRecordLookup) {
+        self.answer = answer
+    }
+
+    var numbers: [String] { lock.withLock { asked } }
+
+    func publicRecord(evidenceNumber: String) async throws -> EZZKRecordLookup {
+        let hold: Bool = lock.withLock {
+            asked.append(evidenceNumber)
+            defer { held = true }
+            return !held
+        }
+        if hold {
+            await withCheckedContinuation { continuation in
+                lock.withLock { waiting = continuation }
+            }
+        }
+        return answer
+    }
+
+    func waitUntilLooking() async throws {
+        for _ in 0..<1000 {
+            if lock.withLock({ waiting != nil }) { return }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        XCTFail("the lookup never started")
+    }
+
+    func release() {
+        let continuation: CheckedContinuation<Void, Never>? = lock.withLock {
+            defer { waiting = nil }
+            return waiting
+        }
+        continuation?.resume()
     }
 }
