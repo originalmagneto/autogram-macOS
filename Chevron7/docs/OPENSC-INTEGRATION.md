@@ -1,6 +1,6 @@
 # OpenSC as a signing driver
 
-Status (2026-09-23): **prepared, not verified on a card.** The work lives on the branch `feature/opensc-driver`. It must not reach `main` before a real card has signed through it: every push to `main` with a `feat` or `fix` commit publishes a release (`.github/workflows/release.yml`), so merging this branch ships it to users.
+Status (2026-09-23): **prepared, not verified on a card; OpenSC does not recognise the IDEMIA Cosmo 9.2 eID (see Findings).** The work lives on the branch `feature/opensc-driver`. It must not reach `main` before a real card has signed through it: every push to `main` with a `feat` or `fix` commit publishes a release (`.github/workflows/release.yml`), so merging this branch ships it to users.
 
 The goal is a second, open-source route to the card next to the vendor middleware. For the Slovak eID it could replace the eID klient; for other cards it could replace proprietary drivers. The eID klient stays the preferred driver until the open questions below are answered.
 
@@ -113,4 +113,16 @@ Each prompt is self-contained: paste it into a fresh session in this repository.
 
 ## Findings
 
-(Empty. Add dated findings with sources here.)
+### 2026-09-23: OpenSC does not handle the IDEMIA Cosmo 9.2 eID (prompt A, partial)
+
+Mac Studio, macOS 27.0, OpenSC 0.27.1 from Homebrew (`/opt/homebrew/lib/opensc-pkcs11.so`), contact reader "Generic EMV Smartcard Reader 01". Everything below ran without a login, PIN or BOK.
+
+- The owner's eID has ATR `3b:df:18:ff:81:b1:fe:45:1f:87:00:31:b9:64:09:37:72:13:73:84:01:e0:00:00:00:8e`. The eID klient module (`pkcs11-tool --module /Applications/eID_klient.app/Contents/Frameworks/libPkcs11.dylib -I -L`) reports it as **IDEMIA "Cosmo 9.2, CombI"** (hardware 9.2, firmware 2.2), not the CardOS 5.4 chip of eID v3.
+- `opensc-tool --name` answers "Unsupported card"; `pkcs11-tool -L` shows the slot as "token not recognized"; `pkcs15-tool --list-certificates|--list-keys|--list-pins` fail with "Card is invalid or cannot be handled".
+- Forcing a driver does not help: `-c skeid` / `OPENSC_DRIVER=skeid` fails ("Internal error", then "Card is invalid or cannot be handled"), `iasecc` fails ("Card does not support the requested operation"), `default` answers "Unsupported card".
+- `card-skeid.c` matches only `3b:d2:18:00:81:31:fe:58:c9:04:11` in both the `0.27.1` tag and `master` (checked 2026-09-23, https://github.com/OpenSC/OpenSC/blob/master/src/libopensc/card-skeid.c line 48).
+- Through the eID klient the same card shows two PKCS#11 slots, `Sig_ZEP` and `Sig_EP`, both with "PIN pad present" (protected authentication path) and PIN length 6/6.
+
+Consequence: with today's OpenSC, the `opensc` driver cannot sign with an IDEMIA Cosmo 9.2 eID at all. The route stays open only for eID v3 (CardOS 5.4) cards, which still need a card to verify, or after OpenSC gains a driver for the Cosmo generation. The eID klient remains the only way to sign with this card.
+
+Also seen on the same Mac: an I.CA SAK card (ATR `3b:da:96:ff:81:b1:fe:45:1f:07:80:58:49:43:41:20:56:32:2e:30:e9`, "XICA V2.0") is "Unsupported card" in OpenSC too; the I.CA SecureStore driver handles it.
