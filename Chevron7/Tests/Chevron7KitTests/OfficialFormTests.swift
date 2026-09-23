@@ -27,12 +27,23 @@ final class OfficialFormTests: XCTestCase {
         XCTAssertEqual(clause.presentationMediaDestination, "HTML")
     }
 
+    func testRecordValidationSchemaDiffersOnlyInTheIdentifierPattern() throws {
+        let official = String(decoding: OfficialForm.record_1_0.schema, as: UTF8.self).components(separatedBy: "\n")
+        let validation = String(decoding: OfficialForm.record_1_0.validationSchema, as: UTF8.self).components(separatedBy: "\n")
+        XCTAssertEqual(official.count, validation.count)
+        let changed = zip(official, validation).filter { $0 != $1 }
+        XCTAssertEqual(changed.count, 1)
+        XCTAssertTrue(changed.first?.1.contains("https://data\\.gov\\.sk/id/legal-subject/([0-9]{8}|[0-9]{12})") == true)
+        XCTAssertEqual(OfficialForm.clause_1_3.validationSchema, OfficialForm.clause_1_3.schema)
+    }
+
     func testEmbeddedFilesEqualTheReferenceCopiesAndProvenance() throws {
         let provenance = try JSONSerialization.jsonObject(
             with: Data(contentsOf: formsDirectory.appendingPathComponent("provenance.json"))) as? [String: Any]
         let files = try XCTUnwrap(provenance?["files"] as? [String: [String: String]])
         let embedded: [(String, Data)] = [
             ("record-1.0/schema.xsd", OfficialForm.record_1_0.schema),
+            ("record-1.0/schema.validation.xsd", OfficialForm.record_1_0.validationSchema),
             ("record-1.0/form103.sb.xslt", OfficialForm.record_1_0.presentation),
             ("clause-1.3/schema.xsd", OfficialForm.clause_1_3.schema),
             ("clause-1.3/form.2.html2.xslt", OfficialForm.clause_1_3.presentation),

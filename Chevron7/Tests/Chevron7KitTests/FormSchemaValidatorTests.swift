@@ -23,6 +23,15 @@ final class FormSchemaValidatorTests: XCTestCase {
         }
     }
 
+    func testRecordSchemaCompilesAndRejectsAWrongRoot() {
+        let xml = Data("<Nothing xmlns=\"\(OfficialForm.record_1_0.namespace)\"/>".utf8)
+        XCTAssertThrowsError(try validator.validate(xml, against: .record_1_0)) { error in
+            guard case FormSchemaValidator.Failure.invalid(let details) = error else { return XCTFail("\(error)") }
+            XCTAssertFalse(details.contains("failed to compile"), details)
+            XCTAssertTrue(details.contains("Nothing"), details)
+        }
+    }
+
     func testMissingValidatorIsReported() {
         let missing = FormSchemaValidator(xmllintURL: URL(fileURLWithPath: "/nonexistent/xmllint"))
         XCTAssertThrowsError(try missing.validate(Data("<a/>".utf8), against: .clause_1_3)) { error in

@@ -36,7 +36,7 @@ public struct FormSchemaValidator: Sendable {
         defer { try? FileManager.default.removeItem(at: directory) }
         let schemaURL = directory.appendingPathComponent("schema.xsd")
         let documentURL = directory.appendingPathComponent("document.xml")
-        try form.schema.write(to: schemaURL)
+        try form.validationSchema.write(to: schemaURL)
         try xml.write(to: documentURL)
 
         let process = Process()

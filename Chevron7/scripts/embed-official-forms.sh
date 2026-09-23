@@ -11,6 +11,7 @@ root = pathlib.Path(sys.argv[1])
 forms = root / "docs/reference/forms"
 files = [
     ("recordSchema", forms / "record-1.0/schema.xsd"),
+    ("recordValidationSchema", forms / "record-1.0/schema.validation.xsd"),
     ("recordPresentation", forms / "record-1.0/form103.sb.xslt"),
     ("clauseSchema", forms / "clause-1.3/schema.xsd"),
     ("clausePresentation", forms / "clause-1.3/form.2.html2.xslt"),
@@ -33,7 +34,8 @@ out = [
 ]
 for name, path in files:
     out.append(f'    static let {name} = Data(base64Encoded: "{base64.b64encode(path.read_bytes()).decode()}")!')
-    out.append(f'    static let {name}Digest = "{digest(path)}"')
+    if name != "recordValidationSchema":
+        out.append(f'    static let {name}Digest = "{digest(path)}"')
 out.append("}")
 target = root / "Sources/Chevron7Kit/Attestation/Forms/OfficialFormFiles.swift"
 target.parent.mkdir(parents=True, exist_ok=True)

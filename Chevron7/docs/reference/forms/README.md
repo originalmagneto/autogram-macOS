@@ -10,3 +10,8 @@ After changing any file here, run `scripts/embed-official-forms.sh` and commit t
 `Sources/Chevron7Kit/Attestation/Forms/OfficialFormFiles.swift`. `OfficialFormTests` fails when
 the two drift apart. The record digests must stay equal to those of the record EZZK accepted on
 2026-08-24 (spec: `docs/superpowers/specs/2026-09-23-ezzk-part-b-design.md`).
+
+`record-1.0/schema.validation.xsd` is a derived copy of `record-1.0/schema.xsd` with only the
+`IdentifierValueType` pattern's escaped slashes unescaped, because libxml2 (`xmllint`) rejects
+`\/` in a schema pattern and cannot compile the official file as-is. It is used only for local
+validation; every XMLDataContainer reference and digest still points at the official `schema.xsd`.
