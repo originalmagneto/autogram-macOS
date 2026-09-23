@@ -63,15 +63,21 @@ public actor EZZKSOAPClient {
         return try await task.value
     }
 
+    /// Keeps the current token until the login ends: a call still using it must not see it
+    /// vanish mid-flight. The token is replaced on success and dropped when the credentials
+    /// are missing or rejected.
     private func performLogIn() async throws -> String {
-        token = nil
         guard let credentials = try credentialsProvider(),
               !credentials.login.isEmpty, !credentials.password.isEmpty else {
+            token = nil
             throw EZZKError.notConfigured
         }
         let fingerprint = SHA256.hash(data: Data((credentials.login + "\u{0}" + credentials.password).utf8))
         if let rejectedCredentials {
-            if rejectedCredentials.fingerprint == fingerprint { throw rejectedCredentials.error }
+            if rejectedCredentials.fingerprint == fingerprint {
+                token = nil
+                throw rejectedCredentials.error
+            }
             self.rejectedCredentials = nil
         }
         let (data, response) = try await send(.login(login: credentials.login, password: credentials.password))
@@ -82,6 +88,7 @@ public actor EZZKSOAPClient {
         if let code = outcome.errorCode {
             let error = code == "CORE-018" ? EZZKError.accountLocked : EZZKError.credentialsRejected(code: code)
             rejectedCredentials = (fingerprint, error)
+            token = nil
             throw error
         }
         guard let newToken = outcome.token else { throw EZZKError.invalidResponse }
@@ -130,13 +137,14 @@ public actor EZZKSOAPClient {
             object: EZZKSOAPResponseParser.objectData(in: document))
     }
 
-    /// Hands the records to EZZK and returns the `MessageId` sent with them, so a record
-    /// whose outcome is unknown can be matched with what EZZK later reports.
+    /// Hands the records to EZZK. Only when EZZK accepts them does it return a receipt: the
+    /// `MessageId` sent in the body and the time the reply arrived. A failure throws and
+    /// carries no receipt.
     public func receive(records: [EZZKRecordAttachment], person: EZZKPerson) async throws -> EZZKSOAPSubmissionReceipt {
         guard person.isComplete else { throw EZZKError.notConfigured }
         let messageID = UUID()
-        let submittedAt = now()
         let document = try await perform(.receive(records: records, person: person, messageID: messageID))
+        let submittedAt = now()
         try EZZKSOAPResponseParser.requireSuccess(document)
         return EZZKSOAPSubmissionReceipt(messageID: messageID.uuidString.lowercased(), submittedAt: submittedAt)
     }
@@ -152,22 +160,27 @@ public actor EZZKSOAPClient {
         if request.requiresAuthentication, token == nil {
             try await logIn()
         }
-        if case let .document(document) = try await attempt(request) {
+        let sentToken = token
+        if case let .document(document) = try await attempt(request, sessionToken: sentToken) {
             return document
         }
         guard request.requiresAuthentication else { throw EZZKError.authenticationFailed }
         // EZZK rejected the token before acting on the request, so one fresh login and
-        // one repeat are safe even for consequential calls.
-        try await logIn()
-        if case let .document(document) = try await attempt(request) {
+        // one repeat are safe even for consequential calls. Another call may already have
+        // replaced the rejected token meanwhile; then the repeat uses the new one.
+        if token == nil || token == sentToken {
+            try await logIn()
+        }
+        let retryToken = token
+        if case let .document(document) = try await attempt(request, sessionToken: retryToken) {
             return document
         }
-        token = nil
+        if token == retryToken { token = nil }
         throw EZZKError.authenticationFailed
     }
 
-    private func attempt(_ request: EZZKSOAPRequest) async throws -> EZZKSOAPReply {
-        let (data, response) = try await send(request)
+    private func attempt(_ request: EZZKSOAPRequest, sessionToken: String?) async throws -> EZZKSOAPReply {
+        let (data, response) = try await send(request, sessionToken: sessionToken)
         do {
             return try EZZKSOAPResponseParser.reply(data: data, statusCode: response.statusCode)
         } catch EZZKError.networkFailure where request.isConsequential && response.statusCode >= 500 {
@@ -177,10 +190,12 @@ public actor EZZKSOAPClient {
         }
     }
 
-    private func send(_ request: EZZKSOAPRequest) async throws -> (Data, HTTPURLResponse) {
+    /// Sends the request with the given token as cookie, so the caller knows exactly which
+    /// token EZZK saw even when another call replaces `token` meanwhile.
+    private func send(_ request: EZZKSOAPRequest, sessionToken: String? = nil) async throws -> (Data, HTTPURLResponse) {
         var urlRequest = request.urlRequest(in: environment)
-        if request.requiresAuthentication, let token {
-            urlRequest.setValue("IamTokenDescriptor=\(token)", forHTTPHeaderField: "Cookie")
+        if request.requiresAuthentication, let sessionToken {
+            urlRequest.setValue("IamTokenDescriptor=\(sessionToken)", forHTTPHeaderField: "Cookie")
         }
         do {
             return try await transport.send(urlRequest)

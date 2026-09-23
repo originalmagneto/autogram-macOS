@@ -134,3 +134,63 @@ final class SOAPScriptedTransport: EZZKHTTPTransport, @unchecked Sendable {
         }
     }
 }
+
+/// Answers each request through an async handler, so a test can hold a reply until other
+/// requests have arrived. The handler gets the SOAP operation and its per-operation index.
+final class SOAPHandlerTransport: EZZKHTTPTransport, @unchecked Sendable {
+    typealias Handler = @Sendable (_ operation: String, _ index: Int, _ transport: SOAPHandlerTransport) async throws
+        -> SOAPScriptedTransport.Step
+
+    private let lock = NSLock()
+    private var recorded: [URLRequest] = []
+    private let handler: Handler
+
+    init(_ handler: @escaping Handler) {
+        self.handler = handler
+    }
+
+    var requests: [URLRequest] {
+        lock.withLock { recorded }
+    }
+
+    var operations: [String] {
+        requests.map(Self.operation(of:))
+    }
+
+    func count(of operation: String) -> Int {
+        operations.filter { $0 == operation }.count
+    }
+
+    /// Polls until the condition holds or the timeout passes; returns whether it held.
+    @discardableResult
+    func waitUntil(timeout: Duration = .seconds(5), _ condition: @Sendable () -> Bool) async -> Bool {
+        let deadline = ContinuousClock.now + timeout
+        while !condition() {
+            if ContinuousClock.now >= deadline { return false }
+            try? await Task.sleep(for: .milliseconds(1))
+        }
+        return true
+    }
+
+    func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        let operation = Self.operation(of: request)
+        let index: Int = lock.withLock {
+            recorded.append(request)
+            return recorded.filter { Self.operation(of: $0) == operation }.count - 1
+        }
+        switch try await handler(operation, index, self) {
+        case let .reply(status, body, headers):
+            let response = HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: "HTTP/1.1",
+                                           headerFields: headers)!
+            return (Data(body.utf8), response)
+        case let .fail(error):
+            throw error
+        }
+    }
+
+    private static func operation(of request: URLRequest) -> String {
+        request.value(forHTTPHeaderField: "Content-Type")?
+            .components(separatedBy: "/").last?
+            .replacingOccurrences(of: "\"", with: "") ?? ""
+    }
+}
