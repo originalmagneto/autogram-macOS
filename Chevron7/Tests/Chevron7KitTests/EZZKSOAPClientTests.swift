@@ -253,6 +253,107 @@ final class EZZKSOAPClientTests: XCTestCase {
         XCTAssertEqual(transport.requests.count, 2)
     }
 
+    func testReceiveReturnsTheMessageIDItSent() async throws {
+        let transport = SOAPScriptedTransport([
+            .ok(EZZKSOAPFixtures.loginSucceeded()),
+            .ok(EZZKSOAPFixtures.result(code: 0, description: "OK", operation: "ReceiveConversionRecord"))
+        ])
+        let record = EZZKRecordAttachment(evidenceNumber: "1563-260917-1", mimeType: "application/vnd.etsi.asic-e+zip",
+                                          data: Data("asic".utf8))
+
+        let receipt = try await makeClient(transport).receive(records: [record], person: person)
+
+        let body = try XCTUnwrap(transport.requests.last?.httpBody.map { String(decoding: $0, as: UTF8.self) })
+        let sent = try XCTUnwrap(body.range(of: #"(?<=<w:MessageId>)[^<]+"#, options: .regularExpression))
+        XCTAssertEqual(receipt.messageID, String(body[sent]))
+        XCTAssertEqual(receipt.messageID, receipt.messageID.lowercased())
+        XCTAssertNotNil(UUID(uuidString: receipt.messageID))
+        XCTAssertEqual(receipt.submittedAt, Date(timeIntervalSince1970: 1_789_653_359))
+        XCTAssertEqual(transport.operations, ["LogIn", "ReceiveConversionRecord"])
+    }
+
+    func testConcurrentAuthenticatedCallsShareOneLogin() async throws {
+        let transport = SOAPScriptedTransport([
+            .ok(EZZKSOAPFixtures.loginSucceeded()),
+            .ok(EZZKSOAPFixtures.evidenceNumbers(["a"])),
+            .ok(EZZKSOAPFixtures.evidenceNumbers(["b"]))
+        ])
+        let client = makeClient(transport)
+        let person = person
+
+        async let first = client.evidenceNumbers(for: person)
+        async let second = client.evidenceNumbers(for: person)
+        let numbers = try await [first, second].flatMap { $0 }
+
+        XCTAssertEqual(Set(numbers), ["a", "b"])
+        XCTAssertEqual(transport.operations.filter { $0 == "LogIn" }.count, 1)
+        XCTAssertEqual(transport.requests.count, 3)
+    }
+
+    func testRejectedPasswordStopsFurtherLoginsUntilCredentialsChange() async throws {
+        let transport = SOAPScriptedTransport([
+            .ok(EZZKSOAPFixtures.loginRejected(code: "CORE-003")),
+            .ok(EZZKSOAPFixtures.loginSucceeded()),
+            .ok(EZZKSOAPFixtures.evidenceNumbers(["a"]))
+        ])
+        let credentials = MutableCredentials(EZZKSOAPCredentials(login: "ucet", password: "zle-heslo"))
+        let client = EZZKSOAPClient(environment: .sandbox, transport: transport,
+                                    credentials: { credentials.value },
+                                    now: { Date(timeIntervalSince1970: 1_789_653_359) })
+
+        await assertThrows(EZZKError.credentialsRejected(code: "CORE-003")) {
+            _ = try await client.evidenceNumbers(for: self.person)
+        }
+        XCTAssertEqual(transport.requests.count, 1)
+
+        await assertThrows(EZZKError.credentialsRejected(code: "CORE-003")) {
+            _ = try await client.evidenceNumbers(for: self.person)
+        }
+        XCTAssertEqual(transport.requests.count, 1)
+
+        credentials.value = EZZKSOAPCredentials(login: "ucet", password: "heslo")
+        let numbers = try await client.evidenceNumbers(for: person)
+
+        XCTAssertEqual(numbers, ["a"])
+        XCTAssertEqual(transport.operations, ["LogIn", "LogIn", "GetConversionRecordEvidenceNumber"])
+    }
+
+    func testLockedAccountStopsFurtherLoginsWithTheSameCredentials() async {
+        let transport = SOAPScriptedTransport([.ok(EZZKSOAPFixtures.loginRejected(code: "CORE-018"))])
+        let client = makeClient(transport)
+
+        await assertThrows(EZZKError.accountLocked) {
+            _ = try await client.evidenceNumbers(for: self.person)
+        }
+        await assertThrows(EZZKError.accountLocked) {
+            try await client.logIn()
+        }
+        XCTAssertEqual(transport.requests.count, 1)
+    }
+
+    func testConnectionLostDuringReceiveIsOutcomeUnknown() async {
+        let record = EZZKRecordAttachment(evidenceNumber: "1563-260917-1", mimeType: "application/vnd.etsi.asic-e+zip",
+                                          data: Data("asic".utf8))
+        for code in [URLError.Code.networkConnectionLost, .notConnectedToInternet] {
+            let transport = SOAPScriptedTransport([.ok(EZZKSOAPFixtures.loginSucceeded()), .fail(URLError(code))])
+            await assertThrows(EZZKError.outcomeUnknown) {
+                _ = try await self.makeClient(transport).receive(records: [record], person: self.person)
+            }
+            XCTAssertEqual(transport.requests.count, 2, "\(code)")
+        }
+
+        let transport = SOAPScriptedTransport([.ok(EZZKSOAPFixtures.loginSucceeded()),
+                                               .fail(URLError(.cannotConnectToHost))])
+        do {
+            _ = try await makeClient(transport).receive(records: [record], person: person)
+            XCTFail("expected networkFailure")
+        } catch {
+            guard case .networkFailure = error as? EZZKError else {
+                return XCTFail("expected networkFailure, got \(error)")
+            }
+        }
+    }
+
     private func makeClient(_ transport: SOAPScriptedTransport) -> EZZKSOAPClient {
         EZZKSOAPClient(environment: .sandbox, transport: transport,
                        credentials: { EZZKSOAPCredentials(login: "ucet", password: "heslo") },
@@ -267,5 +368,20 @@ final class EZZKSOAPClientTests: XCTestCase {
         } catch {
             XCTAssertEqual(error as? EZZKError, expected, file: file, line: line)
         }
+    }
+}
+
+/// Credentials the test can change between calls, as a Keychain item changes after a new sign-in.
+private final class MutableCredentials: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: EZZKSOAPCredentials
+
+    init(_ credentials: EZZKSOAPCredentials) {
+        stored = credentials
+    }
+
+    var value: EZZKSOAPCredentials {
+        get { lock.withLock { stored } }
+        set { lock.withLock { stored = newValue } }
     }
 }

@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Marián Čuprík
 // SPDX-License-Identifier: EUPL-1.2
 
+import CryptoKit
 import Foundation
 
 public struct EZZKOwnRecord: Sendable {
@@ -9,8 +10,22 @@ public struct EZZKOwnRecord: Sendable {
     public var object: Data?
 }
 
+/// What was handed to EZZK for one `ReceiveConversionRecord` call.
+public struct EZZKSOAPSubmissionReceipt: Equatable, Sendable {
+    /// The `MessageId` sent in the request body (lowercased UUID).
+    public var messageID: String
+    public var submittedAt: Date
+
+    public init(messageID: String, submittedAt: Date) {
+        self.messageID = messageID
+        self.submittedAt = submittedAt
+    }
+}
+
 /// Talks to one EZZK environment through the Ditec SOAP service. The token lives only
 /// in this actor; the password is read from the credentials provider for each login.
+/// Concurrent calls share one login, and credentials EZZK rejected are never sent again
+/// by this client, so repeated attempts cannot lock the advocate's account.
 public actor EZZKSOAPClient {
     public typealias CredentialsProvider = @Sendable () throws -> EZZKSOAPCredentials?
 
@@ -19,6 +34,9 @@ public actor EZZKSOAPClient {
     private let credentialsProvider: CredentialsProvider
     private let now: @Sendable () -> Date
     private var token: String?
+    private var loginTask: Task<String, Error>?
+    /// SHA-256 of the credentials EZZK last rejected and the error it gave, in memory only.
+    private var rejectedCredentials: (fingerprint: SHA256.Digest, error: EZZKError)?
 
     public init(environment: EZZKEnvironment, transport: any EZZKHTTPTransport,
                 credentials: @escaping CredentialsProvider,
@@ -30,12 +48,31 @@ public actor EZZKSOAPClient {
     }
 
     /// Logs in with the provided credentials and returns the account name EZZK reports.
+    /// A call made while another login is in flight waits for that login instead of
+    /// starting a second one.
     @discardableResult
     public func logIn() async throws -> String {
+        if let loginTask { return try await loginTask.value }
+        // An unstructured task: a caller that is cancelled while waiting does not cancel
+        // the login the other callers wait for.
+        let task = Task<String, Error> {
+            defer { loginTask = nil }
+            return try await performLogIn()
+        }
+        loginTask = task
+        return try await task.value
+    }
+
+    private func performLogIn() async throws -> String {
         token = nil
         guard let credentials = try credentialsProvider(),
               !credentials.login.isEmpty, !credentials.password.isEmpty else {
             throw EZZKError.notConfigured
+        }
+        let fingerprint = SHA256.hash(data: Data((credentials.login + "\u{0}" + credentials.password).utf8))
+        if let rejectedCredentials {
+            if rejectedCredentials.fingerprint == fingerprint { throw rejectedCredentials.error }
+            self.rejectedCredentials = nil
         }
         let (data, response) = try await send(.login(login: credentials.login, password: credentials.password))
         guard case let .document(document) = try EZZKSOAPResponseParser.reply(data: data, statusCode: response.statusCode) else {
@@ -43,7 +80,9 @@ public actor EZZKSOAPClient {
         }
         let outcome = EZZKSOAPResponseParser.login(in: document)
         if let code = outcome.errorCode {
-            throw code == "CORE-018" ? EZZKError.accountLocked : EZZKError.credentialsRejected(code: code)
+            let error = code == "CORE-018" ? EZZKError.accountLocked : EZZKError.credentialsRejected(code: code)
+            rejectedCredentials = (fingerprint, error)
+            throw error
         }
         guard let newToken = outcome.token else { throw EZZKError.invalidResponse }
         token = newToken
@@ -91,10 +130,15 @@ public actor EZZKSOAPClient {
             object: EZZKSOAPResponseParser.objectData(in: document))
     }
 
-    public func receive(records: [EZZKRecordAttachment], person: EZZKPerson) async throws {
+    /// Hands the records to EZZK and returns the `MessageId` sent with them, so a record
+    /// whose outcome is unknown can be matched with what EZZK later reports.
+    public func receive(records: [EZZKRecordAttachment], person: EZZKPerson) async throws -> EZZKSOAPSubmissionReceipt {
         guard person.isComplete else { throw EZZKError.notConfigured }
-        let document = try await perform(.receive(records: records, person: person))
+        let messageID = UUID()
+        let submittedAt = now()
+        let document = try await perform(.receive(records: records, person: person, messageID: messageID))
         try EZZKSOAPResponseParser.requireSuccess(document)
+        return EZZKSOAPSubmissionReceipt(messageID: messageID.uuidString.lowercased(), submittedAt: submittedAt)
     }
 
     private func perform(_ request: EZZKSOAPRequest) async throws -> XMLDocument {
@@ -143,6 +187,9 @@ public actor EZZKSOAPClient {
         } catch let error as EZZKError {
             throw error
         } catch let error as URLError where Self.neverReachedServer(error) {
+            // Only a failure to reach the host proves EZZK never saw the request. Any other
+            // failure (a lost connection, the device going offline) may have happened after
+            // the request was sent.
             throw EZZKError.networkFailure(error.localizedDescription)
         } catch is CancellationError where !request.isConsequential {
             // A cancelled read is not a network failure; the caller decides what to show.
@@ -155,7 +202,7 @@ public actor EZZKSOAPClient {
     }
 
     static func neverReachedServer(_ error: URLError) -> Bool {
-        [.notConnectedToInternet, .cannotFindHost, .cannotConnectToHost, .dnsLookupFailed].contains(error.code)
+        [.cannotFindHost, .cannotConnectToHost, .dnsLookupFailed].contains(error.code)
     }
 
     static func httpDate(_ value: String) -> Date? {

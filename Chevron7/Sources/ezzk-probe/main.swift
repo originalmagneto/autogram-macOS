@@ -104,11 +104,12 @@ Task.detached {
         case "receive":
             guard let number, let file = option("--file") else { fail(usage, code: 2) }
             let data = try Data(contentsOf: URL(fileURLWithPath: file))
-            try await client.receive(records: [EZZKRecordAttachment(evidenceNumber: number,
-                                                                    mimeType: "application/vnd.etsi.asic-e+zip",
-                                                                    data: data)],
-                                     person: person)
+            let receipt = try await client.receive(records: [EZZKRecordAttachment(evidenceNumber: number,
+                                                                                  mimeType: "application/vnd.etsi.asic-e+zip",
+                                                                                  data: data)],
+                                                   person: person)
             print("Prijaté na spracovanie: \(number)")
+            print("MessageId: \(receipt.messageID)")
         case "record":
             guard let number, let out = option("--out") else { fail(usage, code: 2) }
             let purpose: EZZKRecordPurpose = option("--purpose") == "xml" ? .xml : .original
