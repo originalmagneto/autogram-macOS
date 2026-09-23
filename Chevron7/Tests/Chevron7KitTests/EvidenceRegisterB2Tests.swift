@@ -96,6 +96,38 @@ final class EvidenceRegisterB2Tests: XCTestCase {
                       "Expected a register.unreadable-<timestamp>.json copy next to the original")
     }
 
+    /// A register.json that exists but cannot be read at all (here a folder in its place,
+    /// in real life a permission or disk error) is a load failure too: never treated as an
+    /// empty register that the next write would replace.
+    func testRegisterThatExistsButCannotBeReadIsALoadFailure() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let registerURL = directory.appendingPathComponent("Evidence/register.json")
+        try FileManager.default.createDirectory(at: registerURL, withIntermediateDirectories: true)
+
+        let store = LocalEvidenceStore(directory: directory)
+        XCTAssertNotNil(store.loadError)
+        XCTAssertTrue(store.records.isEmpty)
+
+        let record = EvidenceRecord(status: .draft, direction: .paperToElectronic, originalName: "b", newDocumentName: "b.pdf",
+                                    evidenceNumber: nil, fingerprintSHA256Hex: "cd", attestationXML: "<x/>",
+                                    conversionTime: Date(), performingPersonName: "N", securityElementCount: 0,
+                                    totalPages: 1, totalSheets: 1)
+        store.upsert(record)
+        var isDirectory: ObjCBool = false
+        XCTAssertTrue(FileManager.default.fileExists(atPath: registerURL.path, isDirectory: &isDirectory))
+        XCTAssertTrue(isDirectory.boolValue, "nothing may be written over an unreadable register")
+    }
+
+    /// The 24-hour "Po lehote" must not hide what the advocate has to do next: an unknown
+    /// outcome is looked up first, and a late row carries its own warning.
+    func testOverdueDoesNotHideUnknownOrLateLabels() {
+        XCTAssertEqual(UXLabels.evidenceStatusLabel(for: .outcomeUnknown, isOverdue: true),
+                       "Výsledok neznámy, najprv overte v EZZK")
+        XCTAssertEqual(UXLabels.evidenceStatusLabel(for: .late, isOverdue: true), "Oneskorený")
+        XCTAssertEqual(UXLabels.evidenceStatusLabel(for: .queuedForSubmission, isOverdue: true), "Po lehote")
+    }
+
     func testReadableRegisterStillSaves() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: directory) }

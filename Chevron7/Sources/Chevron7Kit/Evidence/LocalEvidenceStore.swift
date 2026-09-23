@@ -177,8 +177,8 @@ public final class LocalEvidenceStore: @unchecked Sendable {
     private let queue = DispatchQueue(label: "\(ProductIdentity.bundleIdentifier).evidence")
     public private(set) var records: [EvidenceRecord] = []
 
-    /// Set when `register.json` exists but could not be decoded (for example a status
-    /// string written by a newer, not-yet-released build). While this is set the store
+    /// Set when `register.json` exists but could not be read or decoded (for example a
+    /// status string written by a newer, not-yet-released build). While this is set the store
     /// never writes to `register.json`: the original file is left byte-for-byte
     /// untouched and a timestamped copy is saved next to it for support/recovery.
     /// Slovak, since this is meant to reach the UI as-is (the register is a legal
@@ -204,13 +204,17 @@ public final class LocalEvidenceStore: @unchecked Sendable {
         self.folderURL = base
         self.fileURL = base.appendingPathComponent("register.json")
 
-        guard let data = try? Data(contentsOf: fileURL) else { return }
-        if let loaded = try? JSONDecoder.standard.decode([EvidenceRecord].self, from: data) {
+        // No file yet: a new, empty register. A file that exists but cannot be read
+        // (permissions, disk error, a folder in its place) is a load failure like an
+        // undecodable one, never an empty register the next write would replace.
+        guard FileManager.default.fileExists(atPath: fileURL.path) else { return }
+        if let data = try? Data(contentsOf: fileURL),
+           let loaded = try? JSONDecoder.standard.decode([EvidenceRecord].self, from: data) {
             self.records = loaded.sorted { $0.createdAt > $1.createdAt }
             return
         }
 
-        // The file exists but this build cannot make sense of it. Never touch it:
+        // The file exists but this build cannot read or make sense of it. Never touch it:
         // leave records empty, save a timestamped copy for recovery/support, and
         // refuse every write for the life of this instance (see `persistLocked`).
         self.loadFailed = true

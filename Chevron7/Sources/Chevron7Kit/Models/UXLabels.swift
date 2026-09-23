@@ -16,7 +16,9 @@ public enum UXLabels {
 
     public static func evidenceStatusLabel(for status: EvidenceRecord.Status,
                                            isOverdue: Bool = false) -> String {
-        if isOverdue { return "Po lehote" }
+        // The 24-hour deadline never hides a state that tells the advocate what to do
+        // next: an unknown outcome is looked up first, and a late row has its own warning.
+        if isOverdue, status != .outcomeUnknown, status != .late { return "Po lehote" }
         switch status {
         case .draft: return "Koncept"
         case .awaitingNumber: return "Čaká na evidenčné číslo"
