@@ -1,6 +1,6 @@
 # EZZK part B: correct clause, signed record, submission, production
 
-Date: 2026-09-23. Revision 4 (facts found while planning B1 added), after two independent reviews and after reading an accepted record back from EZZK. Status: approved by the owner on 2026-09-23 (conditional on the second review, which approved with the changes now applied).
+Date: 2026-09-23. Revision 5 (B1 shipped; B2 amendments from live test EZZK and code mapping, see "Revision 5"). Revision 4 (facts found while planning B1 added), after two independent reviews and after reading an accepted record back from EZZK. Status: approved by the owner on 2026-09-23 (conditional on the second review, which approved with the changes now applied).
 Builds on: `2026-09-17-ezzk-soap-design.md` (part A). Background: `Chevron7/docs/EZZK-INTEGRATION.md`, `Chevron7/docs/P2E-EZZK-FINDINGS.md`.
 
 ## Goal
@@ -159,6 +159,33 @@ Every `feat` or `fix` push to `main` publishes a release, so:
 1. B1 and B2 merge to `main` with production allocation and submission off for everyone.
 2. A hidden owner switch (`defaults write` key read by `EZZKProductionPolicy`, no UI) enables production on the owner's Mac. The key ships in every build and can be found, but it only unlocks EZZK calls with the account the user has already signed in with, so it gives nobody access they do not have. The owner performs the first live conversion; the lookup must report "Záznam je spracovaný".
 3. A `feat` commit enables production for everyone and unlocks "Odosielanie záznamov" in Settings, which publishes the release.
+
+## Revision 5: B2 amendments (2026-09-23)
+
+B1 was merged to `main` as `4bebb1e6`. Planning B2 against the live test service and the code produced these facts and rulings. Where they differ from the sections above, this section wins for B2 and B3.
+
+Live on test EZZK (account `sys_zaktest1`, 2026-09-23, `ezzk-probe`):
+
+- `GetConversionRecordEvidenceNumber` allocates one new number per call and returns only that number. When the account's limit of unconsumed numbers is reached it refuses with code 113 ("vyčerpaný nastavený limit aktuálne nespotrebovaných evidenčných čísiel ... zaslať záznam"). It never returns numbers allocated earlier.
+- `ReceiveConversionRecord` consumes the number: right after result 0 a new number could be allocated. No `ConsumeConversionRecordEvidenceNumber` call is needed. EZZK accepted even an unsigned record with result 0; the public lookup then reports code 1 ("evidovaný, ale nespracovaný") while EZZK processes it later.
+- Ten numbers allocated on 2026-09-17 and never used were gone on 2026-09-23 (lapsed).
+
+From the code:
+
+- The official record 1.0 `schema.xsd` does not compile in libxml2 (`xmllint`): the `IdentifierValue` pattern escapes `/` as `\/`. The record's identifier pattern also differs from the clause's: 8 or 12 digits, not 8 to 12.
+- The engine refuses a bare `.xdcf` source (`isSupportedSource`). If allowed, `buildForASiCWithXAdES` would fetch the form from slovensko.sk (`autoLoadEform=true`, `UpvsEFormResources`) and `SigningJob.build` forces the MIME `application/vnd.gov.sk.xmldatacontainer+xml; charset=UTF-8`.
+- The engine signs with the endpoints of `TimestampSourcePreferencesStore` (default BOSA and Sectigo qualified); it ignores `SigningRequest.includeTimestamp`, `tsaURL` and `AppSettings.selectedTSAURL`. The app's `hasQualifiedTimestamp` means "has an intact timestamp", and the only real qualification check (`engine.validate`, v2 with trust initialisation) is not exposed.
+- `EvidenceRecord` uses synthesized `Codable`; a failed decode loads an empty register and the next write overwrites it. New fields must be optional.
+
+Rulings:
+
+1. **Record schema.** Validation uses a derived copy `docs/reference/forms/record-1.0/schema.validation.xsd` in which only that one pattern is rewritten to `https://data\.gov\.sk/id/legal-subject/([0-9]{8}|[0-9]{12})`. The XDC keeps referencing and digesting the official `schema.xsd`. Provenance records the derivation; a test pins that the two files differ only in that pattern.
+2. **Record container route (engine).** A sign request whose single source is an `.xdcf` holding an `XMLDataContainer` root, with no attachments and no eForm, is signed locally: `SigningParameters.buildParameters` with `autoLoadEform=false`, `fsFormId=null`, `plainXmlEnabled=true`, ASiC-E, XAdES; the document keeps the bare MIME `application/vnd.gov.sk.xmldatacontainer+xml`, as in the accepted record. No network.
+3. **Qualified timestamp by construction.** Outside Demo, ZaKo passes the qualified built-in authorities (`TimestampAuthority.qualifiedURLs`) to the engine as the only timestamp endpoints for both signatures, and the engine's existing Baseline T output check (one new `XAdES_BASELINE_T` signature with a cryptographically valid timestamp) must pass. This replaces the post-signing `qualifiedTimestampValid` inspection of component 8. The QTS toggle is shown only in Demo.
+4. **Evidence numbers.** Chevron7 keeps every number it allocated and has not yet used, per EZZK mode and Bratislava day, and reuses it before allocating a new one. Code 113 with no reusable number shows: "EZZK vám už pridelilo evidenčné číslo, na ktoré ešte neprišiel záznam. Dokončite rozpracovanú konverziu alebo počkajte do polnoci."
+5. **Record container storage.** The signed record container is written to the register's folder (`Evidence/records/<record id>.asice`, the copy submission reads) and next to the outputs as `<number>.record.asice` (the advocate's archive). `EvidenceRecord` stores the register path.
+6. **Submission receipt.** `EZZKSOAPClient.receive` returns the request's WS-Addressing `MessageID`; the register stores it with the submit time.
+7. **Late record.** The live check sending a record for a 2026-09-23 number after Bratislava midnight is pending; until its result is recorded here, "Oneskorený" rows may be sent with the warning "Záznam sa neodoslal v deň pridelenia čísla. EZZK ho môže odmietnuť alebo evidovať ako oneskorený."
 
 ## Out of scope
 
