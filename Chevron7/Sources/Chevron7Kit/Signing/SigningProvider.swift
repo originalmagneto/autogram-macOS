@@ -258,6 +258,13 @@ public struct SigningRequest: Sendable {
     /// ZaKo: sign `pdfData` and the data entries of `extraFiles` as separate data objects of
     /// one ASiC-E the engine builds, instead of wrapping a packaged container.
     public var signsExtraFilesAsDataObjects: Bool
+    /// Explicit timestamp endpoints for this signature. When set and non-empty the
+    /// engine uses exactly these for a Baseline T signature instead of the user's
+    /// own timestamp preferences; `nil` keeps today's behaviour.
+    public var timestampServers: [String]?
+    /// EZZK conversion record: sign `pdfData` (the record's XDC bytes) under
+    /// `filename`, which must end in `.xdcf`, as a one-file ASiC-E.
+    public var signsAsRecordContainer: Bool
 
     public init(pdfData: Data, identityID: String,
                 includeTimestamp: Bool, tsaURL: String? = nil,
@@ -268,7 +275,9 @@ public struct SigningRequest: Sendable {
                 eform: EFormSigningAttributes? = nil,
                 signatureLevelOverride: String? = nil,
                 filename: String? = nil,
-                signsExtraFilesAsDataObjects: Bool = false) {
+                signsExtraFilesAsDataObjects: Bool = false,
+                timestampServers: [String]? = nil,
+                signsAsRecordContainer: Bool = false) {
         self.pdfData = pdfData
         self.identityID = identityID
         self.includeTimestamp = includeTimestamp
@@ -281,6 +290,8 @@ public struct SigningRequest: Sendable {
         self.signatureLevelOverride = signatureLevelOverride
         self.filename = filename
         self.signsExtraFilesAsDataObjects = signsExtraFilesAsDataObjects
+        self.timestampServers = timestampServers
+        self.signsAsRecordContainer = signsAsRecordContainer
     }
 }
 

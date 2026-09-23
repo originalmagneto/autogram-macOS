@@ -363,12 +363,26 @@ public final class EngineBridgeSigningProvider: QualifiedSigningProviding, @unch
         let wantsPAdES = request.outputFormat == .embeddedPAdES
         var sourceURL: URL
         var attachmentURLs: [URL] = []
-        if request.eform != nil {
+        if request.eform != nil, request.signsAsRecordContainer {
+            // A conversion record is a plain XML Data Container with no attachments
+            // and no eForm attributes; the two never combine.
+            throw SigningError.signingFailed("Záznam nemôže mať eForm atribúty.")
+        } else if request.eform != nil {
             // The engine decides how to treat the payload from the file extension,
             // so an eForm has to arrive as XML rather than under a .pdf name.
             let name = request.filename.map { ($0 as NSString).lastPathComponent } ?? "form.xml"
             let extensionIsXML = ["xml", "xdcf"].contains((name as NSString).pathExtension.lowercased())
             sourceURL = workDirectory.appendingPathComponent(extensionIsXML ? name : "form.xml")
+            try request.pdfData.write(to: sourceURL, options: [.atomic])
+        } else if request.signsAsRecordContainer {
+            // EZZK's GetConversionRecord expects the signed record's data object
+            // under its own "<number>.record.xml.xdcf" name, so the record keeps
+            // its filename verbatim instead of a generic document name.
+            guard let name = request.filename.map({ ($0 as NSString).lastPathComponent }),
+                  name.lowercased().hasSuffix(".xdcf") else {
+                throw SigningError.signingFailed("Záznam musí mať príponu .xdcf.")
+            }
+            sourceURL = workDirectory.appendingPathComponent(name)
             try request.pdfData.write(to: sourceURL, options: [.atomic])
         } else if !wantsPAdES, request.signsExtraFilesAsDataObjects {
             // ZaKo: the PDF/A and the clause XDC go into the engine as separate data
@@ -413,7 +427,8 @@ public final class EngineBridgeSigningProvider: QualifiedSigningProviding, @unch
             files: [signingFile],
             outputFormat: wantsPAdES ? .pades : .asiceXAdES,
             eform: request.eform,
-            signatureLevelOverride: request.signatureLevelOverride)
+            signatureLevelOverride: request.signatureLevelOverride,
+            timestampServersOverride: request.timestampServers)
 
         statusLog("Podpisujem kvalifikovaným podpisom (DSS)…")
         var outputURL: URL?
