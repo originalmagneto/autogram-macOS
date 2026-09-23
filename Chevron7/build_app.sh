@@ -6,23 +6,30 @@ set -euo pipefail
 # Chevron7.app build script - assembly of a macOS app bundle.
 #
 # Usage:
-#   ./build_app.sh                    # debug build (fast)
-#   ./build_app.sh --release          # release build
+#   ./build_app.sh                    # debug build (fast); no Safari extension in the product
+#   ./build_app.sh --release          # release build; no Safari extension in the product
 #   ./build_app.sh install            # debug build and install into /Applications
 #   ./build_app.sh --release install  # release build and install into /Applications
+#   ./build_app.sh --release package  # release build for the DMG; keeps the Safari extension
 
 MODE="debug"
 INSTALL=false
+PACKAGE=false
 for argument in "$@"; do
     case "$argument" in
         --release) MODE="release" ;;
         install) INSTALL=true ;;
+        package) PACKAGE=true ;;
         *)
-            echo "Usage: $0 [--release] [install]" >&2
+            echo "Usage: $0 [--release] [install|package]" >&2
             exit 2
             ;;
     esac
 done
+if [[ "$INSTALL" == true && "$PACKAGE" == true ]]; then
+    echo "install and package are mutually exclusive" >&2
+    exit 2
+fi
 
 export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
 export MACOSX_DEPLOYMENT_TARGET="27.0"
@@ -303,6 +310,13 @@ if [[ -x "$EXTENSION_BIN" ]]; then
 </dict>
 APPEXPLIST
     echo '</plist>' >> "$APPEX/Contents/Info.plist"
+    /usr/libexec/PlistBuddy \
+        -c "Set :CFBundleVersion $VERSION" \
+        -c "Set :CFBundleShortVersionString $VERSION" \
+        "$APPEX/Contents/Info.plist"
+    if [[ -f "$APPEX/Contents/Resources/manifest.json" ]]; then
+        sed -i '' -E "s/(\"version\": \")[^\"]+/\1$VERSION/" "$APPEX/Contents/Resources/manifest.json"
+    fi
 
     APPEX_ENTITLEMENTS="$(mktemp -t chevron7-appex-entitlements).plist"
     cat > "$APPEX_ENTITLEMENTS" <<'ENTPLIST'
@@ -331,31 +345,72 @@ codesign --force --sign - "$APP_DIR" >/dev/null 2>&1 || true
 echo "✔ Hotovo: $APP_DIR ($VERSION)"
 echo "  Spustenie: open \"$APP_DIR\""
 
+# pluginkit -r does not stick while the appex file remains: discovery adds it
+# back. Dev builds drop it. `package` keeps it so the DMG can ship it.
+strip_build_product_extension() {
+    local lsregister="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
+    pluginkit -r "$APP_DIR/Contents/PlugIns/Chevron7WebExtension.appex" >/dev/null 2>&1 || true
+    rm -rf "$APP_DIR/Contents/PlugIns"
+    codesign --force --sign - "$APP_DIR" >/dev/null 2>&1 || true
+    "$lsregister" -u "$APP_DIR" >/dev/null 2>&1 || true
+}
+
 if [[ "$INSTALL" == true ]]; then
     INSTALL_DIR="/Applications/Chevron7.app"
     rm -rf "$INSTALL_DIR"
     ditto --rsrc --extattr --acl "$APP_DIR" "$INSTALL_DIR"
+    strip_build_product_extension
 
-    # Safari lists the web extension only once the system knows the appex. A copied
-    # bundle is registered only when the app first runs, so register it here, and
-    # drop the build product so Safari does not show a second, stale entry for it.
+    # Drop every other registered copy, then register only the installed one.
+    # pluginkit -m without -D hides duplicates, so Safari would show one row per path.
     LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
-    "$LSREGISTER" -u "$APP_DIR" >/dev/null 2>&1 || true
-    "$LSREGISTER" -f "$INSTALL_DIR" >/dev/null 2>&1 || true
     INSTALLED_APPEX="$INSTALL_DIR/Contents/PlugIns/Chevron7WebExtension.appex"
+    while IFS= read -r pluginkit_line; do
+        case "$pluginkit_line" in
+            *"Path ="*)
+                appex_path="${pluginkit_line#*Path = }"
+                if [[ -n "$appex_path" && "$appex_path" != "$INSTALLED_APPEX" ]]; then
+                    pluginkit -r "$appex_path" >/dev/null 2>&1 || true
+                fi
+                ;;
+            *"Parent Bundle ="*)
+                parent_app="${pluginkit_line#*Parent Bundle = }"
+                if [[ -n "$parent_app" && "$parent_app" != "$INSTALL_DIR" ]]; then
+                    "$LSREGISTER" -u "$parent_app" >/dev/null 2>&1 || true
+                fi
+                ;;
+        esac
+    done < <(pluginkit -m -D -i app.slovensko.chevron7.WebExtension -vvv 2>/dev/null || true)
+    "$LSREGISTER" -f "$INSTALL_DIR" >/dev/null 2>&1 || true
     if [[ -d "$INSTALLED_APPEX" ]]; then
         # pluginkit accepts the appex right after lsregister but may not list it yet.
+        # An empty match list is not success: that is how a missing registration
+        # used to be reported as registered.
+        registered=false
         for _ in 1 2 3 4 5; do
             pluginkit -a "$INSTALLED_APPEX" >/dev/null 2>&1 || true
-            if pluginkit -m -i app.slovensko.chevron7.WebExtension 2>/dev/null | grep -q WebExtension; then
-                echo "▸ Safari rozšírenie zaregistrované"
+            if pluginkit -m -D -i app.slovensko.chevron7.WebExtension -vvv 2>/dev/null | grep -F -q "Path = $INSTALLED_APPEX"; then
+                registered=true
                 break
             fi
             sleep 1
         done
+        others="$(pluginkit -m -D -i app.slovensko.chevron7.WebExtension -vvv 2>/dev/null | sed -n 's/.*Path = //p' | grep -F -x -v "$INSTALLED_APPEX" || true)"
+        if [[ "$registered" != true ]]; then
+            echo "  (upozornenie: Safari rozšírenie sa nepodarilo zaregistrovať)" >&2
+        elif [[ -n "$others" ]]; then
+            echo "  (upozornenie: Safari stále vidí ďalšie kópie rozšírenia)" >&2
+            printf '%s\n' "$others" >&2
+        else
+            echo "▸ Safari rozšírenie zaregistrované"
+        fi
     fi
     echo "✔ Nainštalované: $INSTALL_DIR"
     if pgrep -x Safari >/dev/null 2>&1; then
         echo "  Safari beží: ukončite ho (⌘Q) a otvorte znova, inak rozšírenie hlási SFErrorDomain error 3."
     fi
+elif [[ "$PACKAGE" == true ]]; then
+    echo "▸ Safari rozšírenie ostáva v balíku: $APP_DIR"
+else
+    strip_build_product_extension
 fi

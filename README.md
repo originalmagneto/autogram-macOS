@@ -509,7 +509,7 @@ Poznámky k vydaniu sa zostavia z commitov; ručne napísaný `docs/releases/vX.
 ```bash
 cd Chevron7
 scripts/next-version.sh
-CHEVRON7_VERSION=0.5.0 ./build_app.sh --release
+CHEVRON7_VERSION=0.5.0 ./build_app.sh --release package
 scripts/package-release.sh 0.5.0
 ```
 

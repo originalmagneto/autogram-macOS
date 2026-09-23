@@ -67,7 +67,7 @@ jobs:
           export DEVELOPER_DIR="$(xcode-select -p)"
           xcodebuild -version
           swift --version
-          ./build_app.sh --release
+          ./build_app.sh --release package
 
       - name: Package the DMG
         if: steps.version.outputs.version != ''
