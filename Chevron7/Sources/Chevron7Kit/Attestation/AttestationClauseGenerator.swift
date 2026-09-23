@@ -16,6 +16,7 @@ public enum AttestationGenerationError: LocalizedError, Equatable, Sendable {
     case invalidSecurityElementPage
     case missingEvidenceNumber
     case invalidOriginalLocation
+    case incompletePersonName
 
     public var errorDescription: String? {
         switch self {
@@ -29,6 +30,8 @@ public enum AttestationGenerationError: LocalizedError, Equatable, Sendable {
             return "Chýba evidenčné číslo záznamu z EZZK."
         case .invalidOriginalLocation:
             return "Pri prvku skontrolovanom na origináli vyberte umiestnenie zo zoznamu."
+        case .incompletePersonName:
+            return "Zadajte meno aj priezvisko osoby, ktorá vykonáva konverziu (napríklad Ján Novák). Záznam pre EZZK ich vyžaduje."
         }
     }
 }

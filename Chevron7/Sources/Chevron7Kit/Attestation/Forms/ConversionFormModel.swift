@@ -91,6 +91,9 @@ public struct ConversionFormModel: Sendable, Equatable {
         }
 
         let names = nameParts(d.performingPerson.fullName)
+        guard !names.given.isEmpty, !names.family.isEmpty else {
+            throw AttestationGenerationError.incompletePersonName
+        }
         let office = d.performingPerson.officeName.trimmingCharacters(in: .whitespacesAndNewlines)
         let typeLabel = d.originalDocumentTypeLabel.trimmingCharacters(in: .whitespacesAndNewlines)
         return ConversionFormModel(
@@ -122,9 +125,11 @@ public struct ConversionFormModel: Sendable, Equatable {
         return formatter.string(from: date)
     }
 
-    /// Given and family name without academic titles (tokens ending with a dot).
+    /// Given and family name without post-nominal suffixes (everything from the first comma on,
+    /// e.g. ", PhD.") or academic titles (remaining tokens ending with a dot).
     static func nameParts(_ fullName: String) -> (given: String, family: String) {
-        let tokens = fullName.split(whereSeparator: \.isWhitespace).map(String.init).filter { !$0.hasSuffix(".") }
+        let withoutSuffix = fullName.split(separator: ",", maxSplits: 1).first.map(String.init) ?? ""
+        let tokens = withoutSuffix.split(whereSeparator: \.isWhitespace).map(String.init).filter { !$0.hasSuffix(".") }
         return (tokens.dropLast().joined(separator: " "), tokens.last ?? "")
     }
 }

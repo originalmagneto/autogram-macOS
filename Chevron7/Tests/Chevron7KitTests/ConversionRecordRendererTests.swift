@@ -53,7 +53,7 @@ final class ConversionRecordRendererTests: XCTestCase {
         let xml = ConversionRecordRenderer().render(try model(data, elements: [other, physical]))
         XCTAssertNoThrow(try FormSchemaValidator().validate(Data(xml.utf8), against: .record_1_0))
         XCTAssertTrue(xml.contains("<PaperSize>Letter</PaperSize>"))
-        XCTAssertTrue(xml.contains("trikolóra"))
+        XCTAssertTrue(xml.contains("<OriginalDocumentSecurityElementsDescription>\(other.descriptionForRecord)</OriginalDocumentSecurityElementsDescription>"))
         XCTAssertTrue(xml.contains("<OriginalDocumentSecurityElementsLocation>Down edge</OriginalDocumentSecurityElementsLocation>"))
     }
 
@@ -63,5 +63,13 @@ final class ConversionRecordRendererTests: XCTestCase {
         let xml = ConversionRecordRenderer().render(try model(data))
         XCTAssertNoThrow(try FormSchemaValidator().validate(Data(xml.utf8), against: .record_1_0))
         XCTAssertFalse(xml.contains("<ID>"))
+    }
+
+    func testIcoWithTwelveDigitsKeepsTheIdentifier() throws {
+        var data = ConversionFormModelTests.attestation()
+        data.performingPerson.ico = "123456789012"
+        let xml = ConversionRecordRenderer().render(try model(data))
+        XCTAssertNoThrow(try FormSchemaValidator().validate(Data(xml.utf8), against: .record_1_0))
+        XCTAssertTrue(xml.contains("<IdentifierValue>https://data.gov.sk/id/legal-subject/123456789012</IdentifierValue>"))
     }
 }

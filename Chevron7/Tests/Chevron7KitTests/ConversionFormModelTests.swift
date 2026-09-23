@@ -113,4 +113,26 @@ final class ConversionFormModelTests: XCTestCase {
         XCTAssertEqual(model.paperSizes.map(\.sheets), [3])
         XCTAssertEqual(model.paperSizes.first?.item.code, "A4")
     }
+
+    func testOneWordPerformerNameIsRefused() {
+        for fullName in ["Novák", "JUDr. Novák"] {
+            var data = Self.attestation()
+            data.performingPerson.fullName = fullName
+            XCTAssertThrowsError(try ConversionFormModel.make(attestation: data, securityElements: [],
+                                                              newDocumentSHA256Hex: Self.fingerprintHex,
+                                                              originalNonEmptyPageIndices: nil, usedDevice: "Chevron7")) {
+                XCTAssertEqual($0 as? AttestationGenerationError, .incompletePersonName, "for \"\(fullName)\"")
+            }
+        }
+    }
+
+    func testPostNominalSuffixIsNotPartOfTheFamilyName() throws {
+        var data = Self.attestation()
+        data.performingPerson.fullName = "JUDr. Ján Novák, PhD."
+        let model = try ConversionFormModel.make(attestation: data, securityElements: [],
+                                                 newDocumentSHA256Hex: Self.fingerprintHex,
+                                                 originalNonEmptyPageIndices: nil, usedDevice: "Chevron7")
+        XCTAssertEqual(model.person.givenName, "Ján")
+        XCTAssertEqual(model.person.familyName, "Novák")
+    }
 }
