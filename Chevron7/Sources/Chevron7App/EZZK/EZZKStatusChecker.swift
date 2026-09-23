@@ -306,16 +306,17 @@ final class EZZKStatusChecker {
         defer { inFlight.remove(id) }
         let updated = await change(record)
         guard updated.updatedAt != record.updatedAt || updated.status != record.status else { return record }
+        if updated.status != record.status,
+           updated.status == .acceptedForProcessing || updated.status == .processed,
+           let number = updated.evidenceNumber {
+            // EZZK consumed the number with the record, so it is never offered again, even
+            // when the row was deleted meanwhile.
+            numberPool.remove(number)
+        }
         // A row the advocate deleted meanwhile is not brought back.
         guard evidenceStore.record(id: id) != nil else { return updated }
         evidenceStore.upsert(updated)
         changeCount += 1
-        if updated.status != record.status,
-           updated.status == .acceptedForProcessing || updated.status == .processed,
-           let number = updated.evidenceNumber {
-            // EZZK consumed the number with the record, so it is never offered again.
-            numberPool.remove(number)
-        }
         return updated
     }
 

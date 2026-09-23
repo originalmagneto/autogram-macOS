@@ -402,6 +402,25 @@ final class EvidenceSubmissionFlowTests: XCTestCase {
         XCTAssertEqual(Set(coordinatorModes), [.test], "every coordinator targets the row's own mode")
     }
 
+    /// A row the advocate deletes while it is being sent is not brought back, but the
+    /// number EZZK consumed is still dropped from the pool.
+    func testDeletedRowStillReleasesItsConsumedNumber() async throws {
+        let clock = TestClock("2026-09-24T10:00:00Z")
+        let submitter = SuspendingSubmitter(EZZKSOAPSubmissionReceipt(messageID: "m-9", submittedAt: clock.now))
+        let (checker, store) = makeChecker(mode: .test, submitter: submitter, lookup: ScriptedLookup([]), clock: clock)
+        pool.add(.init(number: "1563-260924-9", mode: .test, allocatedAt: clock.now))
+        let row = try addRow(.queuedForSubmission, number: "1563-260924-9", to: store, clock: clock)
+
+        let sending = Task { await checker.submit(id: row.id) }
+        try await submitter.waitUntilSending()
+        store.delete(id: row.id)
+        submitter.release()
+        _ = await sending.value
+
+        XCTAssertNil(store.record(id: row.id))
+        XCTAssertNil(pool.reusable(mode: .test, at: clock.now, excluding: []))
+    }
+
     // MARK: - Fixtures
 
     private var storeRoot: URL!
