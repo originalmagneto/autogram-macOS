@@ -224,7 +224,8 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
                                     try FileManager.default.removeItem(at: reservation.temporaryURL)
                                 } catch let error as CocoaError where error.code == .fileNoSuchFile {
                                 }
-                                return machineFile(id: file.id, sourceURL: file.sourceURL, targetURL: reservation.temporaryURL)
+                                return machineFile(id: file.id, sourceURL: file.sourceURL, targetURL: reservation.temporaryURL,
+                                    attachmentURLs: file.attachmentURLs)
                             }
                             let levelAndTimestamp = Self.levelAndTimestamp(for: request, endpoints: timestamp.endpoints)
                             let machineRequest = MachineRequest(
@@ -486,15 +487,21 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
         return payload
     }
 
-    private func machineFile(id: String, sourceURL: URL, targetURL: URL) -> JSONValue {
+    // Not private: MachineRequestEncodingTests asserts the encoded shape directly,
+    // the same way it already asserts `levelAndTimestamp`.
+    func machineFile(id: String, sourceURL: URL, targetURL: URL, attachmentURLs: [URL] = []) -> JSONValue {
         // Java validátor vyžaduje reálny canonical path (realpath, /var → /private/var)
         let source = EnginePaths.canonical(sourceURL).path
         let target = EnginePaths.canonical(targetURL).path
-        return .object([
+        var fields: [String: JSONValue] = [
             "id": .string(id),
             "source": .string(source),
             "target": .string(target)
-        ])
+        ]
+        if !attachmentURLs.isEmpty {
+            fields["attachments"] = .array(attachmentURLs.map { .string(EnginePaths.canonical($0).path) })
+        }
+        return .object(fields)
     }
 
     /// Encodes eForm attributes for the machine protocol. Schema and transformation

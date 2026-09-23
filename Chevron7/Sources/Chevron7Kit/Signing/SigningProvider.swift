@@ -255,6 +255,9 @@ public struct SigningRequest: Sendable {
     /// Filename the document should keep inside the container. The browser path
     /// knows the real name; the app path derives one from the source URL.
     public var filename: String?
+    /// ZaKo: sign `pdfData` and the data entries of `extraFiles` as separate data objects of
+    /// one ASiC-E the engine builds, instead of wrapping a packaged container.
+    public var signsExtraFilesAsDataObjects: Bool
 
     public init(pdfData: Data, identityID: String,
                 includeTimestamp: Bool, tsaURL: String? = nil,
@@ -264,7 +267,8 @@ public struct SigningRequest: Sendable {
                 visualStamp: VisualStampSpec? = nil,
                 eform: EFormSigningAttributes? = nil,
                 signatureLevelOverride: String? = nil,
-                filename: String? = nil) {
+                filename: String? = nil,
+                signsExtraFilesAsDataObjects: Bool = false) {
         self.pdfData = pdfData
         self.identityID = identityID
         self.includeTimestamp = includeTimestamp
@@ -276,6 +280,7 @@ public struct SigningRequest: Sendable {
         self.eform = eform
         self.signatureLevelOverride = signatureLevelOverride
         self.filename = filename
+        self.signsExtraFilesAsDataObjects = signsExtraFilesAsDataObjects
     }
 }
 

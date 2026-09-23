@@ -366,6 +366,41 @@ final class MachineRequestEncodingTests: XCTestCase {
                        .object(["required": .bool(true), "servers": .array([.string("https://tsa.example.test")])]))
     }
 
+    /// ZaKo hands the engine the PDF/A and the clause XDC as two data objects of one
+    /// ASiC-E; the v1 SIGN file object gains an "attachments" array of canonical paths.
+    func testV1SignFileIncludesAttachmentsWhenPresent() {
+        let engine = AutogramCLIEngine()
+        let sourceURL = FileManager.default.temporaryDirectory.appendingPathComponent("dokument.pdf")
+        let attachmentURL = FileManager.default.temporaryDirectory.appendingPathComponent("dokument.xml.xdcf")
+        let targetURL = FileManager.default.temporaryDirectory.appendingPathComponent("out.asice")
+
+        let file = engine.machineFile(id: "document", sourceURL: sourceURL, targetURL: targetURL,
+                                      attachmentURLs: [attachmentURL])
+
+        XCTAssertEqual(file, .object([
+            "id": .string("document"),
+            "source": .string(EnginePaths.canonical(sourceURL).path),
+            "target": .string(EnginePaths.canonical(targetURL).path),
+            "attachments": .array([.string(EnginePaths.canonical(attachmentURL).path)])
+        ]))
+    }
+
+    /// The Java validator refuses an empty "attachments" array, so the key must be
+    /// absent entirely when there are no attachments, exactly like it is today.
+    func testV1SignFileOmitsAttachmentsKeyWhenEmpty() {
+        let engine = AutogramCLIEngine()
+        let sourceURL = FileManager.default.temporaryDirectory.appendingPathComponent("dokument.pdf")
+        let targetURL = FileManager.default.temporaryDirectory.appendingPathComponent("out.asice")
+
+        let file = engine.machineFile(id: "document", sourceURL: sourceURL, targetURL: targetURL)
+
+        XCTAssertEqual(file, .object([
+            "id": .string("document"),
+            "source": .string(EnginePaths.canonical(sourceURL).path),
+            "target": .string(EnginePaths.canonical(targetURL).path)
+        ]))
+    }
+
     func testUnauthenticatedV1RequestKeepsDriversPayloadEmpty() throws {
         let request = MachineRequest(
             protocolVersion: 1,
@@ -387,6 +422,96 @@ final class MachineRequestEncodingTests: XCTestCase {
         let payload = try XCTUnwrap(object["payload"] as? [String: Any])
 
         XCTAssertTrue(payload.isEmpty)
+    }
+}
+
+/// A `SigningEngine` test double: never spawns the real helper process, just
+/// captures the `EngineSigningRequest` the provider builds and reports success.
+private final class RecordingSigningEngine: SigningEngine, @unchecked Sendable {
+    private let lock = NSLock()
+    private var _capturedRequest: EngineSigningRequest?
+
+    var capturedRequest: EngineSigningRequest? {
+        lock.lock()
+        defer { lock.unlock() }
+        return _capturedRequest
+    }
+
+    func capabilities() async throws -> EngineCapabilities {
+        EngineCapabilities(protocolVersion: 1, supportsQualifiedTimestamp: true)
+    }
+
+    func drivers() async throws -> [SigningDriver] {
+        [SigningDriver(id: "eid", displayName: "Fake eID", tokenPresent: true)]
+    }
+
+    func certificates(driverID: String, pin: Secret?) async throws -> [SigningCertificate] {
+        []
+    }
+
+    func certificateDiscovery(driverID: String, pin: Secret?) async throws -> CertificateDiscovery {
+        CertificateDiscovery(token: SigningToken(tokenKey: "fake", providerName: "Fake"), certificates: [])
+    }
+
+    func inspect(files: [PDFItemDescriptor]) async throws -> [PDFInspection] {
+        throw SigningFailure.engine("RecordingSigningEngine does not support inspect.")
+    }
+
+    func sign(request: EngineSigningRequest) -> AsyncThrowingStream<SigningEvent, Error> {
+        lock.lock()
+        _capturedRequest = request
+        lock.unlock()
+        return AsyncThrowingStream { continuation in
+            let outputURL = FileManager.default.temporaryDirectory
+                .appendingPathComponent("recording-engine-\(UUID().uuidString).asice")
+            try? Data("signed".utf8).write(to: outputURL)
+            continuation.yield(.completed(request.files.first?.id ?? "document", outputURL: outputURL))
+            continuation.finish()
+        }
+    }
+
+    func cancel() async {}
+}
+
+final class EngineBridgeSignsExtraFilesAsDataObjectsTests: XCTestCase {
+    private func zakoRequest(signsExtraFilesAsDataObjects: Bool) -> SigningRequest {
+        let pdf = TestPDFBuilder.singlePageWhitePDF()
+        let xdcf = Data("<XMLDataContainer/>".utf8)
+        let entries = ASiCEPackager().zakoContainer(pdfData: pdf, pdfFileName: "dokument.pdf",
+                                                    dolozkaXML: xdcf, dolozkaFileName: "dokument.xml.xdcf")
+        return SigningRequest(pdfData: pdf, identityID: "engine:eid", includeTimestamp: false,
+                              extraFiles: entries, filename: "dokument.pdf",
+                              signsExtraFilesAsDataObjects: signsExtraFilesAsDataObjects)
+    }
+
+    /// ZaKo: the PDF/A and the clause XDC arrive at the engine as two data objects
+    /// of one ASiC-E, not wrapped inside a packaged kontajner.asice.
+    func testSignsExtraFilesAsDataObjectsSendsPDFAndXDCFAsAttachment() async throws {
+        let engine = RecordingSigningEngine()
+        let provider = EngineBridgeSigningProvider(engine: engine)
+
+        _ = try await provider.sign(zakoRequest(signsExtraFilesAsDataObjects: true))
+
+        let files = try XCTUnwrap(engine.capturedRequest?.files)
+        XCTAssertEqual(files.count, 1)
+        let file = try XCTUnwrap(files.first)
+        XCTAssertEqual(file.sourceURL.lastPathComponent, "dokument.pdf")
+        XCTAssertEqual(file.attachmentURLs.map(\.lastPathComponent), ["dokument.xml.xdcf"])
+    }
+
+    /// The main signing window's flag stays off: `extraFiles` keeps packaging a
+    /// kontajner.asice as the source, exactly as it does today.
+    func testFlagOffKeepsPackagingAKontajnerAsice() async throws {
+        let engine = RecordingSigningEngine()
+        let provider = EngineBridgeSigningProvider(engine: engine)
+
+        _ = try await provider.sign(zakoRequest(signsExtraFilesAsDataObjects: false))
+
+        let files = try XCTUnwrap(engine.capturedRequest?.files)
+        XCTAssertEqual(files.count, 1)
+        let file = try XCTUnwrap(files.first)
+        XCTAssertEqual(file.sourceURL.lastPathComponent, "kontajner.asice")
+        XCTAssertTrue(file.attachmentURLs.isEmpty)
     }
 }
 

@@ -19,7 +19,9 @@ public final class EngineBridgeSigningProvider: QualifiedSigningProviding, @unch
     /// never reaches the card. The engine only insists on a non-blank field.
     public static let protectedAuthenticationPathPIN = "protected-authentication-path"
 
-    private let engine: AutogramCLIEngine
+    // `any SigningEngine` (not the concrete `AutogramCLIEngine`) so tests can
+    // substitute a fake engine that captures the `EngineSigningRequest`.
+    private let engine: any SigningEngine
     private let renderer: VisibleSignatureRenderer
     private let cachedCertificates = OSAllocatedUnfairLock<[SigningCertificate]>(initialState: [])
     /// Driver the cached certificates were read from, so signing can reuse them
@@ -32,7 +34,7 @@ public final class EngineBridgeSigningProvider: QualifiedSigningProviding, @unch
     private let lastResolveErrorLock = OSAllocatedUnfairLock<String?>(initialState: nil)
     private let logger = Logger(subsystem: ProductIdentity.bundleIdentifier, category: "EngineBridge")
 
-    init(engine: AutogramCLIEngine = AutogramCLIEngine(),
+    init(engine: any SigningEngine = AutogramCLIEngine(),
          renderer: VisibleSignatureRenderer = VisibleSignatureRenderer()) {
         self.engine = engine
         self.renderer = renderer
@@ -360,6 +362,7 @@ public final class EngineBridgeSigningProvider: QualifiedSigningProviding, @unch
 
         let wantsPAdES = request.outputFormat == .embeddedPAdES
         var sourceURL: URL
+        var attachmentURLs: [URL] = []
         if request.eform != nil {
             // The engine decides how to treat the payload from the file extension,
             // so an eForm has to arrive as XML rather than under a .pdf name.
@@ -367,6 +370,18 @@ public final class EngineBridgeSigningProvider: QualifiedSigningProviding, @unch
             let extensionIsXML = ["xml", "xdcf"].contains((name as NSString).pathExtension.lowercased())
             sourceURL = workDirectory.appendingPathComponent(extensionIsXML ? name : "form.xml")
             try request.pdfData.write(to: sourceURL, options: [.atomic])
+        } else if !wantsPAdES, request.signsExtraFilesAsDataObjects {
+            // ZaKo: the PDF/A and the clause XDC go into the engine as separate data
+            // objects of one ASiC-E instead of a pre-packaged kontajner.asice.
+            let name = request.filename.map { ($0 as NSString).lastPathComponent } ?? Self.pdfSourceName(for: request)
+            sourceURL = workDirectory.appendingPathComponent(name)
+            try request.pdfData.write(to: sourceURL, options: [.atomic])
+            for entry in request.extraFiles
+            where entry.path != "mimetype" && !entry.path.hasPrefix("META-INF/") && entry.path != name {
+                let url = workDirectory.appendingPathComponent(ASiCEPackager.sanitizedFileName(entry.path))
+                try entry.data.write(to: url, options: [.atomic])
+                attachmentURLs.append(EnginePaths.canonical(url))
+            }
         } else if !wantsPAdES, !request.extraFiles.isEmpty {
             sourceURL = workDirectory.appendingPathComponent("kontajner.asice")
             try Self.packageContainer(entries: request.extraFiles)
@@ -388,7 +403,8 @@ public final class EngineBridgeSigningProvider: QualifiedSigningProviding, @unch
 
         let signingFile = SigningFile(id: "document",
                                       sourceURL: EnginePaths.canonical(sourceURL),
-                                      visibleAppearance: appearanceRequest)
+                                      visibleAppearance: appearanceRequest,
+                                      attachmentURLs: attachmentURLs)
         let engineRequest = EngineSigningRequest(
             sessionID: UUID(),
             driverID: driverID,

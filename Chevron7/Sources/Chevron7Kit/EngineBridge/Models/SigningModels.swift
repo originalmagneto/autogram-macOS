@@ -35,15 +35,18 @@ struct SigningFile: Sendable, Equatable, Identifiable {
     let id: String
     let sourceURL: URL
     let visibleAppearance: VisibleSignatureRequest?
+    /// Further documents signed with `sourceURL` as data objects of one ASiC-E.
+    let attachmentURLs: [URL]
 
     var redactedDisplayName: String {
         sourceURL.lastPathComponent
     }
 
-    init(id: String, sourceURL: URL, visibleAppearance: VisibleSignatureRequest? = nil) {
+    init(id: String, sourceURL: URL, visibleAppearance: VisibleSignatureRequest? = nil, attachmentURLs: [URL] = []) {
         self.id = id
         self.sourceURL = sourceURL
         self.visibleAppearance = visibleAppearance
+        self.attachmentURLs = attachmentURLs
     }
 }
 
