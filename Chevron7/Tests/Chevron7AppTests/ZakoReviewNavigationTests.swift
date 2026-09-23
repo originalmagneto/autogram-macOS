@@ -17,7 +17,7 @@ final class ZakoReviewNavigationTests: XCTestCase {
         store.confirmNoSecurityElements()
         XCTAssertTrue(store.attestation.noSecurityElementsConfirmed)
         store.addPhysicalSecurityElement(kind: .bindingCord, pageIndex: 0,
-            description: "Zväzok zviazaný šnúrkou", location: "Ľavý okraj", newDocumentPageIndex: 0)
+            description: "Zväzok zviazaný šnúrkou", location: "Left edge", newDocumentPageIndex: 0)
         XCTAssertFalse(store.attestation.noSecurityElementsConfirmed)
         XCTAssertFalse(store.reviewedNonEmptyPages.contains(0))
         XCTAssertTrue(store.reviewedNonEmptyPages.contains(1))
@@ -62,7 +62,7 @@ final class ZakoReviewNavigationTests: XCTestCase {
         store.analysis.nonEmptyPages = 1
         store.attestation.nonEmptyPageCount = 1
         let id = store.addPhysicalSecurityElement(kind: .watermark, pageIndex: 1,
-            description: "Vodoznak viditeľný proti svetlu", location: "Stred listu", newDocumentPageIndex: 1)
+            description: "Vodoznak viditeľný proti svetlu", location: "Mid", newDocumentPageIndex: 1)
         store.confirmSecurityElement(id: id)
         XCTAssertFalse(store.analysis.pageAnalyses[1].isEmpty)
         XCTAssertEqual(store.analysis.nonEmptyPages, 2)

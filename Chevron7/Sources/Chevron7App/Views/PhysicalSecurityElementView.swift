@@ -34,7 +34,12 @@ struct PhysicalSecurityElementSheet: View {
                 Label(kind.label, systemImage: kind.sfSymbol)
             }
             TextField("Vecný opis prvku", text: $description, axis: .vertical).lineLimit(2...4)
-            TextField("Umiestnenie na origináli, napr. ľavý okraj zväzku", text: $location)
+            Picker("Umiestnenie na origináli", selection: $location) {
+                Text("Vyberte umiestnenie").tag("")
+                ForEach(ZakoCodelists.locationItems, id: \.code) { item in
+                    Text(item.skName).tag(item.code)
+                }
+            }
             OutputSecurityPagePicker(pageCount: store.analysis.totalPages, selection: $outputPage)
             Text("Vyberte stranu, na ktorej je prvok zachytený v novom dokumente. Ak chýba, záznam môžete uložiť a pred autorizáciou doplniť sken.")
                 .font(.caption).foregroundStyle(.secondary)
@@ -48,7 +53,7 @@ struct PhysicalSecurityElementSheet: View {
                     dismiss()
                 }
                 .buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
-                .disabled(location.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .disabled(ZakoCodelists.locationItem(code: location) == nil)
             }
         }
         .textFieldStyle(.roundedBorder)

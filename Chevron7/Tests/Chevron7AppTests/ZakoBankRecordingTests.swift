@@ -69,7 +69,7 @@ final class ZakoBankRecordingTests: XCTestCase {
         let before = try await bank.reviewedPages()
         XCTAssertEqual(Set(before.map(\.pageIndex)), [0, 1])
         let id = store.addPhysicalSecurityElement(kind: .bindingCord, pageIndex: 0,
-            description: "Trikolóra", location: "Ľavý okraj", newDocumentPageIndex: 1)
+            description: "Trikolóra", location: "Left edge", newDocumentPageIndex: 1)
         store.confirmSecurityElement(id: id)
         store.markPageReviewed(0)
         store.markPageReviewed(1)
