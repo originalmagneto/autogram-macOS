@@ -49,12 +49,14 @@ final class EZZKStatusChecker {
         var skipped = 0
         /// Rows written before part B2 (no EZZK mode): never sent.
         var legacy = 0
+        /// Production rows: not sent while production submission is refused (B3).
+        var production = 0
         /// Set when nothing could be done at all (the register is unreadable).
         var refusal: String?
 
         /// True only when every pending row was accepted.
         var isSuccess: Bool {
-            refusal == nil && accepted > 0 && unknown + waiting + rejected + unsigned + skipped + legacy == 0
+            refusal == nil && accepted > 0 && unknown + waiting + rejected + unsigned + skipped + legacy + production == 0
         }
 
         /// One Slovak line for the Register header.
@@ -68,8 +70,13 @@ final class EZZKStatusChecker {
                 (unsigned, "Záznam nepodpísaný"),
                 (skipped, "Preskočené (iný režim EZZK alebo prebieha iná akcia)")
             ].filter { $0.0 > 0 }.map { "\($0.1): \($0.0)." }
-            let notes = legacy > 0
-                ? ["Záznamy spred odosielania do EZZK: \(legacy). \(EZZKStatusChecker.preB2RowMessage)"] : []
+            var notes: [String] = []
+            if legacy > 0 {
+                notes.append("Záznamy spred odosielania do EZZK: \(legacy). \(EZZKStatusChecker.preB2RowMessage)")
+            }
+            if production > 0 {
+                notes.append("Záznamy v režime Produkcia: \(production). \(EZZKStatusChecker.productionRefusal)")
+            }
             let all = parts + notes
             return all.isEmpty ? "Žiadny záznam nečaká na odoslanie." : all.joined(separator: " ")
         }
@@ -88,6 +95,8 @@ final class EZZKStatusChecker {
     /// Ruling R15: a row written before part B2 has no EZZK mode and no signed record.
     nonisolated static let preB2RowMessage =
         "Záznam vznikol pred odosielaním do EZZK v Chevron7, preto ho aplikácia neodosiela."
+    /// Production submission stays refused until part B3 (the adapter refuses it too).
+    nonisolated static let productionRefusal = EZZKError.submissionUnavailable.errorDescription ?? ""
     nonisolated static let missingRowMessage = "Záznam sa v Registri konverzií nenašiel."
 
     /// Increases whenever a row is stored, so views that read rows from the register
@@ -101,6 +110,9 @@ final class EZZKStatusChecker {
     /// mode's environment, whatever the controller's mode is by the time they run.
     @ObservationIgnored private let makeCoordinator: (AppSettings.EZZKMode) -> EZZKSubmissionCoordinator
     @ObservationIgnored private let now: @Sendable () -> Date
+    /// False until part B3 enables production: production rows are then neither sent nor
+    /// looked up by any path, and carry `productionRefusal`.
+    @ObservationIgnored private let sendsInProduction: Bool
     @ObservationIgnored private var inFlight: Set<UUID> = []
     @ObservationIgnored private var automaticAttempts: [UUID: [Date]] = [:]
     @ObservationIgnored private var loop: Task<Void, Never>?
@@ -109,7 +121,9 @@ final class EZZKStatusChecker {
          numberPool: EvidenceNumberPool,
          currentMode: @escaping () -> AppSettings.EZZKMode,
          makeCoordinator: @escaping (AppSettings.EZZKMode) -> EZZKSubmissionCoordinator,
-         now: @escaping @Sendable () -> Date = { Date() }) {
+         now: @escaping @Sendable () -> Date = { Date() },
+         sendsInProduction: Bool = false) {
+        self.sendsInProduction = sendsInProduction
         self.evidenceStore = evidenceStore
         self.numberPool = numberPool
         self.currentMode = currentMode
@@ -193,6 +207,7 @@ final class EZZKStatusChecker {
             // waits; the rest of the pass then belongs to the old mode and stops.
             guard currentMode() == mode else { return }
             guard Self.hasEvidenceNumber(snapshot), snapshot.ezzkMode == mode,
+                  mode != .production || sendsInProduction,
                   !inFlight.contains(snapshot.id) else { continue }
             switch snapshot.status {
             case .signed, .queuedForSubmission, .submissionFailed, .late:
@@ -260,6 +275,8 @@ final class EZZKStatusChecker {
             switch await submit(id: row.id) {
             case .refused(let reason) where reason == Self.preB2RowMessage:
                 summary.legacy += 1
+            case .refused(let reason) where reason == Self.productionRefusal:
+                summary.production += 1
             case .refused:
                 summary.skipped += 1
             case .row(let record):
@@ -291,6 +308,7 @@ final class EZZKStatusChecker {
         guard let record = evidenceStore.record(id: id) else { return Self.missingRowMessage }
         guard let mode = record.ezzkMode else { return Self.preB2RowMessage }
         if mode != currentMode() { return Self.recordFromOtherModeMessage }
+        if mode == .production, !sendsInProduction { return Self.productionRefusal }
         if inFlight.contains(id) { return Self.rowBusyMessage }
         return nil
     }

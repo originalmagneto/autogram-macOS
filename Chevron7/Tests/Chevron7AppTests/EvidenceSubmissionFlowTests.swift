@@ -421,6 +421,29 @@ final class EvidenceSubmissionFlowTests: XCTestCase {
         XCTAssertNil(pool.reusable(mode: .test, at: clock.now, excluding: []))
     }
 
+    /// Production submission is still refused (B3), so production rows are neither sent
+    /// nor counted as waiting; they carry the production reason.
+    func testProductionRowsAreNeverSentWhileProductionIsRefused() async throws {
+        let clock = TestClock("2026-09-24T10:00:00Z")
+        let submitter = ScriptedSubmitter([])
+        let lookup = ScriptedLookup([])
+        let (checker, store) = makeChecker(mode: .production, submitter: submitter, lookup: lookup, clock: clock)
+        let row = try addRow(.queuedForSubmission, number: "1563-260924-1", mode: .production, to: store, clock: clock)
+
+        await checker.runOnce()
+        let summary = await checker.submitPending()
+        let manual = await checker.submit(id: row.id)
+
+        XCTAssertEqual(submitter.calls, 0)
+        XCTAssertEqual(lookup.calls, 0)
+        XCTAssertEqual(summary.production, 1)
+        XCTAssertEqual(summary.waiting, 0)
+        let reason = try XCTUnwrap(EZZKError.submissionUnavailable.errorDescription)
+        XCTAssertTrue(summary.feedback.contains(reason), summary.feedback)
+        XCTAssertEqual(manual.refusal, reason)
+        XCTAssertEqual(store.record(id: row.id)?.updatedAt, row.updatedAt)
+    }
+
     // MARK: - Fixtures
 
     private var storeRoot: URL!
