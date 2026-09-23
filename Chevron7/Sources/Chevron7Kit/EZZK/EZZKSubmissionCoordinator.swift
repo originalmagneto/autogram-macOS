@@ -94,7 +94,8 @@ public struct EZZKSubmissionCoordinator: Sendable {
     }
 
     /// Resolves `.outcomeUnknown` by lookup: found -> accepted/processed, 105 -> queued, error -> unchanged.
-    /// Does nothing until five minutes after the row last changed, so EZZK has registered a
+    /// Any other EZZK result code means EZZK processed and refused the record: `.rejected`
+    /// with EZZK's code and description. Does nothing until five minutes after the row last changed, so EZZK has registered a
     /// record it may still have been receiving (a 105 before that could cause a duplicate).
     /// A failed lookup keeps the status and records the attempt in `lastLookupAt`.
     public func resolveUnknown(_ record: EvidenceRecord) async -> EvidenceRecord {
@@ -113,6 +114,8 @@ public struct EZZKSubmissionCoordinator: Sendable {
             updated.status = .queuedForSubmission
             updated.ezzkResultCode = nil
             updated.ezzkResultDescription = Self.requeuedReason
+        } catch EZZKError.serviceRejected(let code, let message) {
+            markRejected(&updated, code: code, message: message)
         } catch {
             // Still unknown; only the attempt is recorded.
         }
@@ -122,16 +125,23 @@ public struct EZZKSubmissionCoordinator: Sendable {
     }
 
     /// For `.acceptedForProcessing`: lookup code 0 -> `.processed`; code 1 -> unchanged with `lastLookupAt`.
-    /// Any error, 105 included, keeps the status: EZZK accepted the record, so a status
-    /// check never moves it back to a state that would send it again. Every attempt,
+    /// A result code other than 0, 1 and 105 means EZZK processed and refused the record
+    /// (for example 12 "Neznámy obsah"): `.rejected` with EZZK's code and description.
+    /// Every other error, 105 included, keeps the status: EZZK accepted the record, so a
+    /// status check never moves it back to a state that would send it again. Every attempt,
     /// failed or not, is recorded in `lastLookupAt`, so the next check waits an hour.
     public func refreshStatus(_ record: EvidenceRecord) async -> EvidenceRecord {
         guard record.status == .acceptedForProcessing, let number = evidenceNumber(of: record) else { return record }
-        let result = try? await lookup.publicRecord(evidenceNumber: number)
         var updated = record
-        if result?.isProcessed == true {
-            updated.status = .processed
-            updated.ezzkResultCode = 0
+        do {
+            if try await lookup.publicRecord(evidenceNumber: number).isProcessed {
+                updated.status = .processed
+                updated.ezzkResultCode = 0
+            }
+        } catch EZZKError.serviceRejected(let code, let message) where code != Self.unknownRecordCode {
+            markRejected(&updated, code: code, message: message)
+        } catch {
+            // Try again later; only the attempt is recorded.
         }
         let checkedAt = now()
         updated.lastLookupAt = checkedAt
@@ -182,9 +192,7 @@ public struct EZZKSubmissionCoordinator: Sendable {
     private func apply(_ error: EZZKError, to record: inout EvidenceRecord) {
         switch error {
         case .serviceRejected(let code, let message):
-            record.status = .rejected
-            record.ezzkResultCode = code
-            record.ezzkResultDescription = message
+            markRejected(&record, code: code, message: message)
         case .networkFailure, .notConfigured, .authenticationFailed, .credentialsRejected,
              .accountLocked, .submissionUnavailable, .invalidRequest, .untrustedCertificate:
             // Nothing reached EZZK: the host was unreachable, the login or the certificate
@@ -200,6 +208,12 @@ public struct EZZKSubmissionCoordinator: Sendable {
             // row waits for a lookup instead of being sent again.
             markUnknown(&record, description: error.localizedDescription)
         }
+    }
+
+    private func markRejected(_ record: inout EvidenceRecord, code: Int, message: String) {
+        record.status = .rejected
+        record.ezzkResultCode = code
+        record.ezzkResultDescription = message
     }
 
     private func markUnknown(_ record: inout EvidenceRecord, description: String) {

@@ -318,6 +318,59 @@ final class EZZKSubmissionCoordinatorTests: XCTestCase {
         XCTAssertNil(coordinator.nextStatusCheck(for: record(.queuedForSubmission)))
     }
 
+    func testRefreshStatusMarksARefusedRecordRejected() async throws {
+        let now = date("2026-09-23T23:00:00Z")
+        var accepted = record(.acceptedForProcessing)
+        accepted.submittedAt = date("2026-09-23T22:00:00Z")
+        accepted.ezzkResultCode = 0
+        let refused = FakeLookup(.failure(EZZKError.serviceRejected(code: 12, message: "Neznámy obsah")))
+        let coordinator = EZZKSubmissionCoordinator(submitter: FakeSubmitter(.failure(EZZKError.outcomeUnknown)),
+                                                    lookup: refused, now: { now })
+
+        let result = await coordinator.refreshStatus(accepted)
+
+        XCTAssertEqual(result.status, .rejected)
+        XCTAssertEqual(result.ezzkResultCode, 12)
+        XCTAssertEqual(result.ezzkResultDescription, "Neznámy obsah")
+        XCTAssertEqual(result.lastLookupAt, now)
+        XCTAssertEqual(result.updatedAt, now)
+        XCTAssertEqual(result.submittedAt, accepted.submittedAt)
+        XCTAssertNil(coordinator.nextStatusCheck(for: result))
+    }
+
+    func testResolveUnknownMarksARefusedRecordRejected() async throws {
+        let now = date("2026-09-23T10:20:00Z")
+        let refused = FakeLookup(.failure(EZZKError.serviceRejected(code: 12, message: "Neznámy obsah")))
+        let submitter = FakeSubmitter(.failure(EZZKError.outcomeUnknown))
+        let coordinator = EZZKSubmissionCoordinator(submitter: submitter, lookup: refused, now: { now })
+
+        let result = await coordinator.resolveUnknown(record(.outcomeUnknown))
+
+        XCTAssertEqual(result.status, .rejected)
+        XCTAssertEqual(result.ezzkResultCode, 12)
+        XCTAssertEqual(result.ezzkResultDescription, "Neznámy obsah")
+        XCTAssertEqual(result.lastLookupAt, now)
+        XCTAssertEqual(result.updatedAt, now)
+        XCTAssertNil(coordinator.nextStatusCheck(for: result))
+        XCTAssertEqual(submitter.calls, 0)
+    }
+
+    func testRefreshStatusKeepsAnAcceptedRowWhenEZZKDoesNotKnowTheNumber() async throws {
+        let now = date("2026-09-23T11:00:00Z")
+        var accepted = record(.acceptedForProcessing)
+        accepted.submittedAt = date("2026-09-23T10:00:00Z")
+        accepted.ezzkResultCode = 0
+        let unknownNumber = FakeLookup(.failure(EZZKError.serviceRejected(code: 105, message: "Záznam neexistuje")))
+        let result = await EZZKSubmissionCoordinator(submitter: FakeSubmitter(.failure(EZZKError.outcomeUnknown)),
+                                                     lookup: unknownNumber, now: { now })
+            .refreshStatus(accepted)
+
+        XCTAssertEqual(result.status, .acceptedForProcessing)
+        XCTAssertEqual(result.ezzkResultCode, 0)
+        XCTAssertNil(result.ezzkResultDescription)
+        XCTAssertEqual(result.lastLookupAt, now)
+    }
+
     func testResubmissionAfterUnknownNumberIsCheckedFiveMinutesAfterItsReceipt() async throws {
         let clock = TestClock(date("2026-09-23T10:00:00Z"))
         let lostSubmitter = FakeSubmitter(.failure(EZZKError.outcomeUnknown))
