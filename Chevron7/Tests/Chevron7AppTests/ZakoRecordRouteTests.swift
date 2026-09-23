@@ -26,7 +26,8 @@ final class ZakoRecordRouteTests: XCTestCase {
         XCTAssertTrue(text.contains("ZakoRecordDeliveryBuilder()"))
         XCTAssertTrue(text.contains("signsAsRecordContainer: true"))
         XCTAssertTrue(text.contains("timestampServers: "))
-        XCTAssertTrue(text.contains("EZZKSubmissionCoordinator("))
+        XCTAssertTrue(text.contains("statusChecker.submit(id:"),
+                      "the record is sent through the app's status checker, which applies the coordinator")
         XCTAssertTrue(text.contains(".recordUnsigned"))
         XCTAssertFalse(text.contains("clauseGenerator.generateXML"),
                        "the register keeps the record 1.0 XML, not the legacy generator's output")
@@ -89,7 +90,9 @@ final class ZakoRecordRouteTests: XCTestCase {
         await store.authorizeAndSign()
 
         let requests = provider.requests
-        XCTAssertEqual(requests.count, 2)
+        guard requests.count == 2 else {
+            return XCTFail("expected the client container and the record to be signed, got \(requests.count) requests")
+        }
         let qualified = TimestampAuthority.qualifiedURLs.map(\.absoluteString)
         XCTAssertFalse(qualified.isEmpty)
         for request in requests {
@@ -102,7 +105,7 @@ final class ZakoRecordRouteTests: XCTestCase {
 
         XCTAssertEqual(store.step, .done)
         XCTAssertEqual(store.submissionStatus, .recordUnsigned)
-        XCTAssertNotNil(store.lastError)
+        XCTAssertEqual(store.lastError, ZakoSessionStore.recordUnsignedMessage(RecordRefusingProvider.failure))
         let row = try XCTUnwrap(settingsStore.evidenceStore.record(id: store.currentRecordID))
         XCTAssertEqual(row.status, .recordUnsigned)
         XCTAssertEqual(row.ezzkMode, .test)

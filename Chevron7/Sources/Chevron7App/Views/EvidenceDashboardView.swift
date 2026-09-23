@@ -14,6 +14,7 @@ struct EvidenceDashboardView: View {
     @State private var showDetail = false
     @State private var isSubmitting = false
     @State private var submitFeedback: String?
+    @State private var submitSucceeded = false
     @State private var refreshTimer: Timer?
     @State private var recordToDelete: EvidenceRecord?
     @State private var showDeleteConfirmation = false
@@ -240,7 +241,7 @@ struct EvidenceDashboardView: View {
             if let feedback = submitFeedback {
                 Text(feedback)
                     .font(.footnote.weight(.medium))
-                    .foregroundStyle(feedback.hasPrefix("✓") ? Color.green : Color.orange)
+                    .foregroundStyle(submitSucceeded ? Color.green : Color.orange)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
                     .background(Color.primary.opacity(0.04), in: Capsule())
@@ -325,54 +326,20 @@ struct EvidenceDashboardView: View {
             Task { @MainActor in reload() }
         }
     }
+    /// Every pending row goes through the app's status checker: unknown outcomes are
+    /// looked up first and never resent, and nothing is ever marked failed for an error
+    /// that may have followed an accepted record.
     private func submitPending() {
         isSubmitting = true
         submitFeedback = nil
-        reload()
-        let pending = records.filter(\.isSubmissionPending)
-        let isDemoMode = settingsStore.ezzkAccountController.isDemoMode
         Task {
-            var submittedCount = 0
-            var failedCount = 0
-            var submissionUnavailable = false
-            for record in pending {
-                do {
-                    _ = try await settingsStore.ezzkService.submit(record.envelope())
-                    if !isDemoMode {
-                        var updated = record
-                        updated.status = .submitted
-                        updated.updatedAt = Date()
-                        settingsStore.evidenceStore.upsert(updated)
-                    }
-                    submittedCount += 1
-                } catch EZZKError.submissionUnavailable {
-                    // Nothing was sent; the rows stay queued instead of being marked as failed.
-                    submissionUnavailable = true
-                    break
-                } catch {
-                    var updated = record
-                    updated.status = .submissionFailed
-                    updated.updatedAt = Date()
-                    settingsStore.evidenceStore.upsert(updated)
-                    failedCount += 1
-                }
-            }
-            await MainActor.run {
-                reload()
-                isSubmitting = false
-                if submissionUnavailable {
-                    submitFeedback = EZZKError.submissionUnavailable.errorDescription
-                } else {
-                    submitFeedback = failedCount == 0
-                        ? (isDemoMode
-                            ? "✓ Demo: lokálne pripravených \(submittedCount) záznamov."
-                            : "✓ Odoslaných \(submittedCount) záznamov do CEZZK.")
-                        : "⚠ \(submittedCount) úspešných, \(failedCount) zlyhalo."
-                }
-            }
+            let summary = await settingsStore.statusChecker.submitPending()
+            reload()
+            isSubmitting = false
+            submitFeedback = summary.feedback
+            submitSucceeded = summary.isSuccess
         }
     }
-
 
     private func exportCSV() {
         exportError = nil

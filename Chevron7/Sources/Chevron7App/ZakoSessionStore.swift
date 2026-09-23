@@ -103,12 +103,13 @@ final class ZakoSessionStore {
     static let mobileMandateRefusalMessage =
         "Podpis z mobilu nebol vytvorený mandátnym certifikátom. Zaručená konverzia vyžaduje mandátny certifikát advokáta, konverzia nebola autorizovaná a do evidencie sa nič nezapísalo."
 
+    /// Signing the record, checking its container or storing it in the register failed:
+    /// the client outputs exist, nothing was sent.
     static func recordUnsignedMessage(_ error: Error) -> String {
-        "Dokumenty pre klienta sú podpísané a uložené, ale záznam o konverzii sa nepodarilo podpísať: \(error.localizedDescription) Do EZZK sa nič neodoslalo. Záznam podpíšte znova novou konverziou; opakovaný podpis z Registra príde neskôr."
+        "Dokumenty pre klienta sú podpísané a uložené, ale záznam o konverzii sa nepodarilo podpísať alebo uložiť: \(error.localizedDescription) Do EZZK sa nič neodoslalo. Záznam podpíšte znova novou konverziou; opakovaný podpis z Registra príde neskôr."
     }
 
-    static let recordFromOtherModeMessage =
-        "Záznam bol vytvorený v inom režime EZZK, preto sa v tomto režime neodošle. Prepnite režim EZZK späť a odošlite ho znova."
+    static let recordFromOtherModeMessage = EZZKStatusChecker.recordFromOtherModeMessage
 
     static let mobileOutsideDemoMessage =
         "Zaručenú konverziu s EZZK podpisujte kartou SAK. Podpis z mobilu je zatiaľ dostupný iba v režime Demo."
@@ -1394,9 +1395,11 @@ final class ZakoSessionStore {
 
             evidenceStore.upsert(record)
             analysisProgressText = "Odosielam záznam do EZZK…"
-            await submit(record, container: recordContainer)
+            await sendRecord(record.id)
             if let outputCopyError {
-                lastError = "Záznam o konverzii je uložený v Registri, ale jeho kópiu sa nepodarilo uložiť k výstupom: \(outputCopyError.localizedDescription)"
+                // The submission's own message stays: both matter to the advocate.
+                let copyMessage = "Záznam o konverzii je uložený v Registri, ale jeho kópiu sa nepodarilo uložiť k výstupom: \(outputCopyError.localizedDescription)"
+                lastError = [lastError, copyMessage].compactMap { $0 }.joined(separator: "\n")
             }
 
             result = signed
@@ -1409,53 +1412,39 @@ final class ZakoSessionStore {
         }
     }
 
+    /// "Odoslať do EZZK" on the Done screen: sends this conversion's row again (an unknown
+    /// outcome is looked up first, never resent blindly).
     func retryQueuedSubmission() async {
-        guard let record = evidenceStore.record(id: currentRecordID) else { return }
-        await submit(record, container: evidenceStore.recordContainerData(for: record))
+        await sendRecord(currentRecordID)
     }
 
-    /// Sends one register row through the submission coordinator (the one set of rules for
-    /// EZZK states), stores the row it returns and reports its state. An unknown outcome is
-    /// looked up first, so a record EZZK may already have is never sent twice.
-    private func submit(_ record: EvidenceRecord, container: Data?) async {
-        let controller = settingsStore.ezzkAccountController
-        // A row is only ever sent to the EZZK that allocated its number.
-        if let mode = record.ezzkMode, mode != controller.mode {
+    /// "Overiť v EZZK" on the Done screen: looks this conversion's record up in EZZK.
+    func verifyRecordInEZZK() async {
+        apply(await settingsStore.statusChecker.verify(id: currentRecordID))
+    }
+
+    /// Sends one register row through the app's status checker, which applies the
+    /// submission coordinator's rules (late rows marked, unknown outcomes looked up first,
+    /// a row only ever sent to the EZZK that allocated its number) and keeps the Register
+    /// and the periodic check off the row meanwhile.
+    private func sendRecord(_ id: UUID) async {
+        apply(await settingsStore.statusChecker.submit(id: id))
+    }
+
+    private func apply(_ result: EZZKStatusChecker.RowResult) {
+        switch result {
+        case .refused(let reason):
+            submissionStatus = evidenceStore.record(id: currentRecordID)?.status ?? submissionStatus
+            lastError = reason
+        case .row(let record):
             submissionStatus = record.status
-            lastError = Self.recordFromOtherModeMessage
-            return
-        }
-        let coordinator = makeSubmissionCoordinator()
-        var updated = record
-        if updated.status == .outcomeUnknown {
-            updated = await coordinator.resolveUnknown(updated)
-        }
-        updated = await coordinator.submit(updated, container: container)
-        evidenceStore.upsert(updated)
-        submissionStatus = updated.status
-        switch updated.status {
-        case .acceptedForProcessing, .processed:
-            // EZZK consumed the number with the record, so it is never offered again.
-            if let number = updated.evidenceNumber { evidenceNumberPool.remove(number) }
-            lastError = nil
-        default:
-            lastError = updated.ezzkResultDescription
-        }
-    }
-
-    /// Demo sends to the local `MockEZZKService` and has nothing to look up, so a lookup there
-    /// answers "processed"; outside Demo the lookup is the account controller's.
-    func makeSubmissionCoordinator() -> EZZKSubmissionCoordinator {
-        let controller = settingsStore.ezzkAccountController
-        let lookup: EZZKRecordLookupFunction
-        if controller.isDemoMode {
-            lookup = EZZKRecordLookupFunction { _ in EZZKRecordLookup(isProcessed: true, info: nil) }
-        } else {
-            lookup = EZZKRecordLookupFunction { number in
-                try await controller.lookUp(evidenceNumber: number)
+            switch record.status {
+            case .acceptedForProcessing, .processed:
+                lastError = nil
+            default:
+                lastError = record.ezzkResultDescription
             }
         }
-        return EZZKSubmissionCoordinator(submitter: ezzkService, lookup: lookup)
     }
 
     func saveTemplate() {

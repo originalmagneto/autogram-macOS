@@ -45,6 +45,10 @@ final class Chevron7AppModel {
                 || browserSigning.pending != nil
         }
 
+        // Rows waiting for EZZK are sent and looked up every five minutes while the app
+        // runs; the process ending stops the check.
+        settings.statusChecker.start()
+
         // Browser requests reach the app through the Safari extension and the
         // launchd rendezvous; nothing signs without the sheet this raises.
         let coordinator = webSigning
