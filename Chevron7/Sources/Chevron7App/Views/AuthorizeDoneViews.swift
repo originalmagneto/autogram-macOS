@@ -322,6 +322,11 @@ struct AuthorizeView: View {
             .controlSize(.large)
             .disabled(store.isAuthorizing || !store.isMobilePreflightComplete)
             .help("Vyžaduje mandátny certifikát na občianskom preukaze. Bez neho sa konverzia odmietne.")
+        } else if store.showsMobileOutsideDemoNotice {
+            Text(ZakoSessionStore.mobileOutsideDemoMessage)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 }

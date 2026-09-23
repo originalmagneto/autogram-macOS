@@ -31,6 +31,37 @@ final class ZakoMobileAvailabilityTests: XCTestCase {
         XCTAssertTrue(store.isMobileSigningAvailable)
     }
 
+    /// Outside Demo the phone button disappears; the view falls back to a caption naming
+    /// `mobileOutsideDemoMessage` instead of showing nothing.
+    func testShowsMobileOutsideDemoNoticeInTestModeWithMobileEnabled() {
+        let (settingsStore, _) = makeTestModeSettingsStore()
+        settingsStore.settings.mobileSigningEnabled = true
+        let store = ZakoSessionStore(settingsStore: settingsStore)
+
+        XCTAssertTrue(store.showsMobileOutsideDemoNotice)
+    }
+
+    /// In Demo the phone button itself is available (or the card path is the only one, but
+    /// either way the notice is redundant), so the caption must not also appear.
+    func testShowsMobileOutsideDemoNoticeIsFalseInDemo() {
+        let settingsStore = makeSettingsStore()
+        settingsStore.ezzkAccountController.setMode(.demo)
+        settingsStore.settings.mobileSigningEnabled = true
+        let store = ZakoSessionStore(settingsStore: settingsStore)
+
+        XCTAssertFalse(store.showsMobileOutsideDemoNotice)
+    }
+
+    /// With mobile signing turned off in Settings, neither the button nor the notice should
+    /// appear.
+    func testShowsMobileOutsideDemoNoticeIsFalseWhenMobileDisabled() {
+        let (settingsStore, _) = makeTestModeSettingsStore()
+        settingsStore.settings.mobileSigningEnabled = false
+        let store = ZakoSessionStore(settingsStore: settingsStore)
+
+        XCTAssertFalse(store.showsMobileOutsideDemoNotice)
+    }
+
     /// Builds a settings store on an EZZK controller already in Test mode, with in-memory
     /// credentials and a transport with no replies, exactly as
     /// `ZakoEvidenceNumberTests.testNumberFetchedInDemoIsRefusedAfterSwitchingToTest` does

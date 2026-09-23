@@ -105,6 +105,13 @@ final class ZakoSessionStore {
         settings.mobileSigningEnabled && !signingProviderIsDemo && settingsStore.ezzkAccountController.isDemoMode
     }
 
+    /// True when the user turned mobile signing on but the phone path is unavailable because
+    /// EZZK is outside Demo mode: the button (`isMobileSigningAvailable`) hides in that case, so
+    /// the view shows this notice instead of nothing.
+    var showsMobileOutsideDemoNotice: Bool {
+        settings.mobileSigningEnabled && !settingsStore.ezzkAccountController.isDemoMode
+    }
+
     /// Preflight for the mobile path: the certificate is known only after the phone
     /// signs, so identity and mandate checks move to the post-signature refusal.
     var isMobilePreflightComplete: Bool {
