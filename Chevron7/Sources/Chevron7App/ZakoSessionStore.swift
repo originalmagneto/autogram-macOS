@@ -1293,7 +1293,7 @@ final class ZakoSessionStore {
                 formPack: FormPackStamp(pack: selectedFormPack),
                 securityReview: securityReviewSnapshot)
             do {
-                try await ezzkService.submit(envelope)
+                _ = try await ezzkService.submit(envelope)
                 if settingsStore.ezzkAccountController.isDemoMode {
                     var queued = record
                     queued.status = .queuedForSubmission
@@ -1329,7 +1329,7 @@ final class ZakoSessionStore {
         guard let record = evidenceStore.record(id: currentRecordID),
               record.status != .submitted else { return }
         do {
-            try await ezzkService.submit(record.envelope())
+            _ = try await ezzkService.submit(record.envelope())
             if settingsStore.ezzkAccountController.isDemoMode {
                 var queued = record
                 queued.status = .queuedForSubmission

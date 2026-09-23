@@ -34,7 +34,13 @@ public struct EZZKSOAPServiceAdapter: EZZKServicing {
         return Array(available.prefix(count))
     }
 
-    public func submit(_ envelope: ConversionRecordEnvelope) async throws {
-        throw EZZKError.submissionUnavailable
+    public func submit(_ envelope: ConversionRecordEnvelope) async throws -> EZZKSOAPSubmissionReceipt {
+        guard let container = envelope.signedRecordContainer else {
+            throw EZZKError.invalidRequest("chýba podpísaný záznam")
+        }
+        let attachment = EZZKRecordAttachment(evidenceNumber: envelope.evidenceNumber,
+                                              mimeType: "application/vnd.etsi.asic-e+zip",
+                                              data: container)
+        return try await client.receive(records: [attachment], person: person)
     }
 }

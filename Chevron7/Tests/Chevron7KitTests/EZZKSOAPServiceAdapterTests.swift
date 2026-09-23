@@ -64,14 +64,52 @@ final class EZZKSOAPServiceAdapterTests: XCTestCase {
         XCTAssertTrue(transport.requests.isEmpty)
     }
 
-    func testSubmitIsUnavailableInPartA() async {
+    func testSubmitSendsTheSignedContainerAsAsicAttachment() async throws {
+        let transport = SOAPScriptedTransport([
+            .ok(EZZKSOAPFixtures.loginSucceeded()),
+            .ok(EZZKSOAPFixtures.result(code: 0, description: "OK", operation: "ReceiveConversionRecord"))
+        ])
+        let containerData = Data("asic-e-container-bytes".utf8)
+        var envelope = ConversionRecordEnvelope(evidenceNumber: "1563-260917-1", direction: .paperToElectronic,
+                                                originalName: "a", newDocumentName: "a.pdf",
+                                                attestationXML: "<x/>", fingerprintSHA256Hex: "00",
+                                                conversionTime: Date())
+        envelope.signedRecordContainer = containerData
+
+        let receipt = try await makeAdapter(.sandbox, transport, used: []).submit(envelope)
+
+        let body = try XCTUnwrap(transport.requests.last?.httpBody.map { String(decoding: $0, as: UTF8.self) })
+        XCTAssertTrue(body.contains("<d:Mimetype>application/vnd.etsi.asic-e+zip</d:Mimetype>"))
+        XCTAssertTrue(body.contains(containerData.base64EncodedString()))
+        XCTAssertNotNil(UUID(uuidString: receipt.messageID))
+    }
+
+    func testSubmitWithoutContainerIsARequestError() async {
         let transport = SOAPScriptedTransport([])
         let envelope = ConversionRecordEnvelope(evidenceNumber: "1", direction: .paperToElectronic,
                                                 originalName: "a", newDocumentName: "a.pdf",
                                                 attestationXML: "<x/>", fingerprintSHA256Hex: "00",
                                                 conversionTime: Date())
+
         do {
-            try await makeAdapter(.sandbox, transport, used: []).submit(envelope)
+            _ = try await makeAdapter(.sandbox, transport, used: []).submit(envelope)
+            XCTFail("expected invalidRequest")
+        } catch {
+            XCTAssertEqual(error as? EZZKError, .invalidRequest("chýba podpísaný záznam"))
+        }
+        XCTAssertTrue(transport.requests.isEmpty)
+    }
+
+    func testSubmitOnProductionIsStillRefusedWithoutAnyRequest() async {
+        let transport = SOAPScriptedTransport([])
+        var envelope = ConversionRecordEnvelope(evidenceNumber: "1", direction: .paperToElectronic,
+                                                originalName: "a", newDocumentName: "a.pdf",
+                                                attestationXML: "<x/>", fingerprintSHA256Hex: "00",
+                                                conversionTime: Date())
+        envelope.signedRecordContainer = Data("asic-e-container-bytes".utf8)
+
+        do {
+            _ = try await makeAdapter(.production, transport, used: []).submit(envelope)
             XCTFail("expected submissionUnavailable")
         } catch {
             XCTAssertEqual(error as? EZZKError, .submissionUnavailable)

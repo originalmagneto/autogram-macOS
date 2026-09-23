@@ -17,6 +17,9 @@ public struct ConversionRecordEnvelope: Codable, Sendable, Identifiable {
     public var submittedToCEZZKAt: Date?
     public var formPack: FormPackStamp?
     public var securityReview: SecurityReviewStamp?
+    /// The signed record container (ASiC-E) `ReceiveConversionRecord` sends as the attachment.
+    /// Not part of any persisted record: it is produced right before submission.
+    public var signedRecordContainer: Data?
 
     public init(id: UUID = UUID(), evidenceNumber: String, direction: ConversionDirection,
                 originalName: String, newDocumentName: String,
@@ -34,6 +37,7 @@ public struct ConversionRecordEnvelope: Codable, Sendable, Identifiable {
         self.submittedToCEZZKAt = nil
         self.formPack = nil
         self.securityReview = nil
+        self.signedRecordContainer = nil
     }
 
     public init(id: UUID = UUID(), evidenceNumber: String, direction: ConversionDirection,
@@ -116,7 +120,7 @@ public protocol EZZKEvidenceNumberProvider: Sendable {
 }
 
 public protocol EZZKSubmissionTransport: Sendable {
-    func submit(_ envelope: ConversionRecordEnvelope) async throws
+    func submit(_ envelope: ConversionRecordEnvelope) async throws -> EZZKSOAPSubmissionReceipt
 }
 
 public protocol EZZKServicing: EZZKServerClock, EZZKEvidenceNumberProvider, EZZKSubmissionTransport {}
@@ -151,8 +155,9 @@ public final class MockEZZKService: EZZKServicing, @unchecked Sendable {
         }
     }
 
-    public func submit(_ envelope: ConversionRecordEnvelope) async throws {
+    public func submit(_ envelope: ConversionRecordEnvelope) async throws -> EZZKSOAPSubmissionReceipt {
         state.withLock { $0.submitted.append(envelope) }
+        return EZZKSOAPSubmissionReceipt(messageID: UUID().uuidString.lowercased(), submittedAt: Date())
     }
 
     public var submittedRecords: [ConversionRecordEnvelope] {

@@ -104,7 +104,7 @@ final class ConversionPipelineIntegrationTests: XCTestCase {
             attestationXML: xml,
             fingerprintSHA256Hex: fingerprint,
             conversionTime: Date())
-        try await ezzk.submit(envelope)
+        _ = try await ezzk.submit(envelope)
         XCTAssertEqual(ezzk.submittedRecords.count, 1)
     }
 }

@@ -197,7 +197,7 @@ final class EvidenceAndPackagingTests: XCTestCase {
             attestationXML: "<x/>",
             fingerprintSHA256Hex: "ff",
             conversionTime: Date())
-        try await service.submit(envelope)
+        _ = try await service.submit(envelope)
         XCTAssertEqual(service.submittedRecords.count, 1)
 
         let time = try await service.serverTime()
@@ -219,7 +219,7 @@ final class EvidenceAndPackagingTests: XCTestCase {
             fingerprintSHA256Hex: String(repeating: "a", count: 64),
             conversionTime: Date())
 
-        try await submission.submit(envelope)
+        _ = try await submission.submit(envelope)
         let serverTime = try await clock.serverTime()
 
         XCTAssertEqual(service.submittedRecords.map(\.evidenceNumber), [number])

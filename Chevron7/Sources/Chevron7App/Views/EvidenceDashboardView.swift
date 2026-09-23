@@ -337,7 +337,7 @@ struct EvidenceDashboardView: View {
             var submissionUnavailable = false
             for record in pending {
                 do {
-                    try await settingsStore.ezzkService.submit(record.envelope())
+                    _ = try await settingsStore.ezzkService.submit(record.envelope())
                     if !isDemoMode {
                         var updated = record
                         updated.status = .submitted
