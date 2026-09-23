@@ -25,7 +25,7 @@ final class AttestationValidatorTests: XCTestCase {
         var element = SecurityElement(kind: .bindingCord, pageIndex: 0, boundingBox: .zero,
             confidence: 1, detectedByAI: false, observation: .physicalOriginal)
         XCTAssertFalse(AttestationValidator.validate(data, securityElements: [element], qualifiedTimestampTime: nil).isEmpty)
-        element.originalLocation = "Ľavý okraj zväzku"
+        element.originalLocation = "Left edge"
         element.newDocumentPageIndex = 0
         XCTAssertTrue(AttestationValidator.validate(data, securityElements: [element], qualifiedTimestampTime: nil).isEmpty)
     }
