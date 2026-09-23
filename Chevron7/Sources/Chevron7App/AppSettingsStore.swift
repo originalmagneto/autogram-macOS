@@ -33,8 +33,9 @@ final class AppSettingsStore {
         self.settings = loaded
         self.storageRoot = storageRoot
         self.ezzkAccountController = ezzkAccountController ?? EZZKAccountController(mode: loaded.ezzkMode)
-        self.evidenceStore = LocalEvidenceStore(
-            directory: storageRoot.appendingPathComponent("Evidence", isDirectory: true))
+        // LocalEvidenceStore.init appends its own "Evidence" folder to whatever
+        // directory it is given, so pass storageRoot itself here.
+        self.evidenceStore = LocalEvidenceStore(directory: storageRoot)
         self.exampleBank = ExampleBank(directory: Self.exampleBankDirectory(in: storageRoot))
         self.signingProvider = SigningProviderFactory.makeDefault()
         self.ezzkAccountController.configure(

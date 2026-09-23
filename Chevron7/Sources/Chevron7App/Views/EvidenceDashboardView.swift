@@ -307,11 +307,11 @@ struct EvidenceDashboardView: View {
 
     private func statusTint(_ status: EvidenceRecord.Status) -> Color {
         switch status {
-        case .draft, .awaitingNumber: return .secondary
+        case .draft, .awaitingNumber, .recordUnsigned: return .secondary
         case .readyToSign: return .blue
-        case .signed, .queuedForSubmission: return .orange
-        case .submitted: return .green
-        case .submissionFailed: return .red
+        case .signed, .queuedForSubmission, .acceptedForProcessing, .outcomeUnknown, .late: return .orange
+        case .submitted, .processed: return .green
+        case .submissionFailed, .rejected: return .red
         }
     }
 
@@ -582,11 +582,11 @@ struct RecordDetailView: View {
 
     private var statusTint: Color {
         switch record.status {
-        case .draft, .awaitingNumber: return .secondary
+        case .draft, .awaitingNumber, .recordUnsigned: return .secondary
         case .readyToSign: return .blue
-        case .signed, .queuedForSubmission: return .orange
-        case .submitted: return .green
-        case .submissionFailed: return .red
+        case .signed, .queuedForSubmission, .acceptedForProcessing, .outcomeUnknown, .late: return .orange
+        case .submitted, .processed: return .green
+        case .submissionFailed, .rejected: return .red
         }
     }
 }

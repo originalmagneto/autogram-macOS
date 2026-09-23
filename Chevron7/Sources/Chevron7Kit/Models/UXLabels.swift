@@ -21,10 +21,16 @@ public enum UXLabels {
         case .draft: return "Koncept"
         case .awaitingNumber: return "Čaká na evidenčné číslo"
         case .readyToSign: return "Pripravené na autorizáciu"
-        case .signed: return "Stav: čaká na odoslanie"
-        case .queuedForSubmission: return "Stav: čaká na odoslanie"
+        case .signed: return "Podpísaný, čaká na odoslanie"
+        case .queuedForSubmission: return "Čaká na odoslanie"
         case .submitted: return "Zapísané v CEZZK"
         case .submissionFailed: return "Odoslanie zlyhalo – čaká na opakovanie"
+        case .acceptedForProcessing: return "Prijatý na spracovanie"
+        case .processed: return "Spracovaný v EZZK"
+        case .outcomeUnknown: return "Výsledok neznámy, najprv overte v EZZK"
+        case .rejected: return "Odmietnutý v EZZK"
+        case .recordUnsigned: return "Záznam nepodpísaný"
+        case .late: return "Oneskorený"
         }
     }
 }
