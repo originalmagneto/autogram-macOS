@@ -31,6 +31,7 @@ struct RootView: View {
     @AppStorage("sidebar.recentDocumentsExpanded") private var recentDocumentsExpanded = true
     @State private var showAllSignedDocuments = false
     @State private var showAllRecentDocuments = false
+    @State private var showRegisterLoadError = false
     @State private var showSignedClearDialog = false
 
     /// Rows shown per history section before "Zobraziť všetky".
@@ -372,6 +373,17 @@ struct RootView: View {
             Button("Zrušiť", role: .cancel) {}
         } message: {
             Text("Súbory presunuté do Koša sa dajú obnoviť, kým Kôš nevysypete.")
+        }
+        // An unreadable register is the legal record of evidence numbers already used, so
+        // the advocate hears about it at launch instead of seeing an empty Register.
+        .onAppear {
+            if settingsStore.evidenceStore.loadError != nil { showRegisterLoadError = true }
+        }
+        .alert("Register konverzií sa nepodarilo načítať", isPresented: $showRegisterLoadError) {
+            Button("Otvoriť Register konverzií") { selection = .evidence }
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(settingsStore.evidenceStore.loadError ?? "")
         }
     }
 

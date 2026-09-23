@@ -205,3 +205,145 @@ struct ZakoDonePresentation: Equatable {
         }
     }
 }
+
+/// The counts in the Register konverzií header.
+struct EvidenceRegisterSummary: Equatable {
+    let total: Int
+    /// EZZK has the record (accepted, processed, or part A's "Zapísané v CEZZK").
+    let sent: Int
+    /// Waiting to be sent or verified.
+    let pending: Int
+    /// Refused by EZZK, failed in part A, or the record was never signed.
+    let failed: Int
+
+    init(records: [EvidenceRecord]) {
+        total = records.count
+        sent = records.filter { EZZKRecordPresentation.isSent($0.status) }.count
+        failed = records.filter { Self.isFailure($0.status) }.count
+        pending = records.filter { $0.status.isSubmissionPendingState && !Self.isFailure($0.status) }.count
+    }
+
+    private static func isFailure(_ status: EvidenceRecord.Status) -> Bool {
+        EZZKRecordPresentation.isFailed(status) || status == .recordUnsigned
+    }
+}
+
+/// What the Register's detail sheet and deadline column show for one row.
+enum EvidenceRegisterDetail {
+    struct Stage: Equatable {
+        let label: String
+        let done: Bool
+        let failed: Bool
+    }
+
+    struct Fact: Equatable {
+        let label: String
+        let value: String
+    }
+
+    struct Actions: Equatable {
+        /// "Odoslať".
+        let canSend: Bool
+        /// "Overiť v EZZK".
+        let canVerify: Bool
+        /// Why the row cannot be sent, or what sending it means, or nil.
+        let note: String?
+    }
+
+    struct Deadline: Equatable {
+        let text: String
+        let tone: EZZKRecordPresentation.Tone
+    }
+
+    static func timeline(for record: EvidenceRecord) -> [Stage] {
+        let status = record.status
+        return [
+            Stage(label: "Evidenčné číslo", done: record.evidenceNumber != nil, failed: false),
+            Stage(label: "Autorizácia KEP", done: status.progressIndex >= 3, failed: false),
+            Stage(label: "Záznam v EZZK", done: EZZKRecordPresentation.isSent(status),
+                  failed: EZZKRecordPresentation.isFailed(status) || status == .recordUnsigned),
+            Stage(label: "Spracovaný", done: status == .processed || status == .submitted, failed: false)
+        ]
+    }
+
+    /// State, mode and whatever the row knows about its submission (nothing it lacks).
+    static func submissionFacts(for record: EvidenceRecord) -> [Fact] {
+        var facts = [
+            Fact(label: "Stav", value: UXLabels.evidenceStatusLabel(for: record.status)),
+            Fact(label: "Režim EZZK", value: record.ezzkMode?.label ?? "neuvedený")
+        ]
+        if let submittedAt = record.submittedAt {
+            facts.append(Fact(label: "Odoslané", value: EZZKRecordPresentation.timeText(submittedAt)))
+        }
+        if let messageID = record.submissionMessageID, !messageID.isEmpty {
+            facts.append(Fact(label: "ID správy", value: messageID))
+        }
+        let description = record.ezzkResultDescription.flatMap { $0.isEmpty ? nil : $0 }
+        switch (record.ezzkResultCode, description) {
+        case let (code?, description?):
+            facts.append(Fact(label: "Výsledok EZZK", value: "\(code): \(description)"))
+        case let (code?, nil):
+            facts.append(Fact(label: "Výsledok EZZK", value: "\(code)"))
+        case let (nil, description?):
+            facts.append(Fact(label: "Posledná správa", value: description))
+        case (nil, nil):
+            break
+        }
+        if let lastLookupAt = record.lastLookupAt {
+            facts.append(Fact(label: "Posledné overenie", value: EZZKRecordPresentation.timeText(lastLookupAt)))
+        }
+        return facts
+    }
+
+    /// A row is sent or looked up only in the EZZK mode that allocated its number (a row
+    /// without a mode, from before part B2, in the current one), and never in Production yet.
+    static func actions(for record: EvidenceRecord, currentMode: AppSettings.EZZKMode) -> Actions {
+        let status = record.status
+        let mode = record.ezzkMode ?? currentMode
+        let sendable = EZZKRecordPresentation.isSendable(status)
+        let verifiable = EZZKRecordPresentation.isVerifiable(status)
+        if status == .recordUnsigned {
+            return Actions(canSend: false, canVerify: false, note: EZZKRecordPresentation.resignLater)
+        }
+        guard sendable || verifiable else { return Actions(canSend: false, canVerify: false, note: nil) }
+        if mode != currentMode {
+            return Actions(canSend: false, canVerify: false, note: EZZKStatusChecker.recordFromOtherModeMessage)
+        }
+        if mode == .production {
+            return Actions(canSend: false, canVerify: false, note: EZZKError.submissionUnavailable.errorDescription)
+        }
+        return Actions(canSend: sendable, canVerify: verifiable,
+                       note: status == .late ? EZZKRecordPresentation.lateWarning : nil)
+    }
+
+    /// The Register's deadline column. EZZK expects the record on the Bratislava day the
+    /// number was allocated; a row past that day is late and says so.
+    static func deadline(for record: EvidenceRecord, now: Date) -> Deadline {
+        let status = record.status
+        if EZZKRecordPresentation.isSent(status) {
+            return Deadline(text: UXLabels.evidenceStatusLabel(for: status), tone: .success)
+        }
+        switch status {
+        case .late:
+            return Deadline(text: EZZKRecordPresentation.lateWarning, tone: .warning)
+        case .outcomeUnknown:
+            return Deadline(text: "Najprv overte v EZZK", tone: .warning)
+        case .rejected, .recordUnsigned:
+            return Deadline(text: UXLabels.evidenceStatusLabel(for: status), tone: .failure)
+        default:
+            break
+        }
+        let deadlineText = EZZKRecordPresentation.timeText(record.submissionDeadline)
+        guard status.isSubmissionPendingState else {
+            return Deadline(text: "Lehota: \(deadlineText)", tone: .pending)
+        }
+        if let allocatedAt = record.evidenceNumberAllocatedAt,
+           EZZKEvidenceNumberPolicy.isUsable(allocatedAt: allocatedAt, at: now) {
+            return Deadline(text: "Odoslať ešte dnes, do polnoci", tone: .warning)
+        }
+        if now > record.submissionDeadline {
+            return Deadline(text: "Po lehote: \(deadlineText)", tone: .failure)
+        }
+        return Deadline(text: "Blíži sa lehota: do \(deadlineText)", tone: .warning)
+    }
+}

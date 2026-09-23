@@ -76,11 +76,11 @@ final class EZZKStatusChecker {
     /// runs is not sent every five minutes.
     static let automaticAttemptsPerDay = 3
 
-    static let recordFromOtherModeMessage =
+    nonisolated static let recordFromOtherModeMessage =
         "Záznam bol vytvorený v inom režime EZZK, preto sa v tomto režime neodošle. Prepnite režim EZZK späť a odošlite ho znova."
-    static let rowBusyMessage =
+    nonisolated static let rowBusyMessage =
         "Záznam sa práve odosiela alebo overuje v EZZK. Skúste to o chvíľu."
-    static let missingRowMessage = "Záznam sa v Registri konverzií nenašiel."
+    nonisolated static let missingRowMessage = "Záznam sa v Registri konverzií nenašiel."
 
     /// Increases whenever a row is stored, so views that read rows from the register
     /// (which is not observable itself) redraw.

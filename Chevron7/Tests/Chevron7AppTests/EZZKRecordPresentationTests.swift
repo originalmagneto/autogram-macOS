@@ -112,6 +112,94 @@ final class EZZKRecordPresentationTests: XCTestCase {
         XCTAssertEqual(done.error, "Register konverzií sa nepodarilo načítať.")
     }
 
+    // MARK: - Register konverzií
+
+    func testRegisterSummaryCountsAcceptedAndProcessedAsSentAndRejectedAsFailed() {
+        let rows = [row(.acceptedForProcessing), row(.processed), row(.submitted), row(.rejected),
+                    row(.recordUnsigned), row(.outcomeUnknown), row(.late), row(.queuedForSubmission)]
+        let summary = EvidenceRegisterSummary(records: rows)
+        XCTAssertEqual(summary.total, 8)
+        XCTAssertEqual(summary.sent, 3)
+        XCTAssertEqual(summary.failed, 2)
+        XCTAssertEqual(summary.pending, 3)
+    }
+
+    func testTimelineShowsAcceptedAsSentAndRejectedAsFailed() {
+        let accepted = EvidenceRegisterDetail.timeline(for: row(.acceptedForProcessing))
+        XCTAssertEqual(accepted.map(\.label), ["Evidenčné číslo", "Autorizácia KEP", "Záznam v EZZK", "Spracovaný"])
+        XCTAssertEqual(accepted.map(\.done), [true, true, true, false])
+        XCTAssertEqual(accepted.map(\.failed), [false, false, false, false])
+
+        XCTAssertEqual(EvidenceRegisterDetail.timeline(for: row(.processed)).map(\.done), [true, true, true, true])
+        XCTAssertEqual(EvidenceRegisterDetail.timeline(for: row(.rejected)).map(\.failed), [false, false, true, false])
+        XCTAssertEqual(EvidenceRegisterDetail.timeline(for: row(.recordUnsigned)).map(\.failed), [false, false, true, false])
+        XCTAssertEqual(EvidenceRegisterDetail.timeline(for: row(.outcomeUnknown)).map(\.done), [true, true, false, false])
+    }
+
+    func testDetailFactsShowTheSubmission() {
+        var record = row(.rejected)
+        record.submittedAt = now
+        record.submissionMessageID = "ae6fbf72-1"
+        record.ezzkResultCode = 12
+        record.ezzkResultDescription = "Neznámy obsah"
+        record.lastLookupAt = now.addingTimeInterval(3600)
+        let facts = Dictionary(uniqueKeysWithValues: EvidenceRegisterDetail.submissionFacts(for: record).map { ($0.label, $0.value) })
+        XCTAssertEqual(facts["Stav"], "Odmietnutý v EZZK")
+        XCTAssertEqual(facts["Režim EZZK"], "Test")
+        XCTAssertEqual(facts["Odoslané"], "24. 9. 2026 12:00")
+        XCTAssertEqual(facts["ID správy"], "ae6fbf72-1")
+        XCTAssertEqual(facts["Výsledok EZZK"], "12: Neznámy obsah")
+        XCTAssertEqual(facts["Posledné overenie"], "24. 9. 2026 13:00")
+
+        let fresh = EvidenceRegisterDetail.submissionFacts(for: row(.signed)).map(\.label)
+        XCTAssertEqual(fresh, ["Stav", "Režim EZZK"], "only what the row has")
+    }
+
+    func testDetailActionsFollowStateAndMode() {
+        let queued = EvidenceRegisterDetail.actions(for: row(.queuedForSubmission), currentMode: .test)
+        XCTAssertTrue(queued.canSend)
+        XCTAssertFalse(queued.canVerify)
+        XCTAssertNil(queued.note)
+
+        let late = EvidenceRegisterDetail.actions(for: row(.late), currentMode: .test)
+        XCTAssertTrue(late.canSend)
+        XCTAssertEqual(late.note, EZZKRecordPresentation.lateWarning)
+
+        for status in [EvidenceRecord.Status.outcomeUnknown, .acceptedForProcessing] {
+            let actions = EvidenceRegisterDetail.actions(for: row(status), currentMode: .test)
+            XCTAssertFalse(actions.canSend, "\(status)")
+            XCTAssertTrue(actions.canVerify, "\(status)")
+        }
+
+        let otherMode = EvidenceRegisterDetail.actions(for: row(.queuedForSubmission, mode: .demo), currentMode: .test)
+        XCTAssertFalse(otherMode.canSend)
+        XCTAssertEqual(otherMode.note, EZZKStatusChecker.recordFromOtherModeMessage)
+
+        let production = EvidenceRegisterDetail.actions(for: row(.queuedForSubmission, mode: .production),
+                                                         currentMode: .production)
+        XCTAssertFalse(production.canSend)
+        XCTAssertEqual(production.note, EZZKError.submissionUnavailable.errorDescription)
+
+        let unsigned = EvidenceRegisterDetail.actions(for: row(.recordUnsigned), currentMode: .test)
+        XCTAssertFalse(unsigned.canSend)
+        XCTAssertFalse(unsigned.canVerify)
+        XCTAssertEqual(unsigned.note, "Záznam podpíšte znova novou konverziou; opakovaný podpis z Registra príde neskôr.")
+    }
+
+    func testDeadlineColumn() {
+        XCTAssertEqual(EvidenceRegisterDetail.deadline(for: row(.late), now: now).text, EZZKRecordPresentation.lateWarning)
+        XCTAssertEqual(EvidenceRegisterDetail.deadline(for: row(.processed), now: now).text, "Spracovaný v EZZK")
+        XCTAssertEqual(EvidenceRegisterDetail.deadline(for: row(.acceptedForProcessing), now: now).tone, .success)
+
+        let today = EvidenceRegisterDetail.deadline(for: row(.queuedForSubmission), now: now)
+        XCTAssertEqual(today.text, "Odoslať ešte dnes, do polnoci")
+        XCTAssertEqual(today.tone, .warning)
+
+        let unknown = EvidenceRegisterDetail.deadline(for: row(.outcomeUnknown), now: now.addingTimeInterval(2 * 86400))
+        XCTAssertEqual(unknown.text, "Najprv overte v EZZK")
+        XCTAssertFalse(unknown.text.contains("\u{2014}"), "no em dash")
+    }
+
     // MARK: - Fixtures
 
     private func presentation(_ record: EvidenceRecord, nextStatusCheck: Date? = nil) -> ZakoDonePresentation {
