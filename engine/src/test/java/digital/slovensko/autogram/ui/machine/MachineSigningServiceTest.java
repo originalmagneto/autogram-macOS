@@ -763,6 +763,60 @@ class MachineSigningServiceTest {
         assertTrue(signature.contains("URI=\"dokument.xml.xdcf\""), signature);
     }
 
+    /// A real advocate names a source with a space and a diacritic. The ZIP entry names and the
+    /// signature's references must survive that exactly, whatever percent-encoding DSS applies.
+    @Test
+    void attachmentsWithSpaceAndDiacriticAreSignedAsDataObjectsOfOneContainer() throws Exception {
+        var pdf = Files.readAllBytes(Path.of(MachineSigningServiceTest.class
+                .getResource("/digital/slovensko/autogram/sample.pdf").getFile()));
+        var xdcf = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><XMLDataContainer xmlns=\"http://data.gov.sk/def/container/xmldatacontainer+xml/1.1\"/>"
+                .getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        var retained = new MemoryRetainedFile();
+        var responder = new MachineFileResponder(retained, () -> { });
+        var settings = new MachineSettings(true);
+        settings.setSignatureLevel(SignatureLevel.XAdES_BASELINE_B);
+
+        var sourceName = "Zmluva o dielo č. 3.pdf";
+        var attachmentName = "Zmluva o dielo č. 3.xml.xdcf";
+        var job = MachineSigningService.DefaultSigningSession.signingJob(pdf, "/tmp/" + sourceName, responder, settings,
+                null, List.of(new MachineSigningService.AttachmentContent(attachmentName, xdcf)));
+        var token = new Pkcs12SignatureToken(
+                Objects.requireNonNull(MachineSigningServiceTest.class
+                        .getResource("/digital/slovensko/autogram/test.keystore")).getFile(),
+                new KeyStore.PasswordProtection("".toCharArray()));
+        job.signWithKeyAndRespond(new SigningKey(token, token.getKeys().get(0)));
+
+        var names = new ArrayList<String>();
+        String signature = null;
+        try (var zip = new ZipInputStream(new ByteArrayInputStream(retained.readAll()))) {
+            for (var entry = zip.getNextEntry(); entry != null; entry = zip.getNextEntry()) {
+                names.add(java.text.Normalizer.normalize(entry.getName(), java.text.Normalizer.Form.NFC));
+                var content = new String(zip.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+                if (entry.getName().startsWith("META-INF/signatures")) signature = content;
+            }
+        }
+        var normalizedSourceName = java.text.Normalizer.normalize(sourceName, java.text.Normalizer.Form.NFC);
+        var normalizedAttachmentName = java.text.Normalizer.normalize(attachmentName, java.text.Normalizer.Form.NFC);
+        assertTrue(names.contains(normalizedSourceName), names.toString());
+        assertTrue(names.contains(normalizedAttachmentName), names.toString());
+        assertTrue(names.stream().noneMatch(name -> name.endsWith(".asice")), names.toString());
+        assertTrue(referencesFile(signature, sourceName), signature);
+        assertTrue(referencesFile(signature, attachmentName), signature);
+    }
+
+    /// True when `signatureXml` carries a `dsig:Reference` URI for `fileName`, whether DSS wrote
+    /// it plain or percent-encoded; both forms are normalised to NFC before comparison because a
+    /// diacritic can be composed differently depending on the encoding step.
+    private static boolean referencesFile(String signatureXml, String fileName) {
+        var normalizedName = java.text.Normalizer.normalize(fileName, java.text.Normalizer.Form.NFC);
+        var normalizedXml = java.text.Normalizer.normalize(signatureXml, java.text.Normalizer.Form.NFC);
+        if (normalizedXml.contains("URI=\"" + normalizedName + "\"")) return true;
+        var decodedXml = java.text.Normalizer.normalize(
+                java.net.URLDecoder.decode(signatureXml, java.nio.charset.StandardCharsets.UTF_8),
+                java.text.Normalizer.Form.NFC);
+        return decodedXml.contains("URI=\"" + normalizedName + "\"");
+    }
+
     /// The whole path Task 8 drives: validation, reading the attachment, a real signature, the
     /// output check of the two-object container and publishing it.
     @Test
