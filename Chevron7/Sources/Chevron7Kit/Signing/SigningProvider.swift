@@ -439,7 +439,16 @@ public final class DemoSigningProvider: QualifiedSigningProviding, @unchecked Se
             merged["META-INF/timestamp.tsr"] =
                 ASiCEPackager.Entry(path: "META-INF/timestamp.tsr", data: tokenData)
         }
-        merged["document.pdf"] = ASiCEPackager.Entry(path: "document.pdf", data: request.pdfData)
+        // ZaKo names its data objects: the client container already lists the PDF/A under
+        // its own name, and the record keeps "<number>.record.xml.xdcf", as the engine does.
+        if request.signsAsRecordContainer || request.signsExtraFilesAsDataObjects,
+           let filename = request.filename.map({ ($0 as NSString).lastPathComponent }), !filename.isEmpty {
+            if merged[filename] == nil {
+                merged[filename] = ASiCEPackager.Entry(path: filename, data: request.pdfData)
+            }
+        } else {
+            merged["document.pdf"] = ASiCEPackager.Entry(path: "document.pdf", data: request.pdfData)
+        }
 
         if merged["META-INF/manifest.xml"] == nil {
             let dataEntries = merged.values

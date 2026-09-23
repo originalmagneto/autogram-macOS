@@ -63,6 +63,11 @@ final class ZakoSessionStore {
     var identities: [SigningIdentityInfo] = []
     var selectedIdentityID: String?
     var includeQualifiedTimestamp = true
+    /// The QTS switch exists only in Demo. Outside Demo both ZaKo signatures (client container
+    /// and record) always carry a timestamp from the built-in qualified authorities.
+    var showsQualifiedTimestampToggle: Bool { settingsStore.ezzkAccountController.isDemoMode }
+    /// Whether the ZaKo signatures get a timestamp: the switch in Demo, always outside it.
+    var usesQualifiedTimestamp: Bool { showsQualifiedTimestampToggle ? includeQualifiedTimestamp : true }
     var allowNonMandateOverride = false
     private var mandateOverrideIdentityID: String?
     var signingPIN = ""
@@ -97,6 +102,13 @@ final class ZakoSessionStore {
 
     static let mobileMandateRefusalMessage =
         "Podpis z mobilu nebol vytvorený mandátnym certifikátom. Zaručená konverzia vyžaduje mandátny certifikát advokáta, konverzia nebola autorizovaná a do evidencie sa nič nezapísalo."
+
+    static func recordUnsignedMessage(_ error: Error) -> String {
+        "Dokumenty pre klienta sú podpísané a uložené, ale záznam o konverzii sa nepodarilo podpísať: \(error.localizedDescription) Do EZZK sa nič neodoslalo. Záznam podpíšte znova novou konverziou; opakovaný podpis z Registra príde neskôr."
+    }
+
+    static let recordFromOtherModeMessage =
+        "Záznam bol vytvorený v inom režime EZZK, preto sa v tomto režime neodošle. Prepnite režim EZZK späť a odošlite ho znova."
 
     static let mobileOutsideDemoMessage =
         "Zaručenú konverziu s EZZK podpisujte kartou SAK. Podpis z mobilu je zatiaľ dostupný iba v režime Demo."
@@ -184,7 +196,6 @@ final class ZakoSessionStore {
     let settingsStore: AppSettingsStore
     var settings: AppSettings { settingsStore.settings }
     let pdfaConverter: PDFAConverter
-    let clauseGenerator: AttestationClauseGenerator
     let embeddedFileService: EmbeddedFileService
     let formPackRepository: FormPackRepository
     private(set) var selectedFormPack: ConversionFormPack
@@ -223,7 +234,6 @@ final class ZakoSessionStore {
         self.settingsStore = settingsStore
         self.mobileSigning = MobileSigningCoordinator(settingsStore: settingsStore)
         self.pdfaConverter = PDFAConverter()
-        self.clauseGenerator = AttestationClauseGenerator()
         self.embeddedFileService = EmbeddedFileService()
         self.formPackRepository = formPackRepository
         // A bank of its own on the settings store root, as before; the app passes the shared one.
@@ -1091,7 +1101,7 @@ final class ZakoSessionStore {
     }
 
     func validate() -> [AttestationValidationError] {
-        let stampTime: Date? = includeQualifiedTimestamp ? serverTimeUsed : nil
+        let stampTime: Date? = usesQualifiedTimestamp ? serverTimeUsed : nil
         let errors = AttestationValidator.validate(attestation,
                                                    securityElements: confirmedSecurityElements,
                                                    qualifiedTimestampTime: stampTime)
@@ -1130,6 +1140,12 @@ final class ZakoSessionStore {
             evidenceNumberError = modeError
             lastError = modeError
             recomputePreflight()
+            return
+        }
+        // The register is the legal record of this conversion; a register this build could
+        // not read would keep the row only in memory, so nothing is signed or sent.
+        if let loadError = evidenceStore.loadError {
+            lastError = loadError
             return
         }
         guard viaMobile ? isMobilePreflightComplete : isPreflightComplete else { return }
@@ -1191,13 +1207,9 @@ final class ZakoSessionStore {
                 originalNonEmptyPageIndices: nonEmptyPageIndices,
                 usedDevice: attestation.usedDeviceDescription)
 
-            // Record XML for the register only; part B2 replaces it with the record renderer.
-            let xmlInput = AttestationClauseGenerator.Input(
-                attestation: attestation,
-                securityElements: confirmedElementsSnapshot,
-                newDocumentFingerprintSHA256Hex: fingerprint,
-                originalNonEmptyPageIndices: nonEmptyPageIndices)
-            let xml = try clauseGenerator.generateXML(input: xmlInput, formPack: selectedFormPack)
+            // The record EZZK receives, validated before anything is signed: an invalid record
+            // stops the conversion before the client container exists.
+            let recordDelivery = try ZakoRecordDeliveryBuilder().build(model: clause.model)
 
             analysisProgressText = viaMobile ? "Čakám na podpis z mobilu…" : "Autorizujem kvalifikovaným podpisom…"
             if !viaMobile, isCertificateTypePending {
@@ -1214,9 +1226,23 @@ final class ZakoSessionStore {
                 lastError = "Zvolený certifikát nie je mandátnym certifikátom pre zaručenú konverziu. Pokračovanie je možné len s výslovným override (audit záznam)."
                 return
             }
-            if includeQualifiedTimestamp,
-               settings.selectedTSAURL.trimmingCharacters(in: .whitespaces).isEmpty {
-                throw SigningError.timestampFailed
+            // Outside Demo the timestamp is qualified by construction: the engine gets only the
+            // built-in qualified authorities for both signatures (spec Revision 5, ruling 3).
+            let stampsSignatures = usesQualifiedTimestamp
+            let timestampServers: [String]?
+            let tsaURL: String?
+            if settingsStore.ezzkAccountController.isDemoMode {
+                if stampsSignatures,
+                   settings.selectedTSAURL.trimmingCharacters(in: .whitespaces).isEmpty {
+                    throw SigningError.timestampFailed
+                }
+                timestampServers = nil
+                tsaURL = stampsSignatures ? settings.selectedTSAURL : nil
+            } else {
+                let qualified = TimestampAuthority.qualifiedURLs.map(\.absoluteString)
+                guard let first = qualified.first else { throw SigningError.timestampFailed }
+                timestampServers = qualified
+                tsaURL = first
             }
 
             let directory = ConversionOutputNaming.outputDirectory(
@@ -1267,12 +1293,13 @@ final class ZakoSessionStore {
                 signed = try await signingProvider.sign(SigningRequest(
                     pdfData: finalPDF,
                     identityID: identityID,
-                    includeTimestamp: includeQualifiedTimestamp,
-                    tsaURL: includeQualifiedTimestamp ? settings.selectedTSAURL : nil,
+                    includeTimestamp: stampsSignatures,
+                    tsaURL: tsaURL,
                     pin: signingPIN.isEmpty ? nil : signingPIN,
                     extraFiles: containerFiles,
                     filename: docFileName,
-                    signsExtraFilesAsDataObjects: true))
+                    signsExtraFilesAsDataObjects: true,
+                    timestampServers: timestampServers))
             }
 
             if let asic = signed.asicData {
@@ -1296,7 +1323,7 @@ final class ZakoSessionStore {
             }
             outputDirectory = directory
 
-            let record = EvidenceRecord(
+            var record = EvidenceRecord(
                 id: currentRecordID,
                 status: .signed,
                 direction: .paperToElectronic,
@@ -1304,7 +1331,7 @@ final class ZakoSessionStore {
                 newDocumentName: attestation.newDocumentName,
                 evidenceNumber: attestation.evidenceNumber,
                 fingerprintSHA256Hex: fingerprint,
-                attestationXML: xml,
+                attestationXML: recordDelivery.recordXML,
                 conversionTime: conversionTime,
                 performingPersonName: attestation.performingPerson.fullName,
                 securityElementCount: confirmedElementsSnapshot.count,
@@ -1312,40 +1339,64 @@ final class ZakoSessionStore {
                 totalSheets: attestation.numberOfSheets,
                 pdfFileName: pdfTarget.lastPathComponent,
                 formPack: FormPackStamp(pack: selectedFormPack),
-                securityReview: securityReviewSnapshot)
-            evidenceStore.upsert(record)
+                securityReview: securityReviewSnapshot,
+                ezzkMode: attestation.evidenceNumberMode ?? settingsStore.ezzkAccountController.mode,
+                evidenceNumberAllocatedAt: attestation.evidenceNumberAllocatedAt)
 
-            let envelope = ConversionRecordEnvelope(
-                evidenceNumber: attestation.evidenceNumber ?? "",
-                direction: .paperToElectronic,
-                originalName: attestation.originalDocumentName,
-                newDocumentName: attestation.newDocumentName,
-                attestationXML: xml,
-                fingerprintSHA256Hex: fingerprint,
-                conversionTime: conversionTime,
-                formPack: FormPackStamp(pack: selectedFormPack),
-                securityReview: securityReviewSnapshot)
-            do {
-                _ = try await ezzkService.submit(envelope)
-                if settingsStore.ezzkAccountController.isDemoMode {
-                    var queued = record
-                    queued.status = .queuedForSubmission
-                    queued.updatedAt = Date()
-                    evidenceStore.upsert(queued)
-                    submissionStatus = .queuedForSubmission
-                } else {
-                    var updated = record
-                    updated.status = .submitted
-                    updated.updatedAt = Date()
-                    evidenceStore.upsert(updated)
-                    submissionStatus = .submitted
+            // The record is signed with the same card into its own container. The phone route
+            // (Demo only) has no card identity, so its row stays unsigned (the coordinator says so).
+            var recordContainer: Data?
+            var outputCopyError: Error?
+            if !viaMobile, let identityID = selectedIdentityID {
+                analysisProgressText = "Podpisujem záznam o konverzii…"
+                do {
+                    let signedRecord = try await signingProvider.sign(SigningRequest(
+                        pdfData: recordDelivery.recordXDCF,
+                        identityID: identityID,
+                        includeTimestamp: stampsSignatures,
+                        tsaURL: tsaURL,
+                        pin: signingPIN.isEmpty ? nil : signingPIN,
+                        filename: recordDelivery.entryName,
+                        timestampServers: timestampServers,
+                        signsAsRecordContainer: true))
+                    guard let asic = signedRecord.asicData else {
+                        throw SigningError.signingFailed("Podpis záznamu nevrátil kontajner ASiC-E.")
+                    }
+                    let recordCheck = ASiCEContainerVerifier().verify(asic)
+                    guard recordCheck.isValid else {
+                        throw ComplianceValidationError(domain: "Kontajner záznamu o konverzii",
+                                                        issues: recordCheck.issues)
+                    }
+                    // The register copy is the one submission reads; without it the row cannot be sent.
+                    record.recordContainerPath = try evidenceStore.storeRecordContainer(asic, for: record.id)
+                    recordContainer = asic
+                } catch {
+                    // The client outputs above stay: the conversion is delivered, but its
+                    // record must be signed again, so nothing is sent.
+                    record.status = .recordUnsigned
+                    record.ezzkResultDescription = error.localizedDescription
+                    evidenceStore.upsert(record)
+                    submissionStatus = .recordUnsigned
+                    lastError = Self.recordUnsignedMessage(error)
+                    result = signed
+                    step = .done
+                    return
                 }
-            } catch {
-                var queued = record
-                queued.status = .queuedForSubmission
-                queued.updatedAt = Date()
-                evidenceStore.upsert(queued)
-                submissionStatus = .queuedForSubmission
+                // The advocate's archive copy next to the outputs; the register copy is enough to send.
+                do {
+                    let recordTarget = ConversionOutputNaming.uniqueURL(in: directory,
+                                                                        fileName: recordDelivery.containerName)
+                    try recordContainer?.write(to: recordTarget, options: [.atomic])
+                } catch {
+                    outputCopyError = error
+                }
+            }
+
+            evidenceStore.upsert(record)
+            analysisProgressText = "Odosielam záznam do EZZK…"
+            await submit(record, container: recordContainer)
+            if let outputCopyError {
+                lastError = "Záznam o konverzii je uložený v Registri, ale jeho kópiu sa nepodarilo uložiť k výstupom: \(outputCopyError.localizedDescription)"
             }
 
             result = signed
@@ -1359,32 +1410,52 @@ final class ZakoSessionStore {
     }
 
     func retryQueuedSubmission() async {
-        guard let record = evidenceStore.record(id: currentRecordID),
-              record.status != .submitted else { return }
-        do {
-            _ = try await ezzkService.submit(record.envelope())
-            if settingsStore.ezzkAccountController.isDemoMode {
-                var queued = record
-                queued.status = .queuedForSubmission
-                queued.updatedAt = Date()
-                evidenceStore.upsert(queued)
-                submissionStatus = .queuedForSubmission
-            } else {
-                var updated = record
-                updated.status = .submitted
-                updated.updatedAt = Date()
-                evidenceStore.upsert(updated)
-                submissionStatus = .submitted
-            }
-            lastError = nil
-        } catch {
-            var queued = record
-            queued.status = .queuedForSubmission
-            queued.updatedAt = Date()
-            evidenceStore.upsert(queued)
-            submissionStatus = .queuedForSubmission
-            lastError = error.localizedDescription
+        guard let record = evidenceStore.record(id: currentRecordID) else { return }
+        await submit(record, container: evidenceStore.recordContainerData(for: record))
+    }
+
+    /// Sends one register row through the submission coordinator (the one set of rules for
+    /// EZZK states), stores the row it returns and reports its state. An unknown outcome is
+    /// looked up first, so a record EZZK may already have is never sent twice.
+    private func submit(_ record: EvidenceRecord, container: Data?) async {
+        let controller = settingsStore.ezzkAccountController
+        // A row is only ever sent to the EZZK that allocated its number.
+        if let mode = record.ezzkMode, mode != controller.mode {
+            submissionStatus = record.status
+            lastError = Self.recordFromOtherModeMessage
+            return
         }
+        let coordinator = makeSubmissionCoordinator()
+        var updated = record
+        if updated.status == .outcomeUnknown {
+            updated = await coordinator.resolveUnknown(updated)
+        }
+        updated = await coordinator.submit(updated, container: container)
+        evidenceStore.upsert(updated)
+        submissionStatus = updated.status
+        switch updated.status {
+        case .acceptedForProcessing, .processed:
+            // EZZK consumed the number with the record, so it is never offered again.
+            if let number = updated.evidenceNumber { evidenceNumberPool.remove(number) }
+            lastError = nil
+        default:
+            lastError = updated.ezzkResultDescription
+        }
+    }
+
+    /// Demo sends to the local `MockEZZKService` and has nothing to look up, so a lookup there
+    /// answers "processed"; outside Demo the lookup is the account controller's.
+    func makeSubmissionCoordinator() -> EZZKSubmissionCoordinator {
+        let controller = settingsStore.ezzkAccountController
+        let lookup: EZZKRecordLookupFunction
+        if controller.isDemoMode {
+            lookup = EZZKRecordLookupFunction { _ in EZZKRecordLookup(isProcessed: true, info: nil) }
+        } else {
+            lookup = EZZKRecordLookupFunction { number in
+                try await controller.lookUp(evidenceNumber: number)
+            }
+        }
+        return EZZKSubmissionCoordinator(submitter: ezzkService, lookup: lookup)
     }
 
     func saveTemplate() {

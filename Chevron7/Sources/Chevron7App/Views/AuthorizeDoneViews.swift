@@ -119,8 +119,14 @@ struct AuthorizeView: View {
 
     private var checklistItems: [(Bool, String, String)] {
         let identitySelected = store.selectedIdentityID != nil && store.selectedIdentity != nil
-        let qtsReady = !store.includeQualifiedTimestamp ||
-            !store.settings.selectedTSAURL.trimmingCharacters(in: .whitespaces).isEmpty
+        // Outside Demo the switch is hidden and the qualified built-in authorities always stamp.
+        let qtsReady = store.showsQualifiedTimestampToggle
+            ? (!store.includeQualifiedTimestamp
+               || !store.settings.selectedTSAURL.trimmingCharacters(in: .whitespaces).isEmpty)
+            : !TimestampAuthority.qualifiedURLs.isEmpty
+        let qtsLabel = !store.showsQualifiedTimestampToggle
+            ? "QTS z kvalifikovaných autorít časových pečiatok"
+            : (store.includeQualifiedTimestamp ? "QTS pripravená s TSA službou" : "QTS nepoužitá")
         return [
             inputSignatureChecklistItem,
             (store.attestation.originConfirmed,
@@ -143,8 +149,7 @@ struct AuthorizeView: View {
              "Evidenčné číslo advokáta vyplnené", "building.columns"),
             (identitySelected, "Identita pre podpis vybraná", "person.badge.key"),
             (store.mandateRequirementSatisfied, "Mandátny certifikát SAK pripravený", "checkmark.seal"),
-            (qtsReady, store.includeQualifiedTimestamp
-                ? "QTS pripravená s TSA službou" : "QTS nepoužitá", "clock.badge.checkmark")
+            (qtsReady, qtsLabel, "clock.badge.checkmark")
         ]
     }
 
@@ -248,11 +253,13 @@ struct AuthorizeView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            Toggle(isOn: $store.includeQualifiedTimestamp) {
-                Label("Kvalifikovaná časová pečiatka (QTS)", systemImage: "clock.badge.checkmark")
+            if store.showsQualifiedTimestampToggle {
+                Toggle(isOn: $store.includeQualifiedTimestamp) {
+                    Label("Kvalifikovaná časová pečiatka (QTS)", systemImage: "clock.badge.checkmark")
+                }
+                .toggleStyle(.switch)
+                .controlSize(.small)
             }
-            .toggleStyle(.switch)
-            .controlSize(.small)
 
             if store.requiresMandateOverride {
                 VStack(alignment: .leading, spacing: 6) {
