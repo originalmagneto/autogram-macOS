@@ -187,6 +187,46 @@ class MachineRequestValidatorTest {
         assertInvalid(repeated);
     }
 
+    /// With attachments DSS builds a new container, so an existing ASiC would be nested inside it.
+    @Test
+    void attachmentsRefuseAContainerAsSourceOrAttachment() throws Exception {
+        var container = Files.write(temporaryDirectory.resolve("podpisany.asice"), new byte[] { 'P', 'K', 3, 4 }).toRealPath();
+        var inner = Files.write(temporaryDirectory.resolve("vnoreny.ASICS"), new byte[] { 'P', 'K', 3, 4 }).toRealPath();
+        var containerSource = signRequest("XAdES_BASELINE_T", List.of(new MachineFile("doc", container.toString(),
+                target("out-a.asice").toString(), null, List.of(xdcf("a.xml.xdcf").toString()))));
+        var containerAttachment = signRequest("XAdES_BASELINE_T", List.of(new MachineFile("doc", pdf("doc.pdf").toString(),
+                target("out-b.asice").toString(), null, List.of(container.toString()))));
+        var otherContainerAttachment = signRequest("XAdES_BASELINE_T", List.of(new MachineFile("doc",
+                pdf("doc2.pdf").toString(), target("out-c.asice").toString(), null, List.of(inner.toString()))));
+
+        assertInvalid(containerSource);
+        assertInvalid(containerAttachment);
+        assertInvalid(otherContainerAttachment);
+    }
+
+    /// Every document becomes a ZIP entry named after its file, so the names must not collide with
+    /// each other or with the container's own `mimetype` and `META-INF`.
+    @Test
+    void attachmentNamesMustBeDistinctEntriesOfTheContainer() throws Exception {
+        var source = pdf("dokument.pdf");
+        var first = Files.createDirectories(temporaryDirectory.resolve("a")).toRealPath();
+        var second = Files.createDirectories(temporaryDirectory.resolve("b")).toRealPath();
+        var sameName = List.of(
+                Files.writeString(first.resolve("x.xml.xdcf"), "<a/>").toString(),
+                Files.writeString(second.resolve("x.xml.xdcf"), "<b/>").toString());
+        var sourceName = Files.writeString(first.resolve("dokument.pdf"), "<c/>").toString();
+        var caseVariant = Files.writeString(second.resolve("Dokument.PDF"), "<d/>").toString();
+        var mimetype = Files.writeString(first.resolve("mimetype"), "<e/>").toString();
+        var metaInf = Files.writeString(second.resolve("META-INF"), "<f/>").toString();
+
+        for (var attachments : List.of(sameName, List.of(sourceName), List.of(caseVariant), List.of(mimetype),
+                List.of(metaInf))) {
+            var request = signRequest("XAdES_BASELINE_T", List.of(new MachineFile("doc", source.toString(),
+                    target("names.asice").toString(), null, attachments)));
+            assertEquals("PROTOCOL_INVALID_REQUEST", failureCode(request), attachments.toString());
+        }
+    }
+
     @Test
     void requiresQualifiedTimestampAndSupportedTsaUrl() throws Exception {
         var source = pdf("source.pdf");

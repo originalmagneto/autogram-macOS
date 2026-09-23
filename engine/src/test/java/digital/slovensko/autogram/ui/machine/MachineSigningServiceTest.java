@@ -804,6 +804,95 @@ class MachineSigningServiceTest {
         assertTrue(names.stream().noneMatch(name -> name.endsWith(".asice")), names.toString());
     }
 
+    /// DSS only extends an existing container when it signs a single document; with attachments
+    /// an existing ASiC would end up nested inside the new one.
+    @Test
+    void signingJobRefusesAnExistingContainerWithAttachments() throws Exception {
+        var settings = new MachineSettings(true);
+        settings.setSignatureLevel(SignatureLevel.XAdES_BASELINE_T);
+        var container = Files.readAllBytes(Path.of(MachineSigningServiceTest.class
+                .getResource("/digital/slovensko/autogram/FUPS_signed.asice").getFile()));
+
+        assertThrows(java.io.IOException.class, () -> MachineSigningService.DefaultSigningSession.signingJob(container,
+                "/tmp/podpisany.asice", new MachineFileResponder(new MemoryRetainedFile(), () -> { }), settings, null,
+                List.of(new MachineSigningService.AttachmentContent("a.xml.xdcf", "<a/>".getBytes()))));
+    }
+
+    @Test
+    void signingJobRefusesAContainerAsAnAttachment() throws Exception {
+        var settings = new MachineSettings(true);
+        settings.setSignatureLevel(SignatureLevel.XAdES_BASELINE_B);
+        var pdf = Files.readAllBytes(Path.of(MachineSigningServiceTest.class
+                .getResource("/digital/slovensko/autogram/sample.pdf").getFile()));
+        var container = Files.readAllBytes(Path.of(MachineSigningServiceTest.class
+                .getResource("/digital/slovensko/autogram/FUPS_signed.asice").getFile()));
+
+        assertThrows(java.io.IOException.class, () -> MachineSigningService.DefaultSigningSession.signingJob(pdf,
+                "/tmp/dokument.pdf", new MachineFileResponder(new MemoryRetainedFile(), () -> { }), settings, null,
+                List.of(new MachineSigningService.AttachmentContent("dokument.xml.xdcf", container))));
+    }
+
+    /// The validator only sees the name; a ZIP hiding behind an `.xdcf` name is caught when the
+    /// attachment is read, before the token opens.
+    @Test
+    void refusesAZipAttachmentBeforeTokenWork() throws Exception {
+        var writer = new RecordingWriter();
+        var source = Files.copy(Path.of(MachineSigningServiceTest.class
+                .getResource("/digital/slovensko/autogram/sample.pdf").getFile()),
+                temporaryDirectory.resolve("dokument.pdf")).toRealPath();
+        var attachment = Files.copy(Path.of(MachineSigningServiceTest.class
+                .getResource("/digital/slovensko/autogram/FUPS_signed.asice").getFile()),
+                temporaryDirectory.resolve("dokument.xml.xdcf")).toRealPath();
+        var target = target("zip-attachment.asice");
+        var tokenOpened = new AtomicBoolean();
+        var service = new MachineSigningService(writer.writer(), request -> {
+            tokenOpened.set(true);
+            throw new AssertionError("Token must not open for a container attachment");
+        }, content -> true);
+
+        service.sign("request-1", new SignRequest("fake", "123", "1234".toCharArray(), "XAdES_BASELINE_B",
+                new QualifiedTimestampRequest(false, List.of()),
+                List.of(new MachineFile("one", source.toString(), target.toString(), null, List.of(attachment.toString())))));
+
+        assertFalse(tokenOpened.get());
+        assertFalse(Files.exists(target));
+        assertEquals(List.of("session.started", "file.signingStarted", "file.failed", "session.failed"),
+                writer.lifecycleEventTypes());
+    }
+
+    /// Attachments are read through the same retained, no-follow handle as the source, never by
+    /// path a second time after validation.
+    @Test
+    void readsAttachmentsThroughTheRetainedSourceHandle() throws Exception {
+        var writer = new RecordingWriter();
+        var source = Files.writeString(temporaryDirectory.resolve("dokument.pdf"), "%PDF-1.7\nsource\n%%EOF").toRealPath();
+        var attachment = Files.writeString(temporaryDirectory.resolve("dokument.xml.xdcf"), "<on-disk/>").toRealPath();
+        var fileSystem = new TrackingFileSystem();
+        var retainedAttachment = new MemoryRetainedFile("<retained/>".getBytes()) {
+            boolean closed;
+
+            @Override
+            public void close() {
+                closed = true;
+            }
+        };
+        fileSystem.retained.put(attachment, retainedAttachment);
+        var signed = new AtomicReference<MachineSigningService.SigningInput>();
+        var service = new MachineSigningService(writer.writer(), request -> new FakeSession((input, completed) -> {
+            signed.set(input);
+            input.writeSignedContent("PK".getBytes());
+            completed.run();
+        }), content -> true, () -> { }, fileSystem);
+
+        service.sign("request-1", new SignRequest("fake", "123", "1234".toCharArray(), "XAdES_BASELINE_B",
+                new QualifiedTimestampRequest(false, List.of()),
+                List.of(new MachineFile("one", source.toString(), target("retained.asice").toString(), null,
+                        List.of(attachment.toString())))));
+
+        assertEquals("<retained/>", new String(signed.get().attachments().getFirst().content()));
+        assertTrue(retainedAttachment.closed);
+    }
+
     @Test
     void attachmentsNeedAnAsicESignature() {
         var settings = new MachineSettings(true);
@@ -1129,11 +1218,12 @@ class MachineSigningServiceTest {
     private static final class TrackingFileSystem implements MachineSigningFileSystem {
         private final MemoryRetainedFile source = new MemoryRetainedFile("%PDF-1.7\nsource\n%%EOF".getBytes());
         private final MemoryRetainedFile staging = new MemoryRetainedFile();
+        private final java.util.Map<Path, RetainedFile> retained = new java.util.HashMap<>();
         private Error cleanupFailure;
 
         @Override
         public RetainedFile openSource(Path source) {
-            return this.source;
+            return retained.getOrDefault(source, this.source);
         }
 
         @Override

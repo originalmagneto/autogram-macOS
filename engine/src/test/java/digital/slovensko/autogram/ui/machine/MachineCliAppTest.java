@@ -249,22 +249,46 @@ class MachineCliAppTest {
                 new String(signed.get().attachments().getFirst().content(), java.nio.charset.StandardCharsets.UTF_8));
     }
 
+    /// Real source, target and attachment files, so only the parser can refuse these shapes: an
+    /// empty list, more than eight entries, an element that is not a string and a bare string.
     @Test
     void rejectsMalformedSignAttachments() throws Exception {
-        var nine = String.join(",", java.util.Collections.nCopies(9, "\"/tmp/a.xml.xdcf\""));
-        for (var attachments : List.of("[]", "[" + nine + "]", "[1]", "[\"\"]", "\"/tmp/a.xml.xdcf\"")) {
+        var source = Files.writeString(temporaryDirectory.resolve("dokument.pdf"), "%PDF-1.7\nsource\n%%EOF").toRealPath();
+        var target = temporaryDirectory.toRealPath().resolve("dokument.asice");
+        var paths = new java.util.ArrayList<String>();
+        for (var index = 0; index < 9; index++) {
+            paths.add("\"" + Files.writeString(temporaryDirectory.resolve("priloha-" + index + ".xml.xdcf"), "<a/>")
+                    .toRealPath() + "\"");
+        }
+        var cases = List.of(
+                "[]",
+                "[" + String.join(",", paths) + "]",
+                "[[" + paths.getFirst() + "]]",
+                paths.getFirst());
+        for (var attachments : cases) {
             var stdout = new StringWriter();
+            var sessionOpened = new java.util.concurrent.atomic.AtomicBoolean();
             var input = "{\"protocolVersion\":1,\"requestId\":\"r\",\"operation\":\"SIGN\",\"payload\":{"
                     + "\"driver\":\"fake\",\"certificateSerial\":\"123\",\"pin\":\"1234\","
                     + "\"signatureLevel\":\"XAdES_BASELINE_B\",\"timestamp\":{\"required\":false,\"servers\":[]},"
-                    + "\"files\":[{\"id\":\"one\",\"source\":\"/tmp/a.pdf\",\"target\":\"/tmp/a.asice\","
-                    + "\"attachments\":" + attachments + "}]}}";
+                    + "\"files\":[{\"id\":\"one\",\"source\":\"" + source + "\",\"target\":\"" + target
+                    + "\",\"attachments\":" + attachments + "}]}}";
+            var signingFactory = (MachineCliApp.SigningServiceFactory) (writer, ignoredInspection, ignoredTrust) ->
+                    new MachineSigningService(writer, request -> {
+                        sessionOpened.set(true);
+                        throw new AssertionError("a malformed request must not reach the token");
+                    }, content -> true, ignoredTrust);
 
             var code = MachineCliApp.start(commandLine("SIGN"), new StringReader(input), new PrintWriter(stdout),
-                    new PrintWriter(new StringWriter()));
+                    new PrintWriter(new StringWriter()), new MachineDriverService(),
+                    new MachineInspectionService(path -> { throw new AssertionError("not used"); },
+                            content -> qualifiedReport()),
+                    () -> { }, signingFactory);
 
+            var lines = stdout.toString().strip().split("\\n");
+            assertFalse(sessionOpened.get(), attachments);
             assertEquals(64, code, attachments);
-            assertEquals("PROTOCOL_INVALID_REQUEST", JsonParser.parseString(stdout.toString()).getAsJsonObject()
+            assertEquals("PROTOCOL_INVALID_REQUEST", JsonParser.parseString(lines[lines.length - 1]).getAsJsonObject()
                     .getAsJsonObject("payload").get("code").getAsString(), attachments);
         }
     }

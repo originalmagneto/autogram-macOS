@@ -37,7 +37,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
@@ -311,7 +310,16 @@ public final class MachineSigningService {
                 }
                 var attachments = new ArrayList<AttachmentContent>();
                 for (var path : validated.attachments()) {
-                    attachments.add(new AttachmentContent(path.getFileName().toString(), Files.readAllBytes(path)));
+                    try (var retained = fileSystem.openSource(path)) {
+                        var content = retained.readAll();
+                        if (isZip(content)) {
+                            throw new IOException("An attachment may not be a container");
+                        }
+                        attachments.add(new AttachmentContent(path.getFileName().toString(), content));
+                    }
+                }
+                if (!attachments.isEmpty() && !hasPdfHeader(sourceContent)) {
+                    throw new IOException("Attachments are signed next to a PDF, never into an existing container");
                 }
                 workspace = fileSystem.createWorkspace(validated.target().getParent());
                 var staging = workspace.createStagingFile();
@@ -454,6 +462,10 @@ public final class MachineSigningService {
         } catch (IllegalArgumentException exception) {
             throw new MachineProtocolException("PROTOCOL_INVALID_REQUEST", exception);
         }
+    }
+
+    private static boolean isZip(byte[] content) {
+        return content.length >= 4 && content[0] == 'P' && content[1] == 'K' && content[2] == 3 && content[3] == 4;
     }
 
     private static boolean isAsic(String name, byte[] content) {
@@ -643,8 +655,16 @@ public final class MachineSigningService {
             if (parameters.getContainer() != ASiCContainerType.ASiC_E || parameters.getSignatureType() != SignatureForm.XAdES) {
                 throw new IOException("Attachments need an ASiC-E XAdES signature");
             }
+            // DSS extends an existing container only when it signs a single document; with
+            // attachments it would nest the old container inside the new one.
+            if (document.getMimeType().equals(MimeTypeEnum.ASICE) || isZip(source)) {
+                throw new IOException("Attachments are signed next to a PDF, never into an existing container");
+            }
             var extra = new ArrayList<DSSDocument>();
             for (var attachment : attachments) {
+                if (isZip(attachment.content())) {
+                    throw new IOException("An attachment may not be a container");
+                }
                 var mime = attachment.name().toLowerCase(java.util.Locale.ROOT).endsWith(".xdcf")
                         ? AutogramMimeType.XML_DATACONTAINER
                         : detectMimeType(attachment.name(), attachment.content());
