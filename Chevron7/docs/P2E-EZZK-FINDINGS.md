@@ -349,7 +349,7 @@ Official form files (record 1.0 and clause 1.3 schema and signer XSLT) live in `
 
 ### Live check with a SAK card
 
-Live check with a SAK card: pending (owner). This session could not run it (no SAK card). The owner runs one ZaKo conversion of a synthetic document in Demo mode with the SAK card, then:
+Live check with a SAK card: pending (owner). This session could not run it (no SAK card). The owner runs one ZaKo conversion of a synthetic document in Demo mode with the SAK card, naming the source with a space and a diacritic (for example "Zmluva o dielo č. 3", so the source and clause file names carry both), then:
 
 ```bash
 cd <output folder>
@@ -362,5 +362,15 @@ unzip -p *.asice '*.pdf' | openssl dgst -sha256 -binary | base64
 unzip -p *.asice '*.xdcf' | grep -o '<ElectronicFingerprintValue>[^<]*'
 ```
 Expected: the two values are equal.
+
+```bash
+unzip -p *.asice META-INF/signatures001.xml | grep -o '<xades:MimeType>[^<]*'
+```
+Expected: two matches, `application/pdf` and `application/vnd.gov.sk.xmldatacontainer+xml`, one `DataObjectFormat` per signed data object.
+
+```bash
+unzip -p *.asice META-INF/signatures001.xml | grep -o '<xades:SignatureTimeStamp'
+```
+Expected: at least one match, confirming the signature carries a qualified timestamp (Baseline T).
 
 Result: not yet run.
