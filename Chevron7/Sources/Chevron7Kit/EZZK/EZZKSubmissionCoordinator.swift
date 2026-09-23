@@ -29,8 +29,13 @@ public struct EZZKRecordLookupFunction: EZZKRecordLookingUp {
 public struct EZZKSubmissionCoordinator: Sendable {
     /// Unknown evidence number: EZZK has no record under it.
     static let unknownRecordCode = 105
+    /// The first check (of an accepted record, or of an unknown outcome) waits this long,
+    /// so EZZK has registered a record it was still receiving.
     static let firstStatusCheckDelay: TimeInterval = 5 * 60
     static let statusCheckInterval: TimeInterval = 60 * 60
+    static let missingEvidenceNumberReason = "Záznam nemá evidenčné číslo."
+    static let unsignedRecordReason = "Záznam o konverzii nie je podpísaný, preto ho nemožno odoslať do EZZK."
+    static let requeuedReason = "EZZK záznam nenašlo, záznam čaká na opätovné odoslanie."
 
     private let submitter: any EZZKSubmissionTransport
     private let lookup: any EZZKRecordLookingUp
@@ -44,6 +49,7 @@ public struct EZZKSubmissionCoordinator: Sendable {
     }
 
     /// Sends a pending row and returns it in its new state. Never resends an unknown outcome.
+    /// A row without an evidence number is never sent (only its description changes).
     public func submit(_ record: EvidenceRecord, container: Data?) async -> EvidenceRecord {
         switch record.status {
         case .signed, .queuedForSubmission, .submissionFailed, .late:
@@ -53,8 +59,16 @@ public struct EZZKSubmissionCoordinator: Sendable {
             return record
         }
         var updated = record
+        guard evidenceNumber(of: record) != nil else {
+            guard record.ezzkResultDescription != Self.missingEvidenceNumberReason else { return record }
+            updated.ezzkResultDescription = Self.missingEvidenceNumberReason
+            updated.updatedAt = now()
+            return updated
+        }
         guard let container else {
             updated.status = .recordUnsigned
+            updated.ezzkResultCode = nil
+            updated.ezzkResultDescription = Self.unsignedRecordReason
             updated.updatedAt = now()
             return updated
         }
@@ -67,21 +81,26 @@ public struct EZZKSubmissionCoordinator: Sendable {
             updated.submissionMessageID = receipt.messageID
             updated.ezzkResultCode = 0
             updated.ezzkResultDescription = nil
+            // A lookup from an earlier attempt must not delay the first check of this one.
+            updated.lastLookupAt = nil
         } catch let error as EZZKError {
             apply(error, to: &updated)
         } catch {
             // Anything unexpected may have happened after the record reached EZZK.
-            updated.status = .outcomeUnknown
-            updated.ezzkResultCode = nil
-            updated.ezzkResultDescription = EZZKError.outcomeUnknown.localizedDescription
+            markUnknown(&updated, description: EZZKError.outcomeUnknown.localizedDescription)
         }
         updated.updatedAt = now()
         return updated
     }
 
     /// Resolves `.outcomeUnknown` by lookup: found -> accepted/processed, 105 -> queued, error -> unchanged.
+    /// Does nothing until five minutes after the row last changed, so EZZK has registered a
+    /// record it may still have been receiving (a 105 before that could cause a duplicate).
+    /// A failed lookup keeps the status and records the attempt in `lastLookupAt`.
     public func resolveUnknown(_ record: EvidenceRecord) async -> EvidenceRecord {
         guard record.status == .outcomeUnknown, let number = evidenceNumber(of: record) else { return record }
+        let current = now()
+        guard current >= record.updatedAt.addingTimeInterval(Self.firstStatusCheckDelay) else { return record }
         var updated = record
         do {
             let result = try await lookup.publicRecord(evidenceNumber: number)
@@ -93,24 +112,24 @@ public struct EZZKSubmissionCoordinator: Sendable {
             // EZZK never got the record, so it may be sent again.
             updated.status = .queuedForSubmission
             updated.ezzkResultCode = nil
-            updated.ezzkResultDescription = nil
+            updated.ezzkResultDescription = Self.requeuedReason
         } catch {
-            return record
+            // Still unknown; only the attempt is recorded.
         }
-        let checkedAt = now()
-        updated.lastLookupAt = checkedAt
-        updated.updatedAt = checkedAt
+        updated.lastLookupAt = current
+        updated.updatedAt = current
         return updated
     }
 
     /// For `.acceptedForProcessing`: lookup code 0 -> `.processed`; code 1 -> unchanged with `lastLookupAt`.
-    /// Any error, 105 included, leaves the row unchanged: EZZK accepted it, so a status
-    /// check never moves it back to a state that would send it again.
+    /// Any error, 105 included, keeps the status: EZZK accepted the record, so a status
+    /// check never moves it back to a state that would send it again. Every attempt,
+    /// failed or not, is recorded in `lastLookupAt`, so the next check waits an hour.
     public func refreshStatus(_ record: EvidenceRecord) async -> EvidenceRecord {
         guard record.status == .acceptedForProcessing, let number = evidenceNumber(of: record) else { return record }
-        guard let result = try? await lookup.publicRecord(evidenceNumber: number) else { return record }
+        let result = try? await lookup.publicRecord(evidenceNumber: number)
         var updated = record
-        if result.isProcessed {
+        if result?.isProcessed == true {
             updated.status = .processed
             updated.ezzkResultCode = 0
         }
@@ -140,13 +159,24 @@ public struct EZZKSubmissionCoordinator: Sendable {
     }
 
     /// When the next status check is due: 5 minutes after `submittedAt`, then hourly after `lastLookupAt`.
-    /// Nil for every row that is not `.acceptedForProcessing`, and for one with neither time.
+    /// For `.outcomeUnknown` (see `resolveUnknown`): 5 minutes after `updatedAt`, then hourly
+    /// after `lastLookupAt`. Never earlier than the last attempt plus its interval; only a
+    /// lookup at or after the submission counts. Nil for every other row, and for an accepted
+    /// row with neither time.
     public func nextStatusCheck(for record: EvidenceRecord) -> Date? {
-        guard record.status == .acceptedForProcessing else { return nil }
-        if let lastLookupAt = record.lastLookupAt {
+        switch record.status {
+        case .acceptedForProcessing:
+            let first = record.submittedAt?.addingTimeInterval(Self.firstStatusCheckDelay)
+            guard let lastLookupAt = record.lastLookupAt,
+                  record.submittedAt.map({ lastLookupAt >= $0 }) ?? true else { return first }
             return lastLookupAt.addingTimeInterval(Self.statusCheckInterval)
+        case .outcomeUnknown:
+            let first = record.updatedAt.addingTimeInterval(Self.firstStatusCheckDelay)
+            guard let lastLookupAt = record.lastLookupAt else { return first }
+            return max(first, lastLookupAt.addingTimeInterval(Self.statusCheckInterval))
+        default:
+            return nil
         }
-        return record.submittedAt?.addingTimeInterval(Self.firstStatusCheckDelay)
     }
 
     private func apply(_ error: EZZKError, to record: inout EvidenceRecord) {
@@ -156,19 +186,28 @@ public struct EZZKSubmissionCoordinator: Sendable {
             record.ezzkResultCode = code
             record.ezzkResultDescription = message
         case .networkFailure, .notConfigured, .authenticationFailed, .credentialsRejected,
-             .accountLocked, .submissionUnavailable, .invalidRequest:
-            // Nothing reached EZZK: the row stays in the queue with the reason.
-            record.status = .queuedForSubmission
+             .accountLocked, .submissionUnavailable, .invalidRequest, .untrustedCertificate:
+            // Nothing reached EZZK: the host was unreachable, the login or the certificate
+            // pin failed before the request was written, sending is disabled, or WCF refused
+            // the body (DeserializationFailed, ActionMismatch) before the operation ran.
+            // The row stays pending with the reason; a late row stays late.
+            if record.status != .late { record.status = .queuedForSubmission }
             record.ezzkResultCode = nil
             record.ezzkResultDescription = error.localizedDescription
-        case .outcomeUnknown, .invalidResponse, .serverRejected, .untrustedCertificate,
-             .productionAllocationDisabled, .evidenceNumberExpired, .evidenceNumberFromOtherMode:
+        case .outcomeUnknown, .invalidResponse, .serverRejected, .productionAllocationDisabled,
+             .evidenceNumberExpired, .evidenceNumberFromOtherMode:
             // Not proven unsent (an unreadable reply may follow an accepted record), so the
             // row waits for a lookup instead of being sent again.
-            record.status = .outcomeUnknown
-            record.ezzkResultCode = nil
-            record.ezzkResultDescription = error.localizedDescription
+            markUnknown(&record, description: error.localizedDescription)
         }
+    }
+
+    private func markUnknown(_ record: inout EvidenceRecord, description: String) {
+        record.status = .outcomeUnknown
+        record.ezzkResultCode = nil
+        record.ezzkResultDescription = description
+        // A new check cycle starts: the first lookup waits five minutes after this attempt.
+        record.lastLookupAt = nil
     }
 
     private func evidenceNumber(of record: EvidenceRecord) -> String? {
