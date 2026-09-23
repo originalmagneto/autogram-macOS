@@ -282,7 +282,7 @@ Bez čítačky kariet podpíšete dokument občianskym preukazom s NFC a iPhonom
 </tr>
 <tr><td>Formát a pečiatka</td><td>Rovnaké voľby ako pri karte: PAdES v PDF alebo ASiC-E (XAdES), kvalifikovanú časovú pečiatku pridá server pri úrovni <code>_T</code>.</td></tr>
 <tr><td>Vizuálny podpis</td><td>Vypáli sa do PDF lokálne ešte pred odoslaním; karta uvádza "Občiansky preukaz (eID) cez Autogram v mobile", lebo certifikát je známy až po podpise.</td></tr>
-<tr><td>Zaručená konverzia</td><td>Vyžaduje mandátny certifikát. Podpis z mobilu bez neho aplikácia odmietne, nič neuloží a evidenciu nezmení. ZaKo cez mobil je zatiaľ dostupná len v režime Demo, lebo mobil podpisuje iba PDF; kartou SAK sa PDF/A a osvedčovacia doložka (XDC) podpíšu ako dva dátové objekty jedného ASiC-E a PDF/A nič nevkladá.</td></tr>
+<tr><td>Zaručená konverzia</td><td>Vyžaduje mandátny certifikát. Podpis z mobilu bez neho aplikácia odmietne, nič neuloží a evidenciu nezmení. ZaKo cez mobil je zatiaľ dostupná len v režime Demo, lebo mobil podpisuje iba PDF; kartou SAK sa PDF/A a osvedčovacia doložka (XDC) podpíšu ako dva dátové objekty jedného ASiC-E a do PDF/A sa nič nevkladá.</td></tr>
 <tr><td>Súkromie</td><td>Server dokument dešifruje len v pamäti pri podpise a zmaže ho do 24 hodín. Kľúč sa neposiela nikam inam než v hlavičke k danému dokumentu.</td></tr>
 <tr><td>Hranice</td><td>Aplikácia Autogram v mobile číta len občiansky preukaz a otvára len odkazy z <code>autogram.slovensko.digital</code>; SAK karta a vlastný server cez mobil nejdú. Finder Quick Action ostáva len pre kartu.</td></tr>
 </table>
