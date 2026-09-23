@@ -3,6 +3,7 @@
 
 import Chevron7Kit
 import Chevron7TestSupport
+import Foundation
 import XCTest
 @testable import Chevron7App
 
@@ -10,9 +11,84 @@ extension XCTestCase {
     /// An `AppSettingsStore` whose evidence register, vision bank, output, templates and
     /// signature images live in a temporary folder removed when the test ends, never in
     /// the user's real `~/Library/Application Support/Chevron7`.
+    ///
+    /// When no `ezzkAccountController` is given, this builds one in Demo mode with an
+    /// in-memory credential store and a transport that never touches the network: whatever
+    /// EZZK mode and Keychain credentials the developer's real, saved `AppSettings` carry
+    /// (`AppSettingsStore.init` otherwise defaults to `EZZKAccountController(mode:
+    /// loaded.ezzkMode)`, which reads the real Keychain) must never reach a test.
     @MainActor
     func makeSettingsStore(ezzkAccountController: EZZKAccountController? = nil) -> AppSettingsStore {
-        AppSettingsStore(ezzkAccountController: ezzkAccountController,
-                         storageRoot: makeTemporaryDirectory("app-storage"))
+        let controller = ezzkAccountController ?? EZZKAccountController(
+            mode: .demo,
+            credentialStore: MemoryCredentialStore(),
+            transportFactory: { _ in ScriptedTransport([]) })
+        return AppSettingsStore(ezzkAccountController: controller,
+                                 storageRoot: makeTemporaryDirectory("app-storage"))
+    }
+}
+
+/// In-memory `EZZKSOAPCredentialStoring` double: never the real Keychain.
+final class MemoryCredentialStore: EZZKSOAPCredentialStoring, @unchecked Sendable {
+    private let lock = NSLock()
+    private var items: [EZZKEnvironment: EZZKSOAPCredentials] = [:]
+    private var failureOnDelete: Error?
+
+    var deleteFailure: Error? {
+        get { lock.withLock { failureOnDelete } }
+        set { lock.withLock { failureOnDelete = newValue } }
+    }
+
+    func load(environment: EZZKEnvironment) throws -> EZZKSOAPCredentials? {
+        lock.withLock { items[environment] }
+    }
+
+    func save(_ credentials: EZZKSOAPCredentials, environment: EZZKEnvironment) throws {
+        lock.withLock { items[environment] = credentials }
+    }
+
+    func delete(environment: EZZKEnvironment) throws {
+        try lock.withLock {
+            if let failureOnDelete { throw failureOnDelete }
+            items[environment] = nil
+        }
+    }
+}
+
+/// Scripted `EZZKHTTPTransport` double: never a real network request.
+final class ScriptedTransport: EZZKHTTPTransport, @unchecked Sendable {
+    private let lock = NSLock()
+    private var replies: [String]
+    private var recorded: [URLRequest] = []
+
+    init(_ replies: [String]) {
+        self.replies = replies
+    }
+
+    var requestCount: Int {
+        lock.withLock { recorded.count }
+    }
+
+    /// SOAP operation of each request, read from the action in its Content-Type.
+    var operations: [String] {
+        lock.withLock { recorded }.compactMap { request in
+            request.value(forHTTPHeaderField: "Content-Type")?
+                .components(separatedBy: "/").last?
+                .replacingOccurrences(of: "\"", with: "")
+        }
+    }
+
+    /// Request bodies as text, in order.
+    var bodies: [String] {
+        lock.withLock { recorded }.map { String(decoding: $0.httpBody ?? Data(), as: UTF8.self) }
+    }
+
+    func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        let body: String? = lock.withLock {
+            recorded.append(request)
+            return replies.isEmpty ? nil : replies.removeFirst()
+        }
+        guard let body else { throw URLError(.badServerResponse) }
+        return (Data(body.utf8), HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: [:])!)
     }
 }

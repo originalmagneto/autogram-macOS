@@ -169,69 +169,6 @@ final class EZZKAccountControllerTests: XCTestCase {
     private let loginRejected = #"<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope"><s:Body><OutputMessageOf_LogInOutput xmlns="http://ditec/2017/06/iam/core"><Content xmlns:i="http://www.w3.org/2001/XMLSchema-instance"><ErrorCode>CORE-003</ErrorCode><Account i:nil="true"/><TokenDescriptor i:nil="true"/></Content></OutputMessageOf_LogInOutput></s:Body></s:Envelope>"#
 }
 
-final class MemoryCredentialStore: EZZKSOAPCredentialStoring, @unchecked Sendable {
-    private let lock = NSLock()
-    private var items: [EZZKEnvironment: EZZKSOAPCredentials] = [:]
-    private var failureOnDelete: Error?
-
-    var deleteFailure: Error? {
-        get { lock.withLock { failureOnDelete } }
-        set { lock.withLock { failureOnDelete = newValue } }
-    }
-
-    func load(environment: EZZKEnvironment) throws -> EZZKSOAPCredentials? {
-        lock.withLock { items[environment] }
-    }
-
-    func save(_ credentials: EZZKSOAPCredentials, environment: EZZKEnvironment) throws {
-        lock.withLock { items[environment] = credentials }
-    }
-
-    func delete(environment: EZZKEnvironment) throws {
-        try lock.withLock {
-            if let failureOnDelete { throw failureOnDelete }
-            items[environment] = nil
-        }
-    }
-}
-
-final class ScriptedTransport: EZZKHTTPTransport, @unchecked Sendable {
-    private let lock = NSLock()
-    private var replies: [String]
-    private var recorded: [URLRequest] = []
-
-    init(_ replies: [String]) {
-        self.replies = replies
-    }
-
-    var requestCount: Int {
-        lock.withLock { recorded.count }
-    }
-
-    /// SOAP operation of each request, read from the action in its Content-Type.
-    var operations: [String] {
-        lock.withLock { recorded }.compactMap { request in
-            request.value(forHTTPHeaderField: "Content-Type")?
-                .components(separatedBy: "/").last?
-                .replacingOccurrences(of: "\"", with: "")
-        }
-    }
-
-    /// Request bodies as text, in order.
-    var bodies: [String] {
-        lock.withLock { recorded }.map { String(decoding: $0.httpBody ?? Data(), as: UTF8.self) }
-    }
-
-    func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
-        let body: String? = lock.withLock {
-            recorded.append(request)
-            return replies.isEmpty ? nil : replies.removeFirst()
-        }
-        guard let body else { throw URLError(.badServerResponse) }
-        return (Data(body.utf8), HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: [:])!)
-    }
-}
-
 private final class EnvironmentLog: @unchecked Sendable {
     private let lock = NSLock()
     private var recorded: [EZZKEnvironment] = []

@@ -22,7 +22,8 @@ final class EZZKAccountController {
     /// Login name saved for the current environment. Never the password.
     private(set) var storedLogin = ""
 
-    private let credentialStore: any EZZKSOAPCredentialStoring
+    /// Not `private` so tests can confirm which store a controller actually uses.
+    let credentialStore: any EZZKSOAPCredentialStoring
     private let transportFactory: @Sendable (EZZKEnvironment) -> any EZZKHTTPTransport
     @ObservationIgnored private var personProvider: @MainActor () -> EZZKPerson = {
         EZZKPerson(corporateBodyFullName: "", ico: "")
