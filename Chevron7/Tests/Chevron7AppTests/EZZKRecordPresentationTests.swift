@@ -129,6 +129,33 @@ final class EZZKRecordPresentationTests: XCTestCase {
         XCTAssertFalse(EZZKRecordPresentation.stateExplanation(for: unsigned).joined().contains("Neodovzdávajte"))
     }
 
+    /// A retry that leaves the row as it was replaces the flow's error, but the failed
+    /// archive copy is still true.
+    func testDoneKeepsTheArchiveCopyErrorAfterARetry() {
+        let copyError = "Záznam o konverzii je uložený v Registri, ale jeho kópiu sa nepodarilo uložiť k výstupom: disk"
+        var queued = row(.queuedForSubmission)
+        queued.ezzkResultDescription = "Sieťová chyba pri spojení s EZZK: offline"
+        let done = ZakoDonePresentation(record: queued, lastError: "Sieťová chyba pri spojení s EZZK: offline",
+                                        lastErrorStatus: .queuedForSubmission, archiveCopyError: copyError,
+                                        nextStatusCheck: nil, now: now)
+        XCTAssertEqual(done.error, copyError)
+    }
+
+    func testDoneOffersNoActionForARowOfAnotherMode() {
+        for status in [EvidenceRecord.Status.queuedForSubmission, .outcomeUnknown, .acceptedForProcessing] {
+            let done = ZakoDonePresentation(record: row(status, mode: .test), lastError: nil, lastErrorStatus: nil,
+                                            archiveCopyError: nil, nextStatusCheck: nil, now: now,
+                                            currentMode: .demo)
+            XCTAssertEqual(done.action, .none, "\(status)")
+            XCTAssertFalse(done.isActionEnabled)
+            XCTAssertTrue(done.lines.contains(EZZKStatusChecker.recordFromOtherModeMessage), "\(done.lines)")
+        }
+        let sameMode = ZakoDonePresentation(record: row(.queuedForSubmission, mode: .test), lastError: nil,
+                                            lastErrorStatus: nil, archiveCopyError: nil, nextStatusCheck: nil,
+                                            now: now, currentMode: .test)
+        XCTAssertEqual(sameMode.action, .send)
+    }
+
     // MARK: - Register konverzií
 
     func testRegisterSummaryCountsAcceptedAndProcessedAsSentAndRejectedAsFailed() {

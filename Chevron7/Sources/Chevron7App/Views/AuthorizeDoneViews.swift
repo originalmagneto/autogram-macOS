@@ -474,7 +474,8 @@ struct DoneView: View {
                                     lastErrorStatus: store.submissionStatus,
                                     archiveCopyError: store.archiveCopyError,
                                     nextStatusCheck: record.flatMap { checker.nextStatusCheck(for: $0) },
-                                    now: now)
+                                    now: now,
+                                    currentMode: store.settingsStore.ezzkAccountController.mode)
     }
 
     private func toneColor(_ tone: EZZKRecordPresentation.Tone) -> Color {

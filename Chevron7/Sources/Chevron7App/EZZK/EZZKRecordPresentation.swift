@@ -129,8 +129,11 @@ struct ZakoDonePresentation: Equatable {
     ///   - lastError: the ZaKo flow's last error, and `lastErrorStatus` the row state it described.
     ///   - archiveCopyError: the failed copy of the record next to the outputs, which stays true.
     ///   - nextStatusCheck: when the row's next lookup is due (`EZZKStatusChecker.nextStatusCheck`).
+    ///   - currentMode: the controller's EZZK mode; a row of another mode gets no action.
+    ///     Nil skips that check.
     init(record: EvidenceRecord?, lastError: String?, lastErrorStatus: EvidenceRecord.Status?,
-         archiveCopyError: String?, nextStatusCheck: Date?, now: Date) {
+         archiveCopyError: String?, nextStatusCheck: Date?, now: Date,
+         currentMode: AppSettings.EZZKMode? = nil) {
         guard let record else {
             title = "Konverzia nie je zapísaná v Registri konverzií"
             symbol = "exclamationmark.triangle.fill"
@@ -172,7 +175,13 @@ struct ZakoDonePresentation: Equatable {
             lines.append("Spracovanie záznamu sa overuje v EZZK automaticky.")
         }
         let mode = record.ezzkMode
-        if EZZKRecordPresentation.isSendable(status) {
+        let offersAction = EZZKRecordPresentation.isSendable(status) || EZZKRecordPresentation.isVerifiable(status)
+        if let currentMode, offersAction, mode != currentMode {
+            // Like the Register: a row is sent or looked up only in the mode that allocated
+            // its number (a row without one, from before part B2, never).
+            lines.append(mode == nil ? EZZKStatusChecker.preB2RowMessage : EZZKStatusChecker.recordFromOtherModeMessage)
+            action = .none
+        } else if EZZKRecordPresentation.isSendable(status) {
             if mode == .production {
                 lines.append(EZZKError.submissionUnavailable.errorDescription ?? "")
                 action = .none
@@ -194,17 +203,20 @@ struct ZakoDonePresentation: Equatable {
         self.lines = lines
 
         // The flow's error describes the row as ZaKo last saw it. Lines already shown, or
-        // repeating the row's own description, are left out; once the row has moved on
-        // (the periodic check), only the archive copy failure is still true.
+        // repeating the row's own description, are left out, and once the row has moved on
+        // (the periodic check) none of it applies. The archive copy failure stays true
+        // whatever happens to the row, so it is always shown.
+        var remaining: [String] = []
         if let lastError, lastErrorStatus == status {
             let description = record.ezzkResultDescription ?? ""
-            let remaining = lastError.split(separator: "\n").map(String.init).filter { line in
+            remaining = lastError.split(separator: "\n").map(String.init).filter { line in
                 !lines.contains(line) && (description.isEmpty || !line.contains(description))
             }
-            error = remaining.isEmpty ? nil : remaining.joined(separator: "\n")
-        } else {
-            error = archiveCopyError
         }
+        if let archiveCopyError, !remaining.contains(archiveCopyError) {
+            remaining.append(archiveCopyError)
+        }
+        error = remaining.isEmpty ? nil : remaining.joined(separator: "\n")
     }
 }
 
