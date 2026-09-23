@@ -1,0 +1,88 @@
+# Publishes a GitHub release for every push to main that carries a feat, fix or
+# perf commit since the last native-v* tag. The version comes from those
+# commits (Chevron7/scripts/next-version.sh); nothing is committed back.
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release (empty: derive it from the commits)"
+        required: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: xcode-27
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Decide the version
+        id: version
+        env:
+          REQUESTED: ${{ inputs.version }}
+        run: |
+          version="${REQUESTED#v}"
+          [[ -n "$version" ]] || version="$(Chevron7/scripts/next-version.sh)"
+          if [[ -z "$version" ]]; then
+            echo "No feat, fix or perf commit since the last release: nothing to publish."
+          elif git rev-parse -q --verify "refs/tags/native-v$version" >/dev/null; then
+            echo "native-v$version already exists: nothing to publish."
+            version=""
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Azul Zulu FX 25
+        if: steps.version.outputs.version != ''
+        uses: actions/setup-java@v5
+        with:
+          distribution: zulu
+          java-version: "25"
+          java-package: jdk+fx
+          architecture: aarch64
+          cache: maven
+          cache-dependency-path: engine/pom.xml
+
+      - name: Build the signing engine
+        if: steps.version.outputs.version != ''
+        run: AUTOGRAM_JAVA_HOME="$JAVA_HOME" Chevron7/scripts/build-engine.sh
+
+      - name: Build Chevron7.app
+        if: steps.version.outputs.version != ''
+        working-directory: Chevron7
+        env:
+          CHEVRON7_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          export DEVELOPER_DIR="$(xcode-select -p)"
+          xcodebuild -version
+          swift --version
+          ./build_app.sh --release
+
+      - name: Package the DMG
+        if: steps.version.outputs.version != ''
+        run: Chevron7/scripts/package-release.sh "${{ steps.version.outputs.version }}" "$RUNNER_TEMP/dist"
+
+      - name: Publish the release
+        if: steps.version.outputs.version != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          Chevron7/scripts/release-notes.sh "$VERSION" > "$RUNNER_TEMP/notes.md"
+          gh release create "native-v$VERSION" \
+            --target "$GITHUB_SHA" \
+            --title "Chevron7 v$VERSION" \
+            --notes-file "$RUNNER_TEMP/notes.md" \
+            "$RUNNER_TEMP/dist/Chevron7-v$VERSION.dmg" \
+            "$RUNNER_TEMP/dist/SHA256SUMS.txt"

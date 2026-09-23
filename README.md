@@ -407,7 +407,7 @@ Podpis bez Safari sa dá vyskúšať priamo:
 
 ### Stiahnutie
 
-Aktuálny macOS build je v [GitHub Releases](https://github.com/originalmagneto/chevron7/releases/latest) ako DMG.
+Aktuálny macOS build je v [GitHub Releases](https://github.com/originalmagneto/chevron7/releases/latest) ako DMG. Vydania vznikajú automaticky: každý push do `main` s commitom `feat`, `fix` alebo `perf` zostaví a zverejní novú verziu (podrobnosti v sekcii Vydania).
 
 <details open>
 <summary><strong>Prvé spustenie (aplikácia nie je notarizovaná)</strong></summary>
@@ -440,7 +440,17 @@ xattr -d com.apple.quarantine "/Applications/Chevron7.app"
 </details>
 
 <details open>
-<summary><strong>v0.4.0 · aktuálne vydanie: mobil, Safari, ZaKo a nové UI</strong></summary>
+<summary><strong>v0.5.0 · aktuálne vydanie: Chevron7, EZZK a podpisovanie zo Safari</strong></summary>
+<ul>
+<li>Nové meno Chevron7 pre aplikáciu, Safari rozšírenie, Finder Quick Action a ikonu. Nastavenia a údaje z Autogram macOS sa nepreberajú.</li>
+<li>Prihlásenie do EZZK vlastným menom a heslom advokáta cez SOAP, režimy Demo, Test a Produkcia (produkcia zatiaľ iba na čítanie).</li>
+<li>Podpisovací panel nad Safari s náhľadom strán, spustenie aplikácie na pozadí a podpis PDF do obálky ASiC-E pre nove.slovensko.sk.</li>
+<li>Zbaliteľná história v bočnom paneli a upratovanie kópií do Koša.</li>
+</ul>
+</details>
+
+<details>
+<summary><strong>v0.4.0 · predchádzajúce vydanie: mobil, Safari, ZaKo a nové UI</strong></summary>
 <ul>
 <li>Podpis mobilom cez QR kód a NFC eID, aj z podporovaných štátnych portálov cez Safari rozšírenie.</li>
 <li>Natívne rozhranie s postupom v podnadpise okna, nastaviteľným inšpektorom a priehľadným vizuálnym podpisom.</li>
@@ -489,6 +499,19 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./build_app.sh --releas
 `build-engine.sh` zostaví `autogram.jar` a závislosti cez Maven, vytvorí jlink runtime, skompiluje launcher `AutogramCLI-arm64` a runner `AutogramQuickActionRunner-arm64` a overí engine cez `CAPABILITIES`. `build_app.sh` potom všetko zabalí do `Contents/{Helpers,app,runtime}`; bez enginu aplikácia beží, ale podpis padá na Keychain alebo DEMO a Finder Quick Action nepodpisuje.
 
 Aplikácia sa nainštaluje do `/Applications/Chevron7.app`.
+
+### Vydania
+
+Workflow [`.github/workflows/release.yml`](.github/workflows/release.yml) beží pri každom pushi do `main` na GitHub runneri `xcode-27` (macOS 27, arm64). Verziu odvodí z [Conventional Commits](https://www.conventionalcommits.org/) od posledného tagu `native-v*`: `feat` zvýši minor, `fix` a `perf` patch, `!` alebo `BREAKING CHANGE` major (pri 0.x minor). Samé `docs`, `test`, `chore` či `refactor` vydanie nevytvoria a commit s `[skip release]` sa nepočíta. Workflow zostaví engine aj aplikáciu, zabalí DMG so `Install Safari Bridge.command`, pripojí `SHA256SUMS.txt` a vytvorí tag aj GitHub Release. Do repozitára nič nezapisuje: verziu aplikácia dostane cez `CHEVRON7_VERSION`, lokálny build ju berie z posledného tagu.
+
+Poznámky k vydaniu sa zostavia z commitov; ručne napísaný `docs/releases/vX.Y.Z.md` má prednosť. Vydanie s konkrétnou verziou sa dá spustiť aj ručne cez **Actions ▸ Release ▸ Run workflow**. Rovnaký postup lokálne:
+
+```bash
+cd Chevron7
+scripts/next-version.sh
+CHEVRON7_VERSION=0.5.0 ./build_app.sh --release
+scripts/package-release.sh 0.5.0
+```
 
 ### Testy
 

@@ -27,6 +27,11 @@ done
 export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
 export MACOSX_DEPLOYMENT_TARGET="27.0"
 
+# The release workflow passes the version; local builds take it from the last release tag.
+VERSION="${CHEVRON7_VERSION:-$(git describe --tags --abbrev=0 --match 'native-v*' 2>/dev/null | sed 's/^native-v//')}"
+VERSION="${VERSION:-0.0.0}"
+[[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Invalid version: $VERSION" >&2; exit 2; }
+
 echo "▸ swift build -c $MODE"
 swift build -c "$MODE"
 
@@ -127,9 +132,9 @@ cat > "$CONTENTS/Info.plist" <<'PLIST'
         </dict>
     </array>
     <key>CFBundleVersion</key>
-    <string>0.4.0</string>
+    <string>VERSION</string>
     <key>CFBundleShortVersionString</key>
-    <string>0.4.0</string>
+    <string>VERSION</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleExecutable</key>
@@ -218,6 +223,10 @@ PLIST
 cat > "$CONTENTS/PkgInfo" <<'PKG'
 APPL????
 PKG
+/usr/libexec/PlistBuddy \
+    -c "Set :CFBundleVersion $VERSION" \
+    -c "Set :CFBundleShortVersionString $VERSION" \
+    "$CONTENTS/Info.plist"
 
 # ---------------------------------------------------------------------------
 # Safari web extension: a hand-assembled .appex, because this project builds
@@ -319,7 +328,7 @@ fi
 
 codesign --force --sign - "$APP_DIR" >/dev/null 2>&1 || true
 
-echo "✔ Hotovo: $APP_DIR"
+echo "✔ Hotovo: $APP_DIR ($VERSION)"
 echo "  Spustenie: open \"$APP_DIR\""
 
 if [[ "$INSTALL" == true ]]; then
