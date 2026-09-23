@@ -349,6 +349,31 @@ final class EvidenceSubmissionFlowTests: XCTestCase {
         XCTAssertTrue(try poolFileText().contains("1563-260923-8"), "a second start neither prunes nor starts a second loop")
     }
 
+    /// Ruling R15: a row written before B2 has no EZZK mode and no signed record, so no
+    /// path sends or looks it up.
+    func testRowsWrittenBeforeB2AreNeverSent() async throws {
+        let clock = TestClock("2026-09-24T10:00:00Z")
+        let submitter = ScriptedSubmitter([])
+        let lookup = ScriptedLookup([])
+        let (checker, store) = makeChecker(mode: .test, submitter: submitter, lookup: lookup, clock: clock)
+        let legacy = try addRow(.queuedForSubmission, number: "1563-260920-1", mode: nil, to: store, clock: clock)
+
+        let summary = await checker.submitPending()
+        XCTAssertEqual(summary.legacy, 1)
+        XCTAssertEqual(summary.waiting, 0)
+        XCTAssertTrue(summary.feedback.contains(EZZKStatusChecker.preB2RowMessage), summary.feedback)
+        let submitted = await checker.submit(id: legacy.id)
+        XCTAssertEqual(submitted.refusal, EZZKStatusChecker.preB2RowMessage)
+        let verified = await checker.verify(id: legacy.id)
+        XCTAssertEqual(verified.refusal, EZZKStatusChecker.preB2RowMessage)
+        await checker.runOnce()
+
+        XCTAssertEqual(submitter.calls, 0)
+        XCTAssertEqual(lookup.calls, 0)
+        XCTAssertEqual(store.record(id: legacy.id)?.status, .queuedForSubmission)
+        XCTAssertEqual(store.record(id: legacy.id)?.updatedAt, legacy.updatedAt)
+    }
+
     // MARK: - Fixtures
 
     private var storeRoot: URL!

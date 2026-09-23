@@ -12,8 +12,8 @@ import Observation
 /// stores a second copy of a record sent twice, result 106).
 ///
 /// A row is only handled by the EZZK that allocated its number: a row of another mode is
-/// refused (manual actions) or skipped (periodic check). A row without a stored mode
-/// (written before part B2) is sent only by hand, in the current mode, as ZaKo always did.
+/// refused (manual actions) or skipped (periodic check). A row without a stored mode was
+/// written before part B2 and has no signed record: no path sends or looks it up (R15).
 @MainActor
 @Observable
 final class EZZKStatusChecker {
@@ -47,12 +47,14 @@ final class EZZKStatusChecker {
         var unsigned = 0
         /// Rows of another EZZK mode or rows another action is handling.
         var skipped = 0
+        /// Rows written before part B2 (no EZZK mode): never sent.
+        var legacy = 0
         /// Set when nothing could be done at all (the register is unreadable).
         var refusal: String?
 
         /// True only when every pending row was accepted.
         var isSuccess: Bool {
-            refusal == nil && accepted > 0 && unknown + waiting + rejected + unsigned + skipped == 0
+            refusal == nil && accepted > 0 && unknown + waiting + rejected + unsigned + skipped + legacy == 0
         }
 
         /// One Slovak line for the Register header.
@@ -66,7 +68,10 @@ final class EZZKStatusChecker {
                 (unsigned, "Záznam nepodpísaný"),
                 (skipped, "Preskočené (iný režim EZZK alebo prebieha iná akcia)")
             ].filter { $0.0 > 0 }.map { "\($0.1): \($0.0)." }
-            return parts.isEmpty ? "Žiadny záznam nečaká na odoslanie." : parts.joined(separator: " ")
+            let notes = legacy > 0
+                ? ["Záznamy spred odosielania do EZZK: \(legacy). \(EZZKStatusChecker.preB2RowMessage)"] : []
+            let all = parts + notes
+            return all.isEmpty ? "Žiadny záznam nečaká na odoslanie." : all.joined(separator: " ")
         }
     }
 
@@ -80,6 +85,9 @@ final class EZZKStatusChecker {
         "Záznam bol vytvorený v inom režime EZZK, preto sa v tomto režime neodošle. Prepnite režim EZZK späť a odošlite ho znova."
     nonisolated static let rowBusyMessage =
         "Záznam sa práve odosiela alebo overuje v EZZK. Skúste to o chvíľu."
+    /// Ruling R15: a row written before part B2 has no EZZK mode and no signed record.
+    nonisolated static let preB2RowMessage =
+        "Záznam vznikol pred odosielaním do EZZK v Chevron7, preto ho aplikácia neodosiela."
     nonisolated static let missingRowMessage = "Záznam sa v Registri konverzií nenašiel."
 
     /// Increases whenever a row is stored, so views that read rows from the register
@@ -244,6 +252,8 @@ final class EZZKStatusChecker {
         let pending = evidenceStore.records.filter(\.status.isSubmissionPendingState)
         for row in pending {
             switch await submit(id: row.id) {
+            case .refused(let reason) where reason == Self.preB2RowMessage:
+                summary.legacy += 1
             case .refused:
                 summary.skipped += 1
             case .row(let record):
@@ -273,7 +283,8 @@ final class EZZKStatusChecker {
     private func refusal(for id: UUID) -> String? {
         if let loadError = evidenceStore.loadError { return loadError }
         guard let record = evidenceStore.record(id: id) else { return Self.missingRowMessage }
-        if let mode = record.ezzkMode, mode != currentMode() { return Self.recordFromOtherModeMessage }
+        guard let mode = record.ezzkMode else { return Self.preB2RowMessage }
+        if mode != currentMode() { return Self.recordFromOtherModeMessage }
         if inFlight.contains(id) { return Self.rowBusyMessage }
         return nil
     }

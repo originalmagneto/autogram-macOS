@@ -70,6 +70,8 @@ enum EZZKRecordPresentation {
         case .late:
             return [lateWarning] + nonEmpty(record.ezzkResultDescription)
         case .recordUnsigned:
+            // A row from before B2 never had a record of its own, so there is nothing to warn about.
+            guard record.ezzkMode != nil else { return nonEmpty(record.ezzkResultDescription) }
             return nonEmpty(record.ezzkResultDescription) + [unsignedWarning(for: record), resignLater]
         case .signed, .queuedForSubmission, .submissionFailed:
             return nonEmpty(record.ezzkResultDescription)
@@ -295,13 +297,17 @@ enum EvidenceRegisterDetail {
         return facts
     }
 
-    /// A row is sent or looked up only in the EZZK mode that allocated its number (a row
-    /// without a mode, from before part B2, in the current one), and never in Production yet.
+    /// A row is sent or looked up only in the EZZK mode that allocated its number, never
+    /// when it has no mode (written before part B2, ruling R15), and never in Production yet.
     static func actions(for record: EvidenceRecord, currentMode: AppSettings.EZZKMode) -> Actions {
         let status = record.status
-        let mode = record.ezzkMode ?? currentMode
         let sendable = EZZKRecordPresentation.isSendable(status)
         let verifiable = EZZKRecordPresentation.isVerifiable(status)
+        guard let mode = record.ezzkMode else {
+            let needsNote = sendable || verifiable || status == .recordUnsigned
+            return Actions(canSend: false, canVerify: false,
+                           note: needsNote ? EZZKStatusChecker.preB2RowMessage : nil)
+        }
         if status == .recordUnsigned {
             return Actions(canSend: false, canVerify: false, note: EZZKRecordPresentation.resignLater)
         }

@@ -112,6 +112,23 @@ final class EZZKRecordPresentationTests: XCTestCase {
         XCTAssertEqual(done.error, "Register konverzií sa nepodarilo načítať.")
     }
 
+    /// Ruling R15 in the Register detail: no "Odoslať" for a row from before B2, the
+    /// Slovak note instead, and no warning about handing documents over.
+    func testRegisterDetailOffersNothingForARowWrittenBeforeB2() {
+        var legacy = row(.queuedForSubmission)
+        legacy.ezzkMode = nil
+        let actions = EvidenceRegisterDetail.actions(for: legacy, currentMode: .test)
+        XCTAssertFalse(actions.canSend)
+        XCTAssertFalse(actions.canVerify)
+        XCTAssertEqual(actions.note, "Záznam vznikol pred odosielaním do EZZK v Chevron7, preto ho aplikácia neodosiela.")
+
+        var unsigned = row(.recordUnsigned)
+        unsigned.ezzkMode = nil
+        XCTAssertEqual(EvidenceRegisterDetail.actions(for: unsigned, currentMode: .test).note,
+                       EZZKStatusChecker.preB2RowMessage)
+        XCTAssertFalse(EZZKRecordPresentation.stateExplanation(for: unsigned).joined().contains("Neodovzdávajte"))
+    }
+
     // MARK: - Register konverzií
 
     func testRegisterSummaryCountsAcceptedAndProcessedAsSentAndRejectedAsFailed() {
