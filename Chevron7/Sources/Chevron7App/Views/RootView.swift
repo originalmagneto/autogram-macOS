@@ -327,6 +327,12 @@ struct RootView: View {
             .task(id: settingsStore.settings.webSigningRetentionDays) {
                 signedDocumentStore.purgeBrowserCopies(olderThanDays: settingsStore.settings.webSigningRetentionDays)
             }
+            // The reader badge and the signing store follow one poll, only while this
+            // window exists and the app is active; activation refreshes at once.
+            .task { await model.cardReader.watch() }
+            .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+                Task { await model.cardReader.refresh() }
+            }
         } detail: {
             detailView
                 .navigationTitle(selection.rawValue)
@@ -375,21 +381,17 @@ struct RootView: View {
                 .opacity(0.5)
 
             VStack(alignment: .leading, spacing: 10) {
-                let identities = selection == .zako ? zakoStore.identities : signingStore.identities
-                let selectedIdentityID = selection == .zako
-                    ? zakoStore.selectedIdentityID
-                    : signingStore.selectedIdentityID
-                let isCardConnected = !identities.isEmpty
-                let identity = identities.first(where: { $0.id == selectedIdentityID }) ?? identities.first
-                let cardLabel = identity?.label ?? (settingsStore.signingProvider is DemoSigningProvider ? "DEMO režim" : "Karta nepripojená")
-                let cardDetail = isCardConnected
-                    ? [identity?.cardKindLabel, "čítačka je pripravená"].compactMap { $0 }.joined(separator: " · ")
-                    : "Vložte eID alebo SAK kartu"
+                let badge = SmartcardBadge(
+                    section: selection,
+                    reader: model.cardReader.identities,
+                    signingSelectedID: signingStore.selectedIdentityID,
+                    zakoSelectedID: zakoStore.selectedIdentityID,
+                    isDemo: settingsStore.signingProvider is DemoSigningProvider)
 
                 SmartcardHUDStatus(
-                    isConnected: isCardConnected,
-                    label: cardLabel,
-                    detail: cardDetail
+                    isConnected: badge.isConnected,
+                    label: badge.label,
+                    detail: badge.detail
                 )
 
                 Button {

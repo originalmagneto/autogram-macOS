@@ -344,7 +344,14 @@ final class SigningSessionStore {
         guard !isSigning, !isRefreshingIdentities else { return }
         isRefreshingIdentities = true
         defer { isRefreshingIdentities = false }
-        identities = await signingProvider.availableIdentities()
+        applyReaderIdentities(await signingProvider.availableIdentities())
+    }
+
+    /// Takes what the reader reports: from `refreshIdentities` or from the shared
+    /// `CardReaderStatus` poll, so the store never polls the reader on its own.
+    func applyReaderIdentities(_ discovered: [SigningIdentityInfo]) {
+        guard !isSigning else { return }
+        if identities != discovered { identities = discovered }
         // Karta vybratá → vynúť nové overenie PIN (každá karta má iný PIN).
         if identities.isEmpty {
             if !signingPIN.isEmpty { signingPIN = "" }

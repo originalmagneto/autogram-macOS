@@ -23,12 +23,6 @@ struct SigningFlowView: View {
             handleDrop(providers)
         }
         .task { await store.refreshIdentities() }
-        .task {
-            while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 3_000_000_000)
-                await store.refreshIdentities()
-            }
-        }
     }
 
     private var targetedOverlay: some View {

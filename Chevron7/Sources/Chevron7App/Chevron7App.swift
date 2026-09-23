@@ -14,6 +14,7 @@ final class Chevron7AppModel {
     let ezzkAccountController: EZZKAccountController
     let signedDocumentStore: SignedDocumentStore
     let webSigning: WebSigningCoordinator
+    let cardReader: CardReaderStatus
 
     init() {
         let settings = AppSettingsStore()
@@ -30,6 +31,19 @@ final class Chevron7AppModel {
         signedDocumentStore = signedDocuments
         signingStore.signedDocumentStore = signedDocuments
         webSigning = WebSigningCoordinator(settingsStore: settings, signedDocumentStore: signedDocuments)
+        cardReader = CardReaderStatus { [settings] in
+            await settings.signingProvider.availableIdentities()
+        }
+        let signing = signingStore
+        let zako = zakoStore
+        let browserSigning = webSigning
+        cardReader.onRefresh = { signing.applyReaderIdentities($0) }
+        cardReader.isPaused = {
+            signing.isSigning || signing.isResolvingCertificate
+                || signing.batchPhase == .preflighting || signing.batchPhase == .signing
+                || zako.isAuthorizing || zako.isResolvingCertificate
+                || browserSigning.pending != nil
+        }
 
         // Browser requests reach the app through the Safari extension and the
         // launchd rendezvous; nothing signs without the sheet this raises.
