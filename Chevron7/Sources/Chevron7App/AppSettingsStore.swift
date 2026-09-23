@@ -20,6 +20,7 @@ final class AppSettingsStore {
     }
     private(set) var signingProvider: any QualifiedSigningProviding
     private(set) var evidenceStore: LocalEvidenceStore
+    let evidenceNumberPool: EvidenceNumberPool
     let exampleBank: ExampleBank
     /// Root for every file the app keeps: evidence register, vision bank, output,
     /// templates and signature images.
@@ -34,8 +35,10 @@ final class AppSettingsStore {
         self.storageRoot = storageRoot
         self.ezzkAccountController = ezzkAccountController ?? EZZKAccountController(mode: loaded.ezzkMode)
         // LocalEvidenceStore.init appends its own "Evidence" folder to whatever
-        // directory it is given, so pass storageRoot itself here.
+        // directory it is given, so pass storageRoot itself here. EvidenceNumberPool
+        // follows the same convention.
         self.evidenceStore = LocalEvidenceStore(directory: storageRoot)
+        self.evidenceNumberPool = EvidenceNumberPool(directory: storageRoot)
         self.exampleBank = ExampleBank(directory: Self.exampleBankDirectory(in: storageRoot))
         self.signingProvider = SigningProviderFactory.makeDefault()
         self.ezzkAccountController.configure(

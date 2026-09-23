@@ -208,6 +208,7 @@ final class ZakoSessionStore {
     }
     var signingProvider: any QualifiedSigningProviding { settingsStore.signingProvider }
     var evidenceStore: LocalEvidenceStore { settingsStore.evidenceStore }
+    var evidenceNumberPool: EvidenceNumberPool { settingsStore.evidenceNumberPool }
 
     private var evidenceRequestID: UUID?
     private var sourceAccessIsActive = false
@@ -1026,9 +1027,33 @@ final class ZakoSessionStore {
                 evidenceRequestID = nil
             }
         }
+        // The register is the legal record of every number already in use; if this build
+        // could not read it, allocating or reusing a number could produce a duplicate the
+        // app has no way to notice.
+        if let loadError = evidenceStore.loadError {
+            evidenceNumberError = loadError
+            lastError = loadError
+            recomputePreflight()
+            return
+        }
         // A number from one mode is never valid in another, so a reply that arrives after the
         // mode changed is dropped without an error.
         let mode = settingsStore.ezzkAccountController.mode
+        // Demo numbers are a local simulation with no EZZK-side limit, so the pool (which
+        // exists only to avoid asking the real EZZK again) plays no part there.
+        if mode != .demo {
+            let usedNumbers = Set(evidenceStore.records.compactMap(\.evidenceNumber))
+            if let entry = evidenceNumberPool.reusable(mode: mode, at: Date(), excluding: usedNumbers) {
+                attestation.evidenceNumber = entry.number
+                attestation.evidenceNumberAllocatedAt = entry.allocatedAt
+                attestation.evidenceNumberMode = entry.mode
+                evidenceNumberRequested = true
+                lastError = nil
+                evidenceNumberError = nil
+                recomputePreflight()
+                return
+            }
+        }
         do {
             let service = ezzkService
             let numbers = try await service.requestEvidenceNumbers(count: 1)
@@ -1044,6 +1069,9 @@ final class ZakoSessionStore {
             attestation.evidenceNumber = number
             attestation.evidenceNumberAllocatedAt = allocatedAt
             attestation.evidenceNumberMode = mode
+            if mode != .demo {
+                evidenceNumberPool.add(EvidenceNumberPool.Entry(number: number, mode: mode, allocatedAt: allocatedAt))
+            }
             evidenceNumberRequested = true
             lastError = nil
             evidenceNumberError = nil
@@ -1051,8 +1079,13 @@ final class ZakoSessionStore {
         } catch {
             guard requestID == currentRecordID, !Task.isCancelled,
                   mode == settingsStore.ezzkAccountController.mode else { return }
-            evidenceNumberError = error.localizedDescription
-            lastError = error.localizedDescription
+            if let ezzkError = error as? EZZKError, case .serviceRejected(113, _) = ezzkError {
+                evidenceNumberError = EZZKError.numberLimitMessage
+                lastError = EZZKError.numberLimitMessage
+            } else {
+                evidenceNumberError = error.localizedDescription
+                lastError = error.localizedDescription
+            }
             recomputePreflight()
         }
     }

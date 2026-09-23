@@ -26,6 +26,23 @@ extension XCTestCase {
         return AppSettingsStore(ezzkAccountController: controller,
                                  storageRoot: makeTemporaryDirectory("app-storage"))
     }
+
+    /// An `AppSettingsStore` whose register.json is unreadable from the start (a temporary
+    /// folder, never the real register), so `evidenceStore.loadError` is already set when
+    /// the store returns. Used to prove code that must refuse to touch the register or the
+    /// evidence number pool while it cannot be trusted.
+    @MainActor
+    func makeSettingsStoreWithUnreadableRegister(ezzkAccountController: EZZKAccountController? = nil) throws -> AppSettingsStore {
+        let storageRoot = makeTemporaryDirectory("app-storage")
+        let evidence = storageRoot.appendingPathComponent("Evidence", isDirectory: true)
+        try FileManager.default.createDirectory(at: evidence, withIntermediateDirectories: true)
+        try Data(#"{"not":"an array"}"#.utf8).write(to: evidence.appendingPathComponent("register.json"))
+        let controller = ezzkAccountController ?? EZZKAccountController(
+            mode: .demo,
+            credentialStore: MemoryCredentialStore(),
+            transportFactory: { _ in ScriptedTransport([]) })
+        return AppSettingsStore(ezzkAccountController: controller, storageRoot: storageRoot)
+    }
 }
 
 /// In-memory `EZZKSOAPCredentialStoring` double: never the real Keychain.
@@ -89,6 +106,18 @@ final class ScriptedTransport: EZZKHTTPTransport, @unchecked Sendable {
             return replies.isEmpty ? nil : replies.removeFirst()
         }
         guard let body else { throw URLError(.badServerResponse) }
-        return (Data(body.utf8), HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: [:])!)
+        // A real "Date" header on every reply, so `EZZKSOAPClient.serverTime()` (which reads
+        // it, not the body) works against a script the same way it does against EZZK.
+        return (Data(body.utf8),
+               HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil,
+                               headerFields: ["Date": Self.httpDateFormatter.string(from: Date())])!)
     }
+
+    private static let httpDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "GMT")
+        formatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss 'GMT'"
+        return formatter
+    }()
 }
