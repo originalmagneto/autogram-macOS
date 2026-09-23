@@ -49,6 +49,10 @@ public final class PKCS11Module: @unchecked Sendable {
 
     public static let candidatePaths = [
         "/Applications/eID_klient.app/Contents/Frameworks/libPkcs11.dylib",
+        // OpenSC: the official installer puts the module in /Library/OpenSC/lib
+        // (with copies in /usr/local/lib), Homebrew in /opt/homebrew/lib.
+        "/Library/OpenSC/lib/opensc-pkcs11.so",
+        "/usr/local/lib/opensc-pkcs11.so",
         "/opt/homebrew/lib/opensc-pkcs11.so",
         "/opt/homebrew/lib/onepin-opensc-pkcs11.so",
         "/Library/AWP/lib/libOcsCryptoki.dylib",

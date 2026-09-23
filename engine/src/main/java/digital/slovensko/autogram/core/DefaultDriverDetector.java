@@ -21,7 +21,18 @@ public class DefaultDriverDetector implements DriverDetector {
         public static final String FAKE = "fake";
         public static final String KEYSTORE = "keystore";
         public static final String CUSTOM_PKCS11 = "custom_pkcs11";
+        public static final String OPENSC = "opensc";
     }
+
+    /**
+     * Where the OpenSC installer (DMG, /Library/OpenSC) and Homebrew put the OpenSC
+     * PKCS#11 module. The first one present wins; without either, the driver stays
+     * uninstalled and is never offered.
+     */
+    static final List<Path> OPENSC_MAC_MODULE_PATHS = List.of(
+            Path.of("/Library/OpenSC/lib/opensc-pkcs11.so"),
+            Path.of("/opt/homebrew/lib/opensc-pkcs11.so"),
+            Path.of("/usr/local/lib/opensc-pkcs11.so"));
 
     // FIXME use i18n
     private final String HELPER_TEXT_EID = "\n\nV prípade nového občianskeho preukazu to môže znamenať, že si potrebujete certifikáty na podpisovanie cez občiansky preukaz vydať. Robí sa to pomocou obslužného softvéru eID klient.";
@@ -32,6 +43,7 @@ public class DefaultDriverDetector implements DriverDetector {
     private final String HELPER_TEXT_FAKE = "";
     private final String HELPER_TEXT_KEYSTORE = "";
     private final String HELPER_TEXT_CUSTOM_PKCS11_DRIVER = "";
+    private final String HELPER_TEXT_OPENSC = "\n\nOpenSC je open-source ovládač. Občiansky preukaz podporuje iba v kontaktnej čítačke a zatiaľ nie je overený pre kvalifikovaný podpis v tejto aplikácii.";
 
     public DefaultDriverDetector(DriverDetectorSettings settings) {
         this.settings = settings;
@@ -73,10 +85,21 @@ public class DefaultDriverDetector implements DriverDetector {
             new PKCS11TokenDriver("I.CA SecureStore", Path.of("/usr/local/lib/pkcs11/libICASecureStorePkcs11.dylib"), TokenDriverShortnames.SECURE_STORE, HELPER_TEXT_SECURE_STORE),
             new PKCS11TokenDriver("MONET+ ProID+Q", Path.of("/usr/local/lib/ProIDPlus/libproidqcm11.dylib"), TokenDriverShortnames.MONET, HELPER_TEXT_MONET),
             new PKCS11TokenDriver("Gemalto IDPrime 940", Path.of("/usr/local/lib/libIDPrimePKCS11.dylib"), TokenDriverShortnames.GEMALTO, HELPER_TEXT_GEMALTO),
+            // After the vendor drivers: the app prefers the eID client for an eID card and
+            // falls back to the first other driver with a token, so OpenSC only signs when
+            // no vendor middleware claims the card.
+            new PKCS11TokenDriver("OpenSC", openscMacModulePath(), TokenDriverShortnames.OPENSC, HELPER_TEXT_OPENSC),
             new PKCS12KeystoreTokenDriver("Zo súboru", Path.of(settings.getCustomKeystorePath()), TokenDriverShortnames.KEYSTORE, HELPER_TEXT_KEYSTORE),
             new FakeTokenDriver("Fake token driver",  Path.of("fakeTokenDriver"), TokenDriverShortnames.FAKE, HELPER_TEXT_FAKE),
             new PKCS11TokenDriver("Vlastný ovládač pre PKCS11 Token", Path.of(settings.getCustomPKCS11DriverPath()), TokenDriverShortnames.CUSTOM_PKCS11, HELPER_TEXT_CUSTOM_PKCS11_DRIVER)
         );
+    }
+
+    static Path openscMacModulePath() {
+        return OPENSC_MAC_MODULE_PATHS.stream()
+                .filter(java.nio.file.Files::exists)
+                .findFirst()
+                .orElse(OPENSC_MAC_MODULE_PATHS.get(0));
     }
 
     public List<TokenDriver> getAvailableDrivers() {
