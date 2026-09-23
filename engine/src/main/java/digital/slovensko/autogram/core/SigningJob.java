@@ -190,7 +190,10 @@ public class SigningJob {
             document.setMimeType(AutogramMimeType.TEXT_WITH_CHARSET);
 
         if (isXDC(document.getMimeType())) {
-            document.setMimeType(AutogramMimeType.XML_DATACONTAINER_WITH_CHARSET);
+            // A record signed alone keeps the bare MIME EZZK accepted; eForm XDCs keep the charset form.
+            document.setMimeType(params.isPlainRecordXdc()
+                    ? AutogramMimeType.XML_DATACONTAINER
+                    : AutogramMimeType.XML_DATACONTAINER_WITH_CHARSET);
             document.setName(getXdcfFilename(document.getName()));
         }
 

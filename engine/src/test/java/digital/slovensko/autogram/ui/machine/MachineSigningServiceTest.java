@@ -36,6 +36,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.zip.ZipInputStream;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -856,6 +857,158 @@ class MachineSigningServiceTest {
         }
         assertTrue(names.containsAll(List.of("dokument.pdf", "dokument.xml.xdcf")), names.toString());
         assertTrue(names.stream().noneMatch(name -> name.endsWith(".asice")), names.toString());
+    }
+
+    private static final String RECORD_XDC = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><XMLDataContainer xmlns=\"http://data.gov.sk/def/container/xmldatacontainer+xml/1.1\">"
+            + "<XMLData ContentType=\"application/xml; charset=UTF-8\" Identifier=\"http://data.gov.sk/doc/eform/50349287.ConversionRecordOfPaperToElectronicDocument.sk/1.0\" Version=\"1.0\"><ConversionRecord xmlns=\"https://data.gov.sk/id/egov/eform/50349287.ConversionRecordOfPaperToElectronicDocument.sk/1.0\"/></XMLData>"
+            + "</XMLDataContainer>";
+
+    /// The EZZK record is an XMLDataContainer signed alone, as in the record EZZK accepted.
+    @Test
+    void recordXdcIsSignedAloneWithTheBareXdcMimeAndNoNetwork() throws Exception {
+        var xdcf = RECORD_XDC.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        var retained = new MemoryRetainedFile();
+        var settings = new MachineSettings(true);
+        settings.setSignatureLevel(SignatureLevel.XAdES_BASELINE_B);
+        var job = MachineSigningService.DefaultSigningSession.signingJob(xdcf, "/tmp/260923-TEST.record.xml.xdcf",
+                new MachineFileResponder(retained, () -> { }), settings, null, List.of());
+        // No eForm is resolved: nothing is fetched, validated against a form or re-wrapped.
+        assertTrue(job.getParameters().isPlainRecordXdc());
+        assertFalse(job.getParameters().shouldCreateXdc());
+        assertEquals(null, job.getParameters().getSchema());
+        assertEquals(null, job.getParameters().getTransformation());
+        assertEquals(ASiCContainerType.ASiC_E, job.getParameters().getContainer());
+        var token = new Pkcs12SignatureToken(Objects.requireNonNull(MachineSigningServiceTest.class
+                .getResource("/digital/slovensko/autogram/test.keystore")).getFile(), new KeyStore.PasswordProtection("".toCharArray()));
+        job.signWithKeyAndRespond(new SigningKey(token, token.getKeys().get(0)));
+
+        var names = new ArrayList<String>();
+        String manifest = null;
+        String signature = null;
+        byte[] data = null;
+        try (var zip = new ZipInputStream(new ByteArrayInputStream(retained.readAll()))) {
+            for (var entry = zip.getNextEntry(); entry != null; entry = zip.getNextEntry()) {
+                names.add(entry.getName());
+                var content = zip.readAllBytes();
+                if (entry.getName().equals("META-INF/manifest.xml")) manifest = new String(content, java.nio.charset.StandardCharsets.UTF_8);
+                if (entry.getName().startsWith("META-INF/signatures")) signature = new String(content, java.nio.charset.StandardCharsets.UTF_8);
+                if (entry.getName().equals("260923-TEST.record.xml.xdcf")) data = content;
+            }
+        }
+        assertEquals(List.of("260923-TEST.record.xml.xdcf"), names.stream()
+                .filter(name -> !name.equals("mimetype") && !name.startsWith("META-INF/")).toList());
+        assertArrayEquals(xdcf, data, "the record XDC must be signed byte for byte");
+        assertTrue(manifest.contains("manifest:media-type=\"application/vnd.gov.sk.xmldatacontainer+xml\""), manifest);
+        assertTrue(java.util.regex.Pattern.compile("<(\\w+:)?MimeType>application/vnd\\.gov\\.sk\\.xmldatacontainer\\+xml</(\\w+:)?MimeType>")
+                .matcher(signature).find(), signature);
+        assertFalse(signature.contains("charset"), signature);
+    }
+
+    @Test
+    void anXdcfThatIsNotAnXmlDataContainerIsRefused() {
+        var settings = new MachineSettings(true);
+        settings.setSignatureLevel(SignatureLevel.XAdES_BASELINE_B);
+        assertThrows(java.io.IOException.class, () -> MachineSigningService.DefaultSigningSession.signingJob(
+                "<Other/>".getBytes(java.nio.charset.StandardCharsets.UTF_8), "/tmp/x.record.xml.xdcf",
+                new MachineFileResponder(new MemoryRetainedFile(), () -> { }), settings, null, List.of()));
+    }
+
+    /// A record is signed alone; attachments go only next to a PDF.
+    @Test
+    void aRecordXdcWithAttachmentsIsRefused() {
+        var settings = new MachineSettings(true);
+        settings.setSignatureLevel(SignatureLevel.XAdES_BASELINE_B);
+        assertThrows(java.io.IOException.class, () -> MachineSigningService.DefaultSigningSession.signingJob(
+                RECORD_XDC.getBytes(java.nio.charset.StandardCharsets.UTF_8), "/tmp/260923-TEST.record.xml.xdcf",
+                new MachineFileResponder(new MemoryRetainedFile(), () -> { }), settings, null,
+                List.of(new MachineSigningService.AttachmentContent("dokument.pdf", "%PDF-1.7\n%%EOF".getBytes()))));
+    }
+
+    /// A record is XAdES in an ASiC-E; a PAdES level is refused rather than guessed.
+    @Test
+    void aRecordXdcIsRefusedForAPadesLevel() {
+        var settings = new MachineSettings(true);
+        settings.setSignatureLevel(SignatureLevel.PAdES_BASELINE_B);
+        assertThrows(java.io.IOException.class, () -> MachineSigningService.DefaultSigningSession.signingJob(
+                RECORD_XDC.getBytes(java.nio.charset.StandardCharsets.UTF_8), "/tmp/260923-TEST.record.xml.xdcf",
+                new MachineFileResponder(new MemoryRetainedFile(), () -> { }), settings, null, List.of()));
+    }
+
+    /// Only an `.xdcf` whose root is an XMLDataContainer passes preparation; any other XML stays refused.
+    @Test
+    void preparationAcceptsARecordXdcButStillRefusesOtherXml() throws Exception {
+        var xdcWriter = new RecordingWriter();
+        var xdcSource = Files.writeString(temporaryDirectory.resolve("260923-TEST.record.xml.xdcf"), RECORD_XDC).toRealPath();
+        var sessionRequested = new AtomicBoolean();
+        var xdcService = new MachineSigningService(xdcWriter.writer(), request -> {
+            sessionRequested.set(true);
+            throw new IllegalStateException("no token in this test");
+        }, content -> true);
+
+        xdcService.sign("request-1", new SignRequest("fake", "123", "1234".toCharArray(), "XAdES_BASELINE_B",
+                new QualifiedTimestampRequest(false, List.of()),
+                List.of(new MachineFile("one", xdcSource.toString(), target("260923-TEST.asice").toString()))));
+
+        assertTrue(sessionRequested.get(), "a record XDC must reach the session factory");
+
+        var xmlWriter = new RecordingWriter();
+        var xmlSource = Files.writeString(temporaryDirectory.resolve("record.xml"), RECORD_XDC).toRealPath();
+        var tokenOpened = new AtomicBoolean();
+        var xmlService = new MachineSigningService(xmlWriter.writer(), request -> {
+            tokenOpened.set(true);
+            throw new AssertionError("Token must not open for a plain XML source");
+        }, content -> true);
+
+        xmlService.sign("request-1", new SignRequest("fake", "123", "1234".toCharArray(), "XAdES_BASELINE_B",
+                new QualifiedTimestampRequest(false, List.of()),
+                List.of(new MachineFile("one", xmlSource.toString(), target("record.asice").toString()))));
+
+        assertFalse(tokenOpened.get());
+        assertEquals("SIGNING_UNAVAILABLE", xmlWriter.payloadCode(2));
+    }
+
+    /// The whole path for a record: preparation, a real Baseline B signature, the output check
+    /// of the one-object container and publishing it.
+    @Test
+    void signsAndPublishesARecordXdcThroughTheService() throws Exception {
+        var writer = new RecordingWriter();
+        var xdcf = RECORD_XDC.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        var source = Files.write(temporaryDirectory.resolve("260923-TEST.record.xml.xdcf"), xdcf).toRealPath();
+        var target = target("260923-TEST.asice");
+        var settings = new MachineSettings(true);
+        settings.setSignatureLevel(SignatureLevel.XAdES_BASELINE_B);
+        var token = new Pkcs12SignatureToken(
+                Objects.requireNonNull(MachineSigningServiceTest.class
+                        .getResource("/digital/slovensko/autogram/test.keystore")).getFile(),
+                new KeyStore.PasswordProtection("".toCharArray()));
+        var key = new SigningKey(token, token.getKeys().get(0));
+        var service = new MachineSigningService(writer.writer(), request -> new FakeSession((input, completed) ->
+                MachineSigningService.DefaultSigningSession.signingJob(input.sourceContent(), input.file().source(),
+                        new MachineFileResponder(input.staging(), completed), settings, null, input.attachments())
+                        .signWithKeyAndRespond(key)),
+                new MachineSigningService.PdfOutputValidator(new MachineInspectionService()));
+
+        service.sign("request-1", new SignRequest("fake", "123", "1234".toCharArray(), "XAdES_BASELINE_B",
+                new QualifiedTimestampRequest(false, List.of()),
+                List.of(new MachineFile("one", source.toString(), target.toString()))));
+
+        assertEquals(List.of("session.started", "file.signingStarted", "file.completed", "session.completed"),
+                writer.lifecycleEventTypes());
+        var names = new ArrayList<String>();
+        String manifest = null;
+        byte[] data = null;
+        try (var zip = new ZipInputStream(Files.newInputStream(target))) {
+            for (var entry = zip.getNextEntry(); entry != null; entry = zip.getNextEntry()) {
+                names.add(entry.getName());
+                var content = zip.readAllBytes();
+                if (entry.getName().equals("META-INF/manifest.xml")) manifest = new String(content, java.nio.charset.StandardCharsets.UTF_8);
+                if (entry.getName().equals("260923-TEST.record.xml.xdcf")) data = content;
+            }
+        }
+        assertEquals(List.of("260923-TEST.record.xml.xdcf"), names.stream()
+                .filter(name -> !name.equals("mimetype") && !name.startsWith("META-INF/")).toList());
+        assertArrayEquals(xdcf, data, "the record XDC must be published byte for byte");
+        assertTrue(manifest.contains("manifest:full-path=\"260923-TEST.record.xml.xdcf\" manifest:media-type=\"application/vnd.gov.sk.xmldatacontainer+xml\""), manifest);
     }
 
     /// DSS only extends an existing container when it signs a single document; with attachments
