@@ -81,7 +81,24 @@ final class EZZKSOAPServiceAdapterTests: XCTestCase {
         let body = try XCTUnwrap(transport.requests.last?.httpBody.map { String(decoding: $0, as: UTF8.self) })
         XCTAssertTrue(body.contains("<d:Mimetype>application/vnd.etsi.asic-e+zip</d:Mimetype>"))
         XCTAssertTrue(body.contains(containerData.base64EncodedString()))
+        XCTAssertTrue(body.contains("<w:MessageId>\(receipt.messageID)</w:MessageId>"))
         XCTAssertNotNil(UUID(uuidString: receipt.messageID))
+    }
+
+    func testSubmitWithoutContainerOnProductionIsStillUnavailable() async {
+        let transport = SOAPScriptedTransport([])
+        let envelope = ConversionRecordEnvelope(evidenceNumber: "1", direction: .paperToElectronic,
+                                                originalName: "a", newDocumentName: "a.pdf",
+                                                attestationXML: "<x/>", fingerprintSHA256Hex: "00",
+                                                conversionTime: Date())
+
+        do {
+            _ = try await makeAdapter(.production, transport, used: []).submit(envelope)
+            XCTFail("expected submissionUnavailable")
+        } catch {
+            XCTAssertEqual(error as? EZZKError, .submissionUnavailable)
+        }
+        XCTAssertTrue(transport.requests.isEmpty)
     }
 
     func testSubmitWithoutContainerIsARequestError() async {

@@ -35,6 +35,11 @@ public struct EZZKSOAPServiceAdapter: EZZKServicing {
     }
 
     public func submit(_ envelope: ConversionRecordEnvelope) async throws -> EZZKSOAPSubmissionReceipt {
+        // Refuse production before the container check: no caller sets
+        // `signedRecordContainer` yet, and a missing container must not read as an
+        // application bug (`invalidRequest`) when the real reason submission is
+        // impossible today is that production sending is not enabled at all.
+        guard client.environment != .production else { throw EZZKError.submissionUnavailable }
         guard let container = envelope.signedRecordContainer else {
             throw EZZKError.invalidRequest("chýba podpísaný záznam")
         }
