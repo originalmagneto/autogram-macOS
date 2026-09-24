@@ -46,10 +46,11 @@ public struct OutputService {
     ///
     /// The returned temporary file must be finalized with `finalize(_:)`.
     /// Finalization uses an exclusive move, so an output created concurrently
-    /// cannot be replaced.
+    /// cannot be replaced. `stem` replaces the source's own name when given.
     public func reserveUniqueSibling(
         for sourceURL: URL,
         in directoryURL: URL? = nil,
+        stem requestedStem: String? = nil,
         stemSuffix: String = "_podpisane",
         outputExtension: String? = nil
     ) throws -> OutputReservation {
@@ -58,7 +59,7 @@ public struct OutputService {
         let rawDirectory = directoryURL ?? sourceURL.deletingLastPathComponent()
         guard !isSymbolicLink(rawDirectory) else { throw OutputServiceError.unsafeTarget }
         let directory = canonicalURL(rawDirectory)
-        let stem = source.deletingPathExtension().lastPathComponent
+        let stem = requestedStem ?? source.deletingPathExtension().lastPathComponent
         let destinationExtension = outputExtension ?? source.pathExtension
         var number = 1
         while true {
@@ -81,6 +82,7 @@ public struct OutputService {
     public func previewUniqueSibling(
         for sourceURL: URL,
         in directoryURL: URL? = nil,
+        stem requestedStem: String? = nil,
         stemSuffix: String = "_podpisane",
         outputExtension: String? = nil,
         occupiedURLs: Set<URL> = []
@@ -90,7 +92,7 @@ public struct OutputService {
         let rawDirectory = directoryURL ?? sourceURL.deletingLastPathComponent()
         guard !isSymbolicLink(rawDirectory) else { throw OutputServiceError.unsafeTarget }
         let directory = canonicalURL(rawDirectory)
-        let stem = source.deletingPathExtension().lastPathComponent
+        let stem = requestedStem ?? source.deletingPathExtension().lastPathComponent
         let destinationExtension = outputExtension ?? source.pathExtension
         let occupied = Set(occupiedURLs.map(canonicalURL))
         var number = 1

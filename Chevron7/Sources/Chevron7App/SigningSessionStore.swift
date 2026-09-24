@@ -30,6 +30,7 @@ final class SigningSessionStore {
         didSet {
             guard oldValue != signingPIN, batchPhase == .ready else { return }
             batchSettingsSnapshot = nil
+            batchOptionsError = nil
             batchPIN = nil
             batchPhase = .idle
             lastError = "PIN sa zmenil. Dávku znova skontrolujte pred spustením."
@@ -76,6 +77,12 @@ final class SigningSessionStore {
     var batchCurrentIndex: Int?
     var batchErrorDecisionRequest: BatchFailureDecisionRequest?
     private(set) var batchSettingsSnapshot: BatchSettingsSnapshot?
+    /// Name of the shared ASiC-E container, without extension. Empty means the default.
+    var batchContainerName = ""
+    /// The default `batchContainerName` of the current batch, `<first document>_podpisane`.
+    private(set) var batchContainerDefaultName = ""
+    /// Why the current options cannot be signed; the batch stays ready and cannot start.
+    private(set) var batchOptionsError: String?
     private var batchPIN: String?
     private var batchGeneration = UUID()
     private var batchDecisionContinuation: CheckedContinuation<BatchFailureDecision, Never>?
@@ -174,11 +181,16 @@ final class SigningSessionStore {
     }
 
     struct BatchSettingsSnapshot: Sendable, Equatable {
-        let outputFormat: SigningOutputFormat
-        let includeQualifiedTimestamp: Bool
-        let tsaURL: String?
-        let convertToPDFA: Bool
-        let pdfaMode: PDFAConversionMode
+        // The options below can change while the batch is ready (`refreshReadyBatchOptions`);
+        // the certificate and the visual stamp are fixed by the preflight.
+        var outputFormat: SigningOutputFormat
+        var asicPackaging: AppSettings.BatchASiCPackaging
+        /// The shared container's file name without extension, only for a combined ASiC-E.
+        var containerStem: String?
+        var includeQualifiedTimestamp: Bool
+        var tsaURL: String?
+        var convertToPDFA: Bool
+        var pdfaMode: PDFAConversionMode
         let selectedIdentityID: String
         let identityLabel: String
         let identityIsQualified: Bool
@@ -207,6 +219,24 @@ final class SigningSessionStore {
             next.selectedTSAURL = newValue
             settingsStore.settings = next
         }
+    }
+
+    var batchASiCPackaging: AppSettings.BatchASiCPackaging {
+        get { settingsStore.settings.batchASiCPackaging }
+        set {
+            var next = settingsStore.settings
+            next.batchASiCPackaging = newValue
+            settingsStore.settings = next
+        }
+    }
+
+    /// Ready, with something to sign, nothing failed and options that can be signed.
+    var batchCanStart: Bool {
+        batchPhase == .ready
+            && batchSettingsSnapshot != nil
+            && batchOptionsError == nil
+            && batchItems.contains { $0.state == .pending }
+            && !batchItems.contains { $0.state == .failed }
     }
 
     var pdfaMode: PDFAConversionMode {
@@ -702,14 +732,6 @@ final class SigningSessionStore {
         }
     }
 
-    func invalidateBatchSettingsForEditing() {
-        guard batchPhase == .ready else { return }
-        batchSettingsSnapshot = nil
-        batchPIN = nil
-        batchPhase = .idle
-        lastError = nil
-    }
-
     func prepareBatch(ids: [UUID]) async {
         guard batchPhase != .preflighting, batchPhase != .signing else { return }
         invalidateBatchWork()
@@ -721,6 +743,7 @@ final class SigningSessionStore {
         batchCurrentIndex = nil
         batchErrorDecisionRequest = nil
         batchSettingsSnapshot = nil
+        batchOptionsError = nil
         batchPIN = nil
         lastError = nil
 
@@ -862,8 +885,20 @@ final class SigningSessionStore {
 
         let identityID = identity.id
         let effectiveVisualPage = visualPlacement?.pageIndex ?? signaturePage
-        let snapshot = BatchSettingsSnapshot(
+        if let firstItem = selectedItems.first(where: {
+            !ExistingSignatureGuard.hasContainerExtension($0.url.lastPathComponent)
+        }) ?? selectedItems.first {
+            let defaultName = firstItem.url.deletingPathExtension().lastPathComponent + "_podpisane"
+            // Keep a name the person typed; follow the default otherwise.
+            if batchContainerName.isEmpty || batchContainerName == batchContainerDefaultName {
+                batchContainerName = defaultName
+            }
+            batchContainerDefaultName = defaultName
+        }
+        var snapshot = BatchSettingsSnapshot(
             outputFormat: outputFormat,
+            asicPackaging: batchASiCPackaging,
+            containerStem: nil,
             includeQualifiedTimestamp: includeQualifiedTimestamp,
             tsaURL: includeQualifiedTimestamp ? selectedTSAURL : nil,
             convertToPDFA: convertToPDFA,
@@ -877,10 +912,10 @@ final class SigningSessionStore {
             visualPlacement: visualPlacement,
             signaturePage: effectiveVisualPage,
             signatureRect: signatureRect)
+        applyCurrentBatchOptions(to: &snapshot)
 
-        if snapshot.includeQualifiedTimestamp,
-           snapshot.tsaURL.flatMap({ URL(string: $0)?.scheme }) == nil {
-            blockingErrors.append("Adresa služby časovej pečiatky nie je platná.")
+        if let optionsError = Self.batchOptionsError(for: snapshot) {
+            blockingErrors.append(optionsError)
         }
 
         if snapshot.includeVisibleSignature {
@@ -911,54 +946,18 @@ final class SigningSessionStore {
             }
         }
 
-        var plannedURLs = Set<URL>()
-        var sharedPlannedURL: URL?
-        if snapshot.outputFormat == .attachedASIC, let firstItem = selectedItems.first {
-            let location = outputLocation(for: firstItem.url)
-            do {
-                let planned = try outputService.previewUniqueSibling(
-                    for: firstItem.url,
-                    in: location.directory,
-                    stemSuffix: "_podpisane",
-                    outputExtension: "asice",
-                    occupiedURLs: plannedURLs)
-                sharedPlannedURL = planned
-                plannedURLs.insert(planned.standardizedFileURL)
-            } catch {
-                blockingErrors.append("Cieľový spoločný ASiC-E výstup sa nepodarilo pripraviť.")
-            }
-        }
-        let outputExtension = snapshot.outputFormat == .embeddedPAdES ? "pdf" : "asice"
-        for item in selectedItems {
-            guard documents[item.id] != nil else { continue }
-            guard let batchIndex = batchItems.firstIndex(where: { $0.id == item.id }) else {
-                continue
-            }
+        for item in selectedItems where documents[item.id] != nil {
             // A batch signs PDFs; a container's own signatures would be lost when its
             // PDF is extracted and signed again, so it is signed on its own instead.
-            if ExistingSignatureGuard.hasContainerExtension(item.url.lastPathComponent) {
-                batchItems[batchIndex].state = .failed
-                batchItems[batchIndex].errorMessage = Self.containerInBatchMessage
+            guard ExistingSignatureGuard.hasContainerExtension(item.url.lastPathComponent),
+                  let batchIndex = batchItems.firstIndex(where: { $0.id == item.id }) else {
                 continue
             }
-            if let sharedPlannedURL {
-                batchItems[batchIndex].plannedOutputURL = sharedPlannedURL
-                continue
-            }
-            let location = outputLocation(for: item.url)
-            do {
-                let planned = try outputService.previewUniqueSibling(
-                    for: item.url,
-                    in: location.directory,
-                    stemSuffix: "_podpisane",
-                    outputExtension: outputExtension,
-                    occupiedURLs: plannedURLs)
-                batchItems[batchIndex].plannedOutputURL = planned
-                plannedURLs.insert(planned.standardizedFileURL)
-            } catch {
-                batchItems[batchIndex].state = .failed
-                batchItems[batchIndex].errorMessage = "Cieľový výstup sa nepodarilo pripraviť."
-            }
+            batchItems[batchIndex].state = .failed
+            batchItems[batchIndex].errorMessage = Self.containerInBatchMessage
+        }
+        if let planningError = planBatchOutputs(for: snapshot) {
+            blockingErrors.append(planningError)
         }
 
         guard blockingErrors.isEmpty else {
@@ -970,6 +969,93 @@ final class SigningSessionStore {
         batchPIN = pin.isEmpty ? nil : pin
         batchPhase = .ready
         }
+    /// Takes the batch card's current options (format, packaging, container name,
+    /// timestamp, PDF/A) into a ready batch without reading the card again: only the
+    /// planned outputs change. Options that cannot be signed keep the batch ready but
+    /// stop it from starting (`batchOptionsError`).
+    func refreshReadyBatchOptions() {
+        guard batchPhase == .ready, var snapshot = batchSettingsSnapshot else { return }
+        applyCurrentBatchOptions(to: &snapshot)
+        batchSettingsSnapshot = snapshot
+        let planningError = planBatchOutputs(for: snapshot)
+        batchOptionsError = Self.batchOptionsError(for: snapshot) ?? planningError
+    }
+
+    private func applyCurrentBatchOptions(to snapshot: inout BatchSettingsSnapshot) {
+        snapshot.outputFormat = outputFormat
+        snapshot.asicPackaging = batchASiCPackaging
+        snapshot.containerStem = outputFormat == .attachedASIC && batchASiCPackaging == .combined
+            ? (Self.containerStem(from: batchContainerName)
+                ?? Self.containerStem(from: batchContainerDefaultName)
+                ?? "podpisane")
+            : nil
+        snapshot.includeQualifiedTimestamp = includeQualifiedTimestamp
+        snapshot.tsaURL = includeQualifiedTimestamp ? selectedTSAURL : nil
+        snapshot.convertToPDFA = convertToPDFA
+        snapshot.pdfaMode = pdfaMode
+    }
+
+    private static func batchOptionsError(for snapshot: BatchSettingsSnapshot) -> String? {
+        guard snapshot.includeQualifiedTimestamp,
+              snapshot.tsaURL.flatMap({ URL(string: $0)?.scheme }) == nil else { return nil }
+        return "Adresa služby časovej pečiatky nie je platná."
+    }
+
+    /// A file name stem for the shared container: the typed name without ".asice",
+    /// sanitized; nil when nothing usable is left.
+    static func containerStem(from name: String) -> String? {
+        var trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.lowercased().hasSuffix(".asice") {
+            trimmed = String(trimmed.dropLast(".asice".count))
+        }
+        let sanitized = ASiCEPackager.sanitizedFileName(trimmed)
+        return sanitized.isEmpty ? nil : sanitized
+    }
+
+    /// Plans the output of every pending item: one shared container for a combined
+    /// ASiC-E, else a `_podpisane` sibling each. Returns an error that blocks the batch.
+    private func planBatchOutputs(for snapshot: BatchSettingsSnapshot) -> String? {
+        var plannedURLs = Set<URL>()
+        let pendingIndices = batchItems.indices.filter { batchItems[$0].state == .pending }
+        if let containerStem = snapshot.containerStem {
+            guard let firstIndex = pendingIndices.first else { return nil }
+            let firstURL = batchItems[firstIndex].url
+            do {
+                let planned = try outputService.previewUniqueSibling(
+                    for: firstURL,
+                    in: outputLocation(for: firstURL).directory,
+                    stem: containerStem,
+                    stemSuffix: "",
+                    outputExtension: "asice")
+                for index in pendingIndices {
+                    batchItems[index].plannedOutputURL = planned
+                }
+                return nil
+            } catch {
+                return "Cieľový spoločný ASiC-E výstup sa nepodarilo pripraviť."
+            }
+        }
+        let outputExtension = snapshot.outputFormat == .embeddedPAdES ? "pdf" : "asice"
+        for index in pendingIndices {
+            let url = batchItems[index].url
+            do {
+                let planned = try outputService.previewUniqueSibling(
+                    for: url,
+                    in: outputLocation(for: url).directory,
+                    stemSuffix: "_podpisane",
+                    outputExtension: outputExtension,
+                    occupiedURLs: plannedURLs)
+                batchItems[index].plannedOutputURL = planned
+                plannedURLs.insert(planned.standardizedFileURL)
+            } catch {
+                batchItems[index].plannedOutputURL = nil
+                batchItems[index].state = .failed
+                batchItems[index].errorMessage = "Cieľový výstup sa nepodarilo pripraviť."
+            }
+        }
+        return nil
+    }
+
     private func finishBatchPreflight(blockingErrors: [String]) {
         guard !blockingErrors.isEmpty else {
             batchPhase = .ready
@@ -984,11 +1070,13 @@ final class SigningSessionStore {
         batchPhase = .idle
         lastError = message
         batchSettingsSnapshot = nil
+        batchOptionsError = nil
         batchPIN = nil
     }
 
     func startBatch() async {
         guard batchPhase == .ready,
+              batchOptionsError == nil,
               let snapshot = batchSettingsSnapshot,
               !batchItems.isEmpty else { return }
 
@@ -998,7 +1086,7 @@ final class SigningSessionStore {
         batchPhase = .signing
         lastError = nil
         let pin = batchPIN
-        if snapshot.outputFormat == .attachedASIC {
+        if snapshot.outputFormat == .attachedASIC, snapshot.containerStem != nil {
             await signCombinedASiCBatch(snapshot: snapshot, pin: pin, generation: generation)
             return
         }
@@ -1200,7 +1288,8 @@ final class SigningSessionStore {
             let reservation = try outputService.reserveUniqueSibling(
                 for: firstItem.url,
                 in: directory,
-                stemSuffix: "_podpisane",
+                stem: snapshot.containerStem,
+                stemSuffix: snapshot.containerStem == nil ? "_podpisane" : "",
                 outputExtension: "asice")
             do {
                 try checkBatchGeneration(generation)
@@ -1638,6 +1727,8 @@ final class SigningSessionStore {
         certificateLoadError = nil
         lastCertificateLoadPIN = nil
         selectedIdentityID = identity
+        batchContainerName = ""
+        batchContainerDefaultName = ""
     }
 
     func resolveOutputLocation() -> (directory: URL, stem: String) {

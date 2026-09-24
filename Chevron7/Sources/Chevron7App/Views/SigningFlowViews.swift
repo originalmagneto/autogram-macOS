@@ -1140,7 +1140,7 @@ struct SigningBatchView: View {
     }
 
     private var canStart: Bool {
-        store.batchPhase == .ready && pendingCount > 0 && !hasBlockingItems && !pinMissing
+        store.batchCanStart && !pinMissing
     }
 
     var body: some View {
@@ -1178,12 +1178,6 @@ struct SigningBatchView: View {
                     store.decideBatchFailure(.stopBatch)
                 }
             )
-        }
-        .onChange(of: store.outputFormat) { _, _ in
-            invalidateReadyBatchSettings()
-        }
-        .onChange(of: store.convertToPDFA) { _, _ in
-            invalidateReadyBatchSettings()
         }
     }
 
@@ -1229,134 +1223,222 @@ struct SigningBatchView: View {
         }
     }
 
+    /// Options can change until the batch starts; afterwards they show what was used.
+    private var settingsEditable: Bool {
+        store.batchPhase == .ready || store.batchPhase == .idle
+    }
+
+    private var settingsBusy: Bool {
+        store.batchPhase == .preflighting || store.batchPhase == .signing
+    }
+
+    /// A binding that takes the change into a ready batch at once.
+    private func batchOption<Value>(
+        _ keyPath: ReferenceWritableKeyPath<SigningSessionStore, Value>
+    ) -> Binding<Value> {
+        Binding(
+            get: { store[keyPath: keyPath] },
+            set: { newValue in
+                store[keyPath: keyPath] = newValue
+                store.refreshReadyBatchOptions()
+            })
+    }
+
     private var settingsCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             Label("Nastavenie dávky", systemImage: "slider.horizontal.3")
                 .font(.headline)
 
-            if requiresPIN {
-                VStack(alignment: .leading, spacing: 8) {
-                    SecureField("Zadajte PIN karty", text: $store.signingPIN)
-                        .textFieldStyle(.roundedBorder)
-                        .disabled(store.batchPhase == .preflighting || store.batchPhase == .signing)
-                        .accessibilityLabel("PIN podpisovej karty")
-                        .accessibilityValue(
-                            store.signingPIN.isEmpty ? "PIN nie je zadaný" : "PIN je zadaný"
-                        )
-
-                    HStack(spacing: 8) {
-                        Button {
-                            Task { await refreshCertificate() }
-                        } label: {
-                            Label("Obnoviť certifikát", systemImage: "arrow.clockwise")
-                        }
-                        .controlSize(.small)
-                        .disabled(store.batchPhase == .preflighting || store.batchPhase == .signing)
-                        .accessibilityLabel("Obnoviť podpisový certifikát")
-                        .accessibilityValue("Načítať certifikát z pripojenej karty")
-
-                        Text("PIN sa používa iba počas tejto operácie a neukladá sa.")
-                            .font(.caption2)
-                            .foregroundStyle(.tertiary)
-                    }
+            Form {
+                certificateRow
+                if requiresPIN {
+                    pinRow
                 }
-            }
 
-            if store.batchSettingsSnapshot == nil || store.batchPhase == .ready {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Formát výstupu")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                    HStack(spacing: 8) {
-                        ForEach(SigningOutputFormatPresentation.allCases) { presentation in
-                            let isSelected = store.outputFormat == presentation.format
-                            Button {
-                                store.outputFormat = presentation.format
-                            } label: {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(presentation.label)
-                                        .font(.callout.weight(isSelected ? .semibold : .medium))
-                                    Text(presentation.format == .embeddedPAdES
-                                         ? "Podpis priamo v PDF"
-                                         : "Kontajner s XAdES")
-                                        .font(.caption2)
-                                        .foregroundStyle(.secondary)
-                                }
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 8)
-                                .background(
-                                    isSelected
-                                        ? Color.accentColor.opacity(0.12)
-                                        : Color.clear,
-                                    in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                        .strokeBorder(
-                                            isSelected
-                                                ? Color.accentColor.opacity(0.55)
-                                                : Color.primary.opacity(0.12),
-                                            lineWidth: 1))
+                Picker("Formát podpisu", selection: batchOption(\.outputFormat)) {
+                    Text("PAdES").tag(SigningOutputFormat.embeddedPAdES)
+                    Text("ASiC-E (XAdES)").tag(SigningOutputFormat.attachedASIC)
+                }
+                .pickerStyle(.segmented)
+                .fixedSize()
+                .disabled(!settingsEditable)
+
+                if store.outputFormat == .attachedASIC {
+                    Picker("Balenie", selection: batchOption(\.batchASiCPackaging)) {
+                        Text("Samostatný kontajner pre každý dokument")
+                            .tag(AppSettings.BatchASiCPackaging.perDocument)
+                        Text("Jeden spoločný kontajner")
+                            .tag(AppSettings.BatchASiCPackaging.combined)
+                    }
+                    .pickerStyle(.radioGroup)
+                    .disabled(!settingsEditable)
+
+                    if store.batchASiCPackaging == .combined {
+                        LabeledContent("Názov kontajnera") {
+                            HStack(spacing: 4) {
+                                TextField(
+                                    "Názov kontajnera",
+                                    text: batchOption(\.batchContainerName),
+                                    prompt: Text(store.batchContainerDefaultName))
+                                    .labelsHidden()
+                                    .textFieldStyle(.roundedBorder)
+                                    .frame(maxWidth: 280)
+                                Text(".asice")
+                                    .foregroundStyle(.secondary)
                             }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel("Formát výstupu \(presentation.label)")
-                            .accessibilityValue(isSelected ? "Vybraný" : "Nevybraný")
-                            .accessibilityAddTraits(isSelected ? .isSelected : [])
+                            .disabled(!settingsEditable)
                         }
                     }
-                    Text(store.outputFormat == .embeddedPAdES
-                         ? "PAdES podpis priamo v každom PDF."
-                         : "Každý dokument sa vloží do vlastného ASiC-E kontajnera s XAdES podpisom.")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                    Divider().opacity(0.5)
-                    Toggle(isOn: $store.convertToPDFA) {
-                        Label("Konvertovať do PDF/A pred podpisom", systemImage: "doc.badge.arrow.up")
-                            .font(.callout)
-                    }
                 }
-                .disabled(store.batchPhase == .preflighting || store.batchPhase == .signing)
+
+                LabeledContent("Výstup") {
+                    Text(outputSummary)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                LabeledContent("Časová pečiatka") {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Toggle(
+                            "Pridať kvalifikovanú časovú pečiatku (QTS)",
+                            isOn: batchOption(\.includeQualifiedTimestamp))
+                            .toggleStyle(.checkbox)
+                        if store.includeQualifiedTimestamp {
+                            Picker("Služba TSA", selection: batchOption(\.selectedTSAURL)) {
+                                ForEach(store.settings.availableTSAServers) { server in
+                                    Text(server.name).tag(server.url)
+                                }
+                            }
+                            .labelsHidden()
+                            .pickerStyle(.menu)
+                            .fixedSize()
+                            .accessibilityLabel("Služba časovej pečiatky")
+                        }
+                    }
+                    .disabled(!settingsEditable)
+                }
+
+                LabeledContent("PDF/A") {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Toggle(
+                            "Konvertovať do PDF/A pred podpisom",
+                            isOn: batchOption(\.convertToPDFA))
+                            .toggleStyle(.checkbox)
+                        if store.convertToPDFA {
+                            Text("Už podpísané PDF sa nekonvertujú, aby ostali ich podpisy platné.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    .disabled(!settingsEditable)
+                }
+
+                LabeledContent("Vizuálna pečiatka") {
+                    Text(visualStampSummary)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
-            if let snapshot = store.batchSettingsSnapshot {
-                settingRow("Podpisový certifikát", value: snapshot.identityLabel)
-                settingRow("Formát výstupu", value: outputFormatLabel(snapshot.outputFormat))
-                settingRow(
-                    "Časová pečiatka",
-                    value: snapshot.includeQualifiedTimestamp
-                        ? (snapshot.tsaURL ?? "QTS zapnutá")
-                        : "Vypnutá"
-                )
-                settingRow("PDF/A", value: snapshot.convertToPDFA ? "Zapnuté" : "Vypnuté")
-                settingRow(
-                    "Vizuálna pečiatka",
-                    value: snapshot.includeVisibleSignature
-                        ? "Zapnutá"
-                        : "Vypnutá"
-                )
-            } else {
-                Text("Načítavam spoločné nastavenia a kontrolujem dokumenty…")
+            .formStyle(.columns)
+
+            if let optionsError = store.batchOptionsError {
+                Label(optionsError, systemImage: "exclamationmark.triangle.fill")
+                    .font(.callout)
+                    .foregroundStyle(.red)
+            } else if store.batchSettingsSnapshot == nil, store.batchPhase == .preflighting {
+                Text("Kontrolujem certifikát a dokumenty…")
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .glassCard(padding: 14)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Spoločné nastavenia dávky")
     }
 
-    private func settingRow(_ title: String, value: String) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text(title)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Spacer(minLength: 8)
-            Text(value)
-                .font(.caption.weight(.semibold))
-                .multilineTextAlignment(.trailing)
+    private var certificateRow: some View {
+        LabeledContent("Podpisový certifikát") {
+            HStack(spacing: 6) {
+                Text(certificateSummary)
+                    .fontWeight(.medium)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Button {
+                    Task { await refreshCertificate() }
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                }
+                .buttonStyle(.borderless)
+                .help("Znova načítať certifikát z karty")
+                .disabled(settingsBusy)
+                .accessibilityLabel("Obnoviť podpisový certifikát")
+            }
         }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(title)
-        .accessibilityValue(value)
+    }
+
+    private var pinRow: some View {
+        LabeledContent("PIN") {
+            VStack(alignment: .leading, spacing: 4) {
+                SecureField("PIN karty", text: $store.signingPIN, prompt: Text("Zadajte PIN karty"))
+                    .labelsHidden()
+                    .textFieldStyle(.roundedBorder)
+                    .frame(maxWidth: 220)
+                    .disabled(settingsBusy)
+                    .accessibilityLabel("PIN podpisovej karty")
+                    .accessibilityValue(
+                        store.signingPIN.isEmpty ? "PIN nie je zadaný" : "PIN je zadaný")
+                Text("PIN sa používa iba počas tejto dávky a neukladá sa.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var certificateSummary: String {
+        store.batchSettingsSnapshot?.identityLabel
+            ?? selectedIdentity?.label
+            ?? "Overí sa pri kontrole dávky"
+    }
+
+    private var visualStampSummary: String {
+        let enabled = store.batchSettingsSnapshot?.includeVisibleSignature ?? store.includeVisibleSignature
+        return enabled
+            ? "Zapnutá, na mieste zvolenom v náhľade dokumentu"
+            : "Vypnutá (nastavuje sa v náhľade dokumentu)"
+    }
+
+    /// What the batch writes with the options as they are now.
+    private var outputSummary: String {
+        let count = store.batchItems.filter { $0.state != .failed }.count
+        switch store.outputFormat {
+        case .embeddedPAdES:
+            return "Podpis priamo v PDF: \(Self.documentCount(count)), každý ako …_podpisane.pdf."
+        case .attachedASIC:
+            if store.batchASiCPackaging == .combined {
+                let name = store.batchItems.first { $0.state != .failed }?.plannedOutputURL?.lastPathComponent
+                    ?? "\(store.batchSettingsSnapshot?.containerStem ?? store.batchContainerDefaultName).asice"
+                return "Jeden kontajner \(name) so všetkými dokumentmi (\(count))."
+            }
+            return "\(Self.containerCount(count)), každý dokument vo vlastnom …_podpisane.asice."
+        }
+    }
+
+    private static func documentCount(_ count: Int) -> String {
+        switch count {
+        case 1: "1 dokument"
+        case 2...4: "\(count) dokumenty"
+        default: "\(count) dokumentov"
+        }
+    }
+
+    private static func containerCount(_ count: Int) -> String {
+        switch count {
+        case 1: "1 kontajner"
+        case 2...4: "\(count) kontajnery"
+        default: "\(count) kontajnerov"
+        }
     }
 
     private var itemsCard: some View {
@@ -1588,7 +1670,8 @@ struct SigningBatchView: View {
                 Text(
                     pinMissing
                         ? "Zadajte PIN a znova skontrolujte dávku."
-                        : "Odstráňte blokujúce problémy pred spustením."
+                        : store.batchOptionsError
+                            ?? "Odstráňte blokujúce problémy pred spustením."
                 )
                     .font(.caption)
                     .foregroundStyle(.red)
@@ -1816,9 +1899,6 @@ struct SigningBatchView: View {
             }
         }
     }
-    private func invalidateReadyBatchSettings() {
-        store.invalidateBatchSettingsForEditing()
-    }
 
     private func batchLog() -> String {
         var lines = [
@@ -1828,9 +1908,17 @@ struct SigningBatchView: View {
             "Neúspešné: \(failedCount)",
             "Preskočené: \(skippedCount)",
             "Zrušené: \(cancelledCount)",
-            "",
-            "Dokumenty:"
         ]
+        if let snapshot = store.batchSettingsSnapshot {
+            lines.append("Formát: \(outputFormatLabel(snapshot.outputFormat))")
+            if snapshot.outputFormat == .attachedASIC {
+                lines.append(snapshot.containerStem.map { "Balenie: jeden kontajner \($0).asice" }
+                    ?? "Balenie: samostatný kontajner pre každý dokument")
+            }
+            lines.append("Časová pečiatka: \(snapshot.includeQualifiedTimestamp ? (snapshot.tsaURL ?? "zapnutá") : "vypnutá")")
+            lines.append("PDF/A: \(snapshot.convertToPDFA ? "zapnuté" : "vypnuté")")
+        }
+        lines += ["", "Dokumenty:"]
 
         for item in store.batchItems {
             lines.append("- \(item.displayName): \(itemStateLabel(item.state))")

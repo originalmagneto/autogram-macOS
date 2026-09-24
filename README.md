@@ -86,7 +86,7 @@ Chevron7 nie je spojený so Slovensko.Digital ani ním podporovaný a nemá nič
 <ul>
 <li>Výber eID, I.CA SecureStore, PKCS#11 a Keychain tokenov, vrátane čítačiek s viacerými slotmi.</li>
 <li>PAdES a ASiC-E výstupy s kvalifikovanou časovou pečiatkou.</li>
-<li>Vizuálny podpis, dávkové spracovanie a bezpečné zrušenie operácie.</li>
+<li>Vizuálny podpis, dávkové spracovanie (ASiC-E samostatne alebo v jednom kontajneri, QTS a PDF/A priamo v dávke) a bezpečné zrušenie operácie.</li>
 <li>Podpis bez čítačky: QR kód, iPhone s aplikáciou Autogram v mobile a občiansky preukaz s NFC.</li>
 <li>Neplatný vstupný podpis blokuje konkrétny dokument; nedostupná trust služba zostáva iba informatívna.</li>
 </ul>
@@ -318,11 +318,27 @@ Podrobnosti: [pravidlá tréningového datasetu](Chevron7/docs/security-element-
 ## Podpisovanie
 
 1. Otvorte PDF cez `⌘O`, drag and drop alebo Finder Quick Action. Podpísaný súbor sa ukladá vedľa pôvodného pod jeho menom s príponou `_podpisane`, nech ste ho otvorili ktorýmkoľvek z týchto spôsobov; do vlastného priečinka aplikácie spadne len vtedy, keď pôvodný priečinok nie je zapisovateľný alebo keď dokument prišiel bez súboru (napríklad obrázok pretiahnutý z inej aplikácie).
-2. Pri viacerých dokumentoch vyberte **Pripraviť dávku podpisov**.
+2. Pri viacerých dokumentoch kliknite vo fronte podpisovania na **Podpísať všetky** (pozri [Dávkové podpisovanie](#dávkové-podpisovanie)).
 3. Prejdite preflight kontrolou vstupov a nastavení.
 4. Vyberte formát, certifikát a voliteľný vizuálny podpis alebo QTS.
 5. Spustite podpisovanie cez **Podpísať KEP** (karta v čítačke) alebo **Podpísať mobilom** (občiansky preukaz s NFC cez iPhone).
 6. Skontrolujte výsledný PDF, XML alebo ASiC-E artefakt.
+
+### Dávkové podpisovanie
+
+**Podpísať všetky** vo fronte podpisovania skontroluje všetky dokumenty naraz: načíta certifikát (PIN sa zadá raz pre celú dávku), overí existujúce podpisy jednou validáciou a naplánuje názvy výstupov. Karta **Nastavenie dávky** je natívny formulár, v ktorom sa všetko dá zmeniť až do spustenia; zmena sa prejaví hneď v plánovaných výstupoch, bez opätovného čítania karty a bez tlačidla **Znova skontrolovať**.
+
+<table>
+<tr><th>Voľba</th><th>Čo robí</th></tr>
+<tr><td>Formát podpisu</td><td><strong>PAdES</strong> (podpis priamo v každom PDF, výstup <code>&lt;názov&gt;_podpisane.pdf</code>) alebo <strong>ASiC-E (XAdES)</strong>.</td></tr>
+<tr><td>Balenie ASiC-E</td><td><strong>Samostatný kontajner pre každý dokument</strong> (predvolené, <code>&lt;názov&gt;_podpisane.asice</code> pre každý súbor) alebo <strong>Jeden spoločný kontajner</strong>, v ktorom je každé PDF vlastným dátovým objektom jedného podpisu. Aplikácia si poslednú voľbu pamätá.</td></tr>
+<tr><td>Názov kontajnera</td><td>Pri spoločnom kontajneri predvyplnený ako <code>&lt;prvý dokument&gt;_podpisane</code>; nepovolené znaky sa nahradia, prázdne pole použije predvolený názov a existujúci súbor sa nikdy neprepíše (pridá sa „(2)“).</td></tr>
+<tr><td>Časová pečiatka</td><td>Kvalifikovaná časová pečiatka (QTS) sa zapína priamo v dávke, s výberom TSA služby z Nastavení. Neplatná adresa služby dávku nechá pripravenú, ale nedovolí ju spustiť.</td></tr>
+<tr><td>PDF/A</td><td>Konverzia do PDF/A pred podpisom. Už podpísané PDF sa nekonvertujú ani nepečiatkujú, aby ich pôvodné podpisy ostali platné.</td></tr>
+<tr><td>Vizuálna pečiatka</td><td>Preberá sa z náhľadu dokumentu (umiestnenie a vzhľad); v dávke sa len zobrazí.</td></tr>
+</table>
+
+Riadok **Výstup** vždy povie, čo vznikne, napríklad „3 kontajnery, každý dokument vo vlastnom …_podpisane.asice“. Po spustení sa voľby zamknú a ukazujú, s čím sa podpisovalo; rovnaké údaje zapíše aj **Exportovať protokol…**. Kontajnery ASiC-E sa do dávky nepridávajú, podpisujú sa samostatne, aby sa zachovali ich podpisy.
 
 ### Podpis mobilom
 
@@ -498,7 +514,17 @@ xattr -d com.apple.quarantine "/Applications/Chevron7.app"
 </details>
 
 <details open>
-<summary><strong>v0.13.0 · aktuálne vydanie: evidenčné číslo automaticky pri autorizácii</strong></summary>
+<summary><strong>v0.14.0 · aktuálne vydanie: prehľadné nastavenie dávky, ASiC-E samostatne alebo spolu</strong></summary>
+<ul>
+<li>Karta <strong>Nastavenie dávky</strong> je natívny formulár: certifikát, PIN, formát, balenie, QTS s výberom TSA, PDF/A a vizuálna pečiatka na jednom mieste.</li>
+<li>ASiC-E dávka vytvorí kontajner pre každý dokument (predvolené) alebo jeden spoločný kontajner s vlastným názvom; voľba sa pamätá.</li>
+<li>Kvalifikovaná časová pečiatka a TSA služba sa volia priamo v dávke.</li>
+<li>Zmena nastavení pripravenej dávky sa prejaví hneď, bez opätovného čítania karty a bez <strong>Znova skontrolovať</strong>.</li>
+</ul>
+</details>
+
+<details>
+<summary><strong>v0.13.0 · predchádzajúce vydanie: evidenčné číslo automaticky pri autorizácii</strong></summary>
 <ul>
 <li>Evidenčné číslo pridelí EZZK samo pri autorizácii, tesne pred podpisom; tlačidlo <strong>Získať číslo</strong> zmizlo.</li>
 <li>Krok autorizácie sa mimo Demo už nerozťahuje za okraj okna, tlačidlo <strong>Autorizovať</strong> aj výzva na PIN sú dostupné.</li>
