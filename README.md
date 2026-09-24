@@ -443,7 +443,16 @@ xattr -d com.apple.quarantine "/Applications/Chevron7.app"
 </details>
 
 <details open>
-<summary><strong>v0.7.0 · aktuálne vydanie: podpísaný záznam o konverzii a jeho odoslanie do EZZK</strong></summary>
+<summary><strong>v0.8.0 · aktuálne vydanie: jeden súbor pre klienta ako v podpisuj.sk</strong></summary>
+<ul>
+<li>Klient dostane jediný <code>&lt;Názov výstupu&gt;.asice</code> s PDF/A a doložkou <code>&lt;evidenčné číslo&gt;.xml.xdcf</code>, podpísanými spolu s kvalifikovanou časovou pečiatkou; doložka uvádza presne názov PDF v kontajneri.</li>
+<li>Podpísaný záznam o konverzii ostáva v Registri a uloží sa cez <strong>Uložiť záznam…</strong>; <strong>Uložiť ako…</strong> uloží kontajner pre klienta.</li>
+<li>Celý postup prešiel na testovacom EZZK s kartou SAK; produkčné EZZK je zatiaľ len na čítanie.</li>
+</ul>
+</details>
+
+<details>
+<summary><strong>v0.7.0 · predchádzajúce vydanie: podpísaný záznam o konverzii a jeho odoslanie do EZZK</strong></summary>
 <ul>
 <li>ZaKo podpíše rovnakým PIN aj záznam o zaručenej konverzii (record 1.0) s kvalifikovanou časovou pečiatkou a odošle ho do EZZK; na Produkcii je odoslanie zatiaľ zamknuté.</li>
 <li>Register má nové stavy (Prijatý na spracovanie, Spracovaný, Odmietnutý, Výsledok odoslania neznámy, Záznam nepodpísaný, Oneskorený), priebežnú kontrolu stavu a ručné opätovné odoslanie odmietnutého záznamu.</li>
