@@ -450,6 +450,29 @@ final class EZZKSOAPClientTests: XCTestCase {
         XCTAssertEqual(transport.requests.count, 1)
     }
 
+    /// Only CORE-003 means a wrong name or password. Any other LogIn error code is
+    /// remembered the same way (no further LogIn with those credentials until the advocate
+    /// signs in again in Settings), but its text asks for that and names the code.
+    func testOtherLoginErrorCodeIsRememberedAndAsksToSignInAgain() async {
+        let transport = SOAPScriptedTransport([.ok(EZZKSOAPFixtures.loginRejected(code: "CORE-022"))])
+        let client = makeClient(transport)
+
+        await assertThrows(EZZKError.credentialsRejected(code: "CORE-022")) {
+            _ = try await client.evidenceNumbers(for: self.person)
+        }
+        await assertThrows(EZZKError.credentialsRejected(code: "CORE-022")) {
+            try await client.logIn()
+        }
+        XCTAssertEqual(transport.requests.count, 1)
+
+        let text = EZZKError.credentialsRejected(code: "CORE-022").errorDescription ?? ""
+        XCTAssertTrue(text.contains("CORE-022"), text)
+        XCTAssertTrue(text.localizedCaseInsensitiveContains("prihláste sa znova v Nastaveniach"), text)
+        XCTAssertFalse(text.contains("Nesprávne prihlasovacie meno alebo heslo"), text)
+        XCTAssertEqual(EZZKError.credentialsRejected(code: "CORE-003").errorDescription,
+                       "Nesprávne prihlasovacie meno alebo heslo.")
+    }
+
     func testConnectionLostDuringReceiveIsOutcomeUnknown() async {
         let record = EZZKRecordAttachment(evidenceNumber: "1563-260917-1", mimeType: "application/vnd.etsi.asic-e+zip",
                                           data: Data("asic".utf8))

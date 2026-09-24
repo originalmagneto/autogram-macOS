@@ -25,8 +25,10 @@ public struct EZZKSOAPServiceAdapter: EZZKServicing {
         // without a record, which breaks the 24-hour duty to report the conversion.
         guard client.environment != .production else { throw EZZKError.productionAllocationDisabled }
         guard count > 0 else { return [] }
-        // EZZK returns every unconsumed number of the person, including ones already
-        // written into a local record that has not been sent.
+        // EZZK allocates and returns one new number per call and never returns a number it
+        // already gave out (Revision 5, verified live). Dropping numbers a local register row
+        // already carries is a guard, not a rule: should EZZK ever repeat one, it is never
+        // handed to a second conversion.
         let available = try await client.evidenceNumbers(for: person).filter { !usedEvidenceNumbers.contains($0) }
         guard !available.isEmpty else {
             throw EZZKError.serviceRejected(code: 0, message: "EZZK nevrátilo žiadne nepoužité evidenčné číslo.")

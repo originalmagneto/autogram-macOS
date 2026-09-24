@@ -86,9 +86,11 @@ public enum EZZKError: LocalizedError, Equatable, Sendable {
         case .networkFailure(let detail):
             return "Sieťová chyba pri spojení s EZZK: \(detail)"
         case .credentialsRejected(let code):
+            // Only CORE-003 means a wrong name or password. The client stops logging in with
+            // credentials EZZK refused for any code until they are saved again in Settings.
             return code == "CORE-003"
                 ? "Nesprávne prihlasovacie meno alebo heslo."
-                : "EZZK odmietlo prihlásenie (\(code))."
+                : "EZZK odmietlo prihlásenie (kód \(code)). Prihláste sa znova v Nastaveniach."
         case .accountLocked:
             return "Účet v EZZK je zablokovaný."
         case .serviceRejected(let code, let message):

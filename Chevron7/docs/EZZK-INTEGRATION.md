@@ -129,12 +129,13 @@ Verified live on test EZZK, 2026-09-23 (`P2E-EZZK-FINDINGS.md`, "Part B2"):
 | Situation | `EZZKError` | What the user sees |
 | --- | --- | --- |
 | Wrong name or password (`CORE-003`) | `credentialsRejected(code:)` | Nesprávne prihlasovacie meno alebo heslo. |
+| Any other LogIn error code | `credentialsRejected(code:)` | EZZK odmietlo prihlásenie (kód ...). Prihláste sa znova v Nastaveniach. Like `CORE-003` and `CORE-018`, the client does not log in with those credentials again until they are saved again in Settings. |
 | Locked account (`CORE-018`) | `accountLocked` | Účet v EZZK je zablokovaný. |
 | Token rejected after one fresh login | `authenticationFailed` | Prompt to sign in again. |
 | Unknown result code | `serviceRejected(code:message:)` | The code and the server's own text. |
 | `DeserializationFailed` or `ActionMismatch` | `invalidRequest` | An application defect. Logged with the fault subcode public and the reason private. |
 | Test certificate is not the pinned one | `untrustedCertificate` | Update the pin in the app. |
-| Network error or HTTP 5xx on allocate, consume or submit | `outcomeUnknown` | The outcome is unknown and the call is never repeated; `EZZKSubmissionCoordinator` looks it up before resending. |
+| Network error or HTTP 5xx (a readable WCF fault included) on allocate, consume or submit | `outcomeUnknown` | The outcome is unknown and the call is never repeated; `EZZKSubmissionCoordinator` looks it up before resending. |
 | Allocation attempted on production | `productionAllocationDisabled` | Opens together with production submission, in part B3. |
 | Submission attempted on production | `submissionUnavailable` | Rows stay queued in the register until part B3. |
 | Number from another day or another mode | `evidenceNumberExpired`, `evidenceNumberFromOtherMode` | Get a new number. |
