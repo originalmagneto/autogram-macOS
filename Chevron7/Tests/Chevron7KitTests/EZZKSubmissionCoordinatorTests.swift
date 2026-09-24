@@ -569,6 +569,37 @@ final class EZZKSubmissionCoordinatorTests: XCTestCase {
         XCTAssertEqual(recorded, [nil, conversionTime])
     }
 
+    /// A refusal other than 105/106 on the timed retry is real information, not noise: the
+    /// first 106 already proved EZZK holds a record under the number, and this second lookup
+    /// says EZZK processed and refused it. The row becomes `.rejected` with that code, and
+    /// having a `lastLookupAt` (never nil once a row was accepted and looked up) keeps
+    /// `canResend` false, since resending would risk a duplicate under an occupied number.
+    func testLookupResult106ThenAnotherRefusalRejectsTheRow() async throws {
+        let conversionTime = Date(timeIntervalSince1970: 1_790_000_000)
+        let calls = LockedCalls()
+        let lookup = EZZKRecordLookupFunction { _, executionTime in
+            await calls.append(executionTime)
+            if executionTime == nil { throw EZZKError.serviceRejected(code: 106, message: "viac záznamov") }
+            throw EZZKError.serviceRejected(code: 12, message: "Neznámy obsah")
+        }
+        var accepted = record(.acceptedForProcessing)
+        accepted.submittedAt = date("2026-09-23T10:00:00Z")
+        accepted.conversionTime = conversionTime
+        let checkedAt = date("2026-09-23T11:00:00Z")
+        let coordinator = EZZKSubmissionCoordinator(submitter: FakeSubmitter(.failure(.outcomeUnknown)),
+                                                     lookup: lookup, now: { checkedAt })
+
+        let updated = await coordinator.refreshStatus(accepted)
+
+        XCTAssertEqual(updated.status, .rejected)
+        XCTAssertEqual(updated.ezzkResultCode, 12)
+        XCTAssertEqual(updated.ezzkResultDescription, "Neznámy obsah")
+        XCTAssertEqual(updated.lastLookupAt, checkedAt)
+        XCTAssertFalse(EZZKSubmissionCoordinator.canResend(updated))
+        let recorded = await calls.values
+        XCTAssertEqual(recorded, [nil, conversionTime])
+    }
+
     /// A 105 on the timed retry does not mean EZZK lost the record: the first 106 already
     /// proved the number is occupied, and 105 at that exact timestamp only means it did not
     /// match what EZZK stored. The row must keep the original 106 and never be requeued for
