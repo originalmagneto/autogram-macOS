@@ -30,6 +30,7 @@ public actor EZZKSOAPClient {
     public typealias CredentialsProvider = @Sendable () throws -> EZZKSOAPCredentials?
 
     public nonisolated let environment: EZZKEnvironment
+    public nonisolated let productionPolicy: EZZKProductionPolicy
     private let transport: any EZZKHTTPTransport
     private let credentialsProvider: CredentialsProvider
     private let now: @Sendable () -> Date
@@ -40,11 +41,13 @@ public actor EZZKSOAPClient {
 
     public init(environment: EZZKEnvironment, transport: any EZZKHTTPTransport,
                 credentials: @escaping CredentialsProvider,
-                now: @escaping @Sendable () -> Date = { Date() }) {
+                now: @escaping @Sendable () -> Date = { Date() },
+                productionPolicy: EZZKProductionPolicy = .refused) {
         self.environment = environment
         self.transport = transport
         self.credentialsProvider = credentials
         self.now = now
+        self.productionPolicy = productionPolicy
     }
 
     /// Logs in with the provided credentials and returns the account name EZZK reports.
@@ -150,12 +153,12 @@ public actor EZZKSOAPClient {
     }
 
     private func perform(_ request: EZZKSOAPRequest) async throws -> XMLDocument {
-        // Consequential calls must be impossible by construction on production: no login,
-        // no network use, regardless of what the transport would have replied.
-        if request.isConsequential, environment == .production {
-            throw request.operation == EZZKSOAPRequest.receiveOperation
-                ? EZZKError.submissionUnavailable
-                : EZZKError.productionAllocationDisabled
+        // Consequential calls on production run only when the production policy allows them:
+        // otherwise no login and no network use, whatever the transport would reply.
+        if request.isConsequential,
+           let refusal = productionPolicy.refusal(environment: environment,
+                                                  submitting: request.operation == EZZKSOAPRequest.receiveOperation) {
+            throw refusal
         }
         if request.requiresAuthentication, token == nil {
             try await logIn()

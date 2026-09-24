@@ -21,9 +21,11 @@ public struct EZZKSOAPServiceAdapter: EZZKServicing {
     }
 
     public func requestEvidenceNumbers(count: Int) async throws -> [String] {
-        // Records cannot be sent yet. A production number would be consumed at midnight
-        // without a record, which breaks the 24-hour duty to report the conversion.
-        guard client.environment != .production else { throw EZZKError.productionAllocationDisabled }
+        // Production numbers are allocated only when the production policy allows sending,
+        // because an unused production number lapses at midnight.
+        if let refusal = client.productionPolicy.refusal(environment: client.environment, submitting: false) {
+            throw refusal
+        }
         guard count > 0 else { return [] }
         // EZZK allocates and returns one new number per call and never returns a number it
         // already gave out (Revision 5, verified live). Dropping numbers a local register row
@@ -40,8 +42,10 @@ public struct EZZKSOAPServiceAdapter: EZZKServicing {
         // Refuse production before the container check: no caller sets
         // `signedRecordContainer` yet, and a missing container must not read as an
         // application bug (`invalidRequest`) when the real reason submission is
-        // impossible today is that production sending is not enabled at all.
-        guard client.environment != .production else { throw EZZKError.submissionUnavailable }
+        // impossible today is that the production policy does not allow sending.
+        if let refusal = client.productionPolicy.refusal(environment: client.environment, submitting: true) {
+            throw refusal
+        }
         guard let container = envelope.signedRecordContainer else {
             throw EZZKError.invalidRequest("chýba podpísaný záznam")
         }
