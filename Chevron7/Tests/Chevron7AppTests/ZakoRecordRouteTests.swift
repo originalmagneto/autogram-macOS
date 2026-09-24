@@ -69,6 +69,27 @@ final class ZakoRecordRouteTests: XCTestCase {
         XCTAssertEqual(demoService.submittedRecords.first?.signedRecordContainer, stored)
     }
 
+    /// The advocate's details used in a signed clause become the active profile, so the next
+    /// conversion starts with them instead of asking for name, SAK number and IČO again.
+    func testSignedConversionSavesThePersonAsTheActiveProfile() async throws {
+        try requireXMLLint()
+        let settingsStore = makeSettingsStore()
+        settingsStore.useRealSigningProvider(DemoSigningProvider())
+        let store = try makeReadyStore(settingsStore: settingsStore)
+        settingsStore.settings.profiles = []
+        settingsStore.settings.activeProfileID = nil
+        store.setMandateOverride(true)
+        await store.fetchEvidenceNumber()
+
+        await store.authorizeAndSign()
+
+        XCTAssertEqual(store.step, .done)
+        let next = ZakoSessionStore(settingsStore: settingsStore)
+        XCTAssertEqual(next.activeProfile().fullName, "JUDr. Test Testovací")
+        XCTAssertEqual(next.activeProfile().registrationNumber, "4321")
+        XCTAssertEqual(next.activeProfile().ico, "35764102")
+    }
+
     /// Outside Demo both signatures get only the qualified built-in authorities, whatever the
     /// (hidden) QTS toggle says. A failed record signature keeps the client outputs, saves the
     /// row as unsigned and sends nothing.

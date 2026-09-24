@@ -9,6 +9,8 @@ struct AnalysisCanvasView: View {
     @Bindable var store: ZakoSessionStore
     @State private var showPhysicalElementSheet = false
     @State private var showPrecisePlacement = false
+    /// Scope of the bulk rejection waiting for confirmation: a page index, or -1 for the whole document.
+    @State private var bulkRejectScope: Int?
     @State private var interaction: Interaction?
     @State private var pageImage: NSImage?
     @State private var pageAspect: CGFloat = 1.414
@@ -624,6 +626,24 @@ struct AnalysisCanvasView: View {
                     .controlSize(.small)
                     .help("Potvrdí všetky nálezy na tejto strane, ktoré ešte čakajú na kontrolu")
                 }
+                let pendingInDocument = store.pendingElementCount(onPage: nil)
+                if pendingInDocument > 0 {
+                    Menu {
+                        Button("Na tejto strane (\(pendingOnPage))") {
+                            bulkRejectScope = store.previewPageIndex
+                        }
+                        .disabled(pendingOnPage == 0)
+                        Button("V celom dokumente (\(pendingInDocument))") {
+                            bulkRejectScope = -1
+                        }
+                    } label: {
+                        Label("Odmietnuť návrhy", systemImage: "xmark.circle")
+                    }
+                    .menuStyle(.button)
+                    .controlSize(.small)
+                    .fixedSize()
+                    .help("Odmietne naraz všetky nálezy, ktoré ešte čakajú na kontrolu")
+                }
                 if store.lastDeletedElement != nil {
                     Button {
                         store.undoDelete()
@@ -679,6 +699,24 @@ struct AnalysisCanvasView: View {
                 .font(.caption.weight(.semibold))
                 .help("Číselné umiestnenie a klávesové posuny. Ťahanie na plátne a klik na prvok sú rýchlejšie.")
             }
+        }
+        .confirmationDialog(
+            bulkRejectScope == -1
+                ? "Odmietnuť všetky čakajúce nálezy v dokumente (\(store.pendingElementCount(onPage: nil)))?"
+                : "Odmietnuť všetky čakajúce nálezy na tejto strane (\(store.pendingElementCount(onPage: bulkRejectScope)))?",
+            isPresented: Binding(get: { bulkRejectScope != nil }, set: { if !$0 { bulkRejectScope = nil } }),
+            titleVisibility: .visible
+        ) {
+            Button("Odmietnuť", role: .destructive) {
+                if let scope = bulkRejectScope {
+                    store.selectedElementID = nil
+                    store.rejectAllPendingElements(onPage: scope == -1 ? nil : scope)
+                }
+                bulkRejectScope = nil
+            }
+            Button("Zrušiť", role: .cancel) { bulkRejectScope = nil }
+        } message: {
+            Text("Odmietnuté nálezy sa nedostanú do doložky a aplikácia sa z nich naučí, že nejde o bezpečnostný prvok. Potvrdené nálezy ostanú. Každý odmietnutý sa dá vrátiť na kontrolu v jeho riadku.")
         }
     }
 

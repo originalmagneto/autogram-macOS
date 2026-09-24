@@ -253,8 +253,8 @@ final class ZakoSessionStore {
                 settingsStore.settings.profiles[index] = profile
             } else {
                 settingsStore.settings.profiles.append(profile)
-                settingsStore.settings.activeProfileID = profile.id
             }
+            settingsStore.settings.activeProfileID = profile.id
         }
     }
 
@@ -578,11 +578,29 @@ final class ZakoSessionStore {
     }
 
     /// Confirms every pending finding on one page after the advocate checked
-    /// them on the canvas. Rejection stays per element on purpose.
+    /// them on the canvas.
     func confirmAllPendingElements(onPage pageIndex: Int) {
         for element in securityElements where element.pageIndex == pageIndex && element.reviewState == .pending {
             confirmSecurityElement(id: element.id)
         }
+    }
+
+    func pendingElementCount(onPage pageIndex: Int?) -> Int {
+        securityElements.filter { $0.reviewState == .pending && (pageIndex == nil || $0.pageIndex == pageIndex) }.count
+    }
+
+    /// Rejects every finding still waiting for review, on one page or (nil) in the whole
+    /// document, when the detector proposed nonsense. Each rejection teaches the learning
+    /// bank like a single one, and a rejected finding can be returned to review from its row.
+    @discardableResult
+    func rejectAllPendingElements(onPage pageIndex: Int? = nil) -> Int {
+        let ids = securityElements
+            .filter { $0.reviewState == .pending && (pageIndex == nil || $0.pageIndex == pageIndex) }
+            .map(\.id)
+        for id in ids {
+            rejectSecurityElement(id: id)
+        }
+        return ids.count
     }
 
     func unmarkPageReviewed(_ pageIndex: Int) {
@@ -1071,7 +1089,17 @@ final class ZakoSessionStore {
         }
         do {
             let service = ezzkService
-            let numbers = try await service.requestEvidenceNumbers(count: 1)
+            var numbers = try await service.requestEvidenceNumbers(count: 1)
+            if mode == .demo {
+                // The Demo simulator counts from 1 again after every launch, so skip the
+                // numbers the register already holds (bounded, in case it ever repeats).
+                let usedNumbers = Set(evidenceStore.records.compactMap(\.evidenceNumber))
+                var attempts = 0
+                while let candidate = numbers.first, usedNumbers.contains(candidate), attempts < 10_000 {
+                    numbers = try await service.requestEvidenceNumbers(count: 1)
+                    attempts += 1
+                }
+            }
             guard requestID == currentRecordID, !Task.isCancelled,
                   mode == settingsStore.ezzkAccountController.mode else { return }
             guard let number = numbers.first else {
@@ -1320,6 +1348,9 @@ final class ZakoSessionStore {
             if let number = attestation.evidenceNumber {
                 evidenceNumberPool.remove(number)
             }
+            // The details just signed into the clause become the active profile, so the next
+            // conversion starts with them instead of asking for them again.
+            saveProfileFromForm()
 
             analysisProgressText = "Ukladám a zapisujem do evidencie…"
             let pdfTarget = directory.appendingPathComponent(docFileName)

@@ -102,7 +102,7 @@ public enum EZZKError: LocalizedError, Equatable, Sendable {
         case .productionAllocationDisabled:
             return "Pridelenie čísel na produkcii sa zapne spolu s odosielaním záznamov."
         case .submissionUnavailable:
-            return "Odosielanie záznamov do EZZK zatiaľ nie je dostupné. Príde v ďalšej verzii."
+            return "Odosielanie záznamov do produkčného EZZK zatiaľ nie je zapnuté. Príde v ďalšej verzii."
         case .evidenceNumberExpired:
             return "Evidenčné číslo bolo pridelené v iný deň a EZZK ho o polnoci spotreboval. Získajte nové číslo."
         case .evidenceNumberFromOtherMode:
