@@ -349,7 +349,7 @@ Official form files (record 1.0 and clause 1.3 schema and signer XSLT) live in `
 
 ### Live check with a SAK card
 
-Live check with a SAK card: pending (owner). This session could not run it (no SAK card). The owner runs one ZaKo conversion of a synthetic document in Demo mode with the SAK card, naming the source with a space and a diacritic (for example "Zmluva o dielo č. 3", so the source and clause file names carry both), then:
+Live check with a SAK card: done 2026-09-24 (result below). This session could not run it (no SAK card). The owner runs one ZaKo conversion of a synthetic document in Demo mode with the SAK card, naming the source with a space and a diacritic (for example "Zmluva o dielo č. 3", so the source and clause file names carry both), then:
 
 ```bash
 cd <output folder>
@@ -373,7 +373,7 @@ unzip -p *.asice META-INF/signatures001.xml | grep -o '<xades:SignatureTimeStamp
 ```
 Expected: at least one match, confirming the signature carries a qualified timestamp (Baseline T).
 
-Result: not yet run.
+Result (2026-09-24, owner, I.CA SAK card): passed with source "Ukazkova_listina". The client ASiC-E held `mimetype`, the PDF, `<name>-<number>.xml.xdcf` and `META-INF`, with no nested `.asice`; the clause fingerprint equalled the PDF's SHA-256; both MIME types were present and the signature carried a `SignatureTimeStamp`. The record `1563-260924-1.record.asice` held only the record 1.0 XDC with a timestamp.
 
 ## Part B2 (2026-09-23)
 
@@ -412,4 +412,4 @@ unzip -l /tmp/record.asice
 
 `record` signs in with the credential Settings saved for Test mode, so the first run may prompt for Keychain access. Expected: the register row shows "Prijatý na spracovanie" and later "Spracovaný v EZZK"; the lookup finds the record; the stored object is our `<number>.record.xml.xdcf` inside a one-file ASiC-E carrying a Baseline T signature (`unzip -l` lists `mimetype`, `<number>.record.xml.xdcf` and `META-INF/signatures001.xml`, no nested `.asice`).
 
-Result: not yet run.
+Result (2026-09-24, owner, I.CA SAK card, v0.7.0 plus local fixes): passed. Number `260924-BcE299bb83` came from the app, the Done screen showed "EZZK prijalo záznam na spracovanie", `lookup` found it (code 1, not yet processed), and `record` returned a one-file ASiC-E byte-identical to the local `260924-BcE299bb83.record.asice` (same SHA-256): `mimetype`, `260924-BcE299bb83.record.xml.xdcf`, `META-INF/signatures001.xml`, `META-INF/manifest.xml`, one `SignatureTimeStamp`. The client container passed the fingerprint and timestamp checks. Found on the way: a local build bundled an engine older than the B2 engine change, so the record failed with `SIGNING_UNAVAILABLE` (`build_app.sh` now refuses a stale engine); numbers requested in Settings and a stray probe number blocked allocation with code 113 (Settings numbers now join the pool); Demo reused `1563-<day>-1` after a relaunch (Demo now skips numbers in the register).
