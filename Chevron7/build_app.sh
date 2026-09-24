@@ -57,6 +57,20 @@ rm -rf "$APP_DIR"
 mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources"
 
 cp "$BIN_DIR/Chevron7" "$CONTENTS/MacOS/Chevron7"
+
+# SwiftPM links Sparkle dynamically but this hand-built .app bundle must embed it.
+# ditto preserves the framework symlinks and executable permissions.
+SPARKLE_FRAMEWORK="$(find .build/artifacts -type d -name Sparkle.framework -print -quit 2>/dev/null || true)"
+if [[ -z "$SPARKLE_FRAMEWORK" ]]; then
+    echo "Error: Sparkle.framework was not resolved by SwiftPM" >&2
+    exit 1
+fi
+mkdir -p "$CONTENTS/Frameworks"
+ditto "$SPARKLE_FRAMEWORK" "$CONTENTS/Frameworks/Sparkle.framework"
+if ! otool -l "$CONTENTS/MacOS/Chevron7" | grep -Fq "@executable_path/../Frameworks"; then
+    install_name_tool -add_rpath "@executable_path/../Frameworks" "$CONTENTS/MacOS/Chevron7"
+fi
+
 if [[ -x "$BIN_DIR/pkcs11-helper" ]]; then
     cp "$BIN_DIR/pkcs11-helper" "$CONTENTS/MacOS/pkcs11-helper"
 fi
