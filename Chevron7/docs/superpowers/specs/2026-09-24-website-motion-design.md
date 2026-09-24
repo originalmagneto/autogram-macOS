@@ -1,6 +1,6 @@
 # Website motion with HyperFrames: design
 
-Date: 2026-09-24. Status: approved in conversation, awaiting spec review.
+Date: 2026-09-24. Status: implemented (website main 842fd65).
 Scope: the website (`originalmagneto/chevron7-website`, checked out in `website/`).
 The app is not changed.
 
