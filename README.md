@@ -97,7 +97,8 @@ Chevron7 nie je spojený so Slovensko.Digital ani ním podporovaný a nemá nič
 <li>Kontrolovaný import a potvrdenie pôvodu dokumentu.</li>
 <li>Katalóg 16 druhov bezpečnostných prvkov, AI návrhy a povinná manuálna kontrola vrátane šnúrok, pások a pečatí.</li>
 <li>PDF/A-2b, osvedčovacia doložka, XML a lokálna evidencia.</li>
-<li>Mandátny certifikát, evidenčné číslo priamo z EZZK a kontrola, či číslo nie je z iného dňa alebo z iného režimu. Odosielanie záznamov do CEZZK príde v ďalšej časti.</li>
+<li>Mandátny certifikát, evidenčné číslo priamo z EZZK a kontrola, či číslo nie je z iného dňa alebo z iného režimu.</li>
+<li>Záznam o zaručenej konverzii (record 1.0) sa podpíše rovnakým PIN hneď po doložke, s kvalifikovanou časovou pečiatkou, a sám sa odošle do EZZK. Register ukazuje, či ho EZZK prijalo, spracovalo alebo odmietlo. Na Produkcii je odoslanie zatiaľ zamknuté.</li>
 </ul>
 </td>
 </tr>
@@ -110,7 +111,7 @@ Chevron7 nie je spojený so Slovensko.Digital ani ním podporovaný a nemá nič
 - Inšpektor podpisu sa dá skryť a meniť jeho šírku. Karty v inšpektore sú svetlé, bez vrstveného frosted glass. Vizuálny podpis má priehľadné pozadie.
 - Overenie originálu: lupa 100–250 %, Delete zmaže vybraný prvok, Escape zruší nástroj alebo výber. Klávesové posuny ostávajú ⌥ a ⇧⌥.
 - Doložka má štruktúrovaný živý náhľad (osem polí podľa zákona) a prepínač v toolbare.
-- Register má filter stavu, detail a odoslanie do CEZZK v toolbare. Pri autorizácii sa pole PIN zameria samo.
+- Register má filter stavu, detail, odoslanie do EZZK a overenie stavu v EZZK v toolbare; záznam, ktorý EZZK odmietlo pri odoslaní, sa dá po potvrdení odoslať znova. Pri autorizácii sa pole PIN zameria samo.
 - Počas podpisovania a autorizácie sú zablokované akcie, ktoré by vynulovali rozpracovanú operáciu. Bočný panel má zbaliteľné sekcie podpísaných a nedávnych dokumentov; podpísané kópie sa dajú odstrániť aj so súborom do Koša.
 
 ## AI Vision: vrstvená detekcia bezpečnostných prvkov
@@ -249,7 +250,9 @@ Podrobnosti: [pravidlá tréningového datasetu](Chevron7/docs/security-element-
 
 <p>Prihlasovacie údaje sa zadávajú v <strong>Nastaveniach, karta EZZK</strong>, pre zvolené prostredie: Demo (lokálne), Test alebo Produkcia. Heslo sa uloží do Keychainu až vtedy, keď ho EZZK prijme; prihlasovací token existuje len v pamäti aplikácie. Testovacie prostredie má vlastný certifikát, ktorému aplikácia dôveruje len podľa pripnutého odtlačku.</p>
 
-<p><strong>Čo funguje kde:</strong> na Teste prihlásenie, čas servera, pridelenie a spotrebovanie evidenčných čísel aj overenie záznamu. Na Produkcii zatiaľ len prihlásenie, čas servera a verejné overenie záznamu; pridelenie čísla a odoslanie záznamu sú zámerne zamknuté, kým nebude hotový podpísaný záznam v ASiC a jeho odoslanie cez <code>ReceiveConversionRecord</code>. Bez evidenčného čísla aplikácia nepovolí autorizáciu, a číslo z iného dňa alebo z iného režimu odmietne ešte pred podpisom, lebo EZZK nepoužité čísla o polnoci spotrebuje.</p>
+<p><strong>Čo funguje kde:</strong> na Teste prihlásenie, čas servera, pridelenie evidenčných čísel, odoslanie podpísaného záznamu cez <code>ReceiveConversionRecord</code> aj overenie jeho stavu. Na Produkcii zatiaľ len prihlásenie, čas servera a verejné overenie záznamu; pridelenie čísla a odoslanie záznamu sa otvoria v ďalšej časti, po overení celého postupu kartou SAK na Teste. Bez evidenčného čísla aplikácia nepovolí autorizáciu, a číslo z iného dňa alebo z iného režimu odmietne ešte pred podpisom, lebo EZZK nepoužité čísla o polnoci spotrebuje.</p>
+
+<p><strong>Záznam o konverzii:</strong> po podpise doložky sa rovnakým PIN podpíše aj záznam record 1.0 v kontajneri XDC a ASiC-E, mimo režimu Demo vždy s kvalifikovanou časovou pečiatkou. Kópia <code>&lt;číslo&gt;.record.asice</code> ostane pri výstupoch. Aplikácia záznam odošle hneď a potom každých päť minút skúša čakajúce odoslania a overuje stav v EZZK (Prijatý na spracovanie, Spracovaný, Odmietnutý). Pri prerušenom spojení záznam znova neposiela naslepo: najprv overí, či ho EZZK už má, lebo EZZK duplicity ukladá. Záznam odoslaný po polnoci dňa pridelenia sa označí ako oneskorený, EZZK ho však prijme. Ak sa záznam nepodarí podpísať, výstupy pre klienta ostanú a riadok v registri má stav Záznam nepodpísaný.</p>
 
 <p>Podrobne: <a href="Chevron7/docs/EZZK-INTEGRATION.md">Chevron7/docs/EZZK-INTEGRATION.md</a>.</p>
 </details>
@@ -402,7 +405,7 @@ Podpis bez Safari sa dá vyskúšať priamo:
 <tr><td>Xcode 27.0 a Swift 6</td><td>Iba pre build zo zdrojov. Samotné Command Line Tools nestačia (chýba SwiftUI macro plugin).</td></tr>
 <tr><td>Apple Intelligence</td><td>Voliteľné. Zapína on-device klasifikáciu neistých nálezov.</td></tr>
 <tr><td>eID, advokátsky preukaz, PKCS#11, CryptoTokenKit alebo Keychain token</td><td>Pre reálny kvalifikovaný podpis.</td></tr>
-<tr><td>Vlastný EZZK účet (meno a heslo z registrácie)</td><td>Pre prihlásenie, evidenčné čísla na Teste a overovanie záznamov. Zadáva sa v Nastaveniach, karta EZZK. Bez účtu funguje režim Demo.</td></tr>
+<tr><td>Vlastný EZZK účet (meno a heslo z registrácie)</td><td>Pre prihlásenie, evidenčné čísla a odoslanie záznamov na Teste a overovanie záznamov. Zadáva sa v Nastaveniach, karta EZZK. Bez účtu funguje režim Demo.</td></tr>
 </table>
 
 ### Stiahnutie
@@ -440,7 +443,17 @@ xattr -d com.apple.quarantine "/Applications/Chevron7.app"
 </details>
 
 <details open>
-<summary><strong>v0.5.0 · aktuálne vydanie: Chevron7, EZZK a podpisovanie zo Safari</strong></summary>
+<summary><strong>v0.7.0 · aktuálne vydanie: podpísaný záznam o konverzii a jeho odoslanie do EZZK</strong></summary>
+<ul>
+<li>ZaKo podpíše rovnakým PIN aj záznam o zaručenej konverzii (record 1.0) s kvalifikovanou časovou pečiatkou a odošle ho do EZZK; na Produkcii je odoslanie zatiaľ zamknuté.</li>
+<li>Register má nové stavy (Prijatý na spracovanie, Spracovaný, Odmietnutý, Výsledok odoslania neznámy, Záznam nepodpísaný, Oneskorený), priebežnú kontrolu stavu a ručné opätovné odoslanie odmietnutého záznamu.</li>
+<li>Evidenčné čísla pridelené a nepoužité v ten deň sa použijú znova namiesto žiadosti o nové; číslo raz použité v podpísanom dokumente sa už nikdy neponúkne.</li>
+<li>Register sa po chybe načítania nikdy neprepíše a pred prvým spustením tejto verzie sa zálohuje.</li>
+</ul>
+</details>
+
+<details>
+<summary><strong>v0.5.0 · predchádzajúce vydanie: Chevron7, EZZK a podpisovanie zo Safari</strong></summary>
 <ul>
 <li>Nové meno Chevron7 pre aplikáciu, Safari rozšírenie, Finder Quick Action a ikonu. Nastavenia a údaje z Autogram macOS sa nepreberajú.</li>
 <li>Prihlásenie do EZZK vlastným menom a heslom advokáta cez SOAP, režimy Demo, Test a Produkcia (produkcia zatiaľ iba na čítanie).</li>
@@ -552,10 +565,10 @@ swift test --filter EZZKSOAPTransportTests
 ### EZZK z príkazového riadka
 
 ```bash
-swift run ezzk-probe <login|time|numbers|consume|lookup> [číslo] [--env test|production] [--name N] [--ico I] [--at ISO]
+swift run ezzk-probe <login|time|numbers|consume|lookup|record|receive> [číslo] [--env test|production] [--name N] [--ico I] [--at ISO] [--purpose original|xml] [--out SÚBOR] [--file ASICE]
 ```
 
-Údaje berie z `EZZK_LOGIN` a `EZZK_PASSWORD`, inak z Keychainu uloženého cez Nastavenia. `numbers` a `consume` odmietnu `--env production`. Heslo ani token sa nikdy nevypisujú.
+Údaje berie z `EZZK_LOGIN` a `EZZK_PASSWORD`, inak z Keychainu uloženého cez Nastavenia. `numbers`, `consume` a `receive` odmietnu `--env production`. `record` prečíta jeden vlastný záznam cez `GetConversionRecord` a nič nemení; `receive <číslo> --file <asice>` pošle podpísaný záznam na Test. Heslo ani token sa nikdy nevypisujú.
 
 ## Výstupy a hranice
 
@@ -565,13 +578,13 @@ swift run ezzk-probe <login|time|numbers|consume|lookup> [číslo] [--env test|p
 <th align="left">Kde a ako</th>
 </tr>
 <tr><td>Podpísané a konvertované súbory</td><td>Prednostne vedľa zdrojového dokumentu, inak <code>~/Library/Application Support/Chevron7/Output</code>. Existujúce súbory sa neprepíšu (<code>dokument (2).pdf</code>).</td></tr>
-<tr><td>Register konverzií</td><td><code>~/Library/Application Support/Chevron7/Evidence/register.json</code>, bez obsahu dokumentov.</td></tr>
+<tr><td>Register konverzií</td><td><code>~/Library/Application Support/Chevron7/Evidence/register.json</code>, bez obsahu dokumentov. Vedľa neho <code>records/</code> s podpísanými záznamami na odoslanie do EZZK, <code>allocated-numbers.json</code> s pridelenými a ešte nepoužitými evidenčnými číslami a jednorazová záloha <code>register.backup-before-b2.json</code>. Register, ktorý sa nedá načítať, sa nikdy neprepíše; odloží sa jeho kópia <code>register.unreadable-*.json</code>.</td></tr>
 <tr><td>Dataset AI Vision</td><td><code>~/Library/Application Support/Chevron7/VisionBank</code>: náhľady strán, výrezy a feature printy posúdených prvkov. Lokálne, vymazateľné.</td></tr>
 <tr><td>Tajomstvá</td><td>Keychain: API kľúče a heslo do EZZK (položka <code>app.slovensko.chevron7.ezzk.soap</code>, zvlášť pre Test a Produkciu). Prihlasovací token do EZZK len v pamäti. Security-scoped bookmarks pre prístup k súborom.</td></tr>
 <tr><td>Podpis mobilom</td><td>Dokument dočasne na <code>autogram.slovensko.digital</code>, zašifrovaný kľúčom z tohto Macu, zmazaný po podpise alebo do 24 hodín. Bez registrácie a bez API kľúča.</td></tr>
 </table>
 
-Aktuálny ZaKo profil je implementačný P2E pilot s PDF/A-2b. Lokálny `PDFAValidator` nie je náhradou za veraPDF alebo Acrobat Preflight. Produkcia EZZK je zatiaľ len na čítanie: pridelenie evidenčného čísla a odoslanie záznamu sa otvoria až s podpísaným záznamom v ASiC. Aktívne formuláre a externé požiadavky treba overiť samostatne.
+Aktuálny ZaKo profil je implementačný P2E pilot s PDF/A-2b. Lokálny `PDFAValidator` nie je náhradou za veraPDF alebo Acrobat Preflight. Produkcia EZZK je zatiaľ len na čítanie: podpísaný záznam a jeho odoslanie fungujú na Teste, pridelenie evidenčného čísla a odoslanie na Produkcii sa otvoria až po overení kartou SAK. Aktívne formuláre a externé požiadavky treba overiť samostatne.
 
 ## Architektúra
 
@@ -586,7 +599,7 @@ Aktuálny ZaKo profil je implementačný P2E pilot s PDF/A-2b. Lokálny `PDFAVal
 <tr><td><strong>EngineBridge</strong></td><td>Persistentný machine session helper pre Java/DSS, PDFBox a PKCS#11 integrácie.</td></tr>
 <tr><td><strong>Signing/AVM</strong></td><td><code>AVMClient</code>, <code>AVMSigningSession</code> a <code>MobileSigningCoordinator</code>: podpis mobilom cez relay Autogram v mobile (upload, QR kód, polling, mapovanie výsledku, kontrola mandátu). <code>avm-probe</code> overuje protokol proti reálnemu serveru.</td></tr>
 <tr><td><strong>WebBridge</strong></td><td><code>Chevron7WebBridge</code> nesie kontrakt medzi rozšírením a aplikáciou, <code>chevron7-webbridge-agent</code> je launchd rendezvous vlastniaci meno Mach služby, <code>Chevron7WebExtensionHandler</code> je appex v <code>Contents/PlugIns</code> a <code>WebExtension/</code> samotné rozšírenie. <code>webbridge-probe</code> otestuje celú appkovú polovicu bez Safari.</td></tr>
-<tr><td><strong>EZZK</strong></td><td><code>EZZK/SOAP/</code> nesie celú komunikáciu s registrom: stavbu SOAP požiadaviek overenú voči uloženej WSDL a XSD snímke, parser odpovedí, prenos s pripnutým testovacím certifikátom, heslo v Keychaine, aktéra klienta s jedným bezpečným opakovaním prihlásenia a adaptér pre ZaKo. <code>EZZKAccountController</code> drží stav účtu pre Nastavenia a ZaKo, <code>ezzk-probe</code> overí službu z príkazového riadka.</td></tr>
+<tr><td><strong>EZZK</strong></td><td><code>EZZK/SOAP/</code> nesie celú komunikáciu s registrom: stavbu SOAP požiadaviek overenú voči uloženej WSDL a XSD snímke, parser odpovedí, prenos s pripnutým testovacím certifikátom, heslo v Keychaine, aktéra klienta s jedným bezpečným opakovaním prihlásenia a adaptér pre ZaKo. <code>EZZKSubmissionCoordinator</code> rozhoduje o každom prechode stavu záznamu (odoslanie, overenie, neznámy výsledok, odmietnutie), <code>EvidenceNumberPool</code> pamätá pridelené nepoužité čísla a <code>EZZKStatusChecker</code> v aplikácii každých päť minút posiela a overuje riadky registra, vždy len jeden riadok naraz. <code>EZZKAccountController</code> drží stav účtu pre Nastavenia a ZaKo, <code>ezzk-probe</code> overí službu z príkazového riadka.</td></tr>
 <tr><td><strong>vision-eval</strong></td><td>Samostatný CLI target na meranie presnosti detekcie; nie je súčasťou aplikácie.</td></tr>
 </table>
 
