@@ -203,7 +203,13 @@ enum AppLinks {
 enum SidebarDonateLink {
     static let url = AppLinks.donate
     static let title = "Podporiť vývoj"
-    static let symbol = "cup.and.saucer"
+    static let symbol = "cup.and.heat.waves.fill"
+    /// The official yellow button image bundled by build_app.sh (Contents/Resources).
+    static let buttonImageName = "BuyMeACoffee"
+    /// Buy Me a Coffee's brand yellow (#FFDD00) with near-black text, as on the website's
+    /// button; it reads the same in light and dark mode.
+    static let brandYellow = (red: 1.0, green: 0xDD / 255.0, blue: 0.0)
+    static let brandInk = (red: 0x0D / 255.0, green: 0x0C / 255.0, blue: 0x22 / 255.0)
     static let help =
         "Chevron7 je zadarmo. Príspevok cez Buy Me a Coffee pomáha platiť vývoj a podpisovanie aplikácie."
     static let accessibilityLabel = "Podporiť vývoj Chevron7 cez Buy Me a Coffee"
