@@ -17,10 +17,16 @@ enum FinderQuickActionService {
     static let legacyWorkflowMarker = "Contents/Resources/autogram-cli-sign.sh"
     static let legacyBundleIdentifier = "sk.autogram.Autogram"
 
+    static let legacyMenuTitle = "Podpísať s QES + QTS (Autogram)"
+
     @discardableResult
     static func installQuickAction() -> Bool {
         retireLegacyQuickActions(in: servicesDirectory)
-        return installChevron7QuickAction()
+        // Its menu entry goes with it once the workflow is gone (retired now or earlier).
+        let legacyGone = legacyWorkflowNames.allSatisfy {
+            !FileManager.default.fileExists(atPath: servicesDirectory.appendingPathComponent($0).path)
+        }
+        return installChevron7QuickAction(droppingLegacyEntries: legacyGone)
     }
 
     private static var servicesDirectory: URL {
@@ -58,7 +64,7 @@ enum FinderQuickActionService {
             .contains { !$0.path.contains("/.Trash/") && FileManager.default.fileExists(atPath: $0.path) }
     }
 
-    private static func installChevron7QuickAction() -> Bool {
+    private static func installChevron7QuickAction(droppingLegacyEntries: Bool) -> Bool {
         guard let source = Bundle.main.url(
             forResource: workflowResourceName,
             withExtension: "workflow"
@@ -76,21 +82,49 @@ enum FinderQuickActionService {
                 try FileManager.default.removeItem(at: destination)
             }
             try FileManager.default.copyItem(at: source, to: destination)
-            enableInstalledWorkflow()
+            enableInstalledWorkflow(droppingLegacyEntries: droppingLegacyEntries)
             return refreshServicesCache()
         } catch {
             return false
         }
     }
 
-    private static func enableInstalledWorkflow() {
+    private static func enableInstalledWorkflow(droppingLegacyEntries: Bool) {
         guard let defaults = UserDefaults(suiteName: "pbs") else { return }
-        var statuses = defaults.dictionary(forKey: "NSServicesStatus") ?? [:]
-        statuses["(null) - \(menuTitle) - runWorkflowAsService"] = [
-            "enabled_context_menu": NSNumber(value: 1),
-            "enabled_services_menu": NSNumber(value: 1)
-        ]
-        defaults.set(statuses, forKey: "NSServicesStatus")
+        let statuses = defaults.dictionary(forKey: "NSServicesStatus") ?? [:]
+        defaults.set(
+            servicesStatus(updating: statuses, droppingLegacyEntries: droppingLegacyEntries),
+            forKey: "NSServicesStatus"
+        )
+    }
+
+    private static func statusKey(_ title: String) -> String {
+        "(null) - \(title) - runWorkflowAsService"
+    }
+
+    /// Finder's Quick Actions menu and the context menu read `presentation_modes`; the
+    /// `enabled_*` keys earlier builds wrote are the pre-Mojave format Finder ignores, so
+    /// the workflow never appeared under Quick Actions. A person's own choice, once made
+    /// in the new format, is kept.
+    static func servicesStatus(
+        updating statuses: [String: Any],
+        droppingLegacyEntries: Bool = false
+    ) -> [String: Any] {
+        var statuses = statuses
+        let key = statusKey(menuTitle)
+        let current = statuses[key] as? [String: Any]
+        if current?["presentation_modes"] == nil {
+            statuses[key] = ["presentation_modes": [
+                "ContextMenu": 1,
+                "FinderPreview": 1,
+                "ServicesMenu": 1,
+                "TouchBar": 1
+            ]]
+        }
+        if droppingLegacyEntries {
+            statuses[statusKey(legacyMenuTitle)] = nil
+        }
+        return statuses
     }
 
     @discardableResult
