@@ -197,6 +197,18 @@ enum AppLinks {
     static let donate = URL(string: "https://buymeacoffee.com/chevron7")!
 }
 
+/// The quiet "Podporiť vývoj" row at the bottom of the main window's sidebar, next to
+/// "Nastavenia": the Help menu's page, a plain label and a tooltip that says why. No
+/// badge, animation or prompt.
+enum SidebarDonateLink {
+    static let url = AppLinks.donate
+    static let title = "Podporiť vývoj"
+    static let symbol = "cup.and.saucer"
+    static let help =
+        "Chevron7 je zadarmo. Príspevok cez Buy Me a Coffee pomáha platiť vývoj a podpisovanie aplikácie."
+    static let accessibilityLabel = "Podporiť vývoj Chevron7 cez Buy Me a Coffee"
+}
+
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillFinishLaunching(_ notification: Notification) {
         // A portal request started the app: no Dock icon and no menu bar until the
