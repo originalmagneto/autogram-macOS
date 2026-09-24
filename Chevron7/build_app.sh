@@ -262,6 +262,10 @@ PKG
     -c "Set :CFBundleVersion $VERSION" \
     -c "Set :CFBundleShortVersionString $VERSION" \
     "$CONTENTS/Info.plist"
+/usr/libexec/PlistBuddy -c "Add :SUFeedURL string $UPDATE_FEED_URL" "$CONTENTS/Info.plist"
+if [[ -n "$SPARKLE_PUBLIC_ED_KEY" ]]; then
+    /usr/libexec/PlistBuddy -c "Add :SUPublicEDKey string $SPARKLE_PUBLIC_ED_KEY" "$CONTENTS/Info.plist"
+fi
 
 # ---------------------------------------------------------------------------
 # Safari web extension: a hand-assembled .appex, because this project builds
