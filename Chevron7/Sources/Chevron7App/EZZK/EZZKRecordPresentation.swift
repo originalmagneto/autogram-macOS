@@ -128,8 +128,8 @@ struct ZakoDonePresentation: Equatable {
     ///   - record: the conversion's register row, as stored now.
     ///   - lastError: the ZaKo flow's last error, and `lastErrorStatus` the row state it described.
     ///   - nextStatusCheck: when the row's next lookup is due (`EZZKStatusChecker.nextStatusCheck`).
-    ///   - currentMode: the controller's EZZK mode; a row of another mode gets no action.
-    ///     Nil skips that check.
+    ///   - currentMode: the controller's EZZK mode; a row of another mode is not sent, but
+    ///     is still looked up in its own mode's EZZK. Nil skips that check.
     ///   - productionAllowed: the production policy; a production row is sent or looked up
     ///     only when it allows consequential calls.
     init(record: EvidenceRecord?, lastError: String?, lastErrorStatus: EvidenceRecord.Status?,
@@ -178,9 +178,10 @@ struct ZakoDonePresentation: Equatable {
         }
         let mode = record.ezzkMode
         let offersAction = EZZKRecordPresentation.isSendable(status) || EZZKRecordPresentation.isVerifiable(status)
-        if let currentMode, offersAction, mode != currentMode {
-            // Like the Register: a row is sent or looked up only in the mode that allocated
-            // its number (a row without one, from before part B2, never).
+        if let currentMode, offersAction, mode == nil || (mode != currentMode && EZZKRecordPresentation.isSendable(status)) {
+            // Like the Register: a row is sent only in the mode that allocated its number
+            // and looked up in that mode's EZZK from any mode (a row without one, from
+            // before part B2, never).
             lines.append(mode == nil ? EZZKStatusChecker.preB2RowMessage : EZZKStatusChecker.recordFromOtherModeMessage)
             action = .none
         } else if EZZKRecordPresentation.isSendable(status) {
@@ -327,9 +328,10 @@ enum EvidenceRegisterDetail {
         return facts
     }
 
-    /// A row is sent or looked up only in the EZZK mode that allocated its number, never
-    /// when it has no mode (written before part B2, ruling R15), and in Production only when
-    /// the production policy allows it (`productionAllowed`).
+    /// A row is sent only while the EZZK mode that allocated its number is current, and
+    /// looked up in that mode's EZZK from any mode; never when it has no mode (written before
+    /// part B2, ruling R15), and in Production only when the production policy allows it
+    /// (`productionAllowed`).
     static func actions(for record: EvidenceRecord, currentMode: AppSettings.EZZKMode,
                         productionAllowed: Bool = false, now: Date = Date()) -> Actions {
         let status = record.status
@@ -346,7 +348,8 @@ enum EvidenceRegisterDetail {
         let resendable = status == .rejected && EZZKSubmissionCoordinator.canResend(record)
             && record.recordContainerPath != nil
         guard sendable || verifiable || resendable else { return Actions(canSend: false, canVerify: false, note: nil) }
-        if mode != currentMode {
+        // A lookup only reads and goes to the row's own EZZK, so it is offered from any mode.
+        if mode != currentMode, !verifiable {
             return Actions(canSend: false, canVerify: false, note: EZZKStatusChecker.recordFromOtherModeMessage)
         }
         if mode == .production, !productionAllowed {

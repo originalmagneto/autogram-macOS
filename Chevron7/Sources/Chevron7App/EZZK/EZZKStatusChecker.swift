@@ -11,8 +11,10 @@ import Observation
 /// goes through here, so one row is never sent or looked up by two paths at once (EZZK
 /// stores a second copy of a record sent twice, result 106).
 ///
-/// A row is only handled by the EZZK that allocated its number: a row of another mode is
-/// refused (manual actions) or skipped (periodic check). A row without a stored mode was
+/// A row is only handled by the EZZK that allocated its number. It is sent only while that
+/// mode is the current one (another mode's row is refused by "Odoslať" and skipped by the
+/// periodic send), but looked up in its own mode's EZZK whatever the current mode, since a
+/// lookup only reads. A row without a stored mode was
 /// written before part B2 and has no signed record: no path sends or looks it up (R15).
 @MainActor
 @Observable
@@ -206,37 +208,48 @@ final class EZZKStatusChecker {
 
     /// One pass over the register: late rows are marked, pending rows of this mode are
     /// sent (at most `automaticAttemptsPerDay` a day each), and unknown or accepted rows
-    /// are looked up when their next check is due. Rows without an evidence number, of
-    /// another mode, without a mode, or already being handled are left alone. A row
-    /// resolved in this pass is sent in the next one at the earliest. The coordinator
-    /// targets the pass's mode, and the pass stops when the controller's mode changes.
+    /// of every mode are looked up when their next check is due, each in the EZZK of its
+    /// own mode: a lookup only reads, so a row accepted in Production is still seen as
+    /// processed while the advocate works in Demo. Rows without an evidence number,
+    /// without a mode, of a mode the production policy refuses, or already being handled
+    /// are left alone. A row resolved in this pass is sent in the next one at the
+    /// earliest, and only in its own mode. Sending targets the pass's mode and stops when
+    /// the controller's mode changes.
     func runOnce() async {
         guard evidenceStore.loadError == nil else { return }
         let mode = currentMode()
-        let coordinator = makeCoordinator(mode)
+        var coordinators: [AppSettings.EZZKMode: EZZKSubmissionCoordinator] = [:]
+        func coordinator(for rowMode: AppSettings.EZZKMode) -> EZZKSubmissionCoordinator {
+            if let existing = coordinators[rowMode] { return existing }
+            let made = makeCoordinator(rowMode)
+            coordinators[rowMode] = made
+            return made
+        }
         for snapshot in evidenceStore.records {
-            // The advocate may switch the EZZK mode while a lookup or a send of this pass
-            // waits; the rest of the pass then belongs to the old mode and stops.
-            guard currentMode() == mode else { return }
-            guard Self.hasEvidenceNumber(snapshot), snapshot.ezzkMode == mode,
-                  refusalReason(forMode: mode) == nil,
+            guard Self.hasEvidenceNumber(snapshot), let rowMode = snapshot.ezzkMode,
+                  refusalReason(forMode: rowMode) == nil,
                   !inFlight.contains(snapshot.id) else { continue }
             switch snapshot.status {
             case .signed, .queuedForSubmission, .submissionFailed, .late:
+                // The advocate may switch the EZZK mode while a lookup or a send of this
+                // pass waits; a send then belongs to the old mode and is skipped.
+                guard rowMode == mode, currentMode() == mode else { continue }
+                let sender = coordinator(for: mode)
                 guard takeAutomaticAttempt(for: snapshot.id) else {
                     // Still marked late when its day has passed, even without a send.
-                    await perform(snapshot.id) { record in coordinator.markLateIfNeeded(record) }
+                    await perform(snapshot.id) { record in sender.markLateIfNeeded(record) }
                     continue
                 }
                 await perform(snapshot.id) { record in
-                    await Self.send(record, with: coordinator, store: self.evidenceStore)
+                    await Self.send(record, with: sender, store: self.evidenceStore)
                 }
             case .outcomeUnknown, .acceptedForProcessing:
-                guard let due = coordinator.nextStatusCheck(for: snapshot), due <= now() else { continue }
+                let checker = coordinator(for: rowMode)
+                guard let due = checker.nextStatusCheck(for: snapshot), due <= now() else { continue }
                 await perform(snapshot.id) { record in
                     record.status == .outcomeUnknown
-                        ? await coordinator.resolveUnknown(record)
-                        : await coordinator.refreshStatus(record)
+                        ? await checker.resolveUnknown(record)
+                        : await checker.refreshStatus(record)
                 }
             default:
                 continue
@@ -272,10 +285,12 @@ final class EZZKStatusChecker {
 
     /// Looks one row up now ("Overiť v EZZK"): an unknown outcome is resolved (no sooner
     /// than five minutes after the attempt, see `nextStatusCheck(for:)`), an accepted row
-    /// is refreshed. Nothing is sent.
+    /// is refreshed. Nothing is sent, so a row of another mode is looked up too, in the
+    /// EZZK of its own mode.
     func verify(id: UUID) async -> RowResult {
-        if let refusal = refusal(for: id) { return .refused(refusal) }
-        let coordinator = makeCoordinator(currentMode())
+        if let refusal = refusal(for: id, allowingOtherMode: true) { return .refused(refusal) }
+        guard let mode = evidenceStore.record(id: id)?.ezzkMode else { return .refused(Self.preB2RowMessage) }
+        let coordinator = makeCoordinator(mode)
         let result = await perform(id) { record in
             switch record.status {
             case .outcomeUnknown: return await coordinator.resolveUnknown(record)
@@ -358,11 +373,13 @@ final class EZZKStatusChecker {
 
     // MARK: - Internals
 
-    private func refusal(for id: UUID) -> String? {
+    /// Why a manual action on the row is refused, or nil. `allowingOtherMode` is for a
+    /// lookup, which only reads and goes to the row's own EZZK whatever the current mode.
+    private func refusal(for id: UUID, allowingOtherMode: Bool = false) -> String? {
         if let loadError = evidenceStore.loadError { return loadError }
         guard let record = evidenceStore.record(id: id) else { return Self.missingRowMessage }
         guard let mode = record.ezzkMode else { return Self.preB2RowMessage }
-        if mode != currentMode() { return Self.recordFromOtherModeMessage }
+        if !allowingOtherMode, mode != currentMode() { return Self.recordFromOtherModeMessage }
         if let reason = refusalReason(forMode: mode) { return reason }
         if inFlight.contains(id) { return Self.rowBusyMessage }
         return nil

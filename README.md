@@ -306,7 +306,7 @@ Podrobnosti: [pravidlá tréningového datasetu](Chevron7/docs/security-element-
 
 <p><strong>Ochrany pred chybou:</strong> mimo režimu Demo aplikácia nepridelí evidenčné číslo ani neautorizuje, ak podpisuje iba ukážkovo (bez podpisového enginu alebo bez karty), lebo nepoužité číslo by o polnoci prepadlo bez záznamu. Riadok Registra, ktorého záznam sa práve podpisuje alebo odosiela, sa nedá vymazať. Ak EZZK pri overení odpovie, že pod číslom eviduje viac záznamov (kód 106), aplikácia sa spýta znova s časom konverzie, aby sa stav ustálil.</p>
 
-<p><strong>Záznam o konverzii:</strong> po podpise doložky sa rovnakým PIN podpíše aj záznam record 1.0 v kontajneri XDC a ASiC-E, mimo režimu Demo vždy s kvalifikovanou časovou pečiatkou. Klient dostane jediný súbor: ASiC-E, v ktorom sú PDF/A a doložka podpísané spolu. Ako v kontajneroch z podpisuj.sk sa PDF/A v ňom volá podľa poľa „Názov výstupu (PDF/A)“ (s príponou <code>.pdf</code>), doložka <code>&lt;číslo&gt;.xml.xdcf</code> a doložka aj záznam uvádzajú ako názov nového dokumentu presne názov tohto PDF; súbor pri zdroji sa volá <code>&lt;názov výstupu&gt;.asice</code> a nikdy neprepíše existujúci súbor. Podpísaný záznam ostáva len v Registri konverzií; v kontextovej ponuke riadka alebo v jeho detaile ho uložíte cez <strong>Uložiť záznam…</strong> ako <code>&lt;číslo&gt;.record.asice</code>. Aplikácia záznam odošle hneď a potom každých päť minút skúša čakajúce odoslania a overuje stav v EZZK (Prijatý na spracovanie, Spracovaný, Odmietnutý). Pri prerušenom spojení záznam znova neposiela naslepo: najprv overí, či ho EZZK už má, lebo EZZK duplicity ukladá. Záznam odoslaný po polnoci dňa pridelenia sa označí ako oneskorený, EZZK ho však prijme. Ak sa záznam nepodarí podpísať, výstupy pre klienta ostanú a riadok v registri má stav Záznam nepodpísaný.</p>
+<p><strong>Záznam o konverzii:</strong> po podpise doložky sa rovnakým PIN podpíše aj záznam record 1.0 v kontajneri XDC a ASiC-E, mimo režimu Demo vždy s kvalifikovanou časovou pečiatkou. Klient dostane jediný súbor: ASiC-E, v ktorom sú PDF/A a doložka podpísané spolu. Ako v kontajneroch z podpisuj.sk sa PDF/A v ňom volá podľa poľa „Názov výstupu (PDF/A)“ (s príponou <code>.pdf</code>), doložka <code>&lt;číslo&gt;.xml.xdcf</code> a doložka aj záznam uvádzajú ako názov nového dokumentu presne názov tohto PDF; súbor pri zdroji sa volá <code>&lt;názov výstupu&gt;.asice</code> a nikdy neprepíše existujúci súbor. Podpísaný záznam ostáva len v Registri konverzií; v kontextovej ponuke riadka alebo v jeho detaile ho uložíte cez <strong>Uložiť záznam…</strong> ako <code>&lt;číslo&gt;.record.asice</code>. Aplikácia záznam odošle hneď a potom každých päť minút skúša čakajúce odoslania a overuje stav v EZZK (Prijatý na spracovanie, Spracovaný, Odmietnutý). Odosiela len v režime, v ktorom záznam vznikol, ale stav overuje v EZZK tohto režimu vždy, aj keď je práve zapnutý iný: záznam prijatý na Produkcii sa zmení na Spracovaný aj počas práce v Deme, automaticky aj cez <strong>Overiť v EZZK</strong>. Pri prerušenom spojení záznam znova neposiela naslepo: najprv overí, či ho EZZK už má, lebo EZZK duplicity ukladá. Záznam odoslaný po polnoci dňa pridelenia sa označí ako oneskorený, EZZK ho však prijme. Ak sa záznam nepodarí podpísať, výstupy pre klienta ostanú a riadok v registri má stav Záznam nepodpísaný.</p>
 
 <p>Podrobne: <a href="Chevron7/docs/EZZK-INTEGRATION.md">Chevron7/docs/EZZK-INTEGRATION.md</a>.</p>
 </details>
@@ -514,7 +514,15 @@ xattr -d com.apple.quarantine "/Applications/Chevron7.app"
 </details>
 
 <details open>
-<summary><strong>v0.14.0 · aktuálne vydanie: prehľadné nastavenie dávky, ASiC-E samostatne alebo spolu</strong></summary>
+<summary><strong>v0.14.1 · aktuálne vydanie: stav záznamu v EZZK sa overuje v každom režime</strong></summary>
+<ul>
+<li>Záznam prijatý na spracovanie v EZZK sa overí v režime, v ktorom vznikol, aj keď je práve zapnutý iný režim; produkčný záznam sa tak zmení na <strong>Spracovaný v EZZK</strong> aj počas práce v Deme.</li>
+<li><strong>Overiť v EZZK</strong> v Registri a na záverečnej obrazovke ZaKo funguje aj pre záznam z iného režimu. Odoslanie záznamu ostáva len v jeho vlastnom režime.</li>
+</ul>
+</details>
+
+<details>
+<summary><strong>v0.14.0 · predchádzajúce vydanie: prehľadné nastavenie dávky, ASiC-E samostatne alebo spolu</strong></summary>
 <ul>
 <li>Karta <strong>Nastavenie dávky</strong> je natívny formulár: certifikát, PIN, formát, balenie, QTS s výberom TSA, PDF/A a vizuálna pečiatka na jednom mieste.</li>
 <li>ASiC-E dávka vytvorí kontajner pre každý dokument (predvolené) alebo jeden spoločný kontajner s vlastným názvom; voľba sa pamätá.</li>
