@@ -10,7 +10,7 @@ import Chevron7Kit
 final class EZZKAccountControllerTests: XCTestCase {
     func testDemoModeUsesTheLocalMock() {
         let controller = EZZKAccountController(mode: .demo, credentialStore: MemoryCredentialStore(),
-                                               transportFactory: { _ in ScriptedTransport([]) })
+                                               transportFactory: { _ in ScriptedTransport([]) }, productionPolicy: .refused)
         XCTAssertTrue(controller.isDemoMode)
         XCTAssertNil(controller.environment)
         XCTAssertTrue(controller.service is MockEZZKService)
@@ -20,7 +20,7 @@ final class EZZKAccountControllerTests: XCTestCase {
         let store = MemoryCredentialStore()
         let transport = ScriptedTransport([loginSucceeded])
         let controller = EZZKAccountController(mode: .test, credentialStore: store,
-                                               transportFactory: { _ in transport })
+                                               transportFactory: { _ in transport }, productionPolicy: .refused)
 
         await controller.signIn(login: " ucet ", password: "heslo")
 
@@ -37,7 +37,7 @@ final class EZZKAccountControllerTests: XCTestCase {
         let store = MemoryCredentialStore()
         let transport = ScriptedTransport([loginRejected])
         let controller = EZZKAccountController(mode: .test, credentialStore: store,
-                                               transportFactory: { _ in transport })
+                                               transportFactory: { _ in transport }, productionPolicy: .refused)
 
         await controller.signIn(login: "ucet", password: "zle")
 
@@ -49,7 +49,7 @@ final class EZZKAccountControllerTests: XCTestCase {
     func testEmptyFieldsFailWithoutNetwork() async {
         let transport = ScriptedTransport([])
         let controller = EZZKAccountController(mode: .test, credentialStore: MemoryCredentialStore(),
-                                               transportFactory: { _ in transport })
+                                               transportFactory: { _ in transport }, productionPolicy: .refused)
 
         await controller.signIn(login: "", password: "heslo")
 
@@ -61,7 +61,7 @@ final class EZZKAccountControllerTests: XCTestCase {
         let store = MemoryCredentialStore()
         try store.save(EZZKSOAPCredentials(login: "ucet", password: "heslo"), environment: .production)
         let controller = EZZKAccountController(mode: .production, credentialStore: store,
-                                               transportFactory: { _ in ScriptedTransport([]) })
+                                               transportFactory: { _ in ScriptedTransport([]) }, productionPolicy: .refused)
         XCTAssertEqual(controller.storedLogin, "ucet")
 
         controller.signOut()
@@ -74,10 +74,43 @@ final class EZZKAccountControllerTests: XCTestCase {
     func testProductionServiceRefusesAllocationWithoutNetwork() async {
         let transport = ScriptedTransport([])
         let controller = EZZKAccountController(mode: .production, credentialStore: MemoryCredentialStore(),
-                                               transportFactory: { _ in transport })
+                                               transportFactory: { _ in transport }, productionPolicy: .refused)
 
         do {
             _ = try await controller.service.requestEvidenceNumbers(count: 1)
+            XCTFail("expected productionAllocationDisabled")
+        } catch {
+            XCTAssertEqual(error as? EZZKError, .productionAllocationDisabled)
+        }
+        XCTAssertEqual(transport.requestCount, 0)
+    }
+
+    /// Pins that `service(for:)` actually wires `productionPolicy` through to the SOAP
+    /// client it builds: `.allowed` reaches EZZK for allocation, `.refused` never touches
+    /// the network, whatever mode the controller happens to be in.
+    func testProductionPolicyAllowedReachesEZZKForAllocation() async throws {
+        let store = MemoryCredentialStore()
+        try store.save(EZZKSOAPCredentials(login: "ucet", password: "heslo"), environment: .production)
+        let transport = ScriptedTransport([loginSucceeded, numbersReply])
+        let controller = EZZKAccountController(mode: .production, credentialStore: store,
+                                               transportFactory: { _ in transport }, productionPolicy: .allowed)
+        controller.configure(person: { EZZKPerson(corporateBodyFullName: "Advokátska kancelária Test", ico: "12345678") },
+                             usedEvidenceNumbers: { [] })
+
+        let numbers = try await controller.service(for: .production).requestEvidenceNumbers(count: 1)
+
+        XCTAssertEqual(numbers, ["260917-A"])
+        XCTAssertEqual(transport.operations, ["LogIn", "GetConversionRecordEvidenceNumber"])
+        XCTAssertEqual(transport.requestCount, 2)
+    }
+
+    func testProductionPolicyRefusedTouchesNoNetworkViaServiceForProduction() async {
+        let transport = ScriptedTransport([])
+        let controller = EZZKAccountController(mode: .production, credentialStore: MemoryCredentialStore(),
+                                               transportFactory: { _ in transport }, productionPolicy: .refused)
+
+        do {
+            _ = try await controller.service(for: .production).requestEvidenceNumbers(count: 1)
             XCTFail("expected productionAllocationDisabled")
         } catch {
             XCTAssertEqual(error as? EZZKError, .productionAllocationDisabled)
@@ -89,7 +122,7 @@ final class EZZKAccountControllerTests: XCTestCase {
         let store = MemoryCredentialStore()
         try store.save(EZZKSOAPCredentials(login: "testovaci", password: "x"), environment: .sandbox)
         let controller = EZZKAccountController(mode: .production, credentialStore: store,
-                                               transportFactory: { _ in ScriptedTransport([]) })
+                                               transportFactory: { _ in ScriptedTransport([]) }, productionPolicy: .refused)
         XCTAssertEqual(controller.storedLogin, "")
 
         controller.setMode(.test)
@@ -156,7 +189,8 @@ final class EZZKAccountControllerTests: XCTestCase {
     private func makeController(mode: AppSettings.EZZKMode, store: MemoryCredentialStore,
                                 factory: @escaping @Sendable (EZZKEnvironment) -> any EZZKHTTPTransport)
         -> EZZKAccountController {
-        let controller = EZZKAccountController(mode: mode, credentialStore: store, transportFactory: factory)
+        let controller = EZZKAccountController(mode: mode, credentialStore: store, transportFactory: factory,
+                                               productionPolicy: .refused)
         controller.configure(person: { EZZKPerson(corporateBodyFullName: "Advokátska kancelária Test", ico: "12345678") },
                              usedEvidenceNumbers: { [] })
         return controller

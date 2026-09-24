@@ -261,6 +261,7 @@ final class EZZKSubmissionCoordinatorTests: XCTestCase {
         XCTAssertEqual(result.ezzkResultCode, 106)
         XCTAssertEqual(result.ezzkResultDescription, "Evidenčné číslo je použité viackrát")
         XCTAssertEqual(result.lastLookupAt, now)
+        XCTAssertEqual(lookup.numbers.count, 2, "asks once more with the record's conversion time")
 
         let processedLookup = FakeLookup(.success(EZZKRecordLookup(isProcessed: true, info: nil)))
         let processed = await EZZKSubmissionCoordinator(submitter: FakeSubmitter(.failure(EZZKError.outcomeUnknown)),
@@ -535,11 +536,95 @@ final class EZZKSubmissionCoordinatorTests: XCTestCase {
     }
 
     func testLookupFunctionPassesTheNumberThrough() async throws {
-        let lookup = EZZKRecordLookupFunction { number in
+        let lookup = EZZKRecordLookupFunction { number, _ in
             EZZKRecordLookup(isProcessed: number == "1563-260923-7", info: nil)
         }
-        let result = try await lookup.publicRecord(evidenceNumber: "1563-260923-7")
+        let result = try await lookup.publicRecord(evidenceNumber: "1563-260923-7", executionTime: nil)
         XCTAssertTrue(result.isProcessed)
+    }
+
+    /// Review focus 3: 106 means several records share the number; EZZK tells them apart by
+    /// the conversion time, so the coordinator asks once more with it and settles the row.
+    func testLookupResult106AsksAgainWithTheConversionTime() async throws {
+        // Distinct from every other date on the row, so the assertion cannot pass by
+        // accident against `createdAt`, `submittedAt` or the coordinator's `now`.
+        let conversionTime = Date(timeIntervalSince1970: 1_790_000_000)
+        let calls = LockedCalls()
+        let lookup = EZZKRecordLookupFunction { _, executionTime in
+            await calls.append(executionTime)
+            if executionTime == nil { throw EZZKError.serviceRejected(code: 106, message: "viac záznamov") }
+            return EZZKRecordLookup(isProcessed: true, info: nil)
+        }
+        var accepted = record(.acceptedForProcessing)
+        accepted.submittedAt = date("2026-09-23T10:00:00Z")
+        accepted.conversionTime = conversionTime
+        let checkedAt = date("2026-09-23T11:00:00Z")
+        let coordinator = EZZKSubmissionCoordinator(submitter: FakeSubmitter(.failure(.outcomeUnknown)),
+                                                     lookup: lookup, now: { checkedAt })
+
+        let updated = await coordinator.refreshStatus(accepted)
+
+        XCTAssertEqual(updated.status, .processed)
+        let recorded = await calls.values
+        XCTAssertEqual(recorded, [nil, conversionTime])
+    }
+
+    /// A refusal other than 105/106 on the timed retry is real information, not noise: the
+    /// first 106 already proved EZZK holds a record under the number, and this second lookup
+    /// says EZZK processed and refused it. The row becomes `.rejected` with that code, and
+    /// having a `lastLookupAt` (never nil once a row was accepted and looked up) keeps
+    /// `canResend` false, since resending would risk a duplicate under an occupied number.
+    func testLookupResult106ThenAnotherRefusalRejectsTheRow() async throws {
+        let conversionTime = Date(timeIntervalSince1970: 1_790_000_000)
+        let calls = LockedCalls()
+        let lookup = EZZKRecordLookupFunction { _, executionTime in
+            await calls.append(executionTime)
+            if executionTime == nil { throw EZZKError.serviceRejected(code: 106, message: "viac záznamov") }
+            throw EZZKError.serviceRejected(code: 12, message: "Neznámy obsah")
+        }
+        var accepted = record(.acceptedForProcessing)
+        accepted.submittedAt = date("2026-09-23T10:00:00Z")
+        accepted.conversionTime = conversionTime
+        let checkedAt = date("2026-09-23T11:00:00Z")
+        let coordinator = EZZKSubmissionCoordinator(submitter: FakeSubmitter(.failure(.outcomeUnknown)),
+                                                     lookup: lookup, now: { checkedAt })
+
+        let updated = await coordinator.refreshStatus(accepted)
+
+        XCTAssertEqual(updated.status, .rejected)
+        XCTAssertEqual(updated.ezzkResultCode, 12)
+        XCTAssertEqual(updated.ezzkResultDescription, "Neznámy obsah")
+        XCTAssertEqual(updated.lastLookupAt, checkedAt)
+        XCTAssertFalse(EZZKSubmissionCoordinator.canResend(updated))
+        let recorded = await calls.values
+        XCTAssertEqual(recorded, [nil, conversionTime])
+    }
+
+    /// A 105 on the timed retry does not mean EZZK lost the record: the first 106 already
+    /// proved the number is occupied, and 105 at that exact timestamp only means it did not
+    /// match what EZZK stored. The row must keep the original 106 and never be requeued for
+    /// a resend, which would risk storing a duplicate under an occupied number.
+    func testLookupResult106ThenUnknownNumberNeverRequeuesTheRow() async throws {
+        let conversionTime = Date(timeIntervalSince1970: 1_790_000_000)
+        let calls = LockedCalls()
+        let lookup = EZZKRecordLookupFunction { _, executionTime in
+            await calls.append(executionTime)
+            if executionTime == nil { throw EZZKError.serviceRejected(code: 106, message: "viac záznamov") }
+            throw EZZKError.serviceRejected(code: 105, message: "Záznam neexistuje")
+        }
+        let checkedAt = date("2026-09-23T10:20:00Z")
+        var unknown = record(.outcomeUnknown)
+        unknown.conversionTime = conversionTime
+
+        let resolved = await EZZKSubmissionCoordinator(submitter: FakeSubmitter(.failure(.outcomeUnknown)),
+                                                       lookup: lookup, now: { checkedAt })
+            .resolveUnknown(unknown)
+
+        XCTAssertEqual(resolved.status, .acceptedForProcessing)
+        XCTAssertEqual(resolved.ezzkResultCode, 106)
+        XCTAssertEqual(resolved.ezzkResultDescription, "viac záznamov")
+        let recorded = await calls.values
+        XCTAssertEqual(recorded, [nil, conversionTime])
     }
 
     // MARK: - Helpers
@@ -606,8 +691,14 @@ private final class FakeLookup: EZZKRecordLookingUp, @unchecked Sendable {
 
     var numbers: [String] { state.withLock { $0 } }
 
-    func publicRecord(evidenceNumber: String) async throws -> EZZKRecordLookup {
+    func publicRecord(evidenceNumber: String, executionTime: Date?) async throws -> EZZKRecordLookup {
         state.withLock { $0.append(evidenceNumber) }
         return try result.get()
     }
+}
+
+/// Records the `executionTime` of each lookup call, in order.
+private actor LockedCalls {
+    var values: [Date?] = []
+    func append(_ value: Date?) { values.append(value) }
 }

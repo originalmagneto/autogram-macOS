@@ -475,7 +475,9 @@ struct DoneView: View {
                                     lastErrorStatus: store.submissionStatus,
                                     nextStatusCheck: record.flatMap { checker.nextStatusCheck(for: $0) },
                                     now: now,
-                                    currentMode: store.settingsStore.ezzkAccountController.mode)
+                                    currentMode: store.settingsStore.ezzkAccountController.mode,
+                                    productionAllowed: store.settingsStore.ezzkAccountController
+                                        .productionPolicy.allowsConsequentialCalls)
     }
 
     private func toneColor(_ tone: EZZKRecordPresentation.Tone) -> Color {

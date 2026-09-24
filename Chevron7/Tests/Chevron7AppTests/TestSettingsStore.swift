@@ -16,13 +16,14 @@ extension XCTestCase {
     /// in-memory credential store and a transport that never touches the network: whatever
     /// EZZK mode and Keychain credentials the developer's real, saved `AppSettings` carry
     /// (`AppSettingsStore.init` otherwise defaults to `EZZKAccountController(mode:
-    /// loaded.ezzkMode)`, which reads the real Keychain) must never reach a test.
+    /// loaded.ezzkMode)`, which reads the real Keychain) must never reach a test. Its
+    /// production policy is `.refused`, never the developer's real owner switch.
     @MainActor
     func makeSettingsStore(ezzkAccountController: EZZKAccountController? = nil) -> AppSettingsStore {
         let controller = ezzkAccountController ?? EZZKAccountController(
             mode: .demo,
             credentialStore: MemoryCredentialStore(),
-            transportFactory: { _ in ScriptedTransport([]) })
+            transportFactory: { _ in ScriptedTransport([]) }, productionPolicy: .refused)
         return AppSettingsStore(ezzkAccountController: controller,
                                  storageRoot: makeTemporaryDirectory("app-storage"))
     }
@@ -40,7 +41,7 @@ extension XCTestCase {
         let controller = ezzkAccountController ?? EZZKAccountController(
             mode: .demo,
             credentialStore: MemoryCredentialStore(),
-            transportFactory: { _ in ScriptedTransport([]) })
+            transportFactory: { _ in ScriptedTransport([]) }, productionPolicy: .refused)
         return AppSettingsStore(ezzkAccountController: controller, storageRoot: storageRoot)
     }
 }
