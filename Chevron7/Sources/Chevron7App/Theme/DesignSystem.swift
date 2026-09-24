@@ -284,14 +284,39 @@ struct ConfidenceBar: View {
     }
 }
 
+/// One fixed colour per element kind for canvas boxes and the Nálezy row icons.
+/// Grey is reserved for rejected findings. The first four keep their original system
+/// colours; the other twelve are explicit mid-luminance sRGB values chosen to stay
+/// apart from each other (CIEDE2000 at least 17) and to read both on white scanned
+/// paper (3:1 or more) and on a dark inspector.
 struct ElementKindColor {
+    static let explicitRGB: [SecurityElement.Kind: UInt32] = [
+        .other: 0xFF3888,              // pink
+        .certifiedSignature: 0x008033, // dark green
+        .roundOfficialStamp: 0x3845FF, // indigo
+        .waxSeal: 0xC01B26,            // crimson
+        .bindingCord: 0xFF6038,        // coral
+        .securityTape: 0x989816,       // olive yellow
+        .permanentBinding: 0x9E5400,   // brown
+        .watermark: 0x1B9FC0,          // sky
+        .securityPattern: 0x067979,    // dark teal
+        .opticallyVariable: 0xAF2C7B,  // berry
+        .securityFoil: 0x18A589,       // sea green
+        .lamination: 0x6B6406          // dark olive
+    ]
+
     static func color(for kind: SecurityElement.Kind) -> Color {
         switch kind {
         case .officialStamp: return .blue
         case .handwrittenSignature: return .green
         case .embossedSeal: return .orange
         case .initial: return .purple
-        default: return .gray
+        default:
+            let rgb = explicitRGB[kind] ?? 0xFF3888
+            return Color(.sRGB,
+                         red: Double((rgb >> 16) & 0xFF) / 255,
+                         green: Double((rgb >> 8) & 0xFF) / 255,
+                         blue: Double(rgb & 0xFF) / 255)
         }
     }
 }
