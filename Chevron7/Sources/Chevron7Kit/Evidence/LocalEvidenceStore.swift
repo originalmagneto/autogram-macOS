@@ -111,6 +111,15 @@ public struct EvidenceRecord: Codable, Identifiable, Sendable {
         status.isSubmissionPendingState
     }
 
+    /// The numbers the register already holds for one EZZK mode. A Demo number is a local
+    /// simulation that may look exactly like a real one (the Demo counts "1563-260924-1" the
+    /// way production does), so it never blocks a number EZZK allocates. A row written before
+    /// modes were stored counts in every mode.
+    public static func usedEvidenceNumbers(in records: [EvidenceRecord],
+                                           mode: AppSettings.EZZKMode) -> Set<String> {
+        Set(records.filter { $0.ezzkMode == nil || $0.ezzkMode == mode }.compactMap(\.evidenceNumber))
+    }
+
     public var isOverdue: Bool {
         isSubmissionPending && Date() > submissionDeadline
     }

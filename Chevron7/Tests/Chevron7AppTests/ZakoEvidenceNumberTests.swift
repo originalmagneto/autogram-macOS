@@ -128,7 +128,7 @@ final class ZakoEvidenceNumberTests: XCTestCase {
             settingsStore.evidenceStore.upsert(EvidenceRecord(
                 status: .acceptedForProcessing, direction: .paperToElectronic,
                 originalName: "Zmluva \(suffix)", newDocumentName: "Zmluva \(suffix).pdf",
-                evidenceNumber: "1563-\(day)-\(suffix)", fingerprintSHA256Hex: "ab", attestationXML: "<x/>",
+                evidenceNumber: "DEMO-\(day)-\(suffix)", fingerprintSHA256Hex: "ab", attestationXML: "<x/>",
                 conversionTime: Date(), performingPersonName: "JUDr. Test Testovací",
                 securityElementCount: 0, totalPages: 1, totalSheets: 1, ezzkMode: .demo,
                 evidenceNumberAllocatedAt: Date()))
@@ -137,7 +137,7 @@ final class ZakoEvidenceNumberTests: XCTestCase {
 
         await store.fetchEvidenceNumber()
 
-        XCTAssertEqual(store.attestation.evidenceNumber, "1563-\(day)-3")
+        XCTAssertEqual(store.attestation.evidenceNumber, "DEMO-\(day)-3")
     }
 
     /// A number requested from Settings is held by EZZK until a record uses it, so ZaKo

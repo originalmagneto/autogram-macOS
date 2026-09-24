@@ -95,7 +95,7 @@ final class EZZKAccountControllerTests: XCTestCase {
         let controller = EZZKAccountController(mode: .production, credentialStore: store,
                                                transportFactory: { _ in transport }, productionPolicy: .allowed)
         controller.configure(person: { EZZKPerson(corporateBodyFullName: "Advokátska kancelária Test", ico: "12345678") },
-                             usedEvidenceNumbers: { [] })
+                             usedEvidenceNumbers: { _ in [] })
 
         let numbers = try await controller.service(for: .production).requestEvidenceNumbers(count: 1)
 
@@ -192,7 +192,7 @@ final class EZZKAccountControllerTests: XCTestCase {
         let controller = EZZKAccountController(mode: mode, credentialStore: store, transportFactory: factory,
                                                productionPolicy: .refused)
         controller.configure(person: { EZZKPerson(corporateBodyFullName: "Advokátska kancelária Test", ico: "12345678") },
-                             usedEvidenceNumbers: { [] })
+                             usedEvidenceNumbers: { _ in [] })
         return controller
     }
 

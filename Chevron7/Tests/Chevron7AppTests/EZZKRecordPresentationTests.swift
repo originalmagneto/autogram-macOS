@@ -174,6 +174,17 @@ final class EZZKRecordPresentationTests: XCTestCase {
         XCTAssertEqual(summary.demo, 0)
     }
 
+    /// The reported case: a Demo row "1563-260924-1" blocked the same real number production
+    /// allocated. Only rows of the same mode (and rows from before modes) hold a number.
+    func testDemoNumberNeverBlocksARealOne() {
+        let demo = row(.acceptedForProcessing, mode: .demo)
+        XCTAssertEqual(EvidenceRecord.usedEvidenceNumbers(in: [demo], mode: .production), [])
+        XCTAssertEqual(EvidenceRecord.usedEvidenceNumbers(in: [demo], mode: .demo), ["1563-260924-1"])
+        var legacy = row(.submitted)
+        legacy.ezzkMode = nil
+        XCTAssertEqual(EvidenceRecord.usedEvidenceNumbers(in: [legacy], mode: .production), ["1563-260924-1"])
+    }
+
     /// A Demo row is a local simulation: counted in the total and as Demo, never as in EZZK.
     func testRegisterSummaryKeepsDemoRowsOutOfTheEZZKCounts() {
         var demo = row(.acceptedForProcessing)

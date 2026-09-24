@@ -1166,7 +1166,7 @@ final class ZakoSessionStore {
         // Demo numbers are a local simulation with no EZZK-side limit, so the pool (which
         // exists only to avoid asking the real EZZK again) plays no part there.
         if mode != .demo {
-            let usedNumbers = Set(evidenceStore.records.compactMap(\.evidenceNumber))
+            let usedNumbers = EvidenceRecord.usedEvidenceNumbers(in: evidenceStore.records, mode: mode)
             if let entry = evidenceNumberPool.reusable(mode: mode, at: Date(), excluding: usedNumbers) {
                 attestation.evidenceNumber = entry.number
                 attestation.evidenceNumberAllocatedAt = entry.allocatedAt
@@ -1184,7 +1184,7 @@ final class ZakoSessionStore {
             if mode == .demo {
                 // The Demo simulator counts from 1 again after every launch, so skip the
                 // numbers the register already holds (bounded, in case it ever repeats).
-                let usedNumbers = Set(evidenceStore.records.compactMap(\.evidenceNumber))
+                let usedNumbers = EvidenceRecord.usedEvidenceNumbers(in: evidenceStore.records, mode: mode)
                 var attempts = 0
                 while let candidate = numbers.first, usedNumbers.contains(candidate), attempts < 10_000 {
                     numbers = try await service.requestEvidenceNumbers(count: 1)

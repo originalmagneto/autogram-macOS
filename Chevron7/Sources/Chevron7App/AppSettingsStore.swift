@@ -54,8 +54,8 @@ final class AppSettingsStore {
                 guard let self else { return EZZKPerson(corporateBodyFullName: "", ico: "") }
                 return EZZKPerson(corporateBodyFullName: settings.ezzkPersonName, ico: settings.ezzkICO)
             },
-            usedEvidenceNumbers: { [weak self] in
-                Set(self?.evidenceStore.records.compactMap(\.evidenceNumber) ?? [])
+            usedEvidenceNumbers: { [weak self] mode in
+                EvidenceRecord.usedEvidenceNumbers(in: self?.evidenceStore.records ?? [], mode: mode)
             })
     }
 
