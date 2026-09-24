@@ -39,6 +39,11 @@ VERSION="${CHEVRON7_VERSION:-$(git describe --tags --abbrev=0 --match 'native-v*
 VERSION="${VERSION:-0.0.0}"
 [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Invalid version: $VERSION" >&2; exit 2; }
 
+# Sparkle feed is public configuration. The Ed25519 public key is injected only
+# in production/release builds; without it the updater controller stays dormant.
+UPDATE_FEED_URL="${CHEVRON7_UPDATE_FEED_URL:-https://github.com/originalmagneto/chevron7/releases/latest/download/appcast.xml}"
+SPARKLE_PUBLIC_ED_KEY="${SPARKLE_PUBLIC_ED_KEY:-}"
+
 echo "▸ swift build -c $MODE"
 swift build -c "$MODE"
 
