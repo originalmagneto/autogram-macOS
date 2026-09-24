@@ -118,6 +118,67 @@ final class ZakoRecordRouteTests: XCTestCase {
         XCTAssertEqual(transport.operations, ["GetOptions"], "nothing but the server time reaches EZZK")
     }
 
+    /// From the moment the client container is verified it carries the number, so the pool
+    /// never offers it again, even when the record signature then fails.
+    func testVerifiedClientContainerSpendsTheNumberEvenWhenTheRecordFails() async throws {
+        try requireXMLLint()
+        let transport = ScriptedTransport([Self.optionsReply])
+        let controller = EZZKAccountController(mode: .test, credentialStore: MemoryCredentialStore(),
+                                               transportFactory: { _ in transport })
+        let settingsStore = makeSettingsStore(ezzkAccountController: controller)
+        settingsStore.useRealSigningProvider(RecordRefusingProvider())
+        let store = try makeReadyStore(settingsStore: settingsStore)
+        let allocatedAt = Date()
+        settingsStore.evidenceNumberPool.add(.init(number: "1563-260924-7", mode: .test, allocatedAt: allocatedAt))
+        store.attestation.evidenceNumber = "1563-260924-7"
+        store.attestation.evidenceNumberAllocatedAt = allocatedAt
+        store.attestation.evidenceNumberMode = .test
+
+        await store.authorizeAndSign()
+
+        XCTAssertEqual(store.submissionStatus, .recordUnsigned)
+        XCTAssertNil(settingsStore.evidenceNumberPool.reusable(mode: .test, at: allocatedAt, excluding: []),
+                     "the client documents carry the number, so it is never offered again")
+    }
+
+    /// The row is in the register before the record is signed, so a crash or force-quit
+    /// during the second signature leaves a visible row. The status checker leaves it alone
+    /// meanwhile, and the final state updates that same row.
+    func testRowIsRegisteredAndHeldWhileTheRecordIsSigned() async throws {
+        try requireXMLLint()
+        let transport = ScriptedTransport([Self.optionsReply])
+        let controller = EZZKAccountController(mode: .test, credentialStore: MemoryCredentialStore(),
+                                               transportFactory: { _ in transport })
+        let settingsStore = makeSettingsStore(ezzkAccountController: controller)
+        let provider = RecordRefusingProvider()
+        settingsStore.useRealSigningProvider(provider)
+        let store = try makeReadyStore(settingsStore: settingsStore)
+        store.attestation.evidenceNumber = "1563-260924-7"
+        store.attestation.evidenceNumberAllocatedAt = Date()
+        store.attestation.evidenceNumberMode = .test
+        let rowID = store.currentRecordID
+        var seen: (row: EvidenceRecord?, busy: Bool, afterCheck: EvidenceRecord?) = (nil, false, nil)
+        provider.onRecordSigning = {
+            let row = settingsStore.evidenceStore.record(id: rowID)
+            let busy = settingsStore.statusChecker.isBusy(rowID)
+            await settingsStore.statusChecker.runOnce()
+            seen = (row, busy, settingsStore.evidenceStore.record(id: rowID))
+        }
+
+        await store.authorizeAndSign()
+
+        let during = try XCTUnwrap(seen.row, "the row must exist before the record is signed")
+        XCTAssertEqual(during.status, .signed)
+        XCTAssertNil(during.recordContainerPath)
+        XCTAssertEqual(during.evidenceNumber, "1563-260924-7")
+        XCTAssertTrue(seen.busy, "the status checker must not act on the row while ZaKo signs its record")
+        XCTAssertEqual(seen.afterCheck?.status, .signed)
+        XCTAssertEqual(seen.afterCheck?.updatedAt, during.updatedAt)
+        XCTAssertFalse(settingsStore.statusChecker.isBusy(rowID))
+        XCTAssertEqual(settingsStore.evidenceStore.records.count, 1, "the final state updates the same row")
+        XCTAssertEqual(settingsStore.evidenceStore.record(id: rowID)?.status, .recordUnsigned)
+    }
+
     /// A register this build cannot read is the legal record of numbers already used, so
     /// nothing is signed or sent while it is unreadable.
     func testUnreadableRegisterRefusesToSign() async throws {
@@ -204,6 +265,8 @@ private final class RecordRefusingProvider: QualifiedSigningProviding, @unchecke
     private let lock = NSLock()
     private var received: [SigningRequest] = []
     private let demo = DemoSigningProvider()
+    /// Runs on the main actor when the record signature starts, before it fails.
+    nonisolated(unsafe) var onRecordSigning: (@MainActor () async -> Void)?
 
     var requests: [SigningRequest] { lock.withLock { received } }
 
@@ -211,7 +274,10 @@ private final class RecordRefusingProvider: QualifiedSigningProviding, @unchecke
 
     func sign(_ request: SigningRequest) async throws -> SignedConversionResult {
         lock.withLock { received.append(request) }
-        if request.signsAsRecordContainer { throw Self.failure }
+        if request.signsAsRecordContainer {
+            if let onRecordSigning { await onRecordSigning() }
+            throw Self.failure
+        }
         // The Demo provider would ask a real TSA for a timestamp; the requests above carry
         // what the app asked for, which is what this test checks.
         var local = request

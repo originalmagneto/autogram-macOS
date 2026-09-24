@@ -301,6 +301,33 @@ final class EZZKStatusChecker {
         inFlight.contains(id)
     }
 
+    /// ZaKo holds its row from the moment it is registered (`.signed`, no record container)
+    /// until its record is signed or has failed, so neither the periodic check nor a manual
+    /// action marks it unsigned or sends it meanwhile. The hold lives in memory only: after
+    /// a crash or force-quit during the record signature the row is a crash orphan, and the
+    /// next pass treats it like any row without a signed record (`.recordUnsigned`, via
+    /// `EZZKSubmissionCoordinator.submit`). A signature waiting for a PIN or BOK can take
+    /// any time, which a fixed age window would not cover. Returns false when the row is
+    /// already held or in flight; `release` must then not be called for it.
+    @discardableResult
+    func hold(_ id: UUID) -> Bool {
+        inFlight.insert(id).inserted
+    }
+
+    func release(_ id: UUID) {
+        inFlight.remove(id)
+    }
+
+    /// Deletes a register row ("Vymazať z evidencie") and drops its number from the pool,
+    /// so a deleted row's number is never offered to a new conversion.
+    func delete(id: UUID) {
+        if let number = evidenceStore.record(id: id)?.evidenceNumber {
+            numberPool.remove(number)
+        }
+        evidenceStore.delete(id: id)
+        changeCount += 1
+    }
+
     // MARK: - Internals
 
     private func refusal(for id: UUID) -> String? {

@@ -174,7 +174,7 @@ struct EvidenceDashboardView: View {
         ) {
             Button("Zmazať záznam", role: .destructive) {
                 if let record = recordToDelete {
-                    settingsStore.evidenceStore.delete(id: record.id)
+                    settingsStore.statusChecker.delete(id: record.id)
                     reload()
                 }
                 recordToDelete = nil
@@ -474,7 +474,7 @@ struct RecordDetailView: View {
                minHeight: 400, idealHeight: 600, maxHeight: .infinity)
         .confirmationDialog("Naozaj chcete vymazať tento záznam?", isPresented: $showDeleteConfirm) {
             Button("Zmazať záznam", role: .destructive) {
-                settingsStore.evidenceStore.delete(id: record.id)
+                settingsStore.statusChecker.delete(id: record.id)
                 onClose()
             }
             Button("Zrušiť", role: .cancel) {}

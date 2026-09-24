@@ -1315,6 +1315,11 @@ final class ZakoSessionStore {
                                                     issues: containerCheck.issues)
                 }
             }
+            // The signed client documents carry the number in their clause from here on, so
+            // it is used whatever happens to the record: the pool never offers it again.
+            if let number = attestation.evidenceNumber {
+                evidenceNumberPool.remove(number)
+            }
 
             analysisProgressText = "Ukladám a zapisujem do evidencie…"
             let pdfTarget = directory.appendingPathComponent(docFileName)
@@ -1349,56 +1354,67 @@ final class ZakoSessionStore {
                 ezzkMode: attestation.evidenceNumberMode ?? settingsStore.ezzkAccountController.mode,
                 evidenceNumberAllocatedAt: attestation.evidenceNumberAllocatedAt)
 
+            // The row is registered before the record is signed, so a crash or force-quit
+            // during the second signature still leaves it in the register. The status
+            // checker holds it until the record is signed or has failed (see
+            // `EZZKStatusChecker.hold`); every later write updates this same row.
+            let rowID = record.id
+            let held = settingsStore.statusChecker.hold(rowID)
+            evidenceStore.upsert(record)
+
             // The record is signed with the same card into its own container. The phone route
             // (Demo only) has no card identity, so its row stays unsigned (the coordinator says so).
             var recordContainer: Data?
             var outputCopyError: Error?
-            if !viaMobile, let identityID = selectedIdentityID {
-                analysisProgressText = "Podpisujem záznam o konverzii…"
-                do {
-                    let signedRecord = try await signingProvider.sign(SigningRequest(
-                        pdfData: recordDelivery.recordXDCF,
-                        identityID: identityID,
-                        includeTimestamp: stampsSignatures,
-                        tsaURL: tsaURL,
-                        pin: signingPIN.isEmpty ? nil : signingPIN,
-                        filename: recordDelivery.entryName,
-                        timestampServers: timestampServers,
-                        signsAsRecordContainer: true))
-                    guard let asic = signedRecord.asicData else {
-                        throw SigningError.signingFailed("Podpis záznamu nevrátil kontajner ASiC-E.")
+            do {
+                defer { if held { settingsStore.statusChecker.release(rowID) } }
+                if !viaMobile, let identityID = selectedIdentityID {
+                    analysisProgressText = "Podpisujem záznam o konverzii…"
+                    do {
+                        let signedRecord = try await signingProvider.sign(SigningRequest(
+                            pdfData: recordDelivery.recordXDCF,
+                            identityID: identityID,
+                            includeTimestamp: stampsSignatures,
+                            tsaURL: tsaURL,
+                            pin: signingPIN.isEmpty ? nil : signingPIN,
+                            filename: recordDelivery.entryName,
+                            timestampServers: timestampServers,
+                            signsAsRecordContainer: true))
+                        guard let asic = signedRecord.asicData else {
+                            throw SigningError.signingFailed("Podpis záznamu nevrátil kontajner ASiC-E.")
+                        }
+                        let recordCheck = ASiCEContainerVerifier().verify(asic)
+                        guard recordCheck.isValid else {
+                            throw ComplianceValidationError(domain: "Kontajner záznamu o konverzii",
+                                                            issues: recordCheck.issues)
+                        }
+                        // The register copy is the one submission reads; without it the row cannot be sent.
+                        record.recordContainerPath = try evidenceStore.storeRecordContainer(asic, for: record.id)
+                        recordContainer = asic
+                    } catch {
+                        // The client outputs above stay: the conversion is delivered, but its
+                        // record must be signed again, so nothing is sent.
+                        record.status = .recordUnsigned
+                        record.ezzkResultDescription = error.localizedDescription
+                        evidenceStore.upsert(record)
+                        submissionStatus = .recordUnsigned
+                        lastError = Self.recordUnsignedMessage(error)
+                        result = signed
+                        step = .done
+                        return
                     }
-                    let recordCheck = ASiCEContainerVerifier().verify(asic)
-                    guard recordCheck.isValid else {
-                        throw ComplianceValidationError(domain: "Kontajner záznamu o konverzii",
-                                                        issues: recordCheck.issues)
+                    // The advocate's archive copy next to the outputs; the register copy is enough to send.
+                    do {
+                        let recordTarget = ConversionOutputNaming.uniqueURL(in: directory,
+                                                                            fileName: recordDelivery.containerName)
+                        try recordContainer?.write(to: recordTarget, options: [.atomic])
+                    } catch {
+                        outputCopyError = error
                     }
-                    // The register copy is the one submission reads; without it the row cannot be sent.
-                    record.recordContainerPath = try evidenceStore.storeRecordContainer(asic, for: record.id)
-                    recordContainer = asic
-                } catch {
-                    // The client outputs above stay: the conversion is delivered, but its
-                    // record must be signed again, so nothing is sent.
-                    record.status = .recordUnsigned
-                    record.ezzkResultDescription = error.localizedDescription
-                    evidenceStore.upsert(record)
-                    submissionStatus = .recordUnsigned
-                    lastError = Self.recordUnsignedMessage(error)
-                    result = signed
-                    step = .done
-                    return
                 }
-                // The advocate's archive copy next to the outputs; the register copy is enough to send.
-                do {
-                    let recordTarget = ConversionOutputNaming.uniqueURL(in: directory,
-                                                                        fileName: recordDelivery.containerName)
-                    try recordContainer?.write(to: recordTarget, options: [.atomic])
-                } catch {
-                    outputCopyError = error
-                }
+                evidenceStore.upsert(record)
             }
 
-            evidenceStore.upsert(record)
             analysisProgressText = "Odosielam záznam do EZZK…"
             await sendRecord(record.id)
             if let outputCopyError {

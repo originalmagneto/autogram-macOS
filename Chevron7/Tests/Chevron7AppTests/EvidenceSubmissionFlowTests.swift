@@ -421,6 +421,47 @@ final class EvidenceSubmissionFlowTests: XCTestCase {
         XCTAssertNil(pool.reusable(mode: .test, at: clock.now, excluding: []))
     }
 
+    /// ZaKo holds its row while it signs the record: no path touches it. Once released, a
+    /// `.signed` row still without a record container is a crash orphan, and the check
+    /// marks it unsigned exactly as it treats any row without a signed record.
+    func testHeldRowIsLeftAloneAndAnOrphanBecomesUnsignedAfterRelease() async throws {
+        let clock = TestClock("2026-09-24T10:00:00Z")
+        let submitter = ScriptedSubmitter([])
+        let (checker, store) = makeChecker(mode: .test, submitter: submitter, lookup: ScriptedLookup([]), clock: clock)
+        var row = try addRow(.signed, number: "1563-260924-4", to: store, clock: clock)
+        row.recordContainerPath = nil
+        store.upsert(row)
+
+        checker.hold(row.id)
+        await checker.runOnce()
+        let manual = await checker.submit(id: row.id)
+
+        XCTAssertEqual(store.record(id: row.id)?.status, .signed)
+        XCTAssertEqual(manual.refusal, EZZKStatusChecker.rowBusyMessage)
+
+        checker.release(row.id)
+        await checker.runOnce()
+
+        XCTAssertEqual(store.record(id: row.id)?.status, .recordUnsigned)
+        XCTAssertEqual(submitter.calls, 0)
+    }
+
+    /// A deleted row's number is never offered again: the pool forgets it with the row.
+    func testDeletingARowDropsItsNumberFromThePool() async throws {
+        let clock = TestClock("2026-09-24T10:00:00Z")
+        let (checker, store) = makeChecker(mode: .test, submitter: ScriptedSubmitter([]),
+                                           lookup: ScriptedLookup([]), clock: clock)
+        pool.add(.init(number: "1563-260924-5", mode: .test, allocatedAt: clock.now))
+        let row = try addRow(.recordUnsigned, number: "1563-260924-5", to: store, clock: clock)
+        let changes = checker.changeCount
+
+        checker.delete(id: row.id)
+
+        XCTAssertNil(store.record(id: row.id))
+        XCTAssertNil(pool.reusable(mode: .test, at: clock.now, excluding: []))
+        XCTAssertGreaterThan(checker.changeCount, changes)
+    }
+
     /// Production submission is still refused (B3), so production rows are neither sent
     /// nor counted as waiting; they carry the production reason.
     func testProductionRowsAreNeverSentWhileProductionIsRefused() async throws {

@@ -107,6 +107,37 @@ final class ZakoEvidenceNumberTests: XCTestCase {
                        "the second fetch must reuse the pooled number without another request")
     }
 
+    /// A number whose register row the advocate deleted is never offered again: the next
+    /// document asks EZZK for a new one.
+    func testDeletedRowsNumberIsNotReused() async throws {
+        let credentialStore = MemoryCredentialStore()
+        try credentialStore.save(EZZKSOAPCredentials(login: "ucet", password: "heslo"), environment: .sandbox)
+        let secondNumber = numbersReply.replacingOccurrences(of: "260917-A", with: "260917-B")
+        let transport = ScriptedTransport([loginSucceeded, numbersReply, serverTimeReply, secondNumber, serverTimeReply])
+        let controller = EZZKAccountController(mode: .test, credentialStore: credentialStore,
+                                               transportFactory: { _ in transport })
+        let settingsStore = makeSettingsStore(ezzkAccountController: controller)
+        settingsStore.settings.ezzkPersonName = "Advokátska kancelária Test"
+        settingsStore.settings.ezzkICO = "12345678"
+        let firstDocument = ZakoSessionStore(settingsStore: settingsStore)
+        await firstDocument.fetchEvidenceNumber()
+        XCTAssertEqual(firstDocument.attestation.evidenceNumber, "260917-A")
+        let row = EvidenceRecord(status: .recordUnsigned, direction: .paperToElectronic,
+                                 originalName: "Zmluva", newDocumentName: "Zmluva.pdf",
+                                 evidenceNumber: "260917-A", fingerprintSHA256Hex: "ab", attestationXML: "<x/>",
+                                 conversionTime: Date(), performingPersonName: "JUDr. Test Testovací",
+                                 securityElementCount: 0, totalPages: 1, totalSheets: 1, ezzkMode: .test,
+                                 evidenceNumberAllocatedAt: firstDocument.attestation.evidenceNumberAllocatedAt)
+        settingsStore.evidenceStore.upsert(row)
+
+        settingsStore.statusChecker.delete(id: row.id)
+        let secondDocument = ZakoSessionStore(settingsStore: settingsStore)
+        await secondDocument.fetchEvidenceNumber()
+
+        XCTAssertEqual(secondDocument.attestation.evidenceNumber, "260917-B")
+        XCTAssertEqual(transport.requestCount, 5)
+    }
+
     func testCode113ShowsTheLimitMessage() async throws {
         let credentialStore = MemoryCredentialStore()
         try credentialStore.save(EZZKSOAPCredentials(login: "ucet", password: "heslo"), environment: .sandbox)
