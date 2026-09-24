@@ -78,6 +78,9 @@ public struct EvidenceRecord: Codable, Identifiable, Sendable {
     public var totalPages: Int
     public var totalSheets: Int
     public var pdfFileName: String?
+    /// The file handed to the client next to the source (the ZaKo ASiC-E, or the PDF/A on
+    /// the phone route). Nil for rows written before the single client output.
+    public var deliveredFileName: String?
     public var formPack: FormPackStamp?
     public var securityReview: SecurityReviewStamp?
     public var ezzkMode: AppSettings.EZZKMode?
@@ -132,6 +135,7 @@ public struct EvidenceRecord: Codable, Identifiable, Sendable {
                 conversionTime: Date, performingPersonName: String,
                 securityElementCount: Int, totalPages: Int, totalSheets: Int,
                  pdfFileName: String? = nil,
+                 deliveredFileName: String? = nil,
                  formPack: FormPackStamp? = nil,
                  securityReview: SecurityReviewStamp? = nil,
                  ezzkMode: AppSettings.EZZKMode? = nil,
@@ -158,6 +162,7 @@ public struct EvidenceRecord: Codable, Identifiable, Sendable {
         self.totalPages = totalPages
         self.totalSheets = totalSheets
         self.pdfFileName = pdfFileName
+        self.deliveredFileName = deliveredFileName
         self.formPack = formPack
         self.securityReview = securityReview
         self.ezzkMode = ezzkMode

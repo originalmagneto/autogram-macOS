@@ -4,6 +4,7 @@
 import SwiftUI
 import Chevron7Kit
 import AppKit
+import UniformTypeIdentifiers
 
 struct AuthorizeView: View {
     @Bindable var store: ZakoSessionStore
@@ -472,7 +473,6 @@ struct DoneView: View {
         return ZakoDonePresentation(record: record,
                                     lastError: store.lastError,
                                     lastErrorStatus: store.submissionStatus,
-                                    archiveCopyError: store.archiveCopyError,
                                     nextStatusCheck: record.flatMap { checker.nextStatusCheck(for: $0) },
                                     now: now,
                                     currentMode: store.settingsStore.ezzkAccountController.mode)
@@ -578,24 +578,27 @@ struct DoneView: View {
         }
     }
 
+    /// "Uložiť ako…": a copy of the file the client got (the ASiC-E, or the PDF/A on the
+    /// phone route; rows from before the single output name only the PDF/A).
     private func exportAs() {
         exportError = nil
         guard let directory = store.outputDirectory else { return }
-        let fileName = store.evidenceStore.record(id: store.currentRecordID)?.pdfFileName
+        let record = store.evidenceStore.record(id: store.currentRecordID)
+        let fileName = record?.deliveredFileName ?? record?.pdfFileName
             ?? ConversionOutputNaming.pdfFileName(
                 originalDocumentName: store.attestation.originalDocumentName,
                 requestedDocumentName: store.attestation.newDocumentName)
-        let pdf = directory.appendingPathComponent(fileName)
+        let delivered = directory.appendingPathComponent(fileName)
         let panel = NSSavePanel()
-        panel.allowedContentTypes = [.pdf]
-        panel.nameFieldStringValue = pdf.lastPathComponent
+        panel.allowedContentTypes = [UTType(filenameExtension: delivered.pathExtension) ?? .data]
+        panel.nameFieldStringValue = delivered.lastPathComponent
         panel.begin { response in
             guard response == .OK, let url = panel.url else { return }
             do {
-                guard FileManager.default.fileExists(atPath: pdf.path) else {
-                    throw CocoaError(.fileNoSuchFile, userInfo: [NSLocalizedDescriptionKey: "PDF výstup sa nenašiel."])
+                guard FileManager.default.fileExists(atPath: delivered.path) else {
+                    throw CocoaError(.fileNoSuchFile, userInfo: [NSLocalizedDescriptionKey: "Výstup sa nenašiel."])
                 }
-                try FileManager.default.copyItem(at: pdf, to: url)
+                try FileManager.default.copyItem(at: delivered, to: url)
             } catch {
                 exportError = "Export sa nepodaril: \(error.localizedDescription)"
             }

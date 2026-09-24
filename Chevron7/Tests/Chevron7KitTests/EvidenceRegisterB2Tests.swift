@@ -21,7 +21,25 @@ final class EvidenceRegisterB2Tests: XCTestCase {
         XCTAssertEqual(store.records.count, 1)
         XCTAssertEqual(store.records.first?.status, .queuedForSubmission)
         XCTAssertNil(store.records.first?.submittedAt)
+        XCTAssertNil(store.records.first?.deliveredFileName, "a row written before the single client output has none")
         XCTAssertNil(store.loadError)
+    }
+
+    /// The file ZaKo delivered to the client (the ASiC-E) is remembered on the row, so the
+    /// Done screen exports that file and not a loose PDF/A that is no longer written.
+    func testDeliveredFileNameRoundTrips() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = LocalEvidenceStore(directory: directory)
+        let record = EvidenceRecord(status: .signed, direction: .paperToElectronic, originalName: "a", newDocumentName: "a.pdf",
+                                    evidenceNumber: "1563-260924-1", fingerprintSHA256Hex: "ab", attestationXML: "<x/>",
+                                    conversionTime: Date(), performingPersonName: "M", securityElementCount: 0,
+                                    totalPages: 1, totalSheets: 1, pdfFileName: "a.pdf",
+                                    deliveredFileName: "a.asice")
+        store.upsert(record)
+        let loaded = try XCTUnwrap(LocalEvidenceStore(directory: directory).record(id: record.id))
+        XCTAssertEqual(loaded.deliveredFileName, "a.asice")
+        XCTAssertEqual(loaded.pdfFileName, "a.pdf")
     }
 
     func testNewStatesRoundTripAndKeepTheirRawStrings() throws {

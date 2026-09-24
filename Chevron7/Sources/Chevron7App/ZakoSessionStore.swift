@@ -96,9 +96,6 @@ final class ZakoSessionStore {
     var result: SignedConversionResult?
     /// The row state `lastError` describes (the last send, verify or signing outcome).
     var submissionStatus: EvidenceRecord.Status?
-    /// The record container could not be copied next to the outputs. Stays true when the
-    /// row later changes, unlike the submission part of `lastError`.
-    private(set) var archiveCopyError: String?
     var outputDirectory: URL?
     var lastError: String?
     let mobileSigning: MobileSigningCoordinator
@@ -235,9 +232,10 @@ final class ZakoSessionStore {
 
     init(settingsStore: AppSettingsStore,
          formPackRepository: FormPackRepository = FormPackRepository(),
-         exampleBank: ExampleBank? = nil) {
+         exampleBank: ExampleBank? = nil,
+         mobileSigning: MobileSigningCoordinator? = nil) {
         self.settingsStore = settingsStore
-        self.mobileSigning = MobileSigningCoordinator(settingsStore: settingsStore)
+        self.mobileSigning = mobileSigning ?? MobileSigningCoordinator(settingsStore: settingsStore)
         self.pdfaConverter = PDFAConverter()
         self.embeddedFileService = EmbeddedFileService()
         self.formPackRepository = formPackRepository
@@ -1161,7 +1159,6 @@ final class ZakoSessionStore {
         }
 
         lastError = nil
-        archiveCopyError = nil
         validationErrors = []
         preparePreflight()
         if viaMobile, !settingsStore.ezzkAccountController.isDemoMode {
@@ -1305,7 +1302,8 @@ final class ZakoSessionStore {
                 // avm-server rejects unsigned ASiC-E input (422 "Level can't be empty if document
                 // is not signed yet"), so the phone signs only the final PDF/A and the server wraps
                 // it into a fresh ASiC-E. The clause XDC is not part of that container: it is written
-                // next to it below, unsigned. Carrying the clause on the mobile route is still open.
+                // next to it below, unsigned, with the PDF/A. Carrying the clause on the mobile
+                // route is still open.
                 let upload = AVMUploadRequest(
                     filename: docFileName,
                     data: finalPDF,
@@ -1353,15 +1351,23 @@ final class ZakoSessionStore {
             saveProfileFromForm()
 
             analysisProgressText = "Ukladám a zapisujem do evidencie…"
-            let pdfTarget = directory.appendingPathComponent(docFileName)
-            try signed.pdfData.write(to: pdfTarget, options: [.atomic])
-            try clause.clauseXDCF.write(to: xdcfTarget, options: [.atomic])
-            if let asic = signed.asicData {
-                let asicFileName = ConversionOutputNaming.asicFileName(pdfFileName: pdfTarget.lastPathComponent)
-                let asicTarget = ConversionOutputNaming.uniqueURL(in: directory,
-                                                                   fileName: asicFileName)
-                try asic.write(to: asicTarget,
-                               options: [.atomic])
+            // The card's ASiC-E holds the PDF/A and the clause, signed together, so it is the one
+            // file the client gets. The phone's container holds the PDF/A alone, so there the
+            // PDF/A and the clause are also written and the PDF/A is what is delivered.
+            let asicTarget = ConversionOutputNaming.uniqueURL(
+                in: directory,
+                fileName: ConversionOutputNaming.asicFileName(pdfFileName: docFileName))
+            let deliveredTarget: URL
+            if !viaMobile, let asic = signed.asicData {
+                try asic.write(to: asicTarget, options: [.atomic])
+                deliveredTarget = asicTarget
+            } else {
+                deliveredTarget = directory.appendingPathComponent(docFileName)
+                try signed.pdfData.write(to: deliveredTarget, options: [.atomic])
+                try clause.clauseXDCF.write(to: xdcfTarget, options: [.atomic])
+                if let asic = signed.asicData {
+                    try asic.write(to: asicTarget, options: [.atomic])
+                }
             }
             outputDirectory = directory
 
@@ -1379,7 +1385,8 @@ final class ZakoSessionStore {
                 securityElementCount: confirmedElementsSnapshot.count,
                 totalPages: analysis.totalPages,
                 totalSheets: attestation.numberOfSheets,
-                pdfFileName: pdfTarget.lastPathComponent,
+                pdfFileName: docFileName,
+                deliveredFileName: deliveredTarget.lastPathComponent,
                 formPack: FormPackStamp(pack: selectedFormPack),
                 securityReview: securityReviewSnapshot,
                 ezzkMode: attestation.evidenceNumberMode ?? settingsStore.ezzkAccountController.mode,
@@ -1395,8 +1402,6 @@ final class ZakoSessionStore {
 
             // The record is signed with the same card into its own container. The phone route
             // (Demo only) has no card identity, so its row stays unsigned (the coordinator says so).
-            var recordContainer: Data?
-            var outputCopyError: Error?
             do {
                 defer { if held { settingsStore.statusChecker.release(rowID) } }
                 if !viaMobile, let identityID = selectedIdentityID {
@@ -1419,9 +1424,9 @@ final class ZakoSessionStore {
                             throw ComplianceValidationError(domain: "Kontajner záznamu o konverzii",
                                                             issues: recordCheck.issues)
                         }
-                        // The register copy is the one submission reads; without it the row cannot be sent.
+                        // The register keeps the only copy: submission reads it, and the Register
+                        // saves it for the advocate ("Uložiť záznam…"); without it the row cannot be sent.
                         record.recordContainerPath = try evidenceStore.storeRecordContainer(asic, for: record.id)
-                        recordContainer = asic
                     } catch {
                         // The client outputs above stay: the conversion is delivered, but its
                         // record must be signed again, so nothing is sent.
@@ -1434,26 +1439,12 @@ final class ZakoSessionStore {
                         step = .done
                         return
                     }
-                    // The advocate's archive copy next to the outputs; the register copy is enough to send.
-                    do {
-                        let recordTarget = ConversionOutputNaming.uniqueURL(in: directory,
-                                                                            fileName: recordDelivery.containerName)
-                        try recordContainer?.write(to: recordTarget, options: [.atomic])
-                    } catch {
-                        outputCopyError = error
-                    }
                 }
                 evidenceStore.upsert(record)
             }
 
             analysisProgressText = "Odosielam záznam do EZZK…"
             await sendRecord(record.id)
-            if let outputCopyError {
-                // The submission's own message stays: both matter to the advocate.
-                let copyMessage = "Záznam o konverzii je uložený v Registri, ale jeho kópiu sa nepodarilo uložiť k výstupom: \(outputCopyError.localizedDescription)"
-                archiveCopyError = copyMessage
-                lastError = [lastError, copyMessage].compactMap { $0 }.joined(separator: "\n")
-            }
 
             result = signed
             step = .done
@@ -1592,7 +1583,6 @@ func resetSession(keepingProfile: Bool) {
         preflightErrors = []
         validationErrors = []
         submissionStatus = nil
-        archiveCopyError = nil
         result = nil
         outputDirectory = nil
         outputDirectoryOverride = nil

@@ -127,12 +127,11 @@ struct ZakoDonePresentation: Equatable {
     /// - Parameters:
     ///   - record: the conversion's register row, as stored now.
     ///   - lastError: the ZaKo flow's last error, and `lastErrorStatus` the row state it described.
-    ///   - archiveCopyError: the failed copy of the record next to the outputs, which stays true.
     ///   - nextStatusCheck: when the row's next lookup is due (`EZZKStatusChecker.nextStatusCheck`).
     ///   - currentMode: the controller's EZZK mode; a row of another mode gets no action.
     ///     Nil skips that check.
     init(record: EvidenceRecord?, lastError: String?, lastErrorStatus: EvidenceRecord.Status?,
-         archiveCopyError: String?, nextStatusCheck: Date?, now: Date,
+         nextStatusCheck: Date?, now: Date,
          currentMode: AppSettings.EZZKMode? = nil) {
         guard let record else {
             title = "Konverzia nie je zapísaná v Registri konverzií"
@@ -204,17 +203,13 @@ struct ZakoDonePresentation: Equatable {
 
         // The flow's error describes the row as ZaKo last saw it. Lines already shown, or
         // repeating the row's own description, are left out, and once the row has moved on
-        // (the periodic check) none of it applies. The archive copy failure stays true
-        // whatever happens to the row, so it is always shown.
+        // (the periodic check) none of it applies.
         var remaining: [String] = []
         if let lastError, lastErrorStatus == status {
             let description = record.ezzkResultDescription ?? ""
             remaining = lastError.split(separator: "\n").map(String.init).filter { line in
                 !lines.contains(line) && (description.isEmpty || !line.contains(description))
             }
-        }
-        if let archiveCopyError, !remaining.contains(archiveCopyError) {
-            remaining.append(archiveCopyError)
         }
         error = remaining.isEmpty ? nil : remaining.joined(separator: "\n")
     }
@@ -272,6 +267,17 @@ enum EvidenceRegisterDetail {
         let text: String
         let tone: EZZKRecordPresentation.Tone
     }
+
+    /// "Uložiť záznam…": the signed record the register keeps (the only copy), named as EZZK
+    /// knows it (`<number>.record.asice`). Nil when the row has no readable record.
+    static func storedRecordContainer(for record: EvidenceRecord,
+                                      in store: LocalEvidenceStore) -> (fileName: String, data: Data)? {
+        guard record.recordContainerPath != nil, let data = store.recordContainerData(for: record) else { return nil }
+        let number = record.evidenceNumber.flatMap { $0.isEmpty ? nil : $0 } ?? record.id.uuidString
+        return (ZakoRecordDeliveryBuilder.containerName(evidenceNumber: number), data)
+    }
+
+    static let recordContainerMissingMessage = "Podpísaný záznam o konverzii sa v Registri nenašiel."
 
     static func timeline(for record: EvidenceRecord) -> [Stage] {
         let status = record.status
