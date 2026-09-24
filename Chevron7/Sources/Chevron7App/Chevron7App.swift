@@ -15,6 +15,7 @@ final class Chevron7AppModel {
     let signedDocumentStore: SignedDocumentStore
     let webSigning: WebSigningCoordinator
     let cardReader: CardReaderStatus
+    let updater: AppUpdater
 
     init() {
         let settings = AppSettingsStore()
@@ -34,6 +35,8 @@ final class Chevron7AppModel {
         cardReader = CardReaderStatus { [settings] in
             await settings.signingProvider.availableIdentities()
         }
+        updater = AppUpdater()
+        updater.startIfNeeded()
         let signing = signingStore
         let zako = zakoStore
         let browserSigning = webSigning
@@ -107,7 +110,7 @@ struct Chevron7App: App {
         // Window restoration would reopen the last main window despite the suppression.
         .restorationBehavior(AppLaunchMode.current == .webSigning ? .disabled : .automatic)
         .commands {
-            Chevron7Commands()
+            Chevron7Commands(updater: model.updater)
         }
 
         // A regular window instead of the Settings scene: the Settings scene sizes
@@ -124,6 +127,7 @@ struct Chevron7App: App {
 
 private struct Chevron7Commands: Commands {
     @FocusedValue(\.chevron7CommandActions) private var actions
+    let updater: AppUpdater
 
     var body: some Commands {
         CommandGroup(after: .newItem) {
@@ -174,6 +178,13 @@ private struct Chevron7Commands: Commands {
             }
             .keyboardShortcut("s", modifiers: [.command, .control])
             .disabled(actions == nil)
+        }
+
+        CommandGroup(after: .appInfo) {
+            Button("Skontrolovať aktualizácie…") {
+                updater.checkForUpdates()
+            }
+            .disabled(!updater.isConfigured)
         }
 
         CommandGroup(replacing: .appSettings) {
