@@ -642,6 +642,7 @@ final class SigningBatchTests: XCTestCase {
         store.selectedIdentityID = "identity"
         store.includeQualifiedTimestamp = false
         store.outputFormat = .attachedASIC
+        store.batchASiCPackaging = .combined
 
         await store.prepareBatch(ids: store.queue.map(\.id))
         await store.startBatch()
@@ -652,6 +653,135 @@ final class SigningBatchTests: XCTestCase {
         XCTAssertTrue(request.signsExtraFilesAsDataObjects)
         XCTAssertEqual(request.filename, "a.pdf")
         XCTAssertEqual(request.extraFiles.map(\.path), ["a.pdf", "b.pdf"])
+    }
+
+    func testPerDocumentASiCBatchWritesOneContainerPerDocument() async throws {
+        let provider = RecordingSigningProvider()
+        let store = makeStore(provider: provider)
+        await store.addDocuments(at: [makePDF(named: "a.pdf"), makePDF(named: "b.pdf")], selectLast: false)
+        store.identities = await provider.availableIdentities()
+        store.selectedIdentityID = "identity"
+        store.includeQualifiedTimestamp = false
+        store.outputFormat = .attachedASIC
+        store.batchASiCPackaging = .perDocument
+
+        await store.prepareBatch(ids: store.queue.map(\.id))
+        XCTAssertEqual(store.batchItems.compactMap(\.plannedOutputURL?.lastPathComponent),
+                       ["a_podpisane.asice", "b_podpisane.asice"])
+        await store.startBatch()
+
+        let names = await provider.requestNames()
+        XCTAssertEqual(names, ["a.pdf", "b.pdf"])
+        XCTAssertEqual(store.batchItems.map(\.state), [.signed, .signed])
+        let outputs = store.batchItems.compactMap(\.outputURL)
+        XCTAssertEqual(outputs.map(\.lastPathComponent), ["a_podpisane.asice", "b_podpisane.asice"])
+        XCTAssertTrue(outputs.allSatisfy { FileManager.default.fileExists(atPath: $0.path) })
+    }
+
+    func testCombinedASiCBatchUsesTheChosenContainerName() async throws {
+        let provider = RecordingSigningProvider()
+        let store = makeStore(provider: provider)
+        let first = makePDF(named: "a.pdf")
+        let second = first.deletingLastPathComponent().appendingPathComponent("b.pdf")
+        try FileManager.default.copyItem(at: first, to: second)
+        await store.addDocuments(at: [first, second], selectLast: false)
+        store.identities = await provider.availableIdentities()
+        store.selectedIdentityID = "identity"
+        store.includeQualifiedTimestamp = false
+        store.outputFormat = .attachedASIC
+        store.batchASiCPackaging = .combined
+
+        await store.prepareBatch(ids: store.queue.map(\.id))
+        XCTAssertEqual(store.batchContainerName, "a_podpisane")
+        XCTAssertEqual(store.batchItems.compactMap(\.plannedOutputURL?.lastPathComponent),
+                       ["a_podpisane.asice", "a_podpisane.asice"])
+
+        store.batchContainerName = "Zmluvy/spolu.asice"
+        store.refreshReadyBatchOptions()
+        XCTAssertEqual(store.batchPhase, .ready)
+        XCTAssertEqual(store.batchItems.compactMap(\.plannedOutputURL?.lastPathComponent),
+                       ["Zmluvy-spolu.asice", "Zmluvy-spolu.asice"])
+
+        store.batchContainerName = "   "
+        store.refreshReadyBatchOptions()
+        XCTAssertEqual(store.batchItems.first?.plannedOutputURL?.lastPathComponent, "a_podpisane.asice")
+
+        store.batchContainerName = "Zmluvy spolu"
+        store.refreshReadyBatchOptions()
+        await store.startBatch()
+
+        let requests = await provider.recordedRequests()
+        XCTAssertEqual(requests.count, 1)
+        let output = try XCTUnwrap(store.batchItems.first?.outputURL)
+        XCTAssertEqual(output.lastPathComponent, "Zmluvy spolu.asice")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: output.path))
+    }
+
+    func testChangingBatchOptionsKeepsTheBatchReadyWithoutReadingTheCardAgain() async throws {
+        let provider = RecordingSigningProvider(identityRequiresPIN: true)
+        let store = makeStore(provider: provider)
+        await store.addDocuments(at: [makePDF(named: "a.pdf"), makePDF(named: "b.pdf")], selectLast: false)
+        store.identities = await provider.availableIdentities()
+        store.selectedIdentityID = "identity"
+        store.includeQualifiedTimestamp = false
+        store.outputFormat = .attachedASIC
+        store.signingPIN = "1234"
+
+        await store.prepareBatch(ids: store.queue.map(\.id))
+        XCTAssertEqual(store.batchPhase, .ready, store.lastError ?? "batch did not become ready")
+
+        store.outputFormat = .embeddedPAdES
+        store.includeQualifiedTimestamp = true
+        store.convertToPDFA = true
+        store.refreshReadyBatchOptions()
+
+        XCTAssertEqual(store.batchPhase, .ready)
+        let snapshot = try XCTUnwrap(store.batchSettingsSnapshot)
+        XCTAssertEqual(snapshot.outputFormat, .embeddedPAdES)
+        XCTAssertTrue(snapshot.includeQualifiedTimestamp)
+        XCTAssertEqual(snapshot.tsaURL, store.selectedTSAURL)
+        XCTAssertTrue(snapshot.convertToPDFA)
+        XCTAssertEqual(snapshot.selectedIdentityID, "identity")
+        XCTAssertEqual(store.batchItems.compactMap(\.plannedOutputURL?.lastPathComponent),
+                       ["a_podpisane.pdf", "b_podpisane.pdf"])
+
+        await store.startBatch()
+        let resolveCount = await provider.resolveCount()
+        XCTAssertEqual(resolveCount, 1)
+        let formats = await provider.requestOutputFormats()
+        XCTAssertEqual(formats, [.embeddedPAdES, .embeddedPAdES])
+        let timestamps = await provider.requestTimestamps()
+        XCTAssertEqual(timestamps, [true, true])
+        let pins = await provider.requestPINs()
+        XCTAssertEqual(pins, ["1234", "1234"])
+    }
+
+    func testInvalidTimestampServiceBlocksTheStartButKeepsTheBatchReady() async throws {
+        let provider = RecordingSigningProvider()
+        let store = makeStore(provider: provider)
+        await store.addDocuments(at: [makePDF(named: "a.pdf")], selectLast: false)
+        store.identities = await provider.availableIdentities()
+        store.selectedIdentityID = "identity"
+        store.includeQualifiedTimestamp = false
+
+        await store.prepareBatch(ids: store.queue.map(\.id))
+        let previousTSAURL = store.selectedTSAURL
+        defer { store.selectedTSAURL = previousTSAURL }
+        store.includeQualifiedTimestamp = true
+        store.selectedTSAURL = "bez schemy"
+        store.refreshReadyBatchOptions()
+
+        XCTAssertEqual(store.batchPhase, .ready)
+        XCTAssertNotNil(store.batchOptionsError)
+        XCTAssertFalse(store.batchCanStart)
+        await store.startBatch()
+        let signCount = await provider.signCount()
+        XCTAssertEqual(signCount, 0)
+
+        store.includeQualifiedTimestamp = false
+        store.refreshReadyBatchOptions()
+        XCTAssertNil(store.batchOptionsError)
+        XCTAssertTrue(store.batchCanStart)
     }
 
     /// Opening a signed PDF offers PAdES, so a further signature sits next to the first.
@@ -809,6 +939,7 @@ final class SigningBatchTests: XCTestCase {
         store.selectedIdentityID = "identity"
         store.includeQualifiedTimestamp = false
         store.outputFormat = .attachedASIC
+        store.batchASiCPackaging = .combined
         store.convertToPDFA = true
         store.includeVisibleSignature = true
         store.visualPlacement = VisibleSignaturePlacement(
@@ -830,10 +961,14 @@ final class SigningBatchTests: XCTestCase {
         let settings = makeSettingsStore()
         let defaults = UserDefaults(suiteName: "SigningBatchTests.\(UUID().uuidString)")!
         let recent = RecentDocumentStore(settingsStore: settings, defaults: defaults)
-        return SigningSessionStore(
+        let store = SigningSessionStore(
             signingProvider: provider,
             settingsStore: settings,
             recentDocumentStore: recent)
+        // Settings persist in the test process's defaults; start every test from the default.
+        store.batchASiCPackaging = .perDocument
+        store.selectedTSAURL = TimestampAuthority.legacyDefaultURL
+        return store
     }
 
 

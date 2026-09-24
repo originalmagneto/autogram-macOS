@@ -89,6 +89,14 @@ public struct AppSettings: Codable, Sendable {
         }
     }
 
+    /// How a batch signed as ASiC-E is packaged.
+    public enum BatchASiCPackaging: String, Codable, CaseIterable, Sendable {
+        /// Every PDF in its own `<name>_podpisane.asice`.
+        case perDocument
+        /// Every PDF as a data object of one shared container.
+        case combined
+    }
+
     public var aiMode: AIMode
     public var aiPrompt: String?
     public var omlxURL: String
@@ -126,6 +134,8 @@ public struct AppSettings: Codable, Sendable {
     public var webSigningOutputPath: String
     /// Days after which those copies move to the Trash. Zero keeps them.
     public var webSigningRetentionDays: Int
+    /// The last packaging chosen for an ASiC-E batch.
+    public var batchASiCPackaging: BatchASiCPackaging
 
     public var avmBaseURLValue: URL {
         let trimmed = avmBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -148,6 +158,7 @@ public struct AppSettings: Codable, Sendable {
         case useFoundationModelClassifier, learnFromReviews
         case mobileSigningEnabled, avmBaseURL
         case webSigningSavesLocally, webSigningOutputPath, webSigningRetentionDays
+        case batchASiCPackaging
     }
 
     public init(aiMode: AIMode = .builtInOnDevice,
@@ -176,7 +187,8 @@ public struct AppSettings: Codable, Sendable {
                 avmBaseURL: String = AVMClient.publicBaseURL.absoluteString,
                 webSigningSavesLocally: Bool = true,
                 webSigningOutputPath: String = "",
-                webSigningRetentionDays: Int = 0) {
+                webSigningRetentionDays: Int = 0,
+                batchASiCPackaging: BatchASiCPackaging = .perDocument) {
         self.aiMode = aiMode
         self.aiPrompt = aiPrompt
         self.omlxURL = omlxURL
@@ -204,6 +216,7 @@ public struct AppSettings: Codable, Sendable {
         self.webSigningSavesLocally = webSigningSavesLocally
         self.webSigningOutputPath = webSigningOutputPath
         self.webSigningRetentionDays = webSigningRetentionDays
+        self.batchASiCPackaging = batchASiCPackaging
     }
 
     public init(from decoder: Decoder) throws {
@@ -254,6 +267,8 @@ public struct AppSettings: Codable, Sendable {
         self.webSigningSavesLocally = try container.decodeIfPresent(Bool.self, forKey: .webSigningSavesLocally) ?? true
         self.webSigningOutputPath = try container.decodeIfPresent(String.self, forKey: .webSigningOutputPath) ?? ""
         self.webSigningRetentionDays = try container.decodeIfPresent(Int.self, forKey: .webSigningRetentionDays) ?? 0
+        self.batchASiCPackaging = (try? container.decodeIfPresent(
+            BatchASiCPackaging.self, forKey: .batchASiCPackaging)) ?? .perDocument
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -285,6 +300,7 @@ public struct AppSettings: Codable, Sendable {
         try container.encode(webSigningSavesLocally, forKey: .webSigningSavesLocally)
         try container.encode(webSigningOutputPath, forKey: .webSigningOutputPath)
         try container.encode(webSigningRetentionDays, forKey: .webSigningRetentionDays)
+        try container.encode(batchASiCPackaging, forKey: .batchASiCPackaging)
     }
 
     public var availableTSAServers: [TimestampAuthority] {

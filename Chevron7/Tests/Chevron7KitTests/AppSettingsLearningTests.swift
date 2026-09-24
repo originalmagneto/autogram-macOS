@@ -47,4 +47,17 @@ final class AppSettingsLearningTests: XCTestCase {
         broken.avmBaseURL = "not a url"
         XCTAssertEqual(broken.avmBaseURLValue, AVMClient.publicBaseURL)
     }
+
+    func testBatchASiCPackagingDefaultsToPerDocumentAndRoundTrips() throws {
+        XCTAssertEqual(AppSettings().batchASiCPackaging, .perDocument)
+        let legacy = try JSONDecoder().decode(AppSettings.self, from: Data("{}".utf8))
+        XCTAssertEqual(legacy.batchASiCPackaging, .perDocument)
+
+        var settings = AppSettings()
+        settings.batchASiCPackaging = .combined
+        let encoded = try JSONEncoder().encode(settings)
+        XCTAssertTrue(String(decoding: encoded, as: UTF8.self).contains(#""batchASiCPackaging":"combined""#))
+        let decoded = try JSONDecoder().decode(AppSettings.self, from: encoded)
+        XCTAssertEqual(decoded.batchASiCPackaging, .combined)
+    }
 }
