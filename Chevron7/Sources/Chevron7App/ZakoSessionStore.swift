@@ -146,7 +146,8 @@ final class ZakoSessionStore {
             mandateRequirementSatisfied: true,
             inputSignatureInspection: inputSignatureInspection,
             unreviewedNonEmptyPages: unreviewedNonEmptyPages, documentPageCount: analysis.totalPages)
-        return result.isComplete && preflightErrors.isEmpty && evidenceNumberError == nil
+        return result.errors.allSatisfy { $0 == .missingEvidenceNumber } && result.unreviewedNonEmptyPages.isEmpty
+            && preflightErrors.isEmpty
     }
     var serverTimeUsed: Date?
     var inputSignatureInspection = InputSignatureInspectionResult.unavailable(
@@ -172,7 +173,15 @@ final class ZakoSessionStore {
             mandateRequirementSatisfied: mandateRequirementSatisfied,
             inputSignatureInspection: inputSignatureInspection,
             unreviewedNonEmptyPages: unreviewedNonEmptyPages, documentPageCount: analysis.totalPages
-        ).errors.isEmpty || evidenceNumberError != nil
+        ).errors.filter { $0 != .missingEvidenceNumber }.isEmpty
+    }
+
+    /// No number yet, or one this conversion may not use (another EZZK mode, or allocated on
+    /// an earlier Bratislava day, after which EZZK no longer holds it).
+    var needsFreshEvidenceNumber: Bool {
+        guard let number = attestation.evidenceNumber, !number.isEmpty else { return true }
+        if evidenceNumberModeError != nil { return true }
+        return !EZZKEvidenceNumberPolicy.isUsable(allocatedAt: attestation.evidenceNumberAllocatedAt, at: Date())
     }
 
     var pendingSecurityElementCount: Int {
@@ -1113,8 +1122,10 @@ final class ZakoSessionStore {
                 || isCertificateTypePending,
             inputSignatureInspection: inputSignatureInspection,
             unreviewedNonEmptyPages: unreviewedNonEmptyPages, documentPageCount: analysis.totalPages)
-        preflightErrors = result.errors
-        validationErrors = result.errors
+        // The evidence number is not the person's to fetch: authorization allocates it.
+        let errors = result.errors.filter { $0 != .missingEvidenceNumber }
+        preflightErrors = errors
+        validationErrors = errors
     }
 
     func preparePreflight() {
@@ -1263,6 +1274,10 @@ final class ZakoSessionStore {
         if let modeError = evidenceNumberModeError {
             evidenceNumberError = modeError
             lastError = modeError
+            // Nothing is signed now; the next "Autorizovať" allocates a number in this mode.
+            attestation.evidenceNumber = nil
+            attestation.evidenceNumberAllocatedAt = nil
+            attestation.evidenceNumberMode = nil
             recomputePreflight()
             return
         }
@@ -1286,6 +1301,20 @@ final class ZakoSessionStore {
         if !viaMobile, !signingProviderIsDemo, !mandateRequirementSatisfied {
             lastError = Self.noMandateMessage
             return
+        }
+        // The number is allocated here, after the card and its MQC, right before the
+        // signature: never for a conversion that is not signed, so none lapses at midnight.
+        if needsFreshEvidenceNumber {
+            analysisProgressText = "Získavam evidenčné číslo z EZZK…"
+            attestation.evidenceNumber = nil
+            attestation.evidenceNumberAllocatedAt = nil
+            attestation.evidenceNumberMode = nil
+            evidenceNumberError = nil
+            await fetchEvidenceNumber()
+            guard !needsFreshEvidenceNumber else {
+                if lastError == nil { lastError = evidenceNumberError ?? AttestationValidationError.missingEvidenceNumber.errorDescription }
+                return
+            }
         }
         guard viaMobile ? isMobilePreflightComplete : isPreflightComplete else { return }
         let confirmedElementsSnapshot = confirmedSecurityElements

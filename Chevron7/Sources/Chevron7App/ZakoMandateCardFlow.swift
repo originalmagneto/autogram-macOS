@@ -89,7 +89,7 @@ extension ZakoSessionStore {
 
     /// The authorize button is live before a card is in: the card is a step of the flow.
     var canBeginAuthorization: Bool {
-        if signingProviderIsDemo { return isPreflightComplete }
+        if signingProviderIsDemo, selectedIdentityID == nil || requiresMandateOverride { return false }
         let result = AttestationPreflight.evaluate(
             attestation,
             securityElements: securityElements,
@@ -97,7 +97,9 @@ extension ZakoSessionStore {
             mandateRequirementSatisfied: true,
             inputSignatureInspection: inputSignatureInspection,
             unreviewedNonEmptyPages: unreviewedNonEmptyPages, documentPageCount: analysis.totalPages)
-        return result.isComplete && preflightErrors.isEmpty && evidenceNumberError == nil
+        // The evidence number is allocated by the authorization itself.
+        return result.errors.allSatisfy { $0 == .missingEvidenceNumber }
+            && result.unreviewedNonEmptyPages.isEmpty && preflightErrors.isEmpty
     }
 
     /// Moves the pending action on as far as the card allows: it stops at a prompt, at a

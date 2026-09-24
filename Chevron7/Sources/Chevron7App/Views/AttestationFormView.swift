@@ -223,24 +223,11 @@ struct AttestationFormView: View {
                                 .padding(.vertical, 4)
                                 .background(Color.green.opacity(0.14), in: Capsule())
                         } else {
-                            Text("nezískané")
+                            Text("pridelí sa pri autorizácii")
                                 .font(.callout)
                                 .foregroundStyle(.secondary)
                         }
 
-                        Button {
-                            Task { await store.requestEvidenceNumber() }
-                        } label: {
-                            if store.fetchingEvidenceNumber {
-                                ProgressView().controlSize(.small)
-                            } else {
-                                Label(store.attestation.evidenceNumber == nil
-                                      ? "Získať číslo" : "Znova získať číslo",
-                                      systemImage: "number.square.fill")
-                            }
-                        }
-                        .disabled(store.fetchingEvidenceNumber)
-                        .controlSize(.small)
                     }
                 }
                 mandateCardStatus
@@ -255,8 +242,7 @@ struct AttestationFormView: View {
                         .foregroundStyle(.orange)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                inlineError(.missingEvidenceNumber)
-                Text("Číslo sa viaže na registráciu v evidencii záznamov. Záznam sa odošle do centrálnej evidencie do 24 hodín.")
+                Text("EZZK pridelí číslo samo pri autorizácii, tesne pred podpisom, takže sa nikdy nepridelí pre konverziu, ktorá sa nepodpíše. Záznam sa potom sám odošle do centrálnej evidencie.")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
@@ -329,7 +315,7 @@ struct AttestationFormView: View {
                         clauseFieldRow(number: "4.", label: "Počet neprázdnych strán:", value: "\(store.analysis.nonEmptyPages)")
                         clauseFieldRow(number: "5.", label: "Bezpečnostné prvky:", value: clauseElementSummary)
                         clauseFieldRow(number: "6.", label: "Osoba vykonávajúca konverziu:", value: clausePerformingPerson)
-                        clauseFieldRow(number: "7.", label: "Evidenčné číslo záznamu:", value: store.attestation.evidenceNumber ?? "XXXXXX")
+                        clauseFieldRow(number: "7.", label: "Evidenčné číslo záznamu:", value: store.attestation.evidenceNumber ?? "pridelí sa pri autorizácii")
                         clauseFieldRow(number: "8.", label: "Čas konverzie:", value: "bude určený časovou pečiatkou QTS")
                     }
 
@@ -399,7 +385,7 @@ struct AttestationFormView: View {
 
     private var generatedClausePreviewText: String {
         let name = store.attestation.originalDocumentName.isEmpty ? "Názov dokumentu" : store.attestation.originalDocumentName
-        let evidence = store.attestation.evidenceNumber ?? "XXXXXX"
+        let evidence = store.attestation.evidenceNumber ?? "pridelí sa pri autorizácii"
 
         let elementSummary = store.attestation.noSecurityElementsConfirmed ? "Bez bezpečnostných prvkov (potvrdené kontrolou originálu)" : store.confirmedSecurityElements.map { "\($0.descriptionForRecord), \($0.locationDescription(pageSizePt: .zero))" }.joined(separator: "; ")
 

@@ -33,6 +33,28 @@ final class ZakoRecordRouteTests: XCTestCase {
                        "the register keeps the record 1.0 XML, not the legacy generator's output")
     }
 
+    /// No "Získať číslo" any more: the authorization allocates the number itself, right
+    /// before signing, and the clause and the row carry it.
+    func testAuthorizationAllocatesTheEvidenceNumberItself() async throws {
+        try requireXMLLint()
+        let settingsStore = makeSettingsStore()
+        settingsStore.useRealSigningProvider(DemoSigningProvider())
+        let store = try makeReadyStore(settingsStore: settingsStore)
+        store.setMandateOverride(true)
+        XCTAssertNil(store.attestation.evidenceNumber)
+        XCTAssertFalse(store.hasUnresolvedPreflightErrors, "a missing number does not block the way to authorization")
+        XCTAssertTrue(store.canBeginAuthorization)
+
+        await store.beginAuthorization()
+
+        XCTAssertNil(store.lastError)
+        XCTAssertEqual(store.step, .done)
+        let number = try XCTUnwrap(store.attestation.evidenceNumber)
+        XCTAssertTrue(number.hasPrefix("DEMO-"))
+        let row = try XCTUnwrap(settingsStore.evidenceStore.record(id: store.currentRecordID))
+        XCTAssertEqual(row.evidenceNumber, number)
+    }
+
     /// Demo end to end: Demo signing provider, Demo EZZK (`MockEZZKService`), nothing leaves
     /// the machine. The row ends accepted, with the record container stored in the register.
     func testDemoConversionSignsTheRecordAndEndsAcceptedForProcessing() async throws {
