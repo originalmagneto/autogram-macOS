@@ -48,3 +48,28 @@ final class ReadableDocumentNameTests: XCTestCase {
         XCTAssertEqual(ConversionOutputNaming.readableName("zľava 100%"), "zľava 100%")
     }
 }
+
+/// Item 5 of the live clause preview: each element once, its place once.
+final class SecurityElementPreviewLineTests: XCTestCase {
+    private func element(_ description: String) -> SecurityElement {
+        var element = SecurityElement(kind: .officialStamp, pageIndex: 0,
+                                      boundingBox: NormalizedRect(x: 0.1, y: 0.8, width: 0.1, height: 0.1),
+                                      confidence: 0.9, detectedByAI: false)
+        element.verbalDescription = description
+        return element
+    }
+
+    /// The reported bug: the automatic description already names the kind and the place.
+    func testAutomaticDescriptionIsNotRepeated() {
+        let auto = element("")
+        let location = auto.locationDescription(pageSizePt: .zero)
+        XCTAssertEqual(element(location + ".").clausePreviewLine, location)
+        XCTAssertEqual(element("").clausePreviewLine, location)
+    }
+
+    func testTheAdvocatesOwnWordsFollowThePlace() {
+        let custom = element("Pečiatka notára s erbom")
+        XCTAssertEqual(custom.clausePreviewLine,
+                       custom.locationDescription(pageSizePt: .zero) + ": Pečiatka notára s erbom")
+    }
+}
