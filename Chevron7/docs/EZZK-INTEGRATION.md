@@ -13,7 +13,8 @@ Companion documents:
 
 ## Scope
 
-Parts A, B1, B2 and B3, which ship today:
+Parts A, B1 and B2 ship today; B3 ships without its final step (production for
+everyone), which waits for the owner's live production conversion:
 
 - The advocate signs in with their own EZZK name and password and Chevron7 verifies it against EZZK.
 - Chevron7 reads the EZZK server time, allocates and reuses evidence numbers, and looks records up; on production, allocating and reusing a number is a consequential call gated by `EZZKProductionPolicy` (see "Production and the owner switch" below).

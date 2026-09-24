@@ -1014,7 +1014,7 @@ struct SettingsView: View {
              "Po autorizácii sa záznam o konverzii podpíše rovnakým PIN a hneď odošle do ostrého EZZK. Čakajúce odoslania a stav spracovania aplikácia overuje každých päť minút; výsledok je v Registri konverzií.")
         case .production:
             ("Príde v ďalšej verzii", "lock",
-             "Na produkcii sú pridelenie čísla aj odoslanie záznamu zatiaľ zamknuté. Zapnú sa po overení celého postupu na testovacom EZZK.")
+             "Na produkcii sú pridelenie čísla aj odoslanie záznamu zatiaľ zamknuté. Zapnú sa po overení prvej ostrej konverzie.")
         }
     }
 
