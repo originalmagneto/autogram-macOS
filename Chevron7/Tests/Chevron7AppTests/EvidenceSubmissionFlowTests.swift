@@ -203,20 +203,25 @@ final class EvidenceSubmissionFlowTests: XCTestCase {
         XCTAssertEqual(submitter.calls, 1)
     }
 
-    func testCheckerSkipsRowsOfAnotherMode() async throws {
+    /// A row of another mode is never sent (nor marked late by the send path), but an
+    /// accepted or unknown one is still looked up, in the EZZK of its own mode: a record
+    /// accepted in Production must turn processed while the advocate works in Demo. The
+    /// production policy and rows from before B2 still keep the checker away.
+    func testCheckerSendsOnlyInTheCurrentModeButLooksUpEveryMode() async throws {
         let clock = TestClock("2026-09-24T10:00:00Z")
-        let lookup = ScriptedLookup([])
+        let lookup = ScriptedLookup([.success(EZZKRecordLookup(isProcessed: true, info: nil))])
         let submitter = ScriptedSubmitter([])
         let (checker, store) = makeChecker(mode: .test, submitter: submitter, lookup: lookup, clock: clock)
         var demoAccepted = try addRow(.acceptedForProcessing, number: "1563-260924-1", mode: .demo, to: store, clock: clock)
         demoAccepted.submittedAt = clock.now.addingTimeInterval(-3 * 3600)
         store.upsert(demoAccepted)
+        // The test checker refuses production (`sendsInProduction` false): no lookup either.
         var productionUnknown = try addRow(.outcomeUnknown, number: "1563-260924-2", mode: .production, to: store, clock: clock)
         productionUnknown.updatedAt = clock.now.addingTimeInterval(-3 * 3600)
         store.upsert(productionUnknown)
-        _ = try addRow(.queuedForSubmission, number: "1563-260924-3", mode: .demo, to: store, clock: clock)
+        let demoQueued = try addRow(.queuedForSubmission, number: "1563-260924-3", mode: .demo, to: store, clock: clock)
         // A row from before B2 has no mode: nobody knows which EZZK allocated its number.
-        _ = try addRow(.queuedForSubmission, number: "1563-260924-4", mode: nil, to: store, clock: clock)
+        let legacy = try addRow(.queuedForSubmission, number: "1563-260924-4", mode: nil, to: store, clock: clock)
         var yesterday = try addRow(.queuedForSubmission, number: "1563-260923-5", mode: .demo, to: store, clock: clock)
         yesterday.evidenceNumberAllocatedAt = clock.now.addingTimeInterval(-36 * 3600)
         store.upsert(yesterday)
@@ -224,13 +229,55 @@ final class EvidenceSubmissionFlowTests: XCTestCase {
 
         await checker.runOnce()
 
-        XCTAssertEqual(lookup.calls, 0)
+        XCTAssertEqual(lookup.numbers, ["1563-260924-1"])
         XCTAssertEqual(submitter.calls, 0)
-        for row in before {
+        XCTAssertEqual(store.record(id: demoAccepted.id)?.status, .processed)
+        XCTAssertEqual(coordinatorModes, [.demo], "the lookup targets the row's own mode, and nothing is sent in test")
+        for row in before where row.id != demoAccepted.id {
             let after = try XCTUnwrap(store.record(id: row.id))
             XCTAssertEqual(after.status, row.status, "\(row.evidenceNumber ?? "")")
             XCTAssertEqual(after.updatedAt, row.updatedAt, "\(row.evidenceNumber ?? "")")
         }
+        XCTAssertEqual(store.record(id: demoQueued.id)?.status, .queuedForSubmission)
+        XCTAssertEqual(store.record(id: legacy.id)?.status, .queuedForSubmission)
+    }
+
+    /// The case found on 2026-09-24: a record accepted in Production stayed "Prijatý na
+    /// spracovanie" because the advocate had switched to Demo, and the check skipped it.
+    func testProductionRowAcceptedIsProcessedWhileDemoIsCurrent() async throws {
+        let clock = TestClock("2026-09-24T17:30:00Z")
+        let lookup = ScriptedLookup([.success(EZZKRecordLookup(isProcessed: true, info: nil))])
+        let (checker, store) = makeChecker(mode: .demo, submitter: ScriptedSubmitter([]), lookup: lookup,
+                                           clock: clock, sendsInProduction: true)
+        var accepted = try addRow(.acceptedForProcessing, number: "1563-260924-2", mode: .production, to: store, clock: clock)
+        accepted.submittedAt = clock.now.addingTimeInterval(-97 * 60)
+        accepted.lastLookupAt = clock.now.addingTimeInterval(-97 * 60 + 6)
+        store.upsert(accepted)
+
+        await checker.runOnce()
+
+        XCTAssertEqual(store.record(id: accepted.id)?.status, .processed)
+        XCTAssertEqual(coordinatorModes, [.production])
+    }
+
+    /// "Overiť v EZZK" on a row of another mode looks it up in its own mode's EZZK;
+    /// "Odoslať" on the same kind of row stays refused.
+    func testVerifyLooksUpARowOfAnotherModeInItsOwnMode() async throws {
+        let clock = TestClock("2026-09-24T10:00:00Z")
+        let lookup = ScriptedLookup([.success(EZZKRecordLookup(isProcessed: true, info: nil))])
+        let (checker, store) = makeChecker(mode: .test, submitter: ScriptedSubmitter([]), lookup: lookup, clock: clock)
+        var accepted = try addRow(.acceptedForProcessing, number: "1563-260924-1", mode: .demo, to: store, clock: clock)
+        accepted.submittedAt = clock.now.addingTimeInterval(-60)
+        store.upsert(accepted)
+
+        let verified = await checker.verify(id: accepted.id)
+
+        XCTAssertEqual(verified.record?.status, .processed)
+        XCTAssertEqual(lookup.numbers, ["1563-260924-1"])
+        XCTAssertEqual(coordinatorModes, [.demo])
+        let queued = try addRow(.queuedForSubmission, number: "1563-260924-2", mode: .demo, to: store, clock: clock)
+        let sent = await checker.submit(id: queued.id)
+        XCTAssertEqual(sent.refusal, EZZKStatusChecker.recordFromOtherModeMessage)
     }
 
     func testCheckerSkipsRowsWithoutEvidenceNumber() async throws {
@@ -374,9 +421,10 @@ final class EvidenceSubmissionFlowTests: XCTestCase {
         XCTAssertEqual(store.record(id: legacy.id)?.updatedAt, legacy.updatedAt)
     }
 
-    /// Switching the EZZK mode while a pass waits on a lookup: the rest of the pass leaves
-    /// the old mode's rows alone, and every coordinator targeted the row's own mode.
-    func testModeSwitchDuringAPassStopsTheRestOfThePass() async throws {
+    /// Switching the EZZK mode while a pass waits on a lookup: the rest of the pass sends
+    /// none of the old mode's rows but still looks its rows up, and every coordinator
+    /// targeted the row's own mode.
+    func testModeSwitchDuringAPassStopsSendsButNotLookups() async throws {
         let clock = TestClock("2026-09-24T10:00:00Z")
         let lookup = SuspendingLookup(EZZKRecordLookup(isProcessed: true, info: nil))
         let submitter = ScriptedSubmitter([])
@@ -396,9 +444,9 @@ final class EvidenceSubmissionFlowTests: XCTestCase {
         lookup.release()
         await pass.value
 
-        XCTAssertEqual(lookup.numbers, ["1563-260924-1"], "no lookup after the switch")
+        XCTAssertEqual(lookup.numbers, ["1563-260924-1", "1563-260924-2"], "lookups go on after the switch")
         XCTAssertEqual(submitter.calls, 0, "no send after the switch")
-        XCTAssertEqual(store.record(id: second.id)?.lastLookupAt, nil)
+        XCTAssertEqual(store.record(id: second.id)?.status, .processed)
         XCTAssertEqual(Set(coordinatorModes), [.test], "every coordinator targets the row's own mode")
     }
 
@@ -543,7 +591,8 @@ final class EvidenceSubmissionFlowTests: XCTestCase {
 
     private func makeChecker(mode: AppSettings.EZZKMode, submitter: any EZZKSubmissionTransport,
                              lookup: any EZZKRecordLookingUp,
-                             clock: TestClock) -> (EZZKStatusChecker, LocalEvidenceStore) {
+                             clock: TestClock,
+                             sendsInProduction: Bool = false) -> (EZZKStatusChecker, LocalEvidenceStore) {
         storeRoot = makeTemporaryDirectory("submission-flow")
         let store = LocalEvidenceStore(directory: storeRoot)
         pool = EvidenceNumberPool(directory: storeRoot)
@@ -558,7 +607,8 @@ final class EvidenceSubmissionFlowTests: XCTestCase {
                 self.coordinatorModes.append(rowMode)
                 return EZZKSubmissionCoordinator(submitter: submitter, lookup: lookup, now: now)
             },
-            now: now)
+            now: now,
+            sendsInProduction: sendsInProduction)
         return (checker, store)
     }
 

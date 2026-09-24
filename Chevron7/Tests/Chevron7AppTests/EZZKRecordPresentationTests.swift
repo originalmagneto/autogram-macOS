@@ -128,14 +128,22 @@ final class EZZKRecordPresentationTests: XCTestCase {
         XCTAssertFalse(EZZKRecordPresentation.stateExplanation(for: unsigned).joined().contains("Neodovzdávajte"))
     }
 
-    func testDoneOffersNoActionForARowOfAnotherMode() {
-        for status in [EvidenceRecord.Status.queuedForSubmission, .outcomeUnknown, .acceptedForProcessing] {
+    /// A row of another mode is not sent from the Done screen, but may be looked up: the
+    /// lookup goes to the row's own EZZK.
+    func testDoneSendsNoRowOfAnotherModeButVerifiesIt() {
+        let queued = ZakoDonePresentation(record: row(.queuedForSubmission, mode: .test), lastError: nil,
+                                          lastErrorStatus: nil, nextStatusCheck: nil, now: now,
+                                          currentMode: .demo)
+        XCTAssertEqual(queued.action, .none)
+        XCTAssertFalse(queued.isActionEnabled)
+        XCTAssertTrue(queued.lines.contains(EZZKStatusChecker.recordFromOtherModeMessage), "\(queued.lines)")
+        for status in [EvidenceRecord.Status.outcomeUnknown, .acceptedForProcessing] {
             let done = ZakoDonePresentation(record: row(status, mode: .test), lastError: nil, lastErrorStatus: nil,
                                             nextStatusCheck: nil, now: now,
                                             currentMode: .demo)
-            XCTAssertEqual(done.action, .none, "\(status)")
-            XCTAssertFalse(done.isActionEnabled)
-            XCTAssertTrue(done.lines.contains(EZZKStatusChecker.recordFromOtherModeMessage), "\(done.lines)")
+            XCTAssertEqual(done.action, .verify(availableAt: nil), "\(status)")
+            XCTAssertTrue(done.isActionEnabled)
+            XCTAssertFalse(done.lines.contains(EZZKStatusChecker.recordFromOtherModeMessage), "\(done.lines)")
         }
         let sameMode = ZakoDonePresentation(record: row(.queuedForSubmission, mode: .test), lastError: nil,
                                             lastErrorStatus: nil, nextStatusCheck: nil,
@@ -248,6 +256,15 @@ final class EZZKRecordPresentationTests: XCTestCase {
         let otherMode = EvidenceRegisterDetail.actions(for: row(.queuedForSubmission, mode: .demo), currentMode: .test)
         XCTAssertFalse(otherMode.canSend)
         XCTAssertEqual(otherMode.note, EZZKStatusChecker.recordFromOtherModeMessage)
+        for status in [EvidenceRecord.Status.outcomeUnknown, .acceptedForProcessing] {
+            let verifiable = EvidenceRegisterDetail.actions(for: row(status, mode: .demo), currentMode: .test)
+            XCTAssertTrue(verifiable.canVerify, "a lookup goes to the row's own EZZK from any mode: \(status)")
+            XCTAssertFalse(verifiable.canSend)
+            XCTAssertNil(verifiable.note)
+        }
+        let productionFromDemo = EvidenceRegisterDetail.actions(for: row(.acceptedForProcessing, mode: .production),
+                                                                currentMode: .demo)
+        XCTAssertFalse(productionFromDemo.canVerify, "the production policy still decides")
 
         let production = EvidenceRegisterDetail.actions(for: row(.queuedForSubmission, mode: .production),
                                                          currentMode: .production)
