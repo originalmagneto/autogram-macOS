@@ -85,6 +85,39 @@ final class EZZKAccountControllerTests: XCTestCase {
         XCTAssertEqual(transport.requestCount, 0)
     }
 
+    /// Pins that `service(for:)` actually wires `productionPolicy` through to the SOAP
+    /// client it builds: `.allowed` reaches EZZK for allocation, `.refused` never touches
+    /// the network, whatever mode the controller happens to be in.
+    func testProductionPolicyAllowedReachesEZZKForAllocation() async throws {
+        let store = MemoryCredentialStore()
+        try store.save(EZZKSOAPCredentials(login: "ucet", password: "heslo"), environment: .production)
+        let transport = ScriptedTransport([loginSucceeded, numbersReply])
+        let controller = EZZKAccountController(mode: .production, credentialStore: store,
+                                               transportFactory: { _ in transport }, productionPolicy: .allowed)
+        controller.configure(person: { EZZKPerson(corporateBodyFullName: "Advokátska kancelária Test", ico: "12345678") },
+                             usedEvidenceNumbers: { [] })
+
+        let numbers = try await controller.service(for: .production).requestEvidenceNumbers(count: 1)
+
+        XCTAssertEqual(numbers, ["260917-A"])
+        XCTAssertEqual(transport.operations, ["LogIn", "GetConversionRecordEvidenceNumber"])
+        XCTAssertEqual(transport.requestCount, 2)
+    }
+
+    func testProductionPolicyRefusedTouchesNoNetworkViaServiceForProduction() async {
+        let transport = ScriptedTransport([])
+        let controller = EZZKAccountController(mode: .production, credentialStore: MemoryCredentialStore(),
+                                               transportFactory: { _ in transport }, productionPolicy: .refused)
+
+        do {
+            _ = try await controller.service(for: .production).requestEvidenceNumbers(count: 1)
+            XCTFail("expected productionAllocationDisabled")
+        } catch {
+            XCTAssertEqual(error as? EZZKError, .productionAllocationDisabled)
+        }
+        XCTAssertEqual(transport.requestCount, 0)
+    }
+
     func testModeChangeResetsStateAndLoadsThatEnvironmentsLogin() throws {
         let store = MemoryCredentialStore()
         try store.save(EZZKSOAPCredentials(login: "testovaci", password: "x"), environment: .sandbox)
