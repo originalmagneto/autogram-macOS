@@ -50,10 +50,12 @@ enum SidebarConversionRows {
         let isOverdue = record.status.isSubmissionPendingState && now > record.submissionDeadline
         let stateLabel = UXLabels.evidenceStatusLabel(for: record.status, isOverdue: isOverdue)
         let showsOverdue = stateLabel != UXLabels.evidenceStatusLabel(for: record.status)
+        // A Demo row never reached EZZK: its number says so, its state is the simulation's.
+        let isDemo = record.ezzkMode == .demo
         return Row(id: record.id,
                    name: displayName(for: record),
-                   evidenceNumber: nonEmpty(record.evidenceNumber) ?? "nezískané",
-                   stateLabel: stateLabel,
+                   evidenceNumber: (nonEmpty(record.evidenceNumber) ?? "nezískané") + (isDemo ? " · Demo" : ""),
+                   stateLabel: isDemo ? "Demo, mimo EZZK" : stateLabel,
                    symbol: showsOverdue ? "clock.badge.exclamationmark" : record.status.sfSymbol,
                    tone: showsOverdue ? .failure : EZZKRecordPresentation.tone(for: record.status))
     }
