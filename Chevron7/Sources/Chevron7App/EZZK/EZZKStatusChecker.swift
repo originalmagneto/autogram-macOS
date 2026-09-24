@@ -246,6 +246,18 @@ final class EZZKStatusChecker {
         return result.map(RowResult.row) ?? .refused(Self.missingRowMessage)
     }
 
+    /// Sends a record EZZK refused at submission again ("Odoslať znova" in the Register,
+    /// after the advocate confirmed it). Only `EZZKSubmissionCoordinator.canResend` rows are
+    /// sent; any other row comes back unchanged. The periodic check never calls this.
+    func resend(id: UUID) async -> RowResult {
+        if let refusal = refusal(for: id) { return .refused(refusal) }
+        let coordinator = makeCoordinator(currentMode())
+        let result = await perform(id) { record in
+            await coordinator.resend(record, container: self.evidenceStore.recordContainerData(for: record))
+        }
+        return result.map(RowResult.row) ?? .refused(Self.missingRowMessage)
+    }
+
     /// Looks one row up now ("Overiť v EZZK"): an unknown outcome is resolved (no sooner
     /// than five minutes after the attempt, see `nextStatusCheck(for:)`), an accepted row
     /// is refreshed. Nothing is sent.

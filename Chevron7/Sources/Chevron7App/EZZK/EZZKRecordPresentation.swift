@@ -262,6 +262,10 @@ enum EvidenceRegisterDetail {
         let canVerify: Bool
         /// Why the row cannot be sent, or what sending it means, or nil.
         let note: String?
+        /// "Odoslať znova": a record EZZK refused at submission (ruling R18).
+        var canResend = false
+        /// The confirmation shown before "Odoslať znova", naming EZZK's code and description.
+        var resendConfirmation: String?
     }
 
     struct Deadline: Equatable {
@@ -323,15 +327,34 @@ enum EvidenceRegisterDetail {
         if status == .recordUnsigned {
             return Actions(canSend: false, canVerify: false, note: EZZKRecordPresentation.resignLater)
         }
-        guard sendable || verifiable else { return Actions(canSend: false, canVerify: false, note: nil) }
+        let resendable = status == .rejected && EZZKSubmissionCoordinator.canResend(record)
+            && record.recordContainerPath != nil
+        guard sendable || verifiable || resendable else { return Actions(canSend: false, canVerify: false, note: nil) }
         if mode != currentMode {
             return Actions(canSend: false, canVerify: false, note: EZZKStatusChecker.recordFromOtherModeMessage)
         }
         if mode == .production {
             return Actions(canSend: false, canVerify: false, note: EZZKError.submissionUnavailable.errorDescription)
         }
+        if resendable {
+            return Actions(canSend: false, canVerify: false, note: nil,
+                           canResend: true, resendConfirmation: resendConfirmation(for: record))
+        }
         return Actions(canSend: sendable, canVerify: verifiable,
                        note: status == .late ? EZZKRecordPresentation.lateWarning : nil)
+    }
+
+    /// "EZZK záznam odmietlo (kód N: popis). Odoslať ho znova?"
+    static func resendConfirmation(for record: EvidenceRecord) -> String {
+        let description = record.ezzkResultDescription.flatMap { $0.isEmpty ? nil : $0 }
+        let reason: String
+        switch (record.ezzkResultCode, description) {
+        case let (code?, description?): reason = " (kód \(code): \(description))"
+        case let (code?, nil): reason = " (kód \(code))"
+        case let (nil, description?): reason = " (\(description))"
+        case (nil, nil): reason = ""
+        }
+        return "EZZK záznam odmietlo\(reason). Odoslať ho znova?"
     }
 
     /// The Register's deadline column. EZZK expects the record on the Bratislava day the

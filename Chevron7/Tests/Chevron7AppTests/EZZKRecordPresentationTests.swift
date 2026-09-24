@@ -230,6 +230,44 @@ final class EZZKRecordPresentationTests: XCTestCase {
         XCTAssertEqual(unsigned.note, "Záznam podpíšte znova novou konverziou; opakovaný podpis z Registra príde neskôr.")
     }
 
+    /// Ruling R18: only a record EZZK refused at submission (nothing stored) with its signed
+    /// container in the register can be sent again, behind a confirmation naming EZZK's code.
+    func testRegisterOffersResendOnlyForARecordRefusedAtSubmission() {
+        var refused = row(.rejected)
+        refused.ezzkResultCode = 203
+        refused.ezzkResultDescription = "Neplatný podpis záznamu"
+        refused.recordContainerPath = "Evidence/Records/x.asice"
+
+        let offered = EvidenceRegisterDetail.actions(for: refused, currentMode: .test)
+        XCTAssertTrue(offered.canResend)
+        XCTAssertFalse(offered.canSend)
+        XCTAssertFalse(offered.canVerify)
+        XCTAssertEqual(offered.resendConfirmation,
+                       "EZZK záznam odmietlo (kód 203: Neplatný podpis záznamu). Odoslať ho znova?")
+
+        var afterReceipt = refused
+        afterReceipt.submittedAt = now
+        var afterLookup = refused
+        afterLookup.lastLookupAt = now
+        var withoutContainer = refused
+        withoutContainer.recordContainerPath = nil
+        for row in [afterReceipt, afterLookup, withoutContainer] {
+            let actions = EvidenceRegisterDetail.actions(for: row, currentMode: .test)
+            XCTAssertFalse(actions.canResend)
+            XCTAssertNil(actions.resendConfirmation)
+        }
+
+        let otherMode = EvidenceRegisterDetail.actions(for: refused, currentMode: .demo)
+        XCTAssertFalse(otherMode.canResend)
+        XCTAssertEqual(otherMode.note, EZZKStatusChecker.recordFromOtherModeMessage)
+
+        var production = refused
+        production.ezzkMode = .production
+        let productionActions = EvidenceRegisterDetail.actions(for: production, currentMode: .production)
+        XCTAssertFalse(productionActions.canResend)
+        XCTAssertEqual(productionActions.note, EZZKError.submissionUnavailable.errorDescription)
+    }
+
     func testDeadlineColumn() {
         XCTAssertEqual(EvidenceRegisterDetail.deadline(for: row(.late), now: now).text, EZZKRecordPresentation.lateWarning)
         XCTAssertEqual(EvidenceRegisterDetail.deadline(for: row(.processed), now: now).text, "Spracovaný v EZZK")

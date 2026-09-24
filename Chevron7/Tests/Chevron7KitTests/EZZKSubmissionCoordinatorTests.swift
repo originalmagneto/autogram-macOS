@@ -166,6 +166,61 @@ final class EZZKSubmissionCoordinatorTests: XCTestCase {
         XCTAssertNil(result.submittedAt)
     }
 
+    /// EZZK refused the record at submission and stored nothing, so the advocate may send
+    /// it again by hand (ruling R18). `submit` itself never sends a rejected row.
+    func testRecordRefusedAtSubmissionCanBeResentByHand() async throws {
+        let now = date("2026-09-23T10:00:06Z")
+        let refusing = FakeSubmitter(.failure(EZZKError.serviceRejected(code: 203, message: "Neplatný podpis záznamu")))
+        var queued = record(.queuedForSubmission)
+        queued.lastLookupAt = date("2026-09-23T09:55:00Z")
+        let rejected = await EZZKSubmissionCoordinator(submitter: refusing, lookup: FakeLookup(), now: { now })
+            .submit(queued, container: container)
+        XCTAssertEqual(rejected.status, .rejected)
+        XCTAssertNil(rejected.lastLookupAt, "a lookup of an earlier attempt does not describe this refusal")
+        XCTAssertTrue(EZZKSubmissionCoordinator.canResend(rejected))
+
+        let receipt = EZZKSOAPSubmissionReceipt(messageID: "m-2", submittedAt: now)
+        let accepting = FakeSubmitter(.success(receipt))
+        let coordinator = EZZKSubmissionCoordinator(submitter: accepting, lookup: FakeLookup(), now: { now })
+        let unchanged = await coordinator.submit(rejected, container: container)
+        XCTAssertEqual(unchanged.status, .rejected)
+        XCTAssertEqual(unchanged.updatedAt, rejected.updatedAt)
+        XCTAssertEqual(accepting.calls, 0, "submit never sends a rejected row")
+
+        let resent = await coordinator.resend(rejected, container: container)
+
+        XCTAssertEqual(accepting.calls, 1)
+        XCTAssertEqual(resent.status, .acceptedForProcessing)
+        XCTAssertEqual(resent.submittedAt, now)
+        XCTAssertEqual(resent.submissionMessageID, "m-2")
+        XCTAssertEqual(resent.ezzkResultCode, 0)
+        XCTAssertNil(resent.ezzkResultDescription)
+    }
+
+    /// A record EZZK refused after receiving it (a lookup answered with a refusal code) is
+    /// held by EZZK: resending it would store a duplicate, so it is never resent, whether
+    /// the receipt arrived (`submittedAt`) or the send's outcome was unknown.
+    func testRecordRefusedAfterReceiptIsNeverResent() async throws {
+        let now = date("2026-09-23T23:00:00Z")
+        let refused = FakeLookup(.failure(EZZKError.serviceRejected(code: 12, message: "Neznámy obsah")))
+        let submitter = FakeSubmitter(.success(EZZKSOAPSubmissionReceipt(messageID: "m-3", submittedAt: now)))
+        let coordinator = EZZKSubmissionCoordinator(submitter: submitter, lookup: refused, now: { now })
+        var accepted = record(.acceptedForProcessing)
+        accepted.submittedAt = date("2026-09-23T22:00:00Z")
+        var unknown = record(.outcomeUnknown)
+        unknown.updatedAt = date("2026-09-23T22:00:00Z")
+
+        for refusedRow in [await coordinator.refreshStatus(accepted), await coordinator.resolveUnknown(unknown)] {
+            XCTAssertEqual(refusedRow.status, .rejected)
+            XCTAssertFalse(EZZKSubmissionCoordinator.canResend(refusedRow))
+            let result = await coordinator.resend(refusedRow, container: container)
+            XCTAssertEqual(result.status, .rejected)
+            XCTAssertEqual(result.updatedAt, refusedRow.updatedAt)
+        }
+        XCTAssertEqual(submitter.calls, 0)
+        XCTAssertFalse(EZZKSubmissionCoordinator.canResend(record(.queuedForSubmission)))
+    }
+
     func testRecordUnsignedRowIsNeverSubmitted() async throws {
         let now = date("2026-09-23T10:00:06Z")
         let submitter = FakeSubmitter(.success(EZZKSOAPSubmissionReceipt(messageID: "m", submittedAt: now)))

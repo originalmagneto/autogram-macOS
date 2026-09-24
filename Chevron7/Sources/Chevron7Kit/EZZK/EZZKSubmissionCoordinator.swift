@@ -55,9 +55,31 @@ public struct EZZKSubmissionCoordinator: Sendable {
         case .signed, .queuedForSubmission, .submissionFailed, .late:
             break
         default:
-            // `.outcomeUnknown` is resolved by lookup first; finished and unsigned rows stay.
+            // `.outcomeUnknown` is resolved by lookup first; finished, rejected and unsigned
+            // rows stay (a rejected row is only ever resent by hand, see `resend`).
             return record
         }
+        return await send(record, container: container)
+    }
+
+    /// Whether the advocate may send a rejected row again (ruling R18): EZZK refused the
+    /// record when it was submitted, so it stored nothing and a resend cannot duplicate it.
+    /// A row refused after EZZK received it is never resent: after a receipt (`submittedAt`),
+    /// or when a lookup answered with a refusal code (`lastLookupAt`, set by `resolveUnknown`
+    /// and `refreshStatus`; a refusal at submission clears it).
+    public static func canResend(_ record: EvidenceRecord) -> Bool {
+        record.status == .rejected && record.submittedAt == nil && record.lastLookupAt == nil
+    }
+
+    /// "Odoslať znova" in the Register: sends a row `canResend` allows, exactly as `submit`
+    /// sends a pending row. Any other row is returned unchanged. Only a manual action calls
+    /// this; the periodic check never resends a rejected row.
+    public func resend(_ record: EvidenceRecord, container: Data?) async -> EvidenceRecord {
+        guard Self.canResend(record) else { return record }
+        return await send(record, container: container)
+    }
+
+    private func send(_ record: EvidenceRecord, container: Data?) async -> EvidenceRecord {
         var updated = record
         guard evidenceNumber(of: record) != nil else {
             guard record.ezzkResultDescription != Self.missingEvidenceNumberReason else { return record }
@@ -193,6 +215,9 @@ public struct EZZKSubmissionCoordinator: Sendable {
         switch error {
         case .serviceRejected(let code, let message):
             markRejected(&record, code: code, message: message)
+            // Refused at submission: a lookup of an earlier attempt does not describe it,
+            // and `canResend` reads a set `lastLookupAt` as a refusal after receipt.
+            record.lastLookupAt = nil
         case .networkFailure, .notConfigured, .authenticationFailed, .credentialsRejected,
              .accountLocked, .submissionUnavailable, .invalidRequest, .untrustedCertificate:
             // Nothing reached EZZK: the host was unreachable, the login or the certificate

@@ -462,6 +462,32 @@ final class EvidenceSubmissionFlowTests: XCTestCase {
         XCTAssertGreaterThan(checker.changeCount, changes)
     }
 
+    /// "Odoslať znova" sends a record EZZK refused at submission through the coordinator;
+    /// the periodic check and "Odoslať" never resend a rejected row.
+    func testRejectedRowIsResentOnlyByHand() async throws {
+        let clock = TestClock("2026-09-24T10:00:00Z")
+        let receipt = EZZKSOAPSubmissionReceipt(messageID: "m-7", submittedAt: clock.now)
+        let submitter = ScriptedSubmitter([.success(receipt)])
+        let (checker, store) = makeChecker(mode: .test, submitter: submitter, lookup: ScriptedLookup([]), clock: clock)
+        pool.add(.init(number: "1563-260924-6", mode: .test, allocatedAt: clock.now))
+        var row = try addRow(.rejected, number: "1563-260924-6", to: store, clock: clock)
+        row.ezzkResultCode = 203
+        row.ezzkResultDescription = "Neplatný podpis záznamu"
+        store.upsert(row)
+
+        await checker.runOnce()
+        let summary = await checker.submitPending()
+        XCTAssertEqual(submitter.calls, 0)
+        XCTAssertEqual(summary.feedback, "Žiadny záznam nečaká na odoslanie.")
+
+        let result = await checker.resend(id: row.id)
+
+        XCTAssertEqual(submitter.calls, 1)
+        XCTAssertEqual(result.record?.status, .acceptedForProcessing)
+        XCTAssertEqual(store.record(id: row.id)?.submissionMessageID, "m-7")
+        XCTAssertNil(pool.reusable(mode: .test, at: clock.now, excluding: []))
+    }
+
     /// Production submission is still refused (B3), so production rows are neither sent
     /// nor counted as waiting; they carry the production reason.
     func testProductionRowsAreNeverSentWhileProductionIsRefused() async throws {

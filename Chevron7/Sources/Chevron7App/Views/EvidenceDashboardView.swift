@@ -391,6 +391,7 @@ struct RecordDetailView: View {
     let onClose: () -> Void
     @State private var copiedFingerprint = false
     @State private var showDeleteConfirm = false
+    @State private var showResendConfirm = false
     @State private var selectedTab = 0
     @State private var isWorking = false
     @State private var actionMessage: String?
@@ -548,6 +549,24 @@ struct RecordDetailView: View {
                     if isWorking { ProgressView().controlSize(.small) }
                 }
                 .disabled(isWorking)
+            }
+            if actions.canResend {
+                HStack(spacing: 10) {
+                    Button {
+                        showResendConfirm = true
+                    } label: {
+                        Label("Odoslať znova", systemImage: "arrow.clockwise")
+                    }
+                    if isWorking { ProgressView().controlSize(.small) }
+                }
+                .disabled(isWorking)
+                .confirmationDialog(actions.resendConfirmation ?? "Odoslať záznam znova?",
+                                    isPresented: $showResendConfirm, titleVisibility: .visible) {
+                    Button("Odoslať znova") {
+                        run { await settingsStore.statusChecker.resend(id: record.id) }
+                    }
+                    Button("Zrušiť", role: .cancel) {}
+                }
             }
             if let actionMessage {
                 Text(actionMessage)
