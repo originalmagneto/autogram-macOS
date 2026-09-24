@@ -52,7 +52,7 @@ The relay `autogram.slovensko.digital` answered 503 from nginx on every URL, inc
 - Evidence: containers from the card listed `kontajner.asice` instead of the PDF; phone containers held the PDF.
 - Cause: the app packaged the PDF into an unsigned ASiC-E first and the engine wrapped that again.
 - Fix: the engine receives the PDF under its real filename and builds the ASiC-E itself (`c0598c11`).
-- Open: the main window's ASiC-E output still packages files the same way and probably nests too. Not verified.
+- Main window (2026-09-24): confirmed. A card ASiC-E from the main window held `kontajner.asice`; with a visual stamp the PDF inside had also been rewritten and had lost its own PAdES signature. Fixed on branch `fix/preserve-existing-signatures`: every main-window request passes the PDF as the source (`signsExtraFilesAsDataObjects`), and a signed source is never rewritten (`ExistingSignatureGuard`).
 
 ### 7. Baseline B, the level portals ask for, was blocked three times over
 

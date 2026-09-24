@@ -121,6 +121,10 @@ public final class EngineBridgeSigningProvider: QualifiedSigningProviding, @unch
         identityCache.withLock { $0 = nil }
     }
 
+    /// An `.asice` source reaches the engine under its own name, and the machine
+    /// service extends it (`SigningParameters.buildForExistingASiC`).
+    public var addsSignatureToExistingContainer: Bool { true }
+
     public func inspectInputSignatures(in fileURL: URL) async -> InputSignatureInspectionResult {
         let canonical = EnginePaths.canonical(fileURL)
         return await inspectInputSignatures(in: [canonical])[canonical]
@@ -644,14 +648,11 @@ public final class EngineBridgeSigningProvider: QualifiedSigningProviding, @unch
             || text.contains("oprávnenie") || text.contains("opravnenie")
     }
 
+    /// Only the mandate token decides (`MandateCertificate`): a QESIG certificate from a
+    /// qualified issuer is not a mandate certificate, so it no longer counts as one.
     static func isMandateCertificate(issuer: String, displayName: String, qualification: String? = nil) -> Bool {
         if isCommercialIssuer(issuer) { return false }
-        let text = "\(issuer) \(displayName)".lowercased()
-        if text.contains("oprávnenie") || text.contains("opravnenie")
-            || text.contains("mandát") || text.contains("mandat") {
-            return true
-        }
-        return qualification == "QESIG" && text.contains("qualified")
+        return MandateCertificate.matches(subject: displayName, issuer: issuer)
     }
 
     static func syntheticIdentity(driverNames: [String] = [], driverID connectedDriverID: String? = nil) -> SigningIdentityInfo {

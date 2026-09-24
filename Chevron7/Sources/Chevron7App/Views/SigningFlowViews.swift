@@ -333,6 +333,9 @@ struct SigningPrepareView: View {
                 bridgePlacement = newValue
             }
         }
+        .onChange(of: store.bakedVisualStampIsBlocked, initial: true) { _, blocked in
+            if blocked { store.includeVisibleSignature = false }
+        }
         .onChange(of: store.includeVisibleSignature) { _, enabled in
             guard let visualState else { return }
             if enabled {
@@ -525,6 +528,20 @@ struct SigningPrepareView: View {
         "Podpisy v dokumente" + (store.existingSignatures.isEmpty ? "" : " · \(store.existingSignatures.count)")
     }
 
+    /// How the chosen format treats the signatures the document already has.
+    private var existingSignatureFormatNote: String? {
+        switch (store.sourceSignatureKind, store.outputFormat) {
+        case (.asicContainer, _):
+            "Podpis sa pridá do tohto kontajnera ASiC-E popri existujúcich podpisoch."
+        case (.signedPDF, .embeddedPAdES):
+            "Podpis sa pridá do PDF popri existujúcich podpisoch."
+        case (.signedPDF, .attachedASIC):
+            "Podpísané PDF sa vloží do nového kontajnera bez zmeny; jeho podpisy zostanú v PDF."
+        case (.unsignedPDF, _):
+            nil
+        }
+    }
+
     private var selectedOutputFormatPresentation: SigningOutputFormatPresentation {
         switch store.outputFormat {
         case .embeddedPAdES:
@@ -668,6 +685,8 @@ struct SigningPrepareView: View {
                                             lineWidth: 1))
                             }
                             .buttonStyle(.plain)
+                            .disabled(store.sourceSignatureKind == .asicContainer
+                                      && presentation.format == .embeddedPAdES)
                             .accessibilityLabel("Formát výstupu \(presentation.label)")
                             .accessibilityValue(isSelected ? "Vybraný" : "Nevybraný")
                             .accessibilityAddTraits(isSelected ? .isSelected : [])
@@ -677,6 +696,12 @@ struct SigningPrepareView: View {
                     Text(selectedOutputFormatPresentation.explanation)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
+
+                    if let note = existingSignatureFormatNote {
+                        Text(note)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
                 }
 
                 Divider().opacity(0.5)
@@ -705,6 +730,12 @@ struct SigningPrepareView: View {
                     Label("Konvertovať do PDF/A pred podpisom", systemImage: "doc.badge.arrow.up")
                         .font(.callout)
                 }
+                .disabled(store.preservesSourceBytes)
+                if store.preservesSourceBytes {
+                    Text("Podpísaný dokument sa do PDF/A nekonvertuje: konverzia by zrušila jeho existujúce podpisy.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
             }
             .inspectorCard(cornerRadius: 12, padding: 12)
 
@@ -717,9 +748,18 @@ struct SigningPrepareView: View {
                     Toggle("", isOn: $store.includeVisibleSignature)
                         .labelsHidden()
                         .toggleStyle(.switch)
+                        .disabled(store.bakedVisualStampIsBlocked)
                 }
 
-                if store.includeVisibleSignature, let visualState {
+                if store.bakedVisualStampIsBlocked {
+                    Text(store.sourceSignatureKind == .asicContainer
+                         ? "Do dokumentu v kontajneri ASiC-E sa pečiatka nevkladá, podpis sa pridá do kontajnera."
+                         : "Pečiatka by v kontajneri ASiC-E prepísala PDF a zrušila jeho podpisy. Pre viditeľnú pečiatku zvoľte PAdES.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+
+                if store.includeVisibleSignature, !store.bakedVisualStampIsBlocked, let visualState {
                     Divider().opacity(0.5)
                     VisibleAppearanceInspector(state: visualState)
                 }
@@ -789,7 +829,11 @@ struct SigningPrepareView: View {
             .buttonStyle(.bordered)
             .controlSize(.large)
             .disabled(!store.canSignViaMobile)
-            .help("Podpis občianskym preukazom s NFC cez iPhone a aplikáciu Autogram v mobile")
+            .help(store.sourceSignatureKind == .asicContainer
+                  ? "Do kontajnera ASiC-E sa podpis mobilom pridať nedá."
+                  : store.preservesSourceBytes && store.includeVisibleSignature
+                  ? "Mobilom sa do podpísaného PDF pečiatka vložiť nedá. Vypnite pečiatku alebo podpíšte kartou."
+                  : "Podpis občianskym preukazom s NFC cez iPhone a aplikáciu Autogram v mobile")
         }
     }
 }
@@ -854,7 +898,9 @@ struct SignatureInfoRow: View {
         switch info.state {
         case .valid: "Platný"
         case .invalid: "Neplatný"
-        case .indeterminate: "Dočasný"
+        // DSS INDETERMINATE: the check could not conclude, typically because fresh
+        // revocation data for a signature made moments ago is not published yet.
+        case .indeterminate: "Neurčitý"
         case .unknown: "Neoverené"
         }
     }
@@ -878,6 +924,17 @@ struct SigningDoneView: View {
                     Label("Nový podpis", systemImage: "plus")
                 }
                 .controlSize(.large)
+
+                if let url = store.signedOutputURL {
+                    Button {
+                        Task { await store.addFurtherSignature(to: url) }
+                    } label: {
+                        Label("Pridať ďalší podpis", systemImage: "signature")
+                    }
+                    .controlSize(.large)
+                    .disabled(!store.canAddFurtherSignature)
+                    .help("Otvorí podpísaný dokument a pridá k nemu ďalší podpis")
+                }
 
                 Spacer()
 
@@ -968,7 +1025,9 @@ struct SigningDoneView: View {
                         .font(.caption)
                         .foregroundStyle(store.pdfaPrepared ? .green : .secondary)
 
-                    Label(store.pdfaAfterSign ? "Po podpise: PDF/A zachované" : "Po podpise: PAdES formát",
+                    Label(store.pdfaAfterSign ? "Po podpise: PDF/A zachované"
+                          : store.signedOutputURL?.pathExtension.lowercased() == "asice"
+                          ? "Po podpise: kontajner ASiC-E (XAdES)" : "Po podpise: PDF s podpisom PAdES",
                           systemImage: store.pdfaAfterSign ? "checkmark.circle.fill" : "info.circle")
                         .font(.caption)
                         .foregroundStyle(store.pdfaAfterSign ? .green : .secondary)
