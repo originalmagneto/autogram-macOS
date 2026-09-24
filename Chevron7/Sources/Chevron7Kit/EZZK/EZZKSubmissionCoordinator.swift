@@ -241,7 +241,8 @@ public struct EZZKSubmissionCoordinator: Sendable {
             // and `canResend` reads a set `lastLookupAt` as a refusal after receipt.
             record.lastLookupAt = nil
         case .networkFailure, .notConfigured, .authenticationFailed, .credentialsRejected,
-             .accountLocked, .submissionUnavailable, .invalidRequest, .untrustedCertificate:
+             .accountLocked, .submissionUnavailable, .invalidRequest, .untrustedCertificate,
+             .demoSignatureOutsideDemo:
             // Nothing reached EZZK: the host was unreachable, the login or the certificate
             // pin failed before the request was written, sending is disabled, or WCF refused
             // the body (DeserializationFailed, ActionMismatch) before the operation ran.

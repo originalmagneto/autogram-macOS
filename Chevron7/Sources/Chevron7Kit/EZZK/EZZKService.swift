@@ -72,6 +72,9 @@ public enum EZZKError: LocalizedError, Equatable, Sendable {
     case evidenceNumberExpired
     case evidenceNumberFromOtherMode
     case outcomeUnknown
+    /// Outside Demo, no bundled engine or no card identity leaves only the Demo signing
+    /// provider, which must never allocate a number or send a record it cannot really sign.
+    case demoSignatureOutsideDemo
 
     public var errorDescription: String? {
         switch self {
@@ -109,6 +112,8 @@ public enum EZZKError: LocalizedError, Equatable, Sendable {
             return "Evidenčné číslo bolo získané v inom režime EZZK. Získajte nové číslo."
         case .outcomeUnknown:
             return "Spojenie s EZZK sa prerušilo a nie je isté, či EZZK požiadavku spracovalo. Pred opakovaním overte stav v EZZK."
+        case .demoSignatureOutsideDemo:
+            return "Bez podpisového enginu alebo karty aplikácia podpisuje iba ukážkovo (Demo). Mimo režimu Demo preto nepridelí evidenčné číslo ani neodošle záznam. Vložte kartu SAK a skontrolujte inštaláciu Chevron7."
         }
     }
 }

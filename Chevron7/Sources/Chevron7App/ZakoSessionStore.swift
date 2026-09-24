@@ -1117,6 +1117,14 @@ final class ZakoSessionStore {
         // A number from one mode is never valid in another, so a reply that arrives after the
         // mode changed is dropped without an error.
         let mode = settingsStore.ezzkAccountController.mode
+        // Outside Demo a real number must be backed by a real signature: the Demo signing
+        // provider (no bundled engine or no card identity) would leave it without a record.
+        if mode != .demo, signingProviderIsDemo {
+            evidenceNumberError = EZZKError.demoSignatureOutsideDemo.errorDescription
+            lastError = evidenceNumberError
+            recomputePreflight()
+            return
+        }
         // Demo numbers are a local simulation with no EZZK-side limit, so the pool (which
         // exists only to avoid asking the real EZZK again) plays no part there.
         if mode != .demo {
@@ -1217,6 +1225,15 @@ final class ZakoSessionStore {
         if let modeError = evidenceNumberModeError {
             evidenceNumberError = modeError
             lastError = modeError
+            recomputePreflight()
+            return
+        }
+        // Outside Demo a real number must be backed by a real signature: the Demo signing
+        // provider (no bundled engine or no card identity) would leave it without a record.
+        if !settingsStore.ezzkAccountController.isDemoMode, signingProviderIsDemo {
+            let message = EZZKError.demoSignatureOutsideDemo.errorDescription
+            evidenceNumberError = message
+            lastError = message
             recomputePreflight()
             return
         }

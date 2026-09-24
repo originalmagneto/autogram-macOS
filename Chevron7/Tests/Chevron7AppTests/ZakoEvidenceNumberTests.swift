@@ -218,6 +218,40 @@ final class ZakoEvidenceNumberTests: XCTestCase {
         XCTAssertFalse(store.evidenceNumberRequested)
     }
 
+    /// Review focus 2: outside Demo, the Demo signing provider must not cost a real number.
+    func testDemoSignatureOutsideDemoAllocatesNothing() async throws {
+        let transport = ScriptedTransport([])
+        let controller = EZZKAccountController(mode: .test, credentialStore: MemoryCredentialStore(),
+                                               transportFactory: { _ in transport }, productionPolicy: .refused)
+        let settingsStore = makeSettingsStore(ezzkAccountController: controller)
+        settingsStore.useRealSigningProvider(DemoSigningProvider())
+        let store = ZakoSessionStore(settingsStore: settingsStore)
+
+        await store.fetchEvidenceNumber()
+
+        XCTAssertNil(store.attestation.evidenceNumber)
+        XCTAssertEqual(store.evidenceNumberError, EZZKError.demoSignatureOutsideDemo.errorDescription)
+        XCTAssertEqual(transport.requestCount, 0)
+    }
+
+    func testDemoSignatureOutsideDemoIsNotAuthorized() async throws {
+        let transport = ScriptedTransport([])
+        let controller = EZZKAccountController(mode: .test, credentialStore: MemoryCredentialStore(),
+                                               transportFactory: { _ in transport }, productionPolicy: .refused)
+        let settingsStore = makeSettingsStore(ezzkAccountController: controller)
+        settingsStore.useRealSigningProvider(DemoSigningProvider())
+        let store = ZakoSessionStore(settingsStore: settingsStore)
+        store.attestation.evidenceNumber = "260924-X"
+        store.attestation.evidenceNumberMode = .test
+        store.attestation.evidenceNumberAllocatedAt = Date()
+
+        await store.authorizeAndSign()
+
+        XCTAssertNil(store.result)
+        XCTAssertEqual(store.lastError, EZZKError.demoSignatureOutsideDemo.errorDescription)
+        XCTAssertEqual(transport.requestCount, 0)
+    }
+
     private let loginSucceeded = #"<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope"><s:Body><OutputMessageOf_LogInOutput xmlns="http://ditec/2017/06/iam/core"><Content xmlns:i="http://www.w3.org/2001/XMLSchema-instance"><ErrorCode i:nil="true"/><Account><Id>1</Id><Name>ucet-test</Name></Account><TokenDescriptor>token-1</TokenDescriptor></Content></OutputMessageOf_LogInOutput></s:Body></s:Envelope>"#
 
     private let numbersReply = #"<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope"><s:Body><GetConversionRecordEvidenceNumberResponse xmlns="http://www.ditec.sk/IEZZKService"><GetConversionRecordEvidenceNumberResult><Container xmlns="http://schemas.datacontract.org/2004/07/Ditec.IOM.EZZK.Dol"><Result><Code>0</Code><Description>OK</Description><Object><Data><ConversionRecordEvidenceNumberList><ConversionRecordEvidenceNumber>260917-A</ConversionRecordEvidenceNumber></ConversionRecordEvidenceNumberList></Data></Object></Result></Container></GetConversionRecordEvidenceNumberResult></GetConversionRecordEvidenceNumberResponse></s:Body></s:Envelope>"#
