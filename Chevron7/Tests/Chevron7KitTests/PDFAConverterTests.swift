@@ -63,6 +63,32 @@ final class PDFAConverterTests: XCTestCase {
         XCTAssertEqual(ConversionOutputNaming.outputDirectory(sourceURL: source, fallback: URL(fileURLWithPath: "/tmp")), directory)
     }
 
+    /// The client ASiC-E follows the podpisuj.sk reference: the PDF entry is the advocate's
+    /// new document name (sanitized, with ".pdf" ensured) and the clause entry is
+    /// "<evidence number>.xml.xdcf".
+    func testContainerEntryNamesFollowTheNewDocumentNameAndTheEvidenceNumber() {
+        XCTAssertEqual(ConversionOutputNaming.containerDocumentName(newDocumentName: "Ukazkova_listina copy.pdf",
+                                                                    fallback: "x"),
+                       "Ukazkova_listina copy.pdf")
+        XCTAssertEqual(ConversionOutputNaming.containerDocumentName(newDocumentName: "Zmluva o dielo", fallback: "x"),
+                       "Zmluva o dielo.pdf")
+        XCTAssertEqual(ConversionOutputNaming.containerDocumentName(newDocumentName: "Safinová_príloha v1.2", fallback: "x"),
+                       "Safinová_príloha v1.2.pdf")
+        XCTAssertEqual(ConversionOutputNaming.containerDocumentName(newDocumentName: "Plná moc/2026.PDF", fallback: "x"),
+                       "Plná moc-2026.PDF")
+        XCTAssertEqual(ConversionOutputNaming.containerDocumentName(newDocumentName: "  ", fallback: "Zmluva.pdf"),
+                       "Zmluva.pdf")
+        XCTAssertEqual(ConversionOutputNaming.containerDocumentName(newDocumentName: "", fallback: ""),
+                       "dokument.pdf")
+
+        XCTAssertEqual(ConversionOutputNaming.containerClauseName(evidenceNumber: "6200-260910-1"),
+                       "6200-260910-1.xml.xdcf")
+        XCTAssertEqual(ConversionOutputNaming.containerClauseName(evidenceNumber: "260924-BcE299bb83"),
+                       "260924-BcE299bb83.xml.xdcf")
+        XCTAssertEqual(ConversionOutputNaming.containerClauseName(evidenceNumber: nil), "dolozka.xml.xdcf")
+        XCTAssertEqual(ConversionOutputNaming.containerClauseName(evidenceNumber: " / "), "dolozka.xml.xdcf")
+    }
+
     func testEngineNormalizationIsAvailableWhenBundledEngineIsInstalled() throws {
         let source = try XCTUnwrap(PDFDocument(data: TestPDFBuilder.typicalContractPDF()))
         let sourceData = try XCTUnwrap(source.dataRepresentation())

@@ -76,6 +76,44 @@ final class ZakoRecordRouteTests: XCTestCase {
         XCTAssertEqual(demoService.submittedRecords.first?.signedRecordContainer, stored)
     }
 
+    /// The client ASiC-E follows the podpisuj.sk reference: the PDF entry is the advocate's
+    /// "Názov výstupu (PDF/A)", the clause entry is "<number>.xml.xdcf", and the clause and
+    /// the record name exactly the PDF entry the container carries.
+    func testClientContainerNamesItsPDFExactlyAsTheClauseAndTheRecordDo() async throws {
+        try requireXMLLint()
+        let settingsStore = makeSettingsStore()
+        settingsStore.useRealSigningProvider(DemoSigningProvider())
+        let store = try makeReadyStore(settingsStore: settingsStore)
+        store.attestation.newDocumentName = "Ukazkova_listina copy"
+        store.setMandateOverride(true)
+        await store.fetchEvidenceNumber()
+        let number = try XCTUnwrap(store.attestation.evidenceNumber)
+
+        await store.authorizeAndSign()
+
+        XCTAssertEqual(store.step, .done, store.lastError ?? "")
+        let directory = try XCTUnwrap(store.outputDirectory)
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: directory.path),
+                       ["Ukazkova_listina copy.asice"])
+        let row = try XCTUnwrap(settingsStore.evidenceStore.record(id: store.currentRecordID))
+        XCTAssertEqual(row.deliveredFileName, "Ukazkova_listina copy.asice")
+        XCTAssertEqual(row.newDocumentName, "Ukazkova_listina copy.pdf")
+
+        let container = try Data(contentsOf: directory.appendingPathComponent("Ukazkova_listina copy.asice"))
+        let entries = try XCTUnwrap(ASiCEContainerVerifier.readEntries(container))
+        let names = Set(entries.map(\.name))
+        XCTAssertTrue(names.isSuperset(of: ["mimetype", "Ukazkova_listina copy.pdf", "\(number).xml.xdcf",
+                                            "META-INF/manifest.xml"]), "\(names)")
+        XCTAssertEqual(names.filter { !$0.hasPrefix("META-INF/") && $0 != "mimetype" }.count, 2, "\(names)")
+        let clause = try XCTUnwrap(entries.first { $0.name == "\(number).xml.xdcf" }?.data)
+        XCTAssertEqual(try Self.newDocumentName(in: clause), "Ukazkova_listina copy.pdf")
+
+        let record = try XCTUnwrap(settingsStore.evidenceStore.recordContainerData(for: row))
+        let recordXDCF = try XCTUnwrap(ASiCEContainerVerifier.readEntries(record)?
+            .first { $0.name.hasSuffix(".record.xml.xdcf") }?.data)
+        XCTAssertEqual(try Self.newDocumentName(in: recordXDCF), "Ukazkova_listina copy.pdf")
+    }
+
     /// The phone route (Demo only) signs the PDF/A alone and the relay wraps it into its own
     /// ASiC-E without the clause, so the loose PDF/A and clause XDCF are still written next
     /// to that container, and the Done screen exports the PDF/A.
@@ -103,6 +141,10 @@ final class ZakoRecordRouteTests: XCTestCase {
 
         await store.authorizeAndSign(viaMobile: true)
 
+        // The phone's container carries the PDF under the uploaded name, which the clause names.
+        let uploaded = try XCTUnwrap(transport.uploadedFileName)
+        XCTAssertEqual(uploaded, "Zmluva o dielo.pdf")
+
         XCTAssertEqual(store.step, .done, store.lastError ?? "")
         let outputs = try FileManager.default.contentsOfDirectory(atPath: try XCTUnwrap(store.outputDirectory).path)
         XCTAssertTrue(outputs.contains { $0.hasSuffix(".pdf") }, "outputs: \(outputs)")
@@ -111,6 +153,10 @@ final class ZakoRecordRouteTests: XCTestCase {
         XCTAssertFalse(outputs.contains { $0.hasSuffix(".record.asice") }, "outputs: \(outputs)")
         let row = try XCTUnwrap(settingsStore.evidenceStore.record(id: store.currentRecordID))
         XCTAssertEqual(row.deliveredFileName, row.pdfFileName)
+        XCTAssertEqual(row.newDocumentName, uploaded)
+        let clauseFile = try XCTUnwrap(outputs.first { $0.hasSuffix(".xml.xdcf") })
+        let clause = try Data(contentsOf: try XCTUnwrap(store.outputDirectory).appendingPathComponent(clauseFile))
+        XCTAssertEqual(try Self.newDocumentName(in: clause), uploaded)
         XCTAssertTrue(outputs.contains(try XCTUnwrap(row.deliveredFileName)), "outputs: \(outputs)")
     }
 
@@ -275,6 +321,12 @@ final class ZakoRecordRouteTests: XCTestCase {
     private static let optionsReply = #"<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope" xmlns:a="http://www.w3.org/2005/08/addressing">"#
         + #"<s:Header><a:Action s:mustUnderstand="1">http://www.ditec.sk/IEZZKService/IEZZKService/GetOptionsResponse</a:Action></s:Header><s:Body><GetOptionsResponse xmlns="http://www.ditec.sk/IEZZKService"/></s:Body></s:Envelope>"#
 
+    /// The NewDocumentName of a clause or record XDC.
+    private static func newDocumentName(in xdcf: Data) throws -> String? {
+        let document = try XMLDocument(data: xdcf)
+        return try document.nodes(forXPath: "//*[local-name()='NewDocumentName']").first?.stringValue
+    }
+
     private func requireXMLLint() throws {
         guard FileManager.default.isExecutableFile(atPath: "/usr/bin/xmllint") else {
             throw XCTSkip("xmllint is needed for schema validation of the clause and the record.")
@@ -361,10 +413,19 @@ private final class RecordRefusingProvider: QualifiedSigningProviding, @unchecke
 private final class RelayTransport: AVMHTTPTransport, @unchecked Sendable {
     private let lock = NSLock()
     private var replies: [([String: String], String)]
+    private var uploaded: String?
 
     init(replies: [([String: String], String)]) { self.replies = replies }
 
+    /// The file name the app uploaded (`document.filename` of `POST /documents`).
+    var uploadedFileName: String? { lock.withLock { uploaded } }
+
     func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        if request.httpMethod == "POST", let body = request.httpBody,
+           let json = try? JSONSerialization.jsonObject(with: body) as? [String: Any],
+           let document = json["document"] as? [String: Any] {
+            lock.withLock { uploaded = document["filename"] as? String }
+        }
         let next: ([String: String], String)? = lock.withLock {
             request.httpMethod == "DELETE" || replies.isEmpty ? nil : replies.removeFirst()
         }

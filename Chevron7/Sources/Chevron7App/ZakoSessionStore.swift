@@ -1231,9 +1231,17 @@ final class ZakoSessionStore {
             let nonEmptyPageIndices = analysis.pageAnalyses.filter { !$0.isEmpty }.map(\.pageIndex)
 
             analysisProgressText = "Vytváram osvedčovaciu doložku…"
+            // One value names the PDF/A inside the signed container and in the clause and the
+            // record (NewDocumentName), so the two are equal by construction, as in the
+            // podpisuj.sk reference.
+            let containerDocumentName = ConversionOutputNaming.containerDocumentName(
+                newDocumentName: attestation.newDocumentName,
+                fallback: attestation.originalDocumentName)
+            var deliveredAttestation = attestation
+            deliveredAttestation.newDocumentName = containerDocumentName
             let clause = try ZakoClauseDeliveryBuilder().build(
                 finalPDF: finalPDF,
-                attestation: attestation,
+                attestation: deliveredAttestation,
                 securityElements: confirmedElementsSnapshot,
                 originalNonEmptyPageIndices: nonEmptyPageIndices,
                 usedDevice: attestation.usedDeviceDescription)
@@ -1282,30 +1290,32 @@ final class ZakoSessionStore {
                 fallback: settingsStore.outputDirectory)
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
 
-            let packager = ASiCEPackager()
+            // The card's container follows the podpisuj.sk reference: the PDF/A under its new
+            // document name and the clause as "<number>.xml.xdcf". The loose names below are
+            // used only by the phone route, which writes the PDF/A and the clause next to it.
+            let containerFiles = ASiCEPackager().zakoContainer(
+                pdfData: finalPDF,
+                pdfFileName: containerDocumentName,
+                dolozkaXML: clause.clauseXDCF,
+                dolozkaFileName: ConversionOutputNaming.containerClauseName(evidenceNumber: attestation.evidenceNumber))
             let docFileName = ConversionOutputNaming.deliveryPDFFileName(
                 in: directory,
                 preferredName: outputPDFFileName())
-            let preferredXDCFFileName = ConversionOutputNaming.xdcfFileName(
-                originalDocumentName: attestation.originalDocumentName,
-                pdfFileName: docFileName,
-                evidenceNumber: attestation.evidenceNumber)
-            let xdcfTarget = ConversionOutputNaming.uniqueURL(in: directory,
-                                                              fileName: preferredXDCFFileName)
-            let xdcfFileName = xdcfTarget.lastPathComponent
-            let containerFiles = packager.zakoContainer(pdfData: finalPDF,
-                                                        pdfFileName: docFileName,
-                                                        dolozkaXML: clause.clauseXDCF,
-                                                        dolozkaFileName: xdcfFileName)
+            let xdcfTarget = ConversionOutputNaming.uniqueURL(
+                in: directory,
+                fileName: ConversionOutputNaming.xdcfFileName(
+                    originalDocumentName: attestation.originalDocumentName,
+                    pdfFileName: docFileName,
+                    evidenceNumber: attestation.evidenceNumber))
             let signed: SignedConversionResult
             if viaMobile {
                 // avm-server rejects unsigned ASiC-E input (422 "Level can't be empty if document
                 // is not signed yet"), so the phone signs only the final PDF/A and the server wraps
                 // it into a fresh ASiC-E. The clause XDC is not part of that container: it is written
                 // next to it below, unsigned, with the PDF/A. Carrying the clause on the mobile
-                // route is still open.
+                // route is still open. The PDF/A goes up under the name the clause gives it.
                 let upload = AVMUploadRequest(
-                    filename: docFileName,
+                    filename: containerDocumentName,
                     data: finalPDF,
                     mimeType: AVMUploadRequest.pdfMimeType,
                     level: .xades(timestamp: includeQualifiedTimestamp),
@@ -1329,7 +1339,7 @@ final class ZakoSessionStore {
                     tsaURL: tsaURL,
                     pin: signingPIN.isEmpty ? nil : signingPIN,
                     extraFiles: containerFiles,
-                    filename: docFileName,
+                    filename: containerDocumentName,
                     signsExtraFilesAsDataObjects: true,
                     timestampServers: timestampServers))
             }
@@ -1354,20 +1364,26 @@ final class ZakoSessionStore {
             // The card's ASiC-E holds the PDF/A and the clause, signed together, so it is the one
             // file the client gets. The phone's container holds the PDF/A alone, so there the
             // PDF/A and the clause are also written and the PDF/A is what is delivered.
-            let asicTarget = ConversionOutputNaming.uniqueURL(
-                in: directory,
-                fileName: ConversionOutputNaming.asicFileName(pdfFileName: docFileName))
+            // Outputs are made unique, so neither the source nor an earlier output is replaced.
             let deliveredTarget: URL
+            let pdfFileName: String
             if !viaMobile, let asic = signed.asicData {
-                try asic.write(to: asicTarget, options: [.atomic])
-                deliveredTarget = asicTarget
+                deliveredTarget = ConversionOutputNaming.uniqueURL(
+                    in: directory,
+                    fileName: ConversionOutputNaming.asicFileName(pdfFileName: containerDocumentName))
+                try asic.write(to: deliveredTarget, options: [.atomic])
+                pdfFileName = containerDocumentName
             } else {
                 deliveredTarget = directory.appendingPathComponent(docFileName)
                 try signed.pdfData.write(to: deliveredTarget, options: [.atomic])
                 try clause.clauseXDCF.write(to: xdcfTarget, options: [.atomic])
                 if let asic = signed.asicData {
+                    let asicTarget = ConversionOutputNaming.uniqueURL(
+                        in: directory,
+                        fileName: ConversionOutputNaming.asicFileName(pdfFileName: docFileName))
                     try asic.write(to: asicTarget, options: [.atomic])
                 }
+                pdfFileName = docFileName
             }
             outputDirectory = directory
 
@@ -1376,7 +1392,7 @@ final class ZakoSessionStore {
                 status: .signed,
                 direction: .paperToElectronic,
                 originalName: attestation.originalDocumentName,
-                newDocumentName: attestation.newDocumentName,
+                newDocumentName: containerDocumentName,
                 evidenceNumber: attestation.evidenceNumber,
                 fingerprintSHA256Hex: fingerprint,
                 attestationXML: recordDelivery.recordXML,
@@ -1385,7 +1401,7 @@ final class ZakoSessionStore {
                 securityElementCount: confirmedElementsSnapshot.count,
                 totalPages: analysis.totalPages,
                 totalSheets: attestation.numberOfSheets,
-                pdfFileName: docFileName,
+                pdfFileName: pdfFileName,
                 deliveredFileName: deliveredTarget.lastPathComponent,
                 formPack: FormPackStamp(pack: selectedFormPack),
                 securityReview: securityReviewSnapshot,
