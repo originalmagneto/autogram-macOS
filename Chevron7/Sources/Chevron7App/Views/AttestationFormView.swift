@@ -362,7 +362,7 @@ struct AttestationFormView: View {
             return "Zatiaľ nepotvrdené"
         }
         return store.confirmedSecurityElements
-            .map { "\($0.descriptionForRecord), \($0.locationDescription(pageSizePt: .zero))" }
+            .map(\.clausePreviewLine)
             .joined(separator: "; ")
     }
 
@@ -387,7 +387,7 @@ struct AttestationFormView: View {
         let name = store.attestation.originalDocumentName.isEmpty ? "Názov dokumentu" : store.attestation.originalDocumentName
         let evidence = store.attestation.evidenceNumber ?? "pridelí sa pri autorizácii"
 
-        let elementSummary = store.attestation.noSecurityElementsConfirmed ? "Bez bezpečnostných prvkov (potvrdené kontrolou originálu)" : store.confirmedSecurityElements.map { "\($0.descriptionForRecord), \($0.locationDescription(pageSizePt: .zero))" }.joined(separator: "; ")
+        let elementSummary = store.attestation.noSecurityElementsConfirmed ? "Bez bezpečnostných prvkov (potvrdené kontrolou originálu)" : store.confirmedSecurityElements.map(\.clausePreviewLine).joined(separator: "; ")
 
         return """
         OSVEDČOVACIA DOLOŽKA O ZARUČENEJ KONVERZII

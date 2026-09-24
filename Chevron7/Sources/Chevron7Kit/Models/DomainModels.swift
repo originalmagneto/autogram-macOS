@@ -191,6 +191,16 @@ public struct SecurityElement: Codable, Hashable, Identifiable, Sendable {
         return "\(kind.label) na strane \(pageIndex + 1), \(verticalZone), \(horizontalZone)"
     }
 
+    /// One element in item 5 of the live clause preview: its kind and place once, then the
+    /// advocate's own words if they wrote any. The automatic description is the place itself,
+    /// so it is not added a second time.
+    public var clausePreviewLine: String {
+        let location = locationDescription(pageSizePt: .zero)
+        let detail = verbalDescription.trimmingCharacters(in: .whitespacesAndNewlines)
+        if detail.isEmpty || detail == location || detail == location + "." { return location }
+        return "\(location): \(detail)"
+    }
+
     public var locationCodelist11Item: ZakoCodelistItem {
         let vertical: String
         switch boundingBox.midY {
