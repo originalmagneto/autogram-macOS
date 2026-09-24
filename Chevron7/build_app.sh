@@ -64,6 +64,13 @@ LEGACY_CONTENTS="${CHEVRON7_LEGACY_APP_ROOT:-}"
 ENGINE_BUILD=".build/engine/Contents"
 if [[ -z "$LEGACY_CONTENTS" && -x "$ENGINE_BUILD/Helpers/AutogramCLI-arm64" && -f "$ENGINE_BUILD/app/autogram.jar" ]]; then
     LEGACY_CONTENTS="$ENGINE_BUILD"
+    # An engine built before the latest engine/ changes signs without them (a ZaKo record
+    # then fails with SIGNING_UNAVAILABLE), so refuse to bundle it silently.
+    newer_engine_source="$(find ../engine/src/main ../engine/scripts/native-macos ../engine/pom.xml -type f -newer "$ENGINE_BUILD/app/autogram.jar" -print -quit 2>/dev/null || true)"
+    if [[ -n "$newer_engine_source" ]]; then
+        echo "Error: the signing engine in $ENGINE_BUILD is older than $newer_engine_source. Run scripts/build-engine.sh first." >&2
+        exit 1
+    fi
 fi
 if [[ -z "$LEGACY_CONTENTS" ]]; then
     for candidate in /Applications/*.app/Contents "$HOME"/Applications/*.app/Contents; do
