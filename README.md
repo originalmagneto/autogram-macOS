@@ -57,7 +57,7 @@ Chevron7 nie je spojený so Slovensko.Digital ani ním podporovaný a nemá nič
 <tr>
 <td><strong>Zaručená konverzia</strong></td>
 <td>Import, analýza strán, vrstvená AI Vision detekcia bezpečnostných prvkov, osvedčovacia doložka a autorizácia mandátnym certifikátom.</td>
-<td><code>PDF/A-2b</code> · <code>XML doložka</code> · evidencia</td>
+<td><code>ASiC-E</code> (PDF/A-2b a XML doložka) · evidencia</td>
 </tr>
 <tr>
 <td><strong>Štátne weby</strong></td>
@@ -66,7 +66,7 @@ Chevron7 nie je spojený so Slovensko.Digital ani ním podporovaný a nemá nič
 </tr>
 <tr>
 <td><strong>Register</strong></td>
-<td>Lokálne záznamy o konverziách, stavy, vyhľadávanie a CSV export.</td>
+<td>Lokálne záznamy o konverziách, stavy, vyhľadávanie, uloženie podpísaného záznamu o konverzii a CSV export.</td>
 <td><code>register.json</code> · <code>CSV</code></td>
 </tr>
 <tr>
@@ -239,7 +239,7 @@ Podrobnosti: [pravidlá tréningového datasetu](Chevron7/docs/security-element-
 <td align="center" width="20%"><strong>2 · Overenie</strong><br><sub>analýza, AI nálezy, fyzická kontrola, kontrola každej strany</sub></td>
 <td align="center" width="20%"><strong>3 · Doložka</strong><br><sub>osoba, počítadlá, poloha prvkov, XML, preflight</sub></td>
 <td align="center" width="20%"><strong>4 · Autorizácia</strong><br><sub>evidenčné číslo, PDF/A, mandátny podpis</sub></td>
-<td align="center" width="20%"><strong>5 · Hotovo</strong><br><sub>výsledné súbory a lokálna evidencia</sub></td>
+<td align="center" width="20%"><strong>5 · Hotovo</strong><br><sub>ASiC-E pre klienta a lokálna evidencia</sub></td>
 </tr>
 </table>
 
@@ -252,7 +252,7 @@ Podrobnosti: [pravidlá tréningového datasetu](Chevron7/docs/security-element-
 
 <p><strong>Čo funguje kde:</strong> na Teste prihlásenie, čas servera, pridelenie evidenčných čísel, odoslanie podpísaného záznamu cez <code>ReceiveConversionRecord</code> aj overenie jeho stavu. Na Produkcii zatiaľ len prihlásenie, čas servera a verejné overenie záznamu; pridelenie čísla a odoslanie záznamu sa otvoria v ďalšej časti, po overení celého postupu kartou SAK na Teste. Bez evidenčného čísla aplikácia nepovolí autorizáciu, a číslo z iného dňa alebo z iného režimu odmietne ešte pred podpisom, lebo EZZK nepoužité čísla o polnoci spotrebuje.</p>
 
-<p><strong>Záznam o konverzii:</strong> po podpise doložky sa rovnakým PIN podpíše aj záznam record 1.0 v kontajneri XDC a ASiC-E, mimo režimu Demo vždy s kvalifikovanou časovou pečiatkou. Kópia <code>&lt;číslo&gt;.record.asice</code> ostane pri výstupoch. Aplikácia záznam odošle hneď a potom každých päť minút skúša čakajúce odoslania a overuje stav v EZZK (Prijatý na spracovanie, Spracovaný, Odmietnutý). Pri prerušenom spojení záznam znova neposiela naslepo: najprv overí, či ho EZZK už má, lebo EZZK duplicity ukladá. Záznam odoslaný po polnoci dňa pridelenia sa označí ako oneskorený, EZZK ho však prijme. Ak sa záznam nepodarí podpísať, výstupy pre klienta ostanú a riadok v registri má stav Záznam nepodpísaný.</p>
+<p><strong>Záznam o konverzii:</strong> po podpise doložky sa rovnakým PIN podpíše aj záznam record 1.0 v kontajneri XDC a ASiC-E, mimo režimu Demo vždy s kvalifikovanou časovou pečiatkou. Klient dostane jediný súbor: ASiC-E, v ktorom sú PDF/A a doložka podpísané spolu. Podpísaný záznam ostáva len v Registri konverzií; v kontextovej ponuke riadka alebo v jeho detaile ho uložíte cez <strong>Uložiť záznam…</strong> ako <code>&lt;číslo&gt;.record.asice</code>. Aplikácia záznam odošle hneď a potom každých päť minút skúša čakajúce odoslania a overuje stav v EZZK (Prijatý na spracovanie, Spracovaný, Odmietnutý). Pri prerušenom spojení záznam znova neposiela naslepo: najprv overí, či ho EZZK už má, lebo EZZK duplicity ukladá. Záznam odoslaný po polnoci dňa pridelenia sa označí ako oneskorený, EZZK ho však prijme. Ak sa záznam nepodarí podpísať, výstupy pre klienta ostanú a riadok v registri má stav Záznam nepodpísaný.</p>
 
 <p>Podrobne: <a href="Chevron7/docs/EZZK-INTEGRATION.md">Chevron7/docs/EZZK-INTEGRATION.md</a>.</p>
 </details>
