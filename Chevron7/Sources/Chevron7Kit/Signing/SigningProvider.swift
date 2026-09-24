@@ -258,6 +258,13 @@ public struct SigningRequest: Sendable {
     /// ZaKo: sign `pdfData` and the data entries of `extraFiles` as separate data objects of
     /// one ASiC-E the engine builds, instead of wrapping a packaged container.
     public var signsExtraFilesAsDataObjects: Bool
+    /// Explicit timestamp endpoints for this signature. When set and non-empty the
+    /// engine uses exactly these for a Baseline T signature instead of the user's
+    /// own timestamp preferences; `nil` keeps today's behaviour.
+    public var timestampServers: [String]?
+    /// EZZK conversion record: sign `pdfData` (the record's XDC bytes) under
+    /// `filename`, which must end in `.xdcf`, as a one-file ASiC-E.
+    public var signsAsRecordContainer: Bool
 
     public init(pdfData: Data, identityID: String,
                 includeTimestamp: Bool, tsaURL: String? = nil,
@@ -268,7 +275,9 @@ public struct SigningRequest: Sendable {
                 eform: EFormSigningAttributes? = nil,
                 signatureLevelOverride: String? = nil,
                 filename: String? = nil,
-                signsExtraFilesAsDataObjects: Bool = false) {
+                signsExtraFilesAsDataObjects: Bool = false,
+                timestampServers: [String]? = nil,
+                signsAsRecordContainer: Bool = false) {
         self.pdfData = pdfData
         self.identityID = identityID
         self.includeTimestamp = includeTimestamp
@@ -281,6 +290,8 @@ public struct SigningRequest: Sendable {
         self.signatureLevelOverride = signatureLevelOverride
         self.filename = filename
         self.signsExtraFilesAsDataObjects = signsExtraFilesAsDataObjects
+        self.timestampServers = timestampServers
+        self.signsAsRecordContainer = signsAsRecordContainer
     }
 }
 
@@ -428,7 +439,16 @@ public final class DemoSigningProvider: QualifiedSigningProviding, @unchecked Se
             merged["META-INF/timestamp.tsr"] =
                 ASiCEPackager.Entry(path: "META-INF/timestamp.tsr", data: tokenData)
         }
-        merged["document.pdf"] = ASiCEPackager.Entry(path: "document.pdf", data: request.pdfData)
+        // ZaKo names its data objects: the client container already lists the PDF/A under
+        // its own name, and the record keeps "<number>.record.xml.xdcf", as the engine does.
+        if request.signsAsRecordContainer || request.signsExtraFilesAsDataObjects,
+           let filename = request.filename.map({ ($0 as NSString).lastPathComponent }), !filename.isEmpty {
+            if merged[filename] == nil {
+                merged[filename] = ASiCEPackager.Entry(path: filename, data: request.pdfData)
+            }
+        } else {
+            merged["document.pdf"] = ASiCEPackager.Entry(path: "document.pdf", data: request.pdfData)
+        }
 
         if merged["META-INF/manifest.xml"] == nil {
             let dataEntries = merged.values

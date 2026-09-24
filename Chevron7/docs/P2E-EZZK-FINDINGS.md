@@ -318,22 +318,22 @@ On 2026-09-17 the podpisuj.sk team confirmed that EZZK is not maintained, MIRRI 
 
 ### Open work (part B)
 
-1. Build the record (`50349287.ConversionRecordOfPaperToElectronicDocument.sk` v1.0) in an `XMLDataContainer`, sign it with the mandate certificate and a qualified timestamp into its own ASiC.
-2. Send it with `ReceiveConversionRecord`, then open production allocation.
-3. Switch to record form v1.2 from 2027-01-01.
+1. ~~Build the record (`50349287.ConversionRecordOfPaperToElectronicDocument.sk` v1.0) in an `XMLDataContainer`, sign it with the mandate certificate and a qualified timestamp into its own ASiC.~~ Done in part B2: `ConversionRecordRenderer`, `ZakoRecordDeliveryBuilder`, engine local XDC route, qualified TSA endpoints outside Demo. See "Part B2" below.
+2. ~~Send it with `ReceiveConversionRecord`~~, then open production allocation. Sending is done in part B2; production allocation and submission stay refused until part B3.
+3. Switch to record form v1.2 from 2027-01-01. Still open, out of scope for B2.
 
 ### Known gaps left open in part A
 
 Recorded from the branch reviews so they are not rediscovered later. None of them blocks part A.
 
-1. The test pin covers the whole certificate and expires 2026-10-20; a renewal breaks test mode until the app ships a new pin. Pinning the public key would survive a renewal that keeps the key.
-2. A stored password that has become wrong causes one `LogIn` per authenticated call, so repeated attempts can lock the account (`CORE-018`). There is no single-flight login and no backoff.
-3. `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly` is honored only by the data protection keychain; the adapter uses the file based keychain, so the attribute is not in force. Reading `storedLogin` at launch also decrypts the password item, which prompts after an ad hoc rebuild.
-4. Demo numbers look like production numbers (`1563-yymmdd-N`). A `DEMO-` prefix would make screenshots and test data unmistakable.
-5. `EZZKSOAPClient` treats `notConnectedToInternet` as "nothing was sent" on consequential calls; URLSession can also report it when the network drops mid-request. Revisit before part B enables `ReceiveConversionRecord`.
-6. The ZaKo Done screen reads the current EZZK mode, not the mode the record was signed in, and the attestation form warns about a wrong-mode number only when signing starts.
-7. Three older ZaKo tests build `AppSettingsStore()` with the default controller, so they read the real Keychain (read only). `AppSettingsStore(ezzkAccountController:)` exists to switch them.
-8. Settings has not been checked visually in the running app, and no sign-in has been done from inside the app bundle.
+1. The test pin covers the whole certificate and expires 2026-10-20; a renewal breaks test mode until the app ships a new pin. Pinning the public key would survive a renewal that keeps the key. Still open.
+2. ~~A stored password that has become wrong causes one `LogIn` per authenticated call, so repeated attempts can lock the account (`CORE-018`). There is no single-flight login and no backoff.~~ Closed in part B (task 7, commits `b3a12f7f..350b75ad`): `EZZKSOAPClient` keeps one `loginTask` at a time, stops repeating `LogIn` after a rejected password, and refreshes an expired token once.
+3. `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly` is honored only by the data protection keychain; the adapter uses the file based keychain, so the attribute is not in force. Reading `storedLogin` at launch also decrypts the password item, which prompts after an ad hoc rebuild. Still open.
+4. Demo numbers look like production numbers (`1563-yymmdd-N`). A `DEMO-` prefix would make screenshots and test data unmistakable. Still open.
+5. `EZZKSOAPClient` treats `notConnectedToInternet` as "nothing was sent" on consequential calls; URLSession can also report it when the network drops mid-request. Still open for `ReceiveConversionRecord`, now enabled in part B2: a mid-send drop before a real reply is not distinguishable from no connection at all, and both stay a resendable `queuedForSubmission` rather than `outcomeUnknown`.
+6. ~~The ZaKo Done screen reads the current EZZK mode, not the mode the record was signed in, and the attestation form warns about a wrong-mode number only when signing starts.~~ Closed in part B2 (task 11/12): `EvidenceRecord.ezzkMode` is stamped at signing time and `EZZKStatusChecker` acts only on the EZZK the row's own mode names; a row of another mode is refused with `recordFromOtherModeMessage`.
+7. ~~Three older ZaKo tests build `AppSettingsStore()` with the default controller, so they read the real Keychain (read only). `AppSettingsStore(ezzkAccountController:)` exists to switch them.~~ Closed in part B2 (task 13, commits `6eb4240f..ea9f8259`): `makeSettingsStore()` now defaults to an in-memory controller.
+8. Settings has not been checked visually in the running app, and no sign-in has been done from inside the app bundle. Closed in part B1: the owner signed in from the built app and saved a test EZZK credential (see the ruling R6 note above); Settings has since been used interactively for every B1/B2 live check.
 
 ## Part B1 (2026-09-23)
 
@@ -343,7 +343,7 @@ Recorded from the branch reviews so they are not rediscovered later. None of the
 - **Fingerprint and embedding defect and fix:** Chevron7 hashed the PDF/A, then embedded the clause XML into it and normalised again, so the delivered PDF no longer matched the fingerprint carried in its own clause; B1 stops embedding, hashes the final delivered PDF/A bytes, and signs PDF/A and clause XDC as two data objects of one ASiC-E (`SigningRequest.signsExtraFilesAsDataObjects`, machine protocol v1 `attachments`) instead of nesting an unsigned `kontajner.asice` inside the engine's own container.
 - **Location codelist change:** `OriginalDocumentSecurityElementsLocation` now uses the official codelist 11 item codes (the page centre is `Mid`, not `Center`); physical-original security elements pick their location from the same codelist in both the add-element sheet and the inspector, instead of free text.
 - **Phone limited to Demo:** ZaKo on the phone (AVM) uploads only the PDF and produces no clause XDC, so `isMobileSigningAvailable` is true only in EZZK Demo mode; Test and Production refuse it with `ZakoSessionStore.mobileOutsideDemoMessage`.
-- **Record path unchanged:** the register XML (still rendered by `AttestationClauseGenerator`, which B2 replaces) and the EZZK submission (`ReceiveConversionRecord`) are not touched in B1; they remain part B2 work, listed under "Open work (part B)" above.
+- **Record path unchanged in B1:** the register XML (still rendered by `AttestationClauseGenerator`) and the EZZK submission (`ReceiveConversionRecord`) were not touched in B1; they were part B2 work, listed under "Open work (part B)" above. Part B2 replaced `AttestationClauseGenerator`'s record output with `ConversionRecordRenderer`/`ZakoRecordDeliveryBuilder` and wired the submission; see "Part B2" below.
 
 Official form files (record 1.0 and clause 1.3 schema and signer XSLT) live in `Chevron7/docs/reference/forms`, embedded into `Chevron7Kit` by `scripts/embed-official-forms.sh`. Codelist fixes also cover the legal-subject URI (`https://data.gov.sk/id/legal-subject/<IČO>`) and the `Iny` paper-size fallback. Design: `Chevron7/docs/superpowers/specs/2026-09-23-ezzk-part-b-design.md`.
 
@@ -372,5 +372,44 @@ Expected: two matches, `application/pdf` and `application/vnd.gov.sk.xmldatacont
 unzip -p *.asice META-INF/signatures001.xml | grep -o '<xades:SignatureTimeStamp'
 ```
 Expected: at least one match, confirming the signature carries a qualified timestamp (Baseline T).
+
+Result: not yet run.
+
+## Part B2 (2026-09-23)
+
+### What shipped
+
+- **Record 1.0 rendered and sent:** `ConversionRecordRenderer` renders the conversion record (`50349287.ConversionRecordOfPaperToElectronicDocument.sk` 1.0) from `ConversionFormModel`, exactly in the shape of the record EZZK accepted on 2026-08-24. `ZakoRecordDeliveryBuilder` validates it against the libxml2-compatible derived schema and wraps it as `<number>.record.xml.xdcf`, built by `ZakoRecordDeliveryBuilder`. `EZZKSOAPClient.receive` (`ReceiveConversionRecord`) sends it and returns the request's WS-Addressing `MessageID` as `EZZKSOAPSubmissionReceipt`.
+- **Record schema derivation:** the official record 1.0 `schema.xsd` does not compile in libxml2 (`xmllint`): the `IdentifierValue` pattern escapes `/` as `\/` and the record's identifier pattern differs from the clause's (8 or 12 digits, not 8 to 12). `docs/reference/forms/record-1.0/schema.validation.xsd` is a derived copy in which only that one pattern is rewritten to `https://data\.gov\.sk/id/legal-subject/([0-9]{8}|[0-9]{12})`; the XDC itself keeps referencing and digesting the official `schema.xsd`. A test pins that the two files differ only in that pattern.
+- **Engine local route for the record:** a sign request whose single source is an `.xdcf` holding an `XMLDataContainer` root, with no attachments and no eForm, is signed locally (`SigningParameters.isPlainRecordXdc()`): `autoLoadEform=false`, `fsFormId=null`, `plainXmlEnabled=true`, ASiC-E, XAdES, bare MIME `application/vnd.gov.sk.xmldatacontainer+xml`, no network call to slovensko.sk. This mirrors the record EZZK accepted on 2026-08-24.
+- **Qualified timestamp by construction:** outside Demo, ZaKo passes only the built-in qualified authorities (`TimestampAuthority.qualifiedURLs`) to the engine for both the client and the record signature, so a Baseline T output with a cryptographically valid timestamp is a build property rather than something inspected after signing. The QTS toggle is shown only in Demo.
+- **Storage:** the signed record container is written to `Evidence/records/<record id>.asice` (the copy submission reads, `LocalEvidenceStore.storeRecordContainer`) and next to the client outputs as `<number>.record.asice` (the advocate's archive copy). A record-signing failure leaves the client outputs delivered but marks the row `.recordUnsigned`; nothing is sent.
+- **Evidence numbers reused, not just allocated:** `EvidenceNumberPool` remembers every number this app allocated and has not used yet, per EZZK mode and Bratislava day, and a fresh conversion reuses one before asking EZZK for a new one.
+- **Submission states owned by one coordinator:** `EZZKSubmissionCoordinator` (rulings R9 to R12 and R16 in the plan ledger) decides every transition; `EZZKStatusChecker` runs it for every register row every five minutes, but only in a regular launch of Chevron7 (ruling R13, never in the `--web-signing` accessory mode), one row at a time, per-row EZZK mode, capped automatic sends per day (ruling R14), and never for a row written before part B2 (ruling R15, no stored `ezzkMode`) or a production row (ruling R16 is about late rows; production stays refused independently until B3).
+- **Register safety:** an unreadable register is never overwritten after a failed load (its own timestamped `.unreadable-*` copy is kept beside it), and the first B2 write makes a one-time `register.backup-before-b2.json` copy so a register written by an older build can be recovered.
+- **Tests never touch the real Keychain:** `makeSettingsStore(ezzkAccountController:)` now defaults every App test to an in-memory controller (`MemoryCredentialStore`), closing gap 7 above; this also stopped the hangs the owner hit once a real test EZZK credential was saved (ruling R6).
+
+- **Result 106 (ruling R17):** 106 means the number is used by several records; EZZK stores duplicates rather than refusing them. A `ReceiveConversionRecord` result 106 therefore does not say what became of the record just sent: the row becomes `.outcomeUnknown` and the lookup resolves it. A lookup result 106 means EZZK holds a record under the number: the row is `.acceptedForProcessing` with code 106 and EZZK's text, never `.rejected` under the "other code" rule of ruling R12. Not yet observed live.
+
+### Live checks on test EZZK (account `sys_zaktest1`, `ezzk-probe`)
+
+- `GetConversionRecordEvidenceNumber` refuses with code 113 ("vyčerpaný nastavený limit aktuálne nespotrebovaných evidenčných čísiel") once the account's limit of unconsumed numbers is reached; it never returns a number already given out.
+- `ReceiveConversionRecord` consumes the evidence number: right after a result-0 receipt a new number could be allocated again. No separate `ConsumeConversionRecordEvidenceNumber` call is needed for a sent record.
+- 2026-09-24, 00:05 to 00:33 Bratislava: after midnight EZZK allocated a new number (`260924-SfE299Bb85`) even though `260923-NSE299bA61` was still unconsumed, confirming that a previous day's number no longer counts toward the account's limit once its Bratislava day has passed.
+- A record for the 2026-09-23 number sent at 00:33, after that number's allocation day had ended, was accepted with result 0 (`MessageId ae6fbf72-...`): a late record is still accepted for processing (ruling R12). Its public lookup then answered code 1 ("evidovaný, ale nespracovaný") while EZZK processed it.
+- The earlier, deliberately unsigned test record now looks up as code 12 "Neznámy obsah": EZZK processed and refused it. This is the live evidence behind ruling R12 (a lookup code other than 0, 1 and 105 means EZZK processed and refused the record, mapped to `.rejected`).
+- Test EZZK's processing (the window between a result-0 receipt and the public lookup settling on a final code) took more than 18 minutes for these records; `EZZKSubmissionCoordinator.refreshStatus` polls hourly after the first check, so the app does not busy-loop the account while EZZK processes a record.
+
+### Live check with the owner (Test mode, SAK card)
+
+Pending (owner). This session could not run it (no SAK card, no access to the owner's test EZZK credential). The owner runs one full ZaKo conversion of a synthetic document named "Zmluva o dielo č. 3" in Test mode with the SAK card, then from `Chevron7/`:
+
+```bash
+DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" swift run ezzk-probe lookup <number> --env test
+DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" swift run ezzk-probe record <number> --env test --out /tmp/record.asice
+unzip -l /tmp/record.asice
+```
+
+`record` signs in with the credential Settings saved for Test mode, so the first run may prompt for Keychain access. Expected: the register row shows "Prijatý na spracovanie" and later "Spracovaný v EZZK"; the lookup finds the record; the stored object is our `<number>.record.xml.xdcf` inside a one-file ASiC-E carrying a Baseline T signature (`unzip -l` lists `mimetype`, `<number>.record.xml.xdcf` and `META-INF/signatures001.xml`, no nested `.asice`).
 
 Result: not yet run.

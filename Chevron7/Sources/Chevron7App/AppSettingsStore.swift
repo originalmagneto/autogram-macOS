@@ -19,7 +19,11 @@ final class AppSettingsStore {
         ezzkAccountController.service
     }
     private(set) var signingProvider: any QualifiedSigningProviding
-    private(set) var evidenceStore: LocalEvidenceStore
+    let evidenceStore: LocalEvidenceStore
+    let evidenceNumberPool: EvidenceNumberPool
+    /// Sends and checks register rows for ZaKo, the Register and the periodic check, one
+    /// action per row at a time. The app model starts its five-minute check at launch.
+    let statusChecker: EZZKStatusChecker
     let exampleBank: ExampleBank
     /// Root for every file the app keeps: evidence register, vision bank, output,
     /// templates and signature images.
@@ -32,9 +36,17 @@ final class AppSettingsStore {
         let loaded = AppSettings.load()
         self.settings = loaded
         self.storageRoot = storageRoot
-        self.ezzkAccountController = ezzkAccountController ?? EZZKAccountController(mode: loaded.ezzkMode)
-        self.evidenceStore = LocalEvidenceStore(
-            directory: storageRoot.appendingPathComponent("Evidence", isDirectory: true))
+        let controller = ezzkAccountController ?? EZZKAccountController(mode: loaded.ezzkMode)
+        self.ezzkAccountController = controller
+        // LocalEvidenceStore.init appends its own "Evidence" folder to whatever
+        // directory it is given, so pass storageRoot itself here. EvidenceNumberPool
+        // follows the same convention.
+        let evidenceStore = LocalEvidenceStore(directory: storageRoot)
+        let numberPool = EvidenceNumberPool(directory: storageRoot)
+        self.evidenceStore = evidenceStore
+        self.evidenceNumberPool = numberPool
+        self.statusChecker = EZZKStatusChecker(evidenceStore: evidenceStore, numberPool: numberPool,
+                                               controller: controller)
         self.exampleBank = ExampleBank(directory: Self.exampleBankDirectory(in: storageRoot))
         self.signingProvider = SigningProviderFactory.makeDefault()
         self.ezzkAccountController.configure(

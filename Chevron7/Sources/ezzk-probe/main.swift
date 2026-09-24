@@ -4,18 +4,18 @@
 import Foundation
 import Chevron7Kit
 
-// Usage: ezzk-probe <login|time|numbers|consume|lookup|record> [evidence number]
+// Usage: ezzk-probe <login|time|numbers|consume|lookup|record|receive> [evidence number]
 //                   [--env test|production] [--name <person name>] [--ico <IČO>] [--at <ISO 8601 time>]
-//                   [--purpose original|xml] [--out <file>]
+//                   [--purpose original|xml] [--out <file>] [--file <signed record .asice>]
 // Credentials come from EZZK_LOGIN and EZZK_PASSWORD, otherwise from the Keychain item that
 // Settings saved for the environment. They are never printed.
-// numbers and consume allocate or consume evidence numbers, so they refuse production.
+// numbers, consume and receive allocate, consume or submit, so they refuse production.
 // record reads one of the signed-in person's own records (GetConversionRecord) and writes the
 // returned object to --out; it changes nothing in EZZK.
 
 setlinebuf(stdout)
 
-let usage = "usage: ezzk-probe <login|time|numbers|consume|lookup|record> [number] [--env test|production] [--name N] [--ico I] [--at ISO] [--purpose original|xml] [--out FILE]\n"
+let usage = "usage: ezzk-probe <login|time|numbers|consume|lookup|record|receive> [number] [--env test|production] [--name N] [--ico I] [--at ISO] [--purpose original|xml] [--out FILE] [--file ASICE]\n"
 let arguments = Array(CommandLine.arguments.dropFirst())
 
 func fail(_ message: String, code: Int32) -> Never {
@@ -50,8 +50,8 @@ case "production": environment = .production
 default: fail(usage, code: 2)
 }
 
-if (command == "numbers" || command == "consume") && environment == .production {
-    fail("error: \(command) allocates or consumes evidence numbers and is refused on production\n", code: 2)
+if (command == "numbers" || command == "consume" || command == "receive") && environment == .production {
+    fail("error: \(command) allocates, consumes or submits and is refused on production\n", code: 2)
 }
 
 let person = EZZKPerson(corporateBodyFullName: option("--name") ?? "", ico: option("--ico") ?? "")
@@ -101,6 +101,15 @@ Task.detached {
                 print("Pôvodný dokument: \(info.originalDocumentName ?? "-"), formát \(info.originalDocumentFormat ?? "-"), listov \(info.originalDocumentSheets.map(String.init) ?? "-")")
                 print("Nový dokument: \(info.newDocumentName ?? "-"), formát \(info.newDocumentFormat ?? "-")")
             }
+        case "receive":
+            guard let number, let file = option("--file") else { fail(usage, code: 2) }
+            let data = try Data(contentsOf: URL(fileURLWithPath: file))
+            let receipt = try await client.receive(records: [EZZKRecordAttachment(evidenceNumber: number,
+                                                                                  mimeType: "application/vnd.etsi.asic-e+zip",
+                                                                                  data: data)],
+                                                   person: person)
+            print("Prijaté na spracovanie: \(number)")
+            print("MessageId: \(receipt.messageID)")
         case "record":
             guard let number, let out = option("--out") else { fail(usage, code: 2) }
             let purpose: EZZKRecordPurpose = option("--purpose") == "xml" ? .xml : .original

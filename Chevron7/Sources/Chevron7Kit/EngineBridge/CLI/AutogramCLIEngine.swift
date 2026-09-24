@@ -206,8 +206,8 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
                             // Baseline-B asks for no timestamp, so no TSA needs configuring.
                             let wantsTimestamp = (request.signatureLevelOverride ?? request.outputFormat.signatureLevel)
                                 .hasSuffix("_T")
-                            let timestamp: (endpoints: [String], authentication: TimestampAuthenticationSecret?) =
-                                wantsTimestamp ? try qualifiedTimestampRequest() : (endpoints: [], authentication: nil)
+                            let timestamp = try resolvedTimestamp(wantsTimestamp: wantsTimestamp,
+                                override: request.timestampServersOverride)
                             if usesMachineV2 {
                                 try await signWithMachineV2(request: request, timestamp: timestamp,
                                     continuation: continuation)
@@ -559,6 +559,20 @@ final class AutogramCLIEngine: SigningEngine, @unchecked Sendable {
         for url in urls {
             try? FileManager.default.removeItem(at: url)
         }
+    }
+
+    /// Endpoints and authentication for a Baseline T signature. An explicit
+    /// override (an EZZK record's own required TSA) wins and short-circuits
+    /// `qualifiedTimestampRequest()` entirely, so the app's own timestamp
+    /// preferences are never read, let alone required to be configured, for a
+    /// record submission; without one, resolution keeps today's behaviour.
+    func resolvedTimestamp(wantsTimestamp: Bool, override: [String]?) throws
+        -> (endpoints: [String], authentication: TimestampAuthenticationSecret?) {
+        guard wantsTimestamp else { return (endpoints: [], authentication: nil) }
+        if let override, !override.isEmpty {
+            return (endpoints: override, authentication: nil)
+        }
+        return try qualifiedTimestampRequest()
     }
 
     private func qualifiedTimestampRequest() throws -> (endpoints: [String], authentication: TimestampAuthenticationSecret?) {

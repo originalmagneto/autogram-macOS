@@ -62,4 +62,31 @@ final class SigningInfrastructureTests: XCTestCase {
             XCTAssertTrue(provider is DemoSigningProvider)
         }
     }
+
+    /// Demo mode walks the ZaKo route end to end, so its containers must pass the same
+    /// structural check as the engine's: the client container lists its own data objects,
+    /// and the record keeps its "<number>.record.xml.xdcf" name.
+    func testDemoProviderContainersPassTheZakoStructuralCheck() async throws {
+        let provider = DemoSigningProvider()
+        let pdf = Data("%PDF-1.7 demo".utf8)
+        let clause = Data("<XMLDataContainer/>".utf8)
+        let files = ASiCEPackager().zakoContainer(pdfData: pdf, pdfFileName: "Zmluva.pdf",
+                                                  dolozkaXML: clause, dolozkaFileName: "1563-1.xml.xdcf")
+        let client = try await provider.sign(SigningRequest(pdfData: pdf, identityID: "demo",
+                                                            includeTimestamp: false, extraFiles: files,
+                                                            filename: "Zmluva.pdf",
+                                                            signsExtraFilesAsDataObjects: true))
+        let clientCheck = ASiCEContainerVerifier().verify(try XCTUnwrap(client.asicData))
+        XCTAssertTrue(clientCheck.isValid, "\(clientCheck.issues)")
+        XCTAssertFalse(clientCheck.entryNames.contains("document.pdf"))
+
+        let record = try await provider.sign(SigningRequest(pdfData: clause, identityID: "demo",
+                                                            includeTimestamp: false,
+                                                            filename: "1563-1.record.xml.xdcf",
+                                                            signsAsRecordContainer: true))
+        let recordCheck = ASiCEContainerVerifier().verify(try XCTUnwrap(record.asicData))
+        XCTAssertTrue(recordCheck.isValid, "\(recordCheck.issues)")
+        XCTAssertTrue(recordCheck.entryNames.contains("1563-1.record.xml.xdcf"))
+        XCTAssertFalse(recordCheck.entryNames.contains("document.pdf"))
+    }
 }

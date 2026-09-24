@@ -22,7 +22,8 @@ final class EZZKAccountController {
     /// Login name saved for the current environment. Never the password.
     private(set) var storedLogin = ""
 
-    private let credentialStore: any EZZKSOAPCredentialStoring
+    /// Not `private` so tests can confirm which store a controller actually uses.
+    let credentialStore: any EZZKSOAPCredentialStoring
     private let transportFactory: @Sendable (EZZKEnvironment) -> any EZZKHTTPTransport
     @ObservationIgnored private var personProvider: @MainActor () -> EZZKPerson = {
         EZZKPerson(corporateBodyFullName: "", ico: "")
@@ -58,7 +59,13 @@ final class EZZKAccountController {
     var hasStoredCredentials: Bool { !storedLogin.isEmpty }
 
     var service: any EZZKServicing {
-        guard let environment else { return demoService }
+        service(for: mode)
+    }
+
+    /// The service of one EZZK mode, whatever the current mode is: a register row is sent
+    /// to the EZZK that allocated its number even if the mode changes while it is sent.
+    func service(for mode: AppSettings.EZZKMode) -> any EZZKServicing {
+        guard let environment = mode.environment else { return demoService }
         return EZZKSOAPServiceAdapter(client: client(for: environment), person: personProvider(),
                                       usedEvidenceNumbers: usedEvidenceNumbersProvider())
     }
@@ -116,7 +123,12 @@ final class EZZKAccountController {
     }
 
     func lookUp(evidenceNumber: String) async throws -> EZZKRecordLookup {
-        guard let environment else { throw EZZKError.notConfigured }
+        try await lookUp(evidenceNumber: evidenceNumber, in: mode)
+    }
+
+    /// Looks a number up in one EZZK mode's environment, whatever the current mode is.
+    func lookUp(evidenceNumber: String, in mode: AppSettings.EZZKMode) async throws -> EZZKRecordLookup {
+        guard let environment = mode.environment else { throw EZZKError.notConfigured }
         return try await client(for: environment)
             .publicRecord(evidenceNumber: evidenceNumber.trimmingCharacters(in: .whitespacesAndNewlines))
     }

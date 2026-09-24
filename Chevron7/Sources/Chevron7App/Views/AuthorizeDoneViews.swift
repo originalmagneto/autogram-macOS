@@ -119,8 +119,14 @@ struct AuthorizeView: View {
 
     private var checklistItems: [(Bool, String, String)] {
         let identitySelected = store.selectedIdentityID != nil && store.selectedIdentity != nil
-        let qtsReady = !store.includeQualifiedTimestamp ||
-            !store.settings.selectedTSAURL.trimmingCharacters(in: .whitespaces).isEmpty
+        // Outside Demo the switch is hidden and the qualified built-in authorities always stamp.
+        let qtsReady = store.showsQualifiedTimestampToggle
+            ? (!store.includeQualifiedTimestamp
+               || !store.settings.selectedTSAURL.trimmingCharacters(in: .whitespaces).isEmpty)
+            : !TimestampAuthority.qualifiedURLs.isEmpty
+        let qtsLabel = !store.showsQualifiedTimestampToggle
+            ? "QTS z kvalifikovaných autorít časových pečiatok"
+            : (store.includeQualifiedTimestamp ? "QTS pripravená s TSA službou" : "QTS nepoužitá")
         return [
             inputSignatureChecklistItem,
             (store.attestation.originConfirmed,
@@ -143,8 +149,7 @@ struct AuthorizeView: View {
              "Evidenčné číslo advokáta vyplnené", "building.columns"),
             (identitySelected, "Identita pre podpis vybraná", "person.badge.key"),
             (store.mandateRequirementSatisfied, "Mandátny certifikát SAK pripravený", "checkmark.seal"),
-            (qtsReady, store.includeQualifiedTimestamp
-                ? "QTS pripravená s TSA službou" : "QTS nepoužitá", "clock.badge.checkmark")
+            (qtsReady, qtsLabel, "clock.badge.checkmark")
         ]
     }
 
@@ -248,11 +253,13 @@ struct AuthorizeView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            Toggle(isOn: $store.includeQualifiedTimestamp) {
-                Label("Kvalifikovaná časová pečiatka (QTS)", systemImage: "clock.badge.checkmark")
+            if store.showsQualifiedTimestampToggle {
+                Toggle(isOn: $store.includeQualifiedTimestamp) {
+                    Label("Kvalifikovaná časová pečiatka (QTS)", systemImage: "clock.badge.checkmark")
+                }
+                .toggleStyle(.switch)
+                .controlSize(.small)
             }
-            .toggleStyle(.switch)
-            .controlSize(.small)
 
             if store.requiresMandateOverride {
                 VStack(alignment: .leading, spacing: 6) {
@@ -394,66 +401,17 @@ struct IdentityRow: View {
 struct DoneView: View {
     let store: ZakoSessionStore
     @State private var exportError: String?
+    @State private var isWorkingOnEZZK = false
     var body: some View {
         VStack(spacing: 24) {
             Spacer()
 
-            let isQueued = store.submissionStatus == .queuedForSubmission
-            ZStack {
-                Circle()
-                    .fill((isQueued ? Color.orange : Color.green).opacity(0.12))
-                    .frame(width: 130, height: 130)
-                Image(systemName: isQueued ? "tray.and.arrow.up.fill" : "checkmark.seal.fill")
-                    .font(.system(size: 60))
-                    .foregroundStyle(isQueued ? Color.orange : Color.green)
+            // The stored row decides what is said (its state and the EZZK mode it was signed
+            // in); the checker's change count redraws when the periodic check moves it on,
+            // and the timeline when a waiting "Overiť v EZZK" becomes available.
+            TimelineView(.periodic(from: .now, by: 30)) { context in
+                ezzkStatus(presentation(at: context.date))
             }
-
-            VStack(spacing: 6) {
-                Text(isQueued
-                     ? "Súbor je podpísaný; zápis do CEZZK čaká"
-                     : "Zaručená konverzia bola úspešne dokončená")
-                    .font(.title2.weight(.bold))
-
-                if let result = store.result {
-                    Text(result.isLegallyBinding
-                         ? "Kvalifikovaný elektronický podpis a doložka pripojené"
-                         : "DEMO režim: konverzia nemá právne účinky")
-                        .font(.callout)
-                        .foregroundStyle(result.isLegallyBinding ? Color.secondary : Color.orange)
-                }
-
-                if isQueued, let record = store.evidenceStore.record(id: store.currentRecordID) {
-                    if store.settingsStore.ezzkAccountController.isDemoMode {
-                        Text("Odoslanie sa zopakuje najneskôr do \(record.submissionDeadline, style: .date) \(record.submissionDeadline, style: .time).")
-                            .font(.callout)
-                            .foregroundStyle(.orange)
-                        Button {
-                            Task { await store.retryQueuedSubmission() }
-                        } label: {
-                            Label("Znova odoslať do CEZZK", systemImage: "arrow.clockwise")
-                        }
-                        .controlSize(.small)
-                    } else {
-                        // Test and Produkcia cannot send records in this version, so there is no
-                        // retry to promise or offer; the Register konverzií says the same.
-                        Text(EZZKError.submissionUnavailable.errorDescription ?? "")
-                            .font(.callout)
-                            .foregroundStyle(.orange)
-                            .multilineTextAlignment(.center)
-                    }
-                }
-
-                if let evidence = store.attestation.evidenceNumber {
-                    HStack(spacing: 6) {
-                        Text("Evidenčné číslo:")
-                            .foregroundStyle(.secondary)
-                        Text(evidence)
-                            .font(.callout.monospacedDigit().weight(.bold))
-                    }
-                    .padding(.top, 2)
-                }
-            }
-
             if let directory = store.outputDirectory {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Priečinok s vygenerovanými súbormi:")
@@ -505,6 +463,119 @@ struct DoneView: View {
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func presentation(at now: Date) -> ZakoDonePresentation {
+        let checker = store.settingsStore.statusChecker
+        _ = checker.changeCount
+        let record = store.evidenceStore.record(id: store.currentRecordID)
+        return ZakoDonePresentation(record: record,
+                                    lastError: store.lastError,
+                                    lastErrorStatus: store.submissionStatus,
+                                    archiveCopyError: store.archiveCopyError,
+                                    nextStatusCheck: record.flatMap { checker.nextStatusCheck(for: $0) },
+                                    now: now,
+                                    currentMode: store.settingsStore.ezzkAccountController.mode)
+    }
+
+    private func toneColor(_ tone: EZZKRecordPresentation.Tone) -> Color {
+        switch tone {
+        case .success: return .green
+        case .pending, .warning: return .orange
+        case .failure: return .red
+        }
+    }
+
+    @ViewBuilder
+    private func ezzkStatus(_ done: ZakoDonePresentation) -> some View {
+        let tint = toneColor(done.tone)
+        VStack(spacing: 24) {
+            ZStack {
+                Circle()
+                    .fill(tint.opacity(0.12))
+                    .frame(width: 130, height: 130)
+                Image(systemName: done.symbol)
+                    .font(.system(size: 60))
+                    .foregroundStyle(tint)
+            }
+            .accessibilityHidden(true)
+
+            VStack(spacing: 6) {
+                Text(done.title)
+                    .font(.title2.weight(.bold))
+                    .multilineTextAlignment(.center)
+
+                if let result = store.result {
+                    Text(result.isLegallyBinding
+                         ? "Kvalifikovaný elektronický podpis a doložka pripojené"
+                         : "DEMO režim: konverzia nemá právne účinky")
+                        .font(.callout)
+                        .foregroundStyle(result.isLegallyBinding ? Color.secondary : Color.orange)
+                }
+
+                ForEach(done.lines, id: \.self) { line in
+                    Text(line)
+                        .font(.callout)
+                        .foregroundStyle(done.tone == .success ? Color.secondary : tint)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: 560)
+                }
+
+                if let evidence = store.attestation.evidenceNumber {
+                    HStack(spacing: 6) {
+                        Text("Evidenčné číslo:")
+                            .foregroundStyle(.secondary)
+                        Text(evidence)
+                            .font(.callout.monospacedDigit().weight(.bold))
+                    }
+                    .padding(.top, 2)
+                }
+
+                ezzkActionButton(done)
+
+                if let error = done.error {
+                    Text(error)
+                        .font(.callout)
+                        .foregroundStyle(.red)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: 560)
+                        .textSelection(.enabled)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func ezzkActionButton(_ done: ZakoDonePresentation) -> some View {
+        switch done.action {
+        case .none:
+            EmptyView()
+        case .send, .verify:
+            let isSend = done.action == .send
+            Button {
+                isWorkingOnEZZK = true
+                Task {
+                    if isSend {
+                        await store.retryQueuedSubmission()
+                    } else {
+                        await store.verifyRecordInEZZK()
+                    }
+                    isWorkingOnEZZK = false
+                }
+            } label: {
+                HStack(spacing: 5) {
+                    if isWorkingOnEZZK {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Image(systemName: isSend ? "tray.and.arrow.up" : "magnifyingglass")
+                    }
+                    Text(isSend ? "Odoslať do EZZK" : "Overiť v EZZK")
+                }
+            }
+            .controlSize(.small)
+            .disabled(!done.isActionEnabled || isWorkingOnEZZK)
+            .padding(.top, 4)
+        }
     }
 
     private func exportAs() {

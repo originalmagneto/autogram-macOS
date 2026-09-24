@@ -45,6 +45,15 @@ final class Chevron7AppModel {
                 || browserSigning.pending != nil
         }
 
+        // Rows waiting for EZZK are sent and looked up every five minutes while a regular
+        // Chevron7 runs (ruling R13); a web-signing launch starts the check only once the
+        // app becomes regular. The process ending stops it.
+        let checker = settings.statusChecker
+        checker.startIfAllowed(launchMode: AppLaunchMode.current, isRegularApp: false)
+        AppDelegate.onBecomeRegular = {
+            checker.startIfAllowed(launchMode: AppLaunchMode.current, isRegularApp: true)
+        }
+
         // Browser requests reach the app through the Safari extension and the
         // launchd rendezvous; nothing signs without the sheet this raises.
         let coordinator = webSigning
@@ -238,8 +247,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return nil
     }
 
+    /// Set by the app model: work that waits for a regular app (the EZZK status check).
+    @MainActor static var onBecomeRegular: (() -> Void)?
+
     @MainActor
     static func becomeRegularApp() {
+        onBecomeRegular?()
         guard NSApp.activationPolicy() != .regular else { return }
         NSApp.setActivationPolicy(.regular)
         NSApp.activate()

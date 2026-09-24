@@ -49,6 +49,7 @@ public class SigningParameters {
     private final int visualizationWidth;
     private final TSPSource tspSource;
     private VisiblePadesAppearance visiblePadesAppearance;
+    private boolean plainRecordXdc;
 
     private SigningParameters(
             SignatureLevel level, DigestAlgorithm digestAlgorithm, ASiCContainerType container, SignaturePackaging signaturePackaging,
@@ -155,6 +156,22 @@ public class SigningParameters {
                 (tspSource == null) ? SignatureLevel.CAdES_BASELINE_B : SignatureLevel.CAdES_BASELINE_T, DigestAlgorithm.SHA256,
                 ASiCContainerType.ASiC_E, SignaturePackaging.ENVELOPING, signAsEn319132, null, null, null, null, true,
                 EFormUtils.getFsFormIdFromFilename(document.getName()), checkPDFACompliance, 640, document, tspSource, plainXmlEnabled);
+    }
+
+    /// An XMLDataContainer signed alone into a new ASiC-E, as is: no eForm is resolved, fetched or
+    /// validated (the XDC already references its form), and the data object keeps the bare XDC MIME.
+    public static SigningParameters buildForPlainRecordXdc(DSSDocument document, SignatureLevel level,
+            TSPSource tspSource) throws AutogramException {
+        if (document == null || !AutogramMimeType.isXDC(document.getMimeType()))
+            throw new SigningParametersException(WRONG_MIME_TYPE);
+        if (level != SignatureLevel.XAdES_BASELINE_T && level != SignatureLevel.XAdES_BASELINE_B)
+            throw new SigningParametersException("Nesprávny typ podpisu", "Záznam sa podpisuje ako XAdES v ASiC-E");
+
+        var parameters = buildParameters(level, DigestAlgorithm.SHA256, ASiCContainerType.ASiC_E,
+                SignaturePackaging.ENVELOPING, false, null, null, null, null, false, null, false, 640, document,
+                level == SignatureLevel.XAdES_BASELINE_T ? tspSource : null, true);
+        parameters.plainRecordXdc = true;
+        return parameters;
     }
 
     public static SigningParameters buildForExistingASiC(DSSDocument document, SignatureLevel level,
@@ -336,6 +353,11 @@ public class SigningParameters {
 
     public String getXsdIdentifier() {
         return eFormAttributes.xsdIdentifier();
+    }
+
+    /// True only for parameters built by `buildForPlainRecordXdc`.
+    public boolean isPlainRecordXdc() {
+        return plainRecordXdc;
     }
 
     public boolean shouldCreateXdc() {

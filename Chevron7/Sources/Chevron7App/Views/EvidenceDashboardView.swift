@@ -14,6 +14,7 @@ struct EvidenceDashboardView: View {
     @State private var showDetail = false
     @State private var isSubmitting = false
     @State private var submitFeedback: String?
+    @State private var submitSucceeded = false
     @State private var refreshTimer: Timer?
     @State private var recordToDelete: EvidenceRecord?
     @State private var showDeleteConfirmation = false
@@ -24,7 +25,14 @@ struct EvidenceDashboardView: View {
             summaryHeader
             Divider().opacity(0.5)
 
-            if records.isEmpty {
+            if let loadError = settingsStore.evidenceStore.loadError {
+                // Never an empty register over one that could not be read.
+                ContentUnavailableView {
+                    Label("Register konverzií sa nepodarilo načítať", systemImage: "exclamationmark.triangle.fill")
+                } description: {
+                    Text(loadError)
+                }
+            } else if records.isEmpty {
                 ContentUnavailableView("Register je prázdny",
                                        systemImage: "archivebox",
                                        description: Text("Po dokončení prvej zaručenej konverzie sa tu zobrazí evidenčný záznam."))
@@ -50,11 +58,11 @@ struct EvidenceDashboardView: View {
                     }
                     .width(min: 150, ideal: 190)
 
-                    TableColumn("Lehota CEZZK") { record in
+                    TableColumn("Lehota EZZK") { record in
                         deadlineLabel(record)
                             .contextMenu { recordContextMenu(for: record) }
                     }
-                    .width(min: 120, ideal: 160)
+                    .width(min: 140, ideal: 220)
 
                     TableColumn("Dátum konverzie") { record in
                         Text(LocalEvidenceStore.csvDate(record.conversionTime))
@@ -125,12 +133,13 @@ struct EvidenceDashboardView: View {
                         } else {
                             Image(systemName: "tray.and.arrow.up")
                         }
-                        Text("Odoslať do CEZZK")
+                        Text("Odoslať do EZZK")
                     }
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(isSubmitting || !records.contains(where: \.isSubmissionPending))
-                .help("Odoslať čakajúce záznamy do centrálnej evidencie CEZZK")
+                .disabled(isSubmitting || settingsStore.evidenceStore.loadError != nil
+                          || !records.contains(where: \.isSubmissionPending))
+                .help("Odoslať čakajúce záznamy do EZZK; pri neznámom výsledku sa záznam najprv overí v EZZK")
 
                 Button {
                     exportCSV()
@@ -145,13 +154,16 @@ struct EvidenceDashboardView: View {
             startClock()
         }
         .onDisappear { refreshTimer?.invalidate() }
+        // The periodic check, ZaKo and the detail sheet change rows through the checker.
+        .onChange(of: settingsStore.statusChecker.changeCount) { reload() }
         .sheet(isPresented: $showDetail) {
             if let record = detailRecord {
                 RecordDetailView(settingsStore: settingsStore,
-                                 record: binding(for: record),
+                                 recordID: record.id,
                                  onClose: {
                                      showDetail = false
                                      selectedRecordID = nil
+                                     reload()
                                  })
             }
         }
@@ -162,7 +174,7 @@ struct EvidenceDashboardView: View {
         ) {
             Button("Zmazať záznam", role: .destructive) {
                 if let record = recordToDelete {
-                    settingsStore.evidenceStore.delete(id: record.id)
+                    settingsStore.statusChecker.delete(id: record.id)
                     reload()
                 }
                 recordToDelete = nil
@@ -215,32 +227,20 @@ struct EvidenceDashboardView: View {
         return records.first { $0.id == id }
     }
 
-    private func binding(for record: EvidenceRecord) -> Binding<EvidenceRecord> {
-        guard let index = records.firstIndex(where: { $0.id == record.id }) else {
-            return .constant(record)
-        }
-        return Binding(get: { records[index] },
-                       set: { records[index] = $0; persist($0) })
-    }
-
-    private func persist(_ record: EvidenceRecord) {
-        settingsStore.evidenceStore.upsert(record)
-    }
-
     private var summaryHeader: some View {
-        let pending = records.filter(\.isSubmissionPending).count
+        let summary = EvidenceRegisterSummary(records: records)
         let overdue = records.filter(\.isOverdue).count
-        let submitted = records.filter { $0.status == .submitted }.count
         return HStack(spacing: 12) {
-            SummaryCard(title: "Konverzií celkovo", value: "\(records.count)", symbol: "archivebox", tint: .accentColor)
-            SummaryCard(title: "Zapísaných v CEZZK", value: "\(submitted)", symbol: "checkmark.seal.fill", tint: .green)
-            SummaryCard(title: "Čaká na odoslanie", value: "\(pending)", symbol: "tray.and.arrow.up", tint: pending > 0 ? .orange : .secondary)
+            SummaryCard(title: "Konverzií celkovo", value: "\(summary.total)", symbol: "archivebox", tint: .accentColor)
+            SummaryCard(title: "Zapísaných v EZZK", value: "\(summary.sent)", symbol: "checkmark.seal.fill", tint: .green)
+            SummaryCard(title: "Čaká na odoslanie", value: "\(summary.pending)", symbol: "tray.and.arrow.up", tint: summary.pending > 0 ? .orange : .secondary)
+            SummaryCard(title: "Odmietnuté alebo nepodpísané", value: "\(summary.failed)", symbol: "xmark.seal.fill", tint: summary.failed > 0 ? .red : .secondary)
             SummaryCard(title: "Po lehote 24 h", value: "\(overdue)", symbol: "clock.badge.exclamationmark", tint: overdue > 0 ? .red : .secondary)
             Spacer()
             if let feedback = submitFeedback {
                 Text(feedback)
                     .font(.footnote.weight(.medium))
-                    .foregroundStyle(feedback.hasPrefix("✓") ? Color.green : Color.orange)
+                    .foregroundStyle(submitSucceeded ? Color.green : Color.orange)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
                     .background(Color.primary.opacity(0.04), in: Capsule())
@@ -260,31 +260,21 @@ struct EvidenceDashboardView: View {
         .background(.bar)
     }
 
-    static let deadlineFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "dd.MM. HH:mm"
-        return formatter
-    }()
-
-    @ViewBuilder
     private func deadlineLabel(_ record: EvidenceRecord) -> some View {
-        let formatter = Self.deadlineFormatter
-        if record.status == .submitted {
-            Text(UXLabels.evidenceStatusLabel(for: record.status))
-                .font(.caption)
-                .foregroundStyle(.green)
-        } else if record.isOverdue {
-            Text("Po lehote — \(formatter.string(from: record.submissionDeadline))")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.red)
-        } else if record.isSubmissionPending {
-            Text("Blíži sa lehota — do \(formatter.string(from: record.submissionDeadline))")
-                .font(.caption)
-                .foregroundStyle(.orange)
-        } else {
-            Text("Lehota: \(formatter.string(from: record.submissionDeadline))")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+        let deadline = EvidenceRegisterDetail.deadline(for: record, now: Date())
+        return Text(deadline.text)
+            .font(deadline.tone == .failure ? .caption.weight(.semibold) : .caption)
+            .foregroundStyle(Self.tint(for: deadline.tone))
+            .lineLimit(2)
+            .help(deadline.text)
+    }
+
+    static func tint(for tone: EZZKRecordPresentation.Tone) -> Color {
+        switch tone {
+        case .success: return .green
+        case .pending: return .secondary
+        case .warning: return .orange
+        case .failure: return .red
         }
     }
 
@@ -307,11 +297,11 @@ struct EvidenceDashboardView: View {
 
     private func statusTint(_ status: EvidenceRecord.Status) -> Color {
         switch status {
-        case .draft, .awaitingNumber: return .secondary
+        case .draft, .awaitingNumber, .recordUnsigned: return .secondary
         case .readyToSign: return .blue
-        case .signed, .queuedForSubmission: return .orange
-        case .submitted: return .green
-        case .submissionFailed: return .red
+        case .signed, .queuedForSubmission, .acceptedForProcessing, .outcomeUnknown, .late: return .orange
+        case .submitted, .processed: return .green
+        case .submissionFailed, .rejected: return .red
         }
     }
 
@@ -325,54 +315,20 @@ struct EvidenceDashboardView: View {
             Task { @MainActor in reload() }
         }
     }
+    /// Every pending row goes through the app's status checker: unknown outcomes are
+    /// looked up first and never resent, and nothing is ever marked failed for an error
+    /// that may have followed an accepted record.
     private func submitPending() {
         isSubmitting = true
         submitFeedback = nil
-        reload()
-        let pending = records.filter(\.isSubmissionPending)
-        let isDemoMode = settingsStore.ezzkAccountController.isDemoMode
         Task {
-            var submittedCount = 0
-            var failedCount = 0
-            var submissionUnavailable = false
-            for record in pending {
-                do {
-                    try await settingsStore.ezzkService.submit(record.envelope())
-                    if !isDemoMode {
-                        var updated = record
-                        updated.status = .submitted
-                        updated.updatedAt = Date()
-                        settingsStore.evidenceStore.upsert(updated)
-                    }
-                    submittedCount += 1
-                } catch EZZKError.submissionUnavailable {
-                    // Nothing was sent; the rows stay queued instead of being marked as failed.
-                    submissionUnavailable = true
-                    break
-                } catch {
-                    var updated = record
-                    updated.status = .submissionFailed
-                    updated.updatedAt = Date()
-                    settingsStore.evidenceStore.upsert(updated)
-                    failedCount += 1
-                }
-            }
-            await MainActor.run {
-                reload()
-                isSubmitting = false
-                if submissionUnavailable {
-                    submitFeedback = EZZKError.submissionUnavailable.errorDescription
-                } else {
-                    submitFeedback = failedCount == 0
-                        ? (isDemoMode
-                            ? "✓ Demo: lokálne pripravených \(submittedCount) záznamov."
-                            : "✓ Odoslaných \(submittedCount) záznamov do CEZZK.")
-                        : "⚠ \(submittedCount) úspešných, \(failedCount) zlyhalo."
-                }
-            }
+            let summary = await settingsStore.statusChecker.submitPending()
+            reload()
+            isSubmitting = false
+            submitFeedback = summary.feedback
+            submitSucceeded = summary.isSuccess
         }
     }
-
 
     private func exportCSV() {
         exportError = nil
@@ -431,40 +387,60 @@ struct SummaryCard: View {
 // MARK: - Record Detail Modal Sheet
 struct RecordDetailView: View {
     @Bindable var settingsStore: AppSettingsStore
-    @Binding var record: EvidenceRecord
+    let recordID: UUID
     let onClose: () -> Void
     @State private var copiedFingerprint = false
     @State private var showDeleteConfirm = false
+    @State private var showResendConfirm = false
     @State private var selectedTab = 0
+    @State private var isWorking = false
+    @State private var actionMessage: String?
 
-    private var timelineStages: [(String, Bool, Bool)] {
-        [
-            ("Evidenčné číslo", record.evidenceNumber != nil, false),
-            ("Autorizácia KEP", record.status.progressIndex >= 3, false),
-            ("Zápis v CEZZK", record.status == .submitted, record.status == .submissionFailed)
-        ]
+    /// Read from the register on every draw; the checker's change count redraws the sheet
+    /// when a send, a lookup or the periodic check changes the row.
+    private var record: EvidenceRecord? {
+        _ = settingsStore.statusChecker.changeCount
+        return settingsStore.evidenceStore.record(id: recordID)
     }
 
     var body: some View {
+        if let record {
+            content(record)
+        } else {
+            VStack {
+                ContentUnavailableView("Záznam sa v Registri nenašiel", systemImage: "archivebox")
+                Button("Zavrieť") { onClose() }
+                    .keyboardShortcut(.defaultAction)
+            }
+            .padding(22)
+            .frame(minWidth: 320, minHeight: 200)
+        }
+    }
+
+    private func content(_ record: EvidenceRecord) -> some View {
         VStack(alignment: .leading, spacing: 16) {
-            header
+            header(record)
 
             Picker("Časť detailu záznamu", selection: $selectedTab) {
                 Text("Prehľad záznamu").tag(0)
-                Text("Osvedčovacia doložka (XML)").tag(1)
+                Text("Záznam o konverzii (XML)").tag(1)
             }
             .pickerStyle(.segmented)
 
             if selectedTab == 0 {
-                VStack(alignment: .leading, spacing: 14) {
-                    StatusTimeline(stages: timelineStages)
-                    factsGrid
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 14) {
+                        StatusTimeline(stages: EvidenceRegisterDetail.timeline(for: record)
+                            .map { (label: $0.label, done: $0.done, failed: $0.failed) })
+                        submissionCard(record)
+                        factsGrid(record)
+                    }
                 }
             } else {
-                attestationPreview
+                attestationPreview(record)
             }
 
-            Spacer()
+            Spacer(minLength: 0)
 
             HStack {
                 if let uri = record.evidenceURI {
@@ -495,11 +471,11 @@ struct RecordDetailView: View {
             }
         }
         .padding(22)
-        .frame(minWidth: 320, idealWidth: 580, maxWidth: .infinity,
-               minHeight: 400, idealHeight: 540, maxHeight: .infinity)
+        .frame(minWidth: 320, idealWidth: 600, maxWidth: .infinity,
+               minHeight: 400, idealHeight: 600, maxHeight: .infinity)
         .confirmationDialog("Naozaj chcete vymazať tento záznam?", isPresented: $showDeleteConfirm) {
             Button("Zmazať záznam", role: .destructive) {
-                settingsStore.evidenceStore.delete(id: record.id)
+                settingsStore.statusChecker.delete(id: record.id)
                 onClose()
             }
             Button("Zrušiť", role: .cancel) {}
@@ -508,13 +484,13 @@ struct RecordDetailView: View {
         }
     }
 
-    private var header: some View {
+    private func header(_ record: EvidenceRecord) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(record.originalName)
                 .font(.title3.weight(.bold))
             HStack(spacing: 8) {
-                Label(record.status.rawValue, systemImage: record.status.sfSymbol)
-                    .foregroundStyle(statusTint)
+                Label(UXLabels.evidenceStatusLabel(for: record.status), systemImage: record.status.sfSymbol)
+                    .foregroundStyle(EvidenceDashboardView.tint(for: EZZKRecordPresentation.tone(for: record.status)))
                 Text("·")
                     .foregroundStyle(.tertiary)
                 Text(LocalEvidenceStore.csvDate(record.conversionTime))
@@ -524,20 +500,111 @@ struct RecordDetailView: View {
         }
     }
 
-    private var factsGrid: some View {
-        Grid(horizontalSpacing: 16, verticalSpacing: 8) {
+    /// State, submission facts, what the row needs and the "Odoslať" / "Overiť v EZZK" actions.
+    private func submissionCard(_ record: EvidenceRecord) -> some View {
+        let actions = EvidenceRegisterDetail.actions(for: record,
+                                                     currentMode: settingsStore.ezzkAccountController.mode)
+        let explanation = EZZKRecordPresentation.stateExplanation(for: record)
+            .filter { $0 != actions.note && $0 != record.ezzkResultDescription }
+        let nextCheck = settingsStore.statusChecker.nextStatusCheck(for: record)
+        let verifyWaitsUntil = record.status == .outcomeUnknown ? nextCheck.flatMap { $0 > Date() ? $0 : nil } : nil
+        return VStack(alignment: .leading, spacing: 10) {
+            Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 6) {
+                ForEach(EvidenceRegisterDetail.submissionFacts(for: record), id: \.label) { fact in
+                    GridRow {
+                        Text(fact.label).foregroundStyle(.secondary)
+                        Text(fact.value).textSelection(.enabled)
+                    }
+                }
+            }
+            ForEach(explanation + [actions.note].compactMap { $0 }, id: \.self) { line in
+                Text(line)
+                    .font(.callout)
+                    .foregroundStyle(EvidenceDashboardView.tint(for: EZZKRecordPresentation.tone(for: record.status)))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if let verifyWaitsUntil {
+                Text("Overiť v EZZK bude možné od \(EZZKRecordPresentation.timeText(verifyWaitsUntil)).")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            if actions.canSend || actions.canVerify {
+                HStack(spacing: 10) {
+                    if actions.canSend {
+                        Button {
+                            run { await settingsStore.statusChecker.submit(id: record.id) }
+                        } label: {
+                            Label("Odoslať", systemImage: "tray.and.arrow.up")
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
+                    if actions.canVerify {
+                        Button {
+                            run { await settingsStore.statusChecker.verify(id: record.id) }
+                        } label: {
+                            Label("Overiť v EZZK", systemImage: "magnifyingglass")
+                        }
+                        .disabled(verifyWaitsUntil != nil)
+                    }
+                    if isWorking { ProgressView().controlSize(.small) }
+                }
+                .disabled(isWorking)
+            }
+            if actions.canResend {
+                HStack(spacing: 10) {
+                    Button {
+                        showResendConfirm = true
+                    } label: {
+                        Label("Odoslať znova", systemImage: "arrow.clockwise")
+                    }
+                    if isWorking { ProgressView().controlSize(.small) }
+                }
+                .disabled(isWorking)
+                .confirmationDialog(actions.resendConfirmation ?? "Odoslať záznam znova?",
+                                    isPresented: $showResendConfirm, titleVisibility: .visible) {
+                    Button("Odoslať znova") {
+                        run { await settingsStore.statusChecker.resend(id: record.id) }
+                    }
+                    Button("Zrušiť", role: .cancel) {}
+                }
+            }
+            if let actionMessage {
+                Text(actionMessage)
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glassCard(cornerRadius: 12, padding: 12)
+    }
+
+    private func run(_ action: @escaping () async -> EZZKStatusChecker.RowResult) {
+        isWorking = true
+        actionMessage = nil
+        Task {
+            let result = await action()
+            // A refusal (another mode, a row in flight) says why; a changed row speaks for itself.
+            actionMessage = result.refusal
+            isWorking = false
+        }
+    }
+
+    private func factsGrid(_ record: EvidenceRecord) -> some View {
+        Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 8) {
             row("Evidenčné číslo", record.evidenceNumber ?? "nezískané")
             row("Osvedčujúca osoba", record.performingPersonName.isEmpty ? "neurčená" : record.performingPersonName)
             row("Nový dokument", record.newDocumentName)
             row("Strany / listy / prvky",
                 "\(record.totalPages) strán / \(record.totalSheets) listov / \(record.securityElementCount) prvkov")
-            fingerprintRow
+            fingerprintRow(record)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .glassCard(cornerRadius: 12, padding: 12)
     }
 
     @ViewBuilder
-    private var fingerprintRow: some View {
+    private func fingerprintRow(_ record: EvidenceRecord) -> some View {
         let short = String(record.fingerprintSHA256Hex.prefix(24)) + "…"
         GridRow {
             Text("SHA-256 odtlačok")
@@ -568,8 +635,8 @@ struct RecordDetailView: View {
         }
     }
 
-    private var attestationPreview: some View {
-        GroupBox("Osvedčovacia doložka (XML dáta)") {
+    private func attestationPreview(_ record: EvidenceRecord) -> some View {
+        GroupBox("Záznam o konverzii (XML dáta)") {
             ScrollView {
                 Text(record.attestationXML)
                     .font(.system(size: 10, design: .monospaced))
@@ -577,16 +644,6 @@ struct RecordDetailView: View {
                     .textSelection(.enabled)
             }
             .frame(height: 240)
-        }
-    }
-
-    private var statusTint: Color {
-        switch record.status {
-        case .draft, .awaitingNumber: return .secondary
-        case .readyToSign: return .blue
-        case .signed, .queuedForSubmission: return .orange
-        case .submitted: return .green
-        case .submissionFailed: return .red
         }
     }
 }

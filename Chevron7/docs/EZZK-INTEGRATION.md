@@ -7,23 +7,21 @@ Companion documents:
 
 - `docs/superpowers/specs/2026-09-17-ezzk-soap-design.md`: the approved design of part A.
 - `docs/superpowers/plans/2026-09-17-ezzk-soap.md`: the implementation plan it was built from.
+- `docs/superpowers/specs/2026-09-23-ezzk-part-b-design.md`: the approved design of part B (client clause in B1, record submission in B2, "Revision 5" amendments from the live test service).
 - `docs/P2E-EZZK-FINDINGS.md`: the research register, the deviations from the MIRRI manual, and the gaps left open.
 - `docs/reference/ezzk-soap/2026-09-17/`: the WSDL and XSD snapshot the request tests validate against.
 
 ## Scope
 
-Part A, which is what ships today:
+Parts A and B1+B2, which ship today:
 
 - The advocate signs in with their own EZZK name and password and Chevron7 verifies it against EZZK.
-- Chevron7 reads the EZZK server time, allocates and consumes evidence numbers (test environment only), and looks records up.
-- Production is read only: sign in, server time and public record lookup. Nothing allocates, consumes or submits there.
-- `ezzk-probe` exercises the same service from the command line.
+- Chevron7 reads the EZZK server time, allocates and reuses evidence numbers (test environment only), and looks records up.
+- ZaKo signs the conversion record (form `50349287.ConversionRecordOfPaperToElectronicDocument.sk` 1.0) with the mandate certificate and a qualified timestamp into its own ASiC-E, and sends it with `ReceiveConversionRecord`.
+- Production is read only: sign in, server time and public record lookup. Nothing allocates or submits there; that opens in part B3.
+- `ezzk-probe` exercises the same service from the command line, including reading a record back and submitting one.
 
-Part B, which is not built yet: the signed conversion record (form
-`50349287.ConversionRecordOfPaperToElectronicDocument.sk`) in an `XMLDataContainer`,
-signed with the mandate certificate and a qualified timestamp into its own ASiC,
-sent with `ReceiveConversionRecord`. Part B also unlocks allocation on production
-and brings record form version 1.2, which takes effect on 2027-01-01.
+Part B3, not built yet: production allocation and submission, and record form version 1.2, which takes effect on 2027-01-01.
 
 ## Why SOAP and not the portal API
 
@@ -43,15 +41,16 @@ without the field decode to `demo`.
 
 | Mode | Service | What works |
 | --- | --- | --- |
-| `demo` | none, `MockEZZKService` | Local numbers and local clock. No network, no Keychain. |
-| `test` | `https://ezzk-test.iomo.sk` | Sign in, server time, lookup, allocate and consume numbers. |
-| `production` | `https://ezzk.iomo.sk` | Sign in, server time, public lookup. Allocation, consumption and submission are refused. |
+| `demo` | none, `MockEZZKService` | Local numbers and local clock. No network, no Keychain. Lookup always answers processed (ruling R4). |
+| `test` | `https://ezzk-test.iomo.sk` | Sign in, server time, lookup, allocate numbers, sign and send a record. |
+| `production` | `https://ezzk.iomo.sk` | Sign in, server time, public lookup. Allocation and submission are refused until part B3. |
 
-The production lock is enforced in four independent places, so removing any one of
-them does not open it: `EZZKSOAPClient.perform` (before any network use),
-`EZZKSOAPServiceAdapter.requestEvidenceNumbers`, `EZZKAccountController.requestTestNumbers`
-and `ezzk-probe` itself. `EZZKSOAPServiceAdapter.submit` always throws
-`submissionUnavailable` until part B.
+The production lock is enforced in independent places, so removing any one of them
+does not open it: `EZZKSOAPClient.perform` (before any network use),
+`EZZKSOAPServiceAdapter.requestEvidenceNumbers`, `EZZKAccountController.requestTestNumbers`,
+`EZZKSOAPServiceAdapter.submit` and `ezzk-probe` itself. `EZZKStatusChecker` also never
+sends or looks up a production row (`sendsInProduction`, false until part B3), so a row
+signed on production stays queued with the same `submissionUnavailable` message.
 
 ## Setting it up
 
@@ -86,38 +85,63 @@ MIRRI manual and the live service disagree, the live service wins.
 | `GetConversionRecordEvidenceNumber` | yes | Allocating evidence numbers. Test only. |
 | `ConsumeConversionRecordEvidenceNumber` | yes | Consuming a number. Test only. |
 | `GetConversionRecordInformationPurpose` | no | Public record lookup in Settings and in the probe. |
-| `GetConversionRecord` | yes | The advocate's own record with the stored object. |
-| `ReceiveConversionRecord` | yes | Submitting a record. Built and callable, but the app refuses it until part B. |
+| `GetConversionRecord` | yes | The advocate's own record with the stored object (`ezzk-probe record`). |
+| `ReceiveConversionRecord` | yes | Submitting a record. Consumes the evidence number on acceptance (`EZZKSOAPClient.receive`, `ezzk-probe receive`). |
 
 Result codes: 0 OK; 1 recorded but not processed yet; 101 not authorized; 104 and
 105 number not recorded; 106 the number is used by several records, so the
-execution time has to be sent; 110 and 113 empty batch; 112 the number belongs to
-another person.
+execution time has to be sent (EZZK stores duplicates rather than refusing them:
+as a `ReceiveConversionRecord` result Chevron7 treats it as an unknown outcome
+that a lookup resolves, and as a lookup result as a record EZZK holds, ruling
+R17); 110 empty batch; 112 the number belongs to another
+person; 113 the account's limit of unconsumed evidence numbers is reached (live,
+2026-09-23; the MIRRI manual describes 113 as an empty batch, which the live
+service does not). Any other code on a lookup of an `.acceptedForProcessing` row
+(106 excepted) means EZZK processed and refused the record (for example 12
+"Neznámy obsah").
 
 ## Evidence numbers
 
-- EZZK returns every unconsumed number of the person and allocates new ones only when fewer than the configured amount remain. The test sample account returned ten in one call.
+Verified live on test EZZK, 2026-09-23 (`P2E-EZZK-FINDINGS.md`, "Part B2"):
+
+- `GetConversionRecordEvidenceNumber` allocates and returns exactly one new number per call; it never returns a number already given out. Once the account's limit of unconsumed numbers is reached it refuses with code 113. Chevron7 keeps every number it allocated and has not yet used, per EZZK mode and Bratislava day (`EvidenceNumberPool`), and reuses one before asking EZZK again; code 113 with nothing left to reuse shows `EZZKError.numberLimitMessage`.
 - Test numbers look like `260917-dD9DbFE4f7`, production numbers like `1563-260824-1`. Chevron7 treats a number as an opaque string.
-- EZZK consumes an unused number automatically at midnight of the day it was allocated. `AttestationData.evidenceNumberAllocatedAt` records the server time of the allocation and `EZZKEvidenceNumberPolicy.isUsable` refuses to sign with a number from another calendar day in `Europe/Bratislava`.
-- `AttestationData.evidenceNumberMode` records the mode the number came from, and signing is refused if the current mode differs, so a demo or test number cannot end up in a clause signed on production. Both checks run before anything is signed or written.
+- `ReceiveConversionRecord` consumes the number: right after a result-0 receipt a new number can be allocated. No `ConsumeConversionRecordEvidenceNumber` call is needed for a sent record (that operation still exists for part A's manual `consume`). An unconsumed number allocated on an earlier Bratislava day no longer counts toward the limit after midnight and is dropped from the pool (`EvidenceNumberPool.reusable`, `EZZKEvidenceNumberPolicy.isUsable`); a record for it can still be sent late (see "Submission states" below).
+- `AttestationData.evidenceNumberAllocatedAt` records the server time of the allocation and `EZZKEvidenceNumberPolicy.isUsable` refuses to sign with a number from another calendar day in `Europe/Bratislava`.
+- `AttestationData.evidenceNumberMode` records the mode the number came from, and signing is refused if the current mode differs, so a demo or test number cannot end up in a record signed on production. Both checks run before anything is signed or written.
 - The adapter drops numbers that a local record in `LocalEvidenceStore` already uses before handing one to ZaKo.
 - A number without an allocation time or without a mode (typed by hand or from older data) is not blocked.
-- `ReceiveConversionRecord` answering 0 means the batch was accepted for processing, not that it was accepted. Validation runs later and rejections arrive in the sender's eDesk. Podpisuj reports that EZZK flags many valid advocate records as invalid for a missing timestamp, so part B has to add a qualified timestamp to the record signature.
+- `ReceiveConversionRecord` answering 0 means the record was accepted for processing, not that it is valid: the public lookup then reports code 1 ("evidovaný, ale nespracovaný") until EZZK finishes processing it (observed up to 18 minutes on test), after which it reports 0 (accepted) or another code (rejected, with EZZK's own text).
+
+## Submission states
+
+`EZZKSubmissionCoordinator` (`Sources/Chevron7Kit/EZZK/EZZKSubmissionCoordinator.swift`) owns every transition a register row can make once it has a signed record. The ZaKo flow, the Register's "Odoslať"/"Overiť v EZZK" and the periodic `EZZKStatusChecker` all go through it, so a row is never sent or looked up by two paths at once (a duplicate send earns EZZK result 106).
+
+- **Send** (`submit`): a network error, an unreachable login, a refused certificate pin, or a WCF deserialization fault happens before the operation runs, so nothing was sent; the row stays `.queuedForSubmission` (or `.late`) with the reason. Anything else unexpected after the request left (`outcomeUnknown`, an unreadable reply, a 5xx) is not proven unsent, so the row becomes `.outcomeUnknown` and is never resent blindly. A clean result becomes `.acceptedForProcessing` with the WS-Addressing `MessageID` and the send time. A 106 result (the number is used by several records, ruling R17) proves nothing about this record, so the row becomes `.outcomeUnknown` and the lookup decides.
+- **Resolve an unknown outcome** (`resolveUnknown`): waits five minutes after the send so EZZK has registered a record it may still have been receiving. A 105 (unknown number) means EZZK never got it, so the row is requeued (`.queuedForSubmission`); found means it was accepted after all, and so does a 106 (EZZK holds records under the number; the row keeps code 106 and EZZK's text); any other code means EZZK processed and refused it (`.rejected`, with EZZK's code and text).
+- **Refresh an accepted row** (`refreshStatus`): lookup code 0 becomes `.processed`; code 1 leaves the row `.acceptedForProcessing` (still waiting); any other code (105 included) is never treated as proof the record vanished, except a code outside {0, 1, 105, 106}, which means EZZK processed and refused it (`.rejected`). A 106 keeps the row accepted with code 106 and EZZK's text.
+- **Resend a rejected row** (`resend`, only from "Odoslať znova" in the Register after a confirmation naming EZZK's code and text, ruling R18): allowed only when EZZK refused the record at submission (`canResend`: `.rejected`, no `submittedAt`, no `lastLookupAt`) and the signed record container is stored. A record refused after EZZK received it (after a receipt, or by a lookup that resolved an unknown outcome) is never resent, since EZZK holds it. The periodic check and "Odoslať" never resend a rejected row.
+- **Late rows** (`markLateIfNeeded`): a `.signed`/`.queuedForSubmission`/`.submissionFailed` row whose allocation day (Bratislava) has passed becomes `.late`. EZZK still accepts late records for processing (live, 2026-09-23), so `.late` rows are sent with a warning: "Záznam sa neodoslal v deň pridelenia čísla. EZZK ho môže odmietnuť alebo evidovať ako oneskorený."
+- **Scheduling** (`nextStatusCheck`): the first check is five minutes after the send (or after the row became unknown); after that, hourly.
+- **Evidence number and row lifetime in ZaKo:** the number leaves `EvidenceNumberPool` as soon as the signed client container passes `ASiCEContainerVerifier` (the client documents carry it, whatever happens to the record). The `.signed` row is written before the record is signed, and `EZZKStatusChecker.hold` keeps every path off it until that signature succeeds or fails; after a crash during the record signature the next check marks the orphan `.recordUnsigned` like any row without a signed record. Deleting a row in the Register (`EZZKStatusChecker.delete`) also drops its number from the pool.
+- `EZZKStatusChecker` runs this every five minutes, but only in a regular launch of Chevron7 (`shouldRun`, never in the `--web-signing` accessory mode), one row at a time (`inFlight`), capped at three automatic sends per row per Bratislava day, and only for rows whose stored `ezzkMode` matches the mode currently selected; a row without a stored mode was written before part B2 (no signed record) and no path ever sends or looks it up.
 
 ## Error mapping
 
 | Situation | `EZZKError` | What the user sees |
 | --- | --- | --- |
 | Wrong name or password (`CORE-003`) | `credentialsRejected(code:)` | Nesprávne prihlasovacie meno alebo heslo. |
+| Any other LogIn error code | `credentialsRejected(code:)` | EZZK odmietlo prihlásenie (kód ...). Prihláste sa znova v Nastaveniach. Like `CORE-003` and `CORE-018`, the client does not log in with those credentials again until they are saved again in Settings. |
 | Locked account (`CORE-018`) | `accountLocked` | Účet v EZZK je zablokovaný. |
 | Token rejected after one fresh login | `authenticationFailed` | Prompt to sign in again. |
 | Unknown result code | `serviceRejected(code:message:)` | The code and the server's own text. |
 | `DeserializationFailed` or `ActionMismatch` | `invalidRequest` | An application defect. Logged with the fault subcode public and the reason private. |
 | Test certificate is not the pinned one | `untrustedCertificate` | Update the pin in the app. |
-| Network error or HTTP 5xx on allocate, consume or submit | `outcomeUnknown` | The outcome is unknown and the call is never repeated. |
-| Allocation attempted on production | `productionAllocationDisabled` | Opens together with record submission. |
-| `submit` in part A | `submissionUnavailable` | Rows stay queued in the register. |
+| Network error or HTTP 5xx (a readable WCF fault included) on allocate, consume or submit | `outcomeUnknown` | The outcome is unknown and the call is never repeated; `EZZKSubmissionCoordinator` looks it up before resending. |
+| Allocation attempted on production | `productionAllocationDisabled` | Opens together with production submission, in part B3. |
+| Submission attempted on production | `submissionUnavailable` | Rows stay queued in the register until part B3. |
 | Number from another day or another mode | `evidenceNumberExpired`, `evidenceNumberFromOtherMode` | Get a new number. |
+| No reusable evidence number, EZZK refuses allocation (code 113) | `EvidenceNumberPool.numberLimitMessage` | Finish the pending conversion or wait until midnight. |
 
 Errors that fail before anything was sent (no connection, host not found, DNS
 failure) stay a plain `networkFailure` even on a consequential call, because in
@@ -144,25 +168,33 @@ that case the outcome is known.
 | `Sources/Chevron7Kit/EZZK/SOAP/EZZKSOAPClient.swift` | The actor: lazy login, token cookie, one safe re-login, no repeat of consequential calls. |
 | `Sources/Chevron7Kit/EZZK/SOAP/EZZKSOAPServiceAdapter.swift` | `EZZKServicing` for the app: filters used numbers, refuses production allocation and submission. |
 | `Sources/Chevron7Kit/EZZK/EZZKEvidenceNumberPolicy.swift` | The day rule, the mode rule and the clause identity check. |
+| `Sources/Chevron7Kit/EZZK/EvidenceNumberPool.swift` | Evidence numbers allocated and not yet used, per mode and Bratislava day; reuse before allocating again. |
+| `Sources/Chevron7Kit/EZZK/EZZKSubmissionCoordinator.swift` | The one set of rules for submission states (send, resolve unknown, refresh, late, scheduling). |
+| `Sources/Chevron7Kit/Attestation/Forms/ConversionRecordRenderer.swift` | Renders the record 1.0 XML from `ConversionFormModel`. |
+| `Sources/Chevron7Kit/Attestation/Forms/ZakoRecordDeliveryBuilder.swift` | Validates the record and wraps it as `<number>.record.xml.xdcf`. |
 | `Sources/Chevron7App/EZZK/EZZKAccountController.swift` | Account state for Settings and ZaKo, one transport and one client per environment. |
+| `Sources/Chevron7App/EZZK/EZZKStatusChecker.swift` | Sends and checks register rows: periodic pass, manual "Odoslať"/"Overiť v EZZK", per-row serialization, per-row mode. |
 | `Sources/Chevron7App/Views/SettingsView.swift` | The EZZK tab. |
+| `Sources/Chevron7App/Views/EvidenceDashboardView.swift` | The Register's per-row EZZK actions and status labels. |
 | `Sources/ezzk-probe/main.swift` | The command line probe. |
 
 ## Probe
 
 ```
-swift run ezzk-probe <login|time|numbers|consume|lookup> [number] [--env test|production] [--name N] [--ico I] [--at ISO]
+swift run ezzk-probe <login|time|numbers|consume|lookup|record|receive> [number] [--env test|production] [--name N] [--ico I] [--at ISO] [--purpose original|xml] [--out FILE] [--file ASICE]
 ```
 
 Credentials come from `EZZK_LOGIN` and `EZZK_PASSWORD`, otherwise from the Keychain
-item Settings saved for that environment. `numbers` and `consume` refuse
-`--env production` before building a client. The token is never printed; `login`
-prints only the account name.
+item Settings saved for that environment. `numbers`, `consume` and `receive` refuse
+`--env production` before building a client. `record` reads one of the signed-in
+person's own records (`GetConversionRecord`) and writes the returned object to
+`--out`; it changes nothing in EZZK. The token is never printed; `login` prints
+only the account name.
 
 ## Testing
 
-- `swift test --filter EZZK` runs the unit tests. They never reach the network and never touch the real Keychain.
-- Request bodies are validated with `/usr/bin/xmllint --schema` against the production WSDL and XSD snapshot, including a negative case that must fail.
+- `swift test --filter EZZK` runs the unit tests. They never reach the network and never touch the real Keychain: App tests build settings with `makeSettingsStore(ezzkAccountController:)` (a `MemoryCredentialStore` and a scripted transport), so a saved test-mode credential in the developer's real Keychain never triggers an access prompt during a test run.
+- Request bodies are validated with `/usr/bin/xmllint --schema` against the production WSDL and XSD snapshot, including a negative case that must fail. The record 1.0 schema does not compile in libxml2 as published (the `IdentifierValue` pattern escapes `/` as `\/`); `FormSchemaValidator` validates against a derived `docs/reference/forms/record-1.0/schema.validation.xsd` that rewrites only that one pattern, while the XDC keeps referencing and digesting the official `schema.xsd`.
 - Response parsing runs against recorded replies with tokens redacted and personal data anonymized.
 - `EZZK_LIVE=1 swift test --filter EZZKSOAPTransportTests` additionally performs the real pinned handshake against the test host with an unauthenticated `GetOptions`, and asserts that a wrong pin is refused.
 - Live checks with the probe are manual and are not part of CI.
@@ -177,4 +209,4 @@ prints only the account name.
 
 - Production uses a public RapidSSL certificate for `*.iomo.sk`. The one observed on 2026-09-17 expires on 2026-09-21; if it lapses, EZZK fails for every integrator, which is not a Chevron7 defect.
 - The WSDL and XSD snapshot is dated. Refresh it when the service changes and rerun the request tests.
-- Gaps deliberately left open in part A are listed at the end of `docs/P2E-EZZK-FINDINGS.md`.
+- Gaps deliberately left open in part A, and which of them part B2 closed, are listed at the end of `docs/P2E-EZZK-FINDINGS.md`.

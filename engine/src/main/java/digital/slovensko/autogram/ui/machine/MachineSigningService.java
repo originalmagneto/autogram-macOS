@@ -431,8 +431,28 @@ public final class MachineSigningService {
         return content.length >= 5 && "%PDF-".equals(new String(content, 0, 5, StandardCharsets.ISO_8859_1));
     }
 
+    private static final String XDC_NAMESPACE = "http://data.gov.sk/def/container/xmldatacontainer+xml/1.1";
+
+    /// An `.xdcf` whose root element is an XMLDataContainer: the EZZK conversion record, signed alone.
+    static boolean isRecordXdc(String source, byte[] content) {
+        if (!source.toLowerCase(java.util.Locale.ROOT).endsWith(".xdcf")) {
+            return false;
+        }
+        try {
+            var factory = javax.xml.parsers.DocumentBuilderFactory.newInstance();
+            factory.setNamespaceAware(true);
+            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+            factory.setXIncludeAware(false);
+            factory.setExpandEntityReferences(false);
+            var root = factory.newDocumentBuilder().parse(new java.io.ByteArrayInputStream(content)).getDocumentElement();
+            return "XMLDataContainer".equals(root.getLocalName()) && XDC_NAMESPACE.equals(root.getNamespaceURI());
+        } catch (Exception exception) {
+            return false;
+        }
+    }
+
     private static boolean isSupportedSource(String source, byte[] content) {
-        return hasPdfHeader(content) || isAsic(source, content);
+        return hasPdfHeader(content) || isAsic(source, content) || isRecordXdc(source, content);
     }
 
     private static MimeType detectMimeType(String filename, byte[] content) {
@@ -656,8 +676,9 @@ public final class MachineSigningService {
                 throw new IOException("Attachments need an ASiC-E XAdES signature");
             }
             // DSS extends an existing container only when it signs a single document; with
-            // attachments it would nest the old container inside the new one.
-            if (document.getMimeType().equals(MimeTypeEnum.ASICE) || isZip(source)) {
+            // attachments it would nest the old container inside the new one. A record is signed alone.
+            if (document.getMimeType().equals(MimeTypeEnum.ASICE) || isZip(source)
+                    || AutogramMimeType.isXDC(document.getMimeType())) {
                 throw new IOException("Attachments are signed next to a PDF, never into an existing container");
             }
             var extra = new ArrayList<DSSDocument>();
@@ -707,6 +728,17 @@ public final class MachineSigningService {
                             false, false, settings.getTspSource());
                 }
                 throw new IOException("Unsupported ASiC signature format");
+            }
+            if (AutogramMimeType.isXDC(document.getMimeType())) {
+                if (!isRecordXdc(document.getName(), document.getBytes())) {
+                    throw new IOException("Only an XMLDataContainer is signed as a record");
+                }
+                var level = settings.getSignatureLevel();
+                if (level != SignatureLevel.XAdES_BASELINE_T && level != SignatureLevel.XAdES_BASELINE_B) {
+                    throw new IOException("A record is signed as XAdES in an ASiC-E");
+                }
+                // Local route: the XDC already references its form; nothing is fetched or re-wrapped.
+                return SigningParameters.buildForPlainRecordXdc(document, level, settings.getTspSource());
             }
             var level = settings.getSignatureLevel();
             if (level == SignatureLevel.XAdES_BASELINE_T) {

@@ -13,6 +13,11 @@
   },
   "files": {
     "record-1.0/schema.xsd": { "package_path": "schema.xsd", "sha256": "7b00f00c0e910dccc61f447681ba5b3e6a719650c49f400ba2b7cc8ace582e0e" },
+    "record-1.0/schema.validation.xsd": {
+      "derived_from": "record-1.0/schema.xsd",
+      "sha256": "f8984ce550ee15e64c9a628deafe069be0a6c4bea23a2d9527a0b9e03195a825",
+      "derivation": "Only the IdentifierValueType pattern rewritten from https:\\/\\/data\\.gov\\.sk\\/id\\/legal-subject\\/([0-9]{8}|[0-9]{12}) to https://data\\.gov\\.sk/id/legal-subject/([0-9]{8}|[0-9]{12}) because libxml2 rejects the escaped slashes. Used only for local validation; XMLDataContainer references and digests stay on schema.xsd."
+    },
     "record-1.0/form103.sb.xslt": { "package_path": "Content/form103.sb.xslt", "sha256": "38b980025dee6c2e176e0ca6415b242355be3d3425ded521902e34b7dd76391d" },
     "clause-1.3/schema.xsd": { "package_path": "schema.xsd", "sha256": "5c4de06e0a115943cc3ef3a01cbd1388e495acfb2c66c7e7fe4c5769f383be8e" },
     "clause-1.3/form.2.html2.xslt": { "package_path": "Content/form.2.html2.xslt", "sha256": "86d745d7b4b1cdd1d8cb172270d8efc1cb91e0917a1419c878d783deb2b5078f" }

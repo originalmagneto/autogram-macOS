@@ -17,6 +17,9 @@ public struct ConversionRecordEnvelope: Codable, Sendable, Identifiable {
     public var submittedToCEZZKAt: Date?
     public var formPack: FormPackStamp?
     public var securityReview: SecurityReviewStamp?
+    /// The signed record container (ASiC-E) `ReceiveConversionRecord` sends as the attachment.
+    /// Not part of any persisted record: it is produced right before submission.
+    public var signedRecordContainer: Data?
 
     public init(id: UUID = UUID(), evidenceNumber: String, direction: ConversionDirection,
                 originalName: String, newDocumentName: String,
@@ -34,6 +37,7 @@ public struct ConversionRecordEnvelope: Codable, Sendable, Identifiable {
         self.submittedToCEZZKAt = nil
         self.formPack = nil
         self.securityReview = nil
+        self.signedRecordContainer = nil
     }
 
     public init(id: UUID = UUID(), evidenceNumber: String, direction: ConversionDirection,
@@ -82,9 +86,11 @@ public enum EZZKError: LocalizedError, Equatable, Sendable {
         case .networkFailure(let detail):
             return "Sieťová chyba pri spojení s EZZK: \(detail)"
         case .credentialsRejected(let code):
+            // Only CORE-003 means a wrong name or password. The client stops logging in with
+            // credentials EZZK refused for any code until they are saved again in Settings.
             return code == "CORE-003"
                 ? "Nesprávne prihlasovacie meno alebo heslo."
-                : "EZZK odmietlo prihlásenie (\(code))."
+                : "EZZK odmietlo prihlásenie (kód \(code)). Prihláste sa znova v Nastaveniach."
         case .accountLocked:
             return "Účet v EZZK je zablokovaný."
         case .serviceRejected(let code, let message):
@@ -116,7 +122,7 @@ public protocol EZZKEvidenceNumberProvider: Sendable {
 }
 
 public protocol EZZKSubmissionTransport: Sendable {
-    func submit(_ envelope: ConversionRecordEnvelope) async throws
+    func submit(_ envelope: ConversionRecordEnvelope) async throws -> EZZKSOAPSubmissionReceipt
 }
 
 public protocol EZZKServicing: EZZKServerClock, EZZKEvidenceNumberProvider, EZZKSubmissionTransport {}
@@ -151,8 +157,9 @@ public final class MockEZZKService: EZZKServicing, @unchecked Sendable {
         }
     }
 
-    public func submit(_ envelope: ConversionRecordEnvelope) async throws {
+    public func submit(_ envelope: ConversionRecordEnvelope) async throws -> EZZKSOAPSubmissionReceipt {
         state.withLock { $0.submitted.append(envelope) }
+        return EZZKSOAPSubmissionReceipt(messageID: UUID().uuidString.lowercased(), submittedAt: Date())
     }
 
     public var submittedRecords: [ConversionRecordEnvelope] {

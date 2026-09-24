@@ -20,6 +20,7 @@ final class AccessibilityContractTests: XCTestCase {
     }
 
     func testPendingEvidenceLabelIncludesDeadlineState() {
-        XCTAssertTrue(UXLabels.evidenceStatusLabel(for: .queuedForSubmission).contains("čaká"))
+        XCTAssertTrue(UXLabels.evidenceStatusLabel(for: .queuedForSubmission)
+            .localizedCaseInsensitiveContains("čaká"))
     }
 }

@@ -10,6 +10,9 @@ public struct OfficialForm: Sendable, Equatable {
     public let namespace: String
     public let version: String
     public let schema: Data
+    /// A libxml2-compatible copy used only for local validation; identifiers, digests and
+    /// XMLDataContainer references stay on `schema`. Equal to `schema` unless libxml2 rejects it.
+    public let validationSchema: Data
     public let presentation: Data
     /// `MediaDestinationTypeDescription` of the signer presentation (`TXT` or `HTML`).
     public let presentationMediaDestination: String
@@ -25,6 +28,7 @@ public struct OfficialForm: Sendable, Equatable {
         namespace: "https://data.gov.sk/id/egov/eform/50349287.ConversionRecordOfPaperToElectronicDocument.sk/1.0",
         version: "1.0",
         schema: OfficialFormFiles.recordSchema,
+        validationSchema: OfficialFormFiles.recordValidationSchema,
         presentation: OfficialFormFiles.recordPresentation,
         presentationMediaDestination: "TXT",
         schemaDigestBase64: OfficialFormFiles.recordSchemaDigest,
@@ -36,6 +40,7 @@ public struct OfficialForm: Sendable, Equatable {
         namespace: "http://schemas.gov.sk/form/50349287.ConversionCertificateOfPaperToElectronicDocument.sk/1.3",
         version: "1.3",
         schema: OfficialFormFiles.clauseSchema,
+        validationSchema: OfficialFormFiles.clauseSchema,
         presentation: OfficialFormFiles.clausePresentation,
         presentationMediaDestination: "HTML",
         schemaDigestBase64: OfficialFormFiles.clauseSchemaDigest,

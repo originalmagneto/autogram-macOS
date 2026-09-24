@@ -423,6 +423,66 @@ final class MachineRequestEncodingTests: XCTestCase {
 
         XCTAssertTrue(payload.isEmpty)
     }
+
+    /// A record's explicit timestamp servers must reach the v1 SIGN payload's
+    /// "timestamp.servers", and resolving them must never even query the app's own
+    /// timestamp preferences.
+    func testExplicitTimestampServersOverrideTheProviderInTheV1Payload() throws {
+        let provider = FakeTimestampSourceProvider(configuration: .automatic)
+        let engine = AutogramCLIEngine(timestampSourceProvider: provider)
+        let overrideRequest = request(format: .asiceXAdES, override: nil)
+
+        let timestamp = try engine.resolvedTimestamp(wantsTimestamp: true,
+                                                      override: ["https://tsa.belgium.be/connect"])
+        let payload = AutogramCLIEngine.levelAndTimestamp(for: overrideRequest, endpoints: timestamp.endpoints)
+
+        XCTAssertEqual(payload.timestamp,
+                       .object(["required": .bool(true), "servers": .array([.string("https://tsa.belgium.be/connect")])]))
+        XCTAssertEqual(provider.loadCallCount, 0)
+    }
+
+    /// Without an override, resolution keeps reading the provider's own endpoints,
+    /// exactly as it did before the record path existed.
+    func testWithoutOverrideTheV1PayloadKeepsTheProvidersEndpoints() throws {
+        let provider = FakeTimestampSourceProvider(configuration: .automatic)
+        let engine = AutogramCLIEngine(timestampSourceProvider: provider)
+        let plainRequest = request(format: .asiceXAdES, override: nil)
+
+        let timestamp = try engine.resolvedTimestamp(wantsTimestamp: true, override: nil)
+        let payload = AutogramCLIEngine.levelAndTimestamp(for: plainRequest, endpoints: timestamp.endpoints)
+
+        XCTAssertEqual(payload.timestamp,
+                       .object(["required": .bool(true),
+                                "servers": .array(TimestampSourceConfiguration.automatic.endpoints.map(JSONValue.string))]))
+        XCTAssertEqual(provider.loadCallCount, 1)
+    }
+}
+
+/// A `TimestampSourceProviding` test double: never touches `UserDefaults` or the
+/// Keychain, just returns a fixed configuration and counts how often it was read.
+private final class FakeTimestampSourceProvider: TimestampSourceProviding, @unchecked Sendable {
+    private let configuration: TimestampSourceConfiguration
+    private let lock = NSLock()
+    private var _loadCallCount = 0
+
+    var loadCallCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return _loadCallCount
+    }
+
+    init(configuration: TimestampSourceConfiguration) {
+        self.configuration = configuration
+    }
+
+    func load() -> TimestampSourceConfiguration {
+        lock.lock()
+        _loadCallCount += 1
+        lock.unlock()
+        return configuration
+    }
+
+    func credential(for provider: CustomTimestampProviderConfiguration) throws -> Secret? { nil }
 }
 
 /// A `SigningEngine` test double: never spawns the real helper process, just
@@ -512,6 +572,57 @@ final class EngineBridgeSignsExtraFilesAsDataObjectsTests: XCTestCase {
         let file = try XCTUnwrap(files.first)
         XCTAssertEqual(file.sourceURL.lastPathComponent, "kontajner.asice")
         XCTAssertTrue(file.attachmentURLs.isEmpty)
+    }
+}
+
+final class EngineBridgeRecordSubmissionTests: XCTestCase {
+    private func recordRequest(filename: String?, timestampServers: [String]? = nil) -> SigningRequest {
+        SigningRequest(pdfData: Data("<XMLDataContainer/>".utf8), identityID: "engine:eid",
+                      includeTimestamp: false, filename: filename,
+                      timestampServers: timestampServers, signsAsRecordContainer: true)
+    }
+
+    /// EZZK's GetConversionRecord expects the signed record's data object under its
+    /// own "<number>.record.xml.xdcf" name, not a generic name the ordinary signing
+    /// path would pick for a bare XML payload.
+    func testRecordContainerIsSentUnderItsXdcfName() async throws {
+        let engine = RecordingSigningEngine()
+        let provider = EngineBridgeSigningProvider(engine: engine)
+
+        _ = try await provider.sign(recordRequest(filename: "260923-X.record.xml.xdcf"))
+
+        let request = try XCTUnwrap(engine.capturedRequest)
+        XCTAssertEqual(request.files.first?.sourceURL.lastPathComponent, "260923-X.record.xml.xdcf")
+        XCTAssertEqual(request.files.first?.attachmentURLs, [])
+        XCTAssertEqual(request.outputFormat, .asiceXAdES)
+    }
+
+    /// The extension is how the engine (and EZZK) recognise a record's XML Data
+    /// Container; anything else must be refused rather than silently signed wrong.
+    func testRecordNeedsAnXdcfName() async throws {
+        let engine = RecordingSigningEngine()
+        let provider = EngineBridgeSigningProvider(engine: engine)
+
+        do {
+            _ = try await provider.sign(recordRequest(filename: "x.pdf"))
+            XCTFail("Expected signing to fail for a non-.xdcf record filename.")
+        } catch SigningError.signingFailed(let message) {
+            XCTAssertEqual(message, "Záznam musí mať príponu .xdcf.")
+        }
+    }
+
+    /// A record's own timestamp servers (EZZK's TSA requirement) must reach the
+    /// engine request even though the app's own timestamp preferences say something
+    /// else, or say nothing at all.
+    func testExplicitTimestampServersReachTheEngineRequest() async throws {
+        let engine = RecordingSigningEngine()
+        let provider = EngineBridgeSigningProvider(engine: engine)
+
+        _ = try await provider.sign(recordRequest(filename: "260923-X.record.xml.xdcf",
+                                                  timestampServers: ["https://tsa.belgium.be/connect"]))
+
+        let request = try XCTUnwrap(engine.capturedRequest)
+        XCTAssertEqual(request.timestampServersOverride, ["https://tsa.belgium.be/connect"])
     }
 }
 

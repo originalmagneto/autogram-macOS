@@ -418,7 +418,7 @@ private struct UnavailableEZZKService: EZZKServicing, Sendable {
         throw EZZKError.notConfigured
     }
 
-    func submit(_ envelope: ConversionRecordEnvelope) async throws {
+    func submit(_ envelope: ConversionRecordEnvelope) async throws -> EZZKSOAPSubmissionReceipt {
         throw EZZKError.notConfigured
     }
 }
@@ -438,7 +438,7 @@ private final class EZZKClientServiceAdapter: EZZKServicing, @unchecked Sendable
         try await client.requestEvidenceNumbers(count: count)
     }
 
-    func submit(_ envelope: ConversionRecordEnvelope) async throws {
+    func submit(_ envelope: ConversionRecordEnvelope) async throws -> EZZKSOAPSubmissionReceipt {
         throw EZZKError.notConfigured
     }
 }
