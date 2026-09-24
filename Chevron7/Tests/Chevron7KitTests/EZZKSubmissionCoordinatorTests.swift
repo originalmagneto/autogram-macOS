@@ -261,6 +261,15 @@ final class EZZKSubmissionCoordinatorTests: XCTestCase {
         XCTAssertEqual(result.ezzkResultCode, 106)
         XCTAssertEqual(result.ezzkResultDescription, "Evidenčné číslo je použité viackrát")
         XCTAssertEqual(result.lastLookupAt, now)
+
+        let processedLookup = FakeLookup(.success(EZZKRecordLookup(isProcessed: true, info: nil)))
+        let processed = await EZZKSubmissionCoordinator(submitter: FakeSubmitter(.failure(EZZKError.outcomeUnknown)),
+                                                        lookup: processedLookup, now: { now })
+            .refreshStatus(result)
+
+        XCTAssertEqual(processed.status, .processed)
+        XCTAssertEqual(processed.ezzkResultCode, 0)
+        XCTAssertNil(processed.ezzkResultDescription, "the 106 text no longer describes a processed record")
     }
 
     func testRecordUnsignedRowIsNeverSubmitted() async throws {

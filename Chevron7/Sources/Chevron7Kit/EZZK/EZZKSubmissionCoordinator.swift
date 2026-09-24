@@ -170,6 +170,8 @@ public struct EZZKSubmissionCoordinator: Sendable {
             if try await lookup.publicRecord(evidenceNumber: number).isProcessed {
                 updated.status = .processed
                 updated.ezzkResultCode = 0
+                // An earlier 106 text no longer describes the row.
+                updated.ezzkResultDescription = nil
             }
         } catch EZZKError.serviceRejected(let code, let message) where code == Self.severalRecordsCode {
             // EZZK holds the record (under a number used more than once): still accepted,
