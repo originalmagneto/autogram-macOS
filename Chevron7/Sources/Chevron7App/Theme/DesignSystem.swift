@@ -287,22 +287,22 @@ struct ConfidenceBar: View {
 /// One fixed colour per element kind for canvas boxes and the Nálezy row icons.
 /// Grey is reserved for rejected findings. The first four keep their original system
 /// colours; the other twelve are explicit mid-luminance sRGB values chosen to stay
-/// apart from each other (CIEDE2000 at least 17) and to read both on white scanned
-/// paper (3:1 or more) and on a dark inspector.
+/// apart from each other (CIEDE2000 at least 17.5) and to reach 3:1 both on white
+/// scanned paper and on a dark inspector (#1E1E1E).
 struct ElementKindColor {
     static let explicitRGB: [SecurityElement.Kind: UInt32] = [
-        .other: 0xFF3888,              // pink
-        .certifiedSignature: 0x008033, // dark green
-        .roundOfficialStamp: 0x3845FF, // indigo
-        .waxSeal: 0xC01B26,            // crimson
-        .bindingCord: 0xFF6038,        // coral
-        .securityTape: 0x989816,       // olive yellow
-        .permanentBinding: 0x9E5400,   // brown
-        .watermark: 0x1B9FC0,          // sky
-        .securityPattern: 0x067979,    // dark teal
-        .opticallyVariable: 0xAF2C7B,  // berry
-        .securityFoil: 0x18A589,       // sea green
-        .lamination: 0x6B6406          // dark olive
+        .other: 0xD6718A,              // dusty rose
+        .certifiedSignature: 0x17823C, // dark green
+        .roundOfficialStamp: 0xAE8932, // gold
+        .waxSeal: 0xD01124,            // red
+        .bindingCord: 0xE07552,        // coral
+        .securityTape: 0x829C1C,       // olive green
+        .permanentBinding: 0xA35A00,   // brown
+        .watermark: 0x229FBF,          // sky
+        .securityPattern: 0x007A7A,    // teal
+        .opticallyVariable: 0xCC0085,  // magenta
+        .securityFoil: 0x30A689,       // sea green
+        .lamination: 0x706B00          // dark olive
     ]
 
     static func color(for kind: SecurityElement.Kind) -> Color {
@@ -312,7 +312,7 @@ struct ElementKindColor {
         case .embossedSeal: return .orange
         case .initial: return .purple
         default:
-            let rgb = explicitRGB[kind] ?? 0xFF3888
+            let rgb = explicitRGB[kind] ?? 0xD6718A
             return Color(.sRGB,
                          red: Double((rgb >> 16) & 0xFF) / 255,
                          green: Double((rgb >> 8) & 0xFF) / 255,

@@ -623,7 +623,9 @@ struct AnalysisCanvasView: View {
             HStack(spacing: 8) {
                 Label("Nálezy", systemImage: "checklist")
                     .font(.headline)
-                Text("\(store.securityElements.filter { $0.pageIndex == store.previewPageIndex }.count) z \(store.securityElements.count) celkom")
+                // Rejected findings are counted in their own group, like on the page thumbnails.
+                let liveInDocument = store.securityElements.filter { !$0.isLockedByRejection }
+                Text("\(liveInDocument.filter { $0.pageIndex == store.previewPageIndex }.count) z \(liveInDocument.count) celkom")
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
                 Spacer()

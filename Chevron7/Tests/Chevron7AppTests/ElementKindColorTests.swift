@@ -34,13 +34,16 @@ final class ElementKindColorTests: XCTestCase {
     func testExplicitColoursStayReadableOnPaperAndInDarkMode() {
         XCTAssertEqual(ElementKindColor.explicitRGB.count, 12)
         func linear(_ c: Double) -> Double { c <= 0.04045 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4) }
+        func luminance(_ rgb: UInt32) -> Double {
+            0.2126 * linear(Double((rgb >> 16) & 0xFF) / 255)
+                + 0.7152 * linear(Double((rgb >> 8) & 0xFF) / 255)
+                + 0.0722 * linear(Double(rgb & 0xFF) / 255)
+        }
+        let darkInspector = luminance(0x1E1E1E)
         for (kind, rgb) in ElementKindColor.explicitRGB {
-            let r = linear(Double((rgb >> 16) & 0xFF) / 255)
-            let g = linear(Double((rgb >> 8) & 0xFF) / 255)
-            let b = linear(Double(rgb & 0xFF) / 255)
-            let luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b
-            XCTAssertGreaterThanOrEqual(1.05 / (luminance + 0.05), 3.0, "\(kind) too pale on paper")
-            XCTAssertGreaterThanOrEqual(luminance, 0.12, "\(kind) too dark in dark mode")
+            let value = luminance(rgb)
+            XCTAssertGreaterThanOrEqual(1.05 / (value + 0.05), 3.0, "\(kind) too pale on paper")
+            XCTAssertGreaterThanOrEqual((value + 0.05) / (darkInspector + 0.05), 3.0, "\(kind) too dark in dark mode")
         }
     }
 }
