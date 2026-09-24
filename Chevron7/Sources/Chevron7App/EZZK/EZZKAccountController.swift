@@ -31,8 +31,9 @@ final class EZZKAccountController {
     @ObservationIgnored private var personProvider: @MainActor () -> EZZKPerson = {
         EZZKPerson(corporateBodyFullName: "", ico: "")
     }
-    @ObservationIgnored private var usedEvidenceNumbersProvider: @MainActor () -> Set<String> = { [] }
-    private let demoService = MockEZZKService()
+    @ObservationIgnored private var usedEvidenceNumbersProvider: @MainActor (AppSettings.EZZKMode) -> Set<String> = { _ in [] }
+    /// "DEMO-yyMMdd-n": a simulated number never looks like one a real EZZK allocates.
+    private let demoService = MockEZZKService(registryCode: "DEMO")
     /// Clients read the password from the credential store for each login.
     @ObservationIgnored private var clients: [EZZKEnvironment: EZZKSOAPClient] = [:]
     /// One transport (and so one URLSession) per environment for the controller's lifetime.
@@ -54,7 +55,7 @@ final class EZZKAccountController {
 
     /// Settings owns the person and the evidence store, and exists only after this controller.
     func configure(person: @escaping @MainActor () -> EZZKPerson,
-                   usedEvidenceNumbers: @escaping @MainActor () -> Set<String>) {
+                   usedEvidenceNumbers: @escaping @MainActor (AppSettings.EZZKMode) -> Set<String>) {
         personProvider = person
         usedEvidenceNumbersProvider = usedEvidenceNumbers
     }
@@ -72,7 +73,7 @@ final class EZZKAccountController {
     func service(for mode: AppSettings.EZZKMode) -> any EZZKServicing {
         guard let environment = mode.environment else { return demoService }
         return EZZKSOAPServiceAdapter(client: client(for: environment), person: personProvider(),
-                                      usedEvidenceNumbers: usedEvidenceNumbersProvider())
+                                      usedEvidenceNumbers: usedEvidenceNumbersProvider(mode))
     }
 
     func setMode(_ newMode: AppSettings.EZZKMode) {

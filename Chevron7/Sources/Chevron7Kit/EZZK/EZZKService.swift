@@ -107,9 +107,9 @@ public enum EZZKError: LocalizedError, Equatable, Sendable {
         case .submissionUnavailable:
             return "Odosielanie záznamov do produkčného EZZK zatiaľ nie je zapnuté. Príde v ďalšej verzii."
         case .evidenceNumberExpired:
-            return "Evidenčné číslo bolo pridelené v iný deň a EZZK ho o polnoci spotreboval. Získajte nové číslo."
+            return "Evidenčné číslo bolo pridelené v iný deň a EZZK ho o polnoci spotreboval. Kliknite znova na Autorizovať, pridelí sa nové."
         case .evidenceNumberFromOtherMode:
-            return "Evidenčné číslo bolo získané v inom režime EZZK. Získajte nové číslo."
+            return "Evidenčné číslo bolo získané v inom režime EZZK. Kliknite znova na Autorizovať, pridelí sa nové."
         case .outcomeUnknown:
             return "EZZK neodpovedalo zrozumiteľne (prerušené spojenie alebo chyba servera) a nie je isté, či požiadavku spracovalo. Pred opakovaním overte stav v EZZK."
         case .demoSignatureOutsideDemo:

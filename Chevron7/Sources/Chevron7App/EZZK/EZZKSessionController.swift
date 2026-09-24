@@ -24,7 +24,7 @@ final class EZZKSessionController {
     private let transport: any EZZKHTTPTransport
     private let authenticationSession: any EZZKAuthenticationSessionRunning
     private let demoMode: Bool
-    private let demoService = MockEZZKService()
+    private let demoService = MockEZZKService(registryCode: "DEMO")
     private let unavailableService = UnavailableEZZKService()
     private var client: EZZKClient?
     private var activeService: EZZKClientServiceAdapter?

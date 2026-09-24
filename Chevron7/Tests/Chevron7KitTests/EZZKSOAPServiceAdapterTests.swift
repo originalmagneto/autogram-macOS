@@ -53,7 +53,24 @@ final class EZZKSOAPServiceAdapterTests: XCTestCase {
             XCTFail("expected serviceRejected")
         } catch {
             XCTAssertEqual(error as? EZZKError,
-                           .serviceRejected(code: 0, message: "EZZK nevrátilo žiadne nepoužité evidenčné číslo."))
+                           .serviceRejected(code: 0, message: EZZKSOAPServiceAdapter.numbersAlreadyInRegisterMessage(["260917-A"])))
+        }
+    }
+
+    /// A success with no number in it is told apart from a number the register already holds.
+    func testNoNumberInTheReplyIsReportedAsSuch() async {
+        let transport = SOAPScriptedTransport([
+            .ok(EZZKSOAPFixtures.loginSucceeded()),
+            .ok(EZZKSOAPFixtures.evidenceNumbers([]))
+        ])
+        let adapter = makeAdapter(.sandbox, transport, used: [])
+
+        do {
+            _ = try await adapter.requestEvidenceNumbers(count: 1)
+            XCTFail("expected serviceRejected")
+        } catch {
+            XCTAssertEqual(error as? EZZKError,
+                           .serviceRejected(code: 0, message: EZZKSOAPServiceAdapter.noNumberReturnedMessage))
         }
     }
 

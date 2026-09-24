@@ -31,11 +31,23 @@ public struct EZZKSOAPServiceAdapter: EZZKServicing {
         // already gave out (Revision 5, verified live). Dropping numbers a local register row
         // already carries is a guard, not a rule: should EZZK ever repeat one, it is never
         // handed to a second conversion.
-        let available = try await client.evidenceNumbers(for: person).filter { !usedEvidenceNumbers.contains($0) }
+        let returned = try await client.evidenceNumbers(for: person)
+        guard !returned.isEmpty else {
+            throw EZZKError.serviceRejected(code: 0, message: Self.noNumberReturnedMessage)
+        }
+        let available = returned.filter { !usedEvidenceNumbers.contains($0) }
         guard !available.isEmpty else {
-            throw EZZKError.serviceRejected(code: 0, message: "EZZK nevrátilo žiadne nepoužité evidenčné číslo.")
+            throw EZZKError.serviceRejected(code: 0, message: Self.numbersAlreadyInRegisterMessage(returned))
         }
         return Array(available.prefix(count))
+    }
+
+    static let noNumberReturnedMessage =
+        "EZZK odpovedalo úspešne, ale nevrátilo žiadne evidenčné číslo."
+    /// EZZK never gives a number out twice, so this names a register row of the same mode
+    /// that already carries it, for the person to check.
+    static func numbersAlreadyInRegisterMessage(_ numbers: [String]) -> String {
+        "EZZK pridelilo číslo \(numbers.joined(separator: ", ")), ale rovnaké číslo už nesie riadok v Registri konverzií. Skontrolujte ten riadok, aplikácia číslo nepoužila."
     }
 
     public func submit(_ envelope: ConversionRecordEnvelope) async throws -> EZZKSOAPSubmissionReceipt {
