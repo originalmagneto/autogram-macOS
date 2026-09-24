@@ -30,9 +30,9 @@ final class ElementKindColorTests: XCTestCase {
         }
     }
 
-    /// Explicit colours must read on white scanned paper (3:1) and on a dark inspector.
+    /// Every kind's colour must read on white scanned paper (3:1) and on a dark inspector.
     func testExplicitColoursStayReadableOnPaperAndInDarkMode() {
-        XCTAssertEqual(ElementKindColor.explicitRGB.count, 12)
+        XCTAssertEqual(ElementKindColor.explicitRGB.count, SecurityElement.Kind.allCases.count)
         func linear(_ c: Double) -> Double { c <= 0.04045 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4) }
         func luminance(_ rgb: UInt32) -> Double {
             0.2126 * linear(Double((rgb >> 16) & 0xFF) / 255)
