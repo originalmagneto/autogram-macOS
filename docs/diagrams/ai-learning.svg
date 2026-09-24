@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="920" viewBox="0 0 1040 920" role="img" aria-labelledby="learn-title learn-desc">
+  <title id="learn-title">Ako sa detekcia učí: potvrdiť, odmietnuť, zmazať</title>
+  <desc id="learn-desc">Návrh detektora advokát potvrdí, odmietne alebo zmaže. Potvrdenie uloží pozitívny príklad, odmietnutie negatívny príklad, ktorý zostane zamknutý; zmazanie vlastného rámca nič neuloží. Pri ďalšom dokumente sa nový návrh porovná s piatimi najpodobnejšími príkladmi a pri zhode aspoň troch aplikácia rozhodne sama.</desc>
+  <defs>
+    <marker id="learn-arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L8 4 L0 8 Z" fill="#4f5d75"/></marker>
+    <marker id="learn-feedback" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L8 4 L0 8 Z" fill="#2e5aa8"/></marker>
+  </defs>
+  <rect width="1040" height="920" fill="#f5f5f5"/>
+  <text x="40" y="48" font-family="Georgia, 'Times New Roman', serif" font-size="30" fill="#2d3142">Ako sa detekcia učí z vašej kontroly</text>
+  <text x="40" y="80" font-family="Arial, Helvetica, sans-serif" font-size="16" fill="#4f5d75">Každé rozhodnutie je príklad pre ďalší dokument. Dataset ostáva na Macu a nikdy sa neodosiela.</text>
+
+  <!-- Branches from the suggestion to the three decisions. -->
+  <g fill="none" stroke="#4f5d75" stroke-width="1.6" marker-end="url(#learn-arrow)">
+    <path d="M520 252 V322"/>
+    <path d="M520 284 H198 A8 8 0 0 0 190 292 V322"/>
+    <path d="M520 284 H842 A8 8 0 0 1 850 292 V322"/>
+  </g>
+  <!-- Examples flow into the next document. -->
+  <g fill="none" stroke="#2e5aa8" stroke-width="1.6" stroke-dasharray="5 4" marker-end="url(#learn-feedback)">
+    <path d="M190 584 V652"/>
+    <path d="M520 584 V652"/>
+  </g>
+  <text x="202" y="624" font-family="Arial, Helvetica, sans-serif" font-size="12" fill="#2e5aa8">POZITÍVNY PRÍKLAD</text>
+  <text x="532" y="624" font-family="Arial, Helvetica, sans-serif" font-size="12" fill="#2e5aa8">NEGATÍVNY PRÍKLAD</text>
+  <text x="850" y="624" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="12" fill="#9a2130">NIČ SA NEULOŽÍ</text>
+
+  <g font-family="Arial, Helvetica, sans-serif">
+    <!-- 01 suggestion -->
+    <rect x="290" y="112" width="460" height="140" rx="8" fill="#ffffff" stroke="#b5bdc9"/>
+    <text x="314" y="140" font-size="12" letter-spacing="1" fill="#4f5d75">01 · NÁVRH</text>
+    <text x="314" y="168" font-size="21" font-weight="600" fill="#2d3142">Detektor navrhne rámec</text>
+    <rect x="314" y="186" width="54" height="40" rx="3" fill="#2f6fdb" fill-opacity="0.10" stroke="#2f6fdb" stroke-width="1.5"/>
+    <text x="384" y="202" font-size="15" fill="#4f5d75">Farba rámca = druh prvku.</text>
+    <text x="384" y="224" font-size="15" fill="#4f5d75">Čaká na vašu kontrolu.</text>
+
+    <!-- 02a confirm -->
+    <rect x="40" y="330" width="300" height="254" rx="8" fill="#ffffff" stroke="#2e9e4f" stroke-width="2"/>
+    <text x="64" y="358" font-size="12" letter-spacing="1" fill="#1f7a3b">02a · POTVRDIŤ</text>
+    <text x="64" y="386" font-size="19" font-weight="600" fill="#2d3142">Je to bezpečnostný prvok</text>
+    <rect x="64" y="404" width="46" height="34" rx="3" fill="#2e9e4f" fill-opacity="0.12" stroke="#2e9e4f" stroke-width="1.5"/>
+    <text x="122" y="426" font-size="15" fill="#4f5d75">plný farebný rámec</text>
+    <text x="64" y="470" font-size="15" fill="#4f5d75">Uloží sa pozitívny príklad</text>
+    <text x="64" y="492" font-size="15" fill="#4f5d75">s druhom prvku.</text>
+    <text x="64" y="524" font-size="15" fill="#4f5d75">Nepresný rámec najprv</text>
+    <text x="64" y="546" font-size="15" fill="#4f5d75">posuňte, potom potvrďte.</text>
+
+    <!-- 02b reject -->
+    <rect x="370" y="330" width="300" height="254" rx="8" fill="#ffffff" stroke="#8a8f99" stroke-width="2"/>
+    <text x="394" y="358" font-size="12" letter-spacing="1" fill="#5c616b">02b · ODMIETNUŤ</text>
+    <text x="394" y="386" font-size="19" font-weight="600" fill="#2d3142">Nie je to bezpečnostný prvok</text>
+    <rect x="394" y="404" width="46" height="34" rx="3" fill="none" stroke="#8a8f99" stroke-opacity="0.6" stroke-width="1.2" stroke-dasharray="4 3"/>
+    <text x="452" y="426" font-size="15" fill="#4f5d75">bledý, zamknutý rámec</text>
+    <text x="394" y="470" font-size="15" fill="#4f5d75">Uloží sa negatívny príklad.</text>
+    <text x="394" y="492" font-size="15" fill="#4f5d75">Rámec nereaguje na klik</text>
+    <text x="394" y="514" font-size="15" fill="#4f5d75">a nedá sa zmazať.</text>
+    <text x="394" y="546" font-size="15" font-weight="600" fill="#2d3142">Nechajte ho odmietnutý.</text>
+
+    <!-- 02c delete -->
+    <rect x="700" y="330" width="300" height="254" rx="8" fill="#ffffff" stroke="#d01124" stroke-width="2"/>
+    <text x="724" y="358" font-size="12" letter-spacing="1" fill="#9a2130">02c · ZMAZAŤ</text>
+    <text x="724" y="386" font-size="19" font-weight="600" fill="#2d3142">Len vlastný omyl</text>
+    <text x="724" y="426" font-size="15" fill="#4f5d75">Iba rámec, ktorý ste</text>
+    <text x="724" y="448" font-size="15" fill="#4f5d75">nakreslili sami.</text>
+    <text x="724" y="480" font-size="15" fill="#4f5d75">Návrh detektora sa nezmaže:</text>
+    <text x="724" y="502" font-size="15" fill="#4f5d75">kláves Delete ho odmietne,</text>
+    <text x="724" y="524" font-size="15" fill="#4f5d75">aby sa z neho detektor</text>
+    <text x="724" y="546" font-size="15" fill="#4f5d75">poučil.</text>
+
+    <!-- 03 next document -->
+    <rect x="40" y="660" width="960" height="176" rx="8" fill="#ffffff" stroke="#2e5aa8" stroke-width="1.5"/>
+    <text x="64" y="688" font-size="12" letter-spacing="1" fill="#2e5aa8">03 · ĎALŠÍ DOKUMENT</text>
+    <text x="64" y="716" font-size="21" font-weight="600" fill="#2d3142">Nový návrh sa porovná s vašimi príkladmi</text>
+    <text x="64" y="748" font-size="15" fill="#4f5d75">Aplikácia nájde 5 najpodobnejších uložených príkladov. Ak sa aspoň 3 z nich jasne zhodujú, rozhodne sama:</text>
+    <text x="64" y="770" font-size="15" fill="#4f5d75">podobný falošný poplach zahodí ešte pred kontrolou, podobný skutočný prvok rovno pomenuje.</text>
+    <text x="64" y="802" font-size="15" fill="#4f5d75">Ak zhoda nestačí, spýta sa Apple modelu na zariadení. Kompletne skontrolované strany slúžia aj na export</text>
+    <text x="64" y="824" font-size="15" fill="#4f5d75">tréningových dát pre vlastný model (Create ML).</text>
+  </g>
+
+  <text x="40" y="880" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="600" fill="#2d3142">Čím viac falošných poplachov ostane odmietnutých, tým menej ich detektor navrhne nabudúce.</text>
+  <text x="40" y="904" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#4f5d75">Zmazaný alebo vrátený na kontrolu príklad sa z datasetu odstráni a detektor sa z neho nič nenaučí.</text>
+</svg>

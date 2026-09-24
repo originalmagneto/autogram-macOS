@@ -661,7 +661,7 @@ final class ZakoSessionStore {
         if !changed.isEmpty {
             enqueueBankWork { for element in changed { try await bank.remove(id: element.id) } }
         }
-        // An edit that keeps a finding confirmed (numeric box, snap, refine, kind or text)
+        // An edit that keeps a finding confirmed (numeric box, snap or refine)
         // must still teach the detector: record it again with its new content. Review-state
         // changes record themselves in `updateReviewState`.
         for prior in changed where prior.reviewState == .confirmed {

@@ -140,46 +140,97 @@ Vstavaná detekcia beží na zariadení a skladá sa z troch vrstiev. Voliteľn�
 </tr>
 <tr>
 <td><strong>3 · Kontrola</strong></td>
-<td>Plátno drží iba dokument; vpravo sú tri karty: Kontrola strany, Nálezy a Pridať prvok. Advokát nález potvrdí alebo odmietne, upraví rámec ťahaním, alebo zvolí typ a klikne na prvok, aby sa rámec prichytil k obrysu. Po označení strany aplikácia preskočí na ďalšiu neskontrolovanú; bez kontroly každej neprázdnej strany nepokračuje.</td>
+<td>Plátno drží iba dokument; vpravo sú tri karty: Kontrola strany, Nálezy a Pridať prvok. Advokát nález potvrdí alebo odmietne (aj všetky naraz cez <strong>Odmietnuť návrhy</strong>), upraví rámec ťahaním, alebo zvolí typ a klikne na prvok, aby sa rámec prichytil k obrysu. Každý druh prvku má vlastnú farbu; odmietnuté nálezy sú bledé, zamknuté a nereagujú na klik. Po označení strany aplikácia preskočí na ďalšiu neskontrolovanú; bez kontroly každej neprázdnej strany nepokračuje.</td>
 <td><code>GenerateIterativeSegmentationRequest</code> · SwiftUI canvas</td>
 </tr>
 </table>
 
-<details open>
-<summary><strong>Ako sa detekcia učí z vašej práce</strong></summary>
+### Ako sa detekcia učí z vašej kontroly
+
+<p align="center">
+  <img src="docs/diagrams/ai-learning.svg" alt="Učenie detekcie: potvrdiť uloží pozitívny príklad, odmietnuť negatívny príklad, zmazať vlastný rámec nič neuloží; ďalší dokument sa porovná s piatimi najpodobnejšími príkladmi" width="100%">
+</p>
+
+Detekcia sa neučí raz a navždy vo výrobe, ale priamo z vašej práce na tomto Macu. Každý nález, ktorý potvrdíte alebo odmietnete, sa uloží ako **príklad**: výrez zo skenu, jeho *feature print* (číselný odtlačok vzhľadu) a vaše rozhodnutie. Pri ďalšom dokumente sa každý nový návrh porovná s piatimi najpodobnejšími uloženými príkladmi. Ak sa aspoň tri z nich jasne zhodujú, aplikácia rozhodne sama, bez volania jazykového modelu:
+
+- podobá sa na to, čo ste **potvrdili**, tak ho rovno pomenuje správnym druhom prvku,
+- podobá sa na to, čo ste **odmietli**, tak ho ako falošný poplach zahodí ešte predtým, než ho uvidíte.
+
+Ak zhoda nestačí, rozhodne on-device Apple model a výsledok opäť skontrolujete vy. S každým dokumentom je teda falošných poplachov menej a pomenovania presnejšie, ale iba vtedy, keď sú rozhodnutia v datasete správne a úplné.
+
+#### Prečo nechať odmietnuté návrhy odmietnuté
+
+Odmietnutý návrh nie je odpad, ale najcennejší typ príkladu: učí detektor, čo bezpečnostný prvok **nie je** (tlačený text, logo v hlavičke, tabuľka, čiarový kód, šum skenu). Keby ste ho zmazali, detektor by rovnakú chybu navrhol znova. Preto aplikácia:
+
+- odmietnuté nálezy na plátne zobrazí len bledým prerušovaným rámcom pod ostatnými, bez popisu, aby vás nemýlili (prepínač **Zobraziť odmietnuté** ich skryje úplne),
+- ich zamkne: nereagujú na klik ani ťahanie, nedajú sa posunúť, zmeniť, duplikovať ani zmazať a nový rámec môžete nakresliť priamo cez ne,
+- v zozname Nálezy ich presunie do zbalenej skupiny **Odmietnuté (N)**, kde jediná akcia je **Vrátiť na kontrolu**,
+- pri návrhu detektora nahradí mazanie odmietnutím: kláves Delete návrh odmietne, nie zmaže.
+
+Rozlišujte dve situácie:
 
 <table>
 <tr>
-<th align="left" width="28%">Udalosť</th>
-<th align="left">Čo sa stane</th>
+<th align="left" width="34%">Situácia</th>
+<th align="left">Správny postup</th>
+</tr>
+<tr>
+<td>Na mieste nie je žiadny bezpečnostný prvok</td>
+<td><strong>Odmietnuť</strong> (jednotlivo alebo cez <strong>Odmietnuť návrhy</strong> na strane či v celom dokumente). Vznikne negatívny príklad.</td>
+</tr>
+<tr>
+<td>Prvok tam je, ale rámec sedí nepresne alebo má zlý druh</td>
+<td>Rámec <strong>posuňte alebo zmeňte druh a potvrďte</strong>. Vznikne pozitívny príklad so správnou polohou. Odmietnutím by sa skutočná pečiatka naučila ako „nie prvok“.</td>
+</tr>
+<tr>
+<td>Sami ste nakreslili rámec omylom</td>
+<td><strong>Zmazať</strong>. Vlastný omyl nemá hodnotu príkladu, nič sa neuloží.</td>
+</tr>
+</table>
+
+<details open>
+<summary><strong>Čo presne sa uloží pri každej akcii</strong></summary>
+
+<table>
+<tr>
+<th align="left" width="28%">Akcia</th>
+<th align="left">Čo sa stane v datasete</th>
 </tr>
 <tr>
 <td>Potvrdíte nález</td>
-<td>Podporovaný prvok s rámcom v skene sa uloží ako pozitívny výrez s feature printom. Právne posúdenie podpisu či pečiatky sa mapuje na všeobecnú obrazovú triedu; fyzická kontrola bez rámca nevytvorí výrez.</td>
+<td>Podporovaný prvok s rámcom v skene sa uloží ako pozitívny výrez s feature printom a druhom prvku. Právne posúdenie podpisu či pečiatky sa mapuje na všeobecnú obrazovú triedu; fyzická kontrola bez rámca nevytvorí výrez.</td>
 </tr>
 <tr>
 <td>Odmietnete nález</td>
-<td>Výrez sa uloží ako negatívny príklad; detektor sa učí aj vaše falošné poplachy.</td>
+<td>Výrez sa uloží ako negatívny príklad a nález sa zamkne, aby sa príklad omylom nestratil.</td>
 </tr>
 <tr>
-<td>Vrátite na kontrolu</td>
-<td>Príklad sa z datasetu odstráni.</td>
+<td>Stlačíte Delete na návrhu detektora</td>
+<td>Návrh sa odmietne (negatívny príklad), nezmaže.</td>
+</tr>
+<tr>
+<td>Zmažete vlastný rámec alebo už potvrdený nález</td>
+<td>Nález aj jeho príklad zmiznú; zmazanie sa dá vrátiť tlačidlom <strong>Vrátiť</strong>.</td>
+</tr>
+<tr>
+<td>Upravíte potvrdený nález (poloha v inšpektore, prichytenie alebo spresnenie rámca)</td>
+<td>Nález ostane potvrdený a príklad sa uloží znova s novou polohou. Ťahanie po plátne, zmena druhu alebo popisu vráti nález na kontrolu; potom ho znova potvrďte.</td>
+</tr>
+<tr>
+<td>Vrátite nález na kontrolu</td>
+<td>Príklad sa z datasetu odstráni, kým nerozhodnete znova.</td>
 </tr>
 <tr>
 <td>Dokončíte kontrolu strany</td>
 <td>Úplná anotácia strany sa uloží osobitne do <code>reviewed-pages.json</code>. Samotné potvrdenie jedného výrezu nestačí na export celej strany. Úpravy nálezov zneplatnia jej kontrolu.</td>
 </tr>
 <tr>
-<td>Ďalšia konverzia</td>
-<td>kNN porovnáva výrezy s uloženými príkladmi. Prínos nových príkladov treba overiť na samostatných skenoch.</td>
-</tr>
-<tr>
 <td>Export pre Create ML</td>
-<td>Exportuje sa nový priečinok s <code>annotations.json</code>, obrazmi kompletne skontrolovaných strán a <code>splits.json</code> na rozdelenie podľa dokumentov. Strany s prvkom bez lokalizácie alebo bez podporovanej obrazovej triedy sa vynechajú; fyzický záznam vylúči pôvodnú aj odkazovanú výstupnú stranu. Rozdelenie z <code>splits.json</code> treba pri tréningu použiť explicitne. Export model nenatrénuje.</td>
+<td>Exportuje sa nový priečinok s <code>annotations.json</code>, obrazmi kompletne skontrolovaných strán a <code>splits.json</code> na rozdelenie podľa dokumentov. Odmietnuté nálezy sú v ňom pozadím, nie objektom. Strany s prvkom bez lokalizácie alebo bez podporovanej obrazovej triedy sa vynechajú; fyzický záznam vylúči pôvodnú aj odkazovanú výstupnú stranu. Rozdelenie z <code>splits.json</code> treba pri tréningu použiť explicitne. Export model nenatrénuje.</td>
 </tr>
 </table>
 
-<p>Dataset žije v <code>~/Library/Application Support/Chevron7/VisionBank</code>, obsahuje náhľady strán dokumentov, ktorých prvky ste posúdili, a nikdy sa neodosiela. V Nastaveniach sa dá učenie vypnúť a dataset vymazať.</p>
+<p>Dataset žije v <code>~/Library/Application Support/Chevron7/VisionBank</code>, obsahuje náhľady strán dokumentov, ktorých prvky ste posúdili, a nikdy sa neodosiela. V Nastaveniach sa dá učenie vypnúť (<strong>Učiť sa z potvrdených a odmietnutých prvkov</strong>) a dataset vymazať. Prínos nových príkladov treba overiť na samostatných skenoch príkazom <code>vision-eval</code> (nižšie).</p>
 </details>
 
 <details>
@@ -363,6 +414,7 @@ Podpis bez Safari sa dá vyskúšať priamo:
 <td width="50%" valign="top">
 <ul>
 <li><a href="docs/diagrams/ai-vision.svg">AI Vision pipeline</a></li>
+<li><a href="docs/diagrams/ai-learning.svg">Ako sa detekcia učí z vašej kontroly</a></li>
 <li><a href="docs/diagrams/pdfa-pipeline.svg">PDF/A pipeline</a></li>
 <li><a href="docs/diagrams/finder-quick-action.svg">Finder Quick Action</a></li>
 <li><a href="docs/diagrams/state-machine.svg">Stavový automat evidencie</a></li>
@@ -443,7 +495,17 @@ xattr -d com.apple.quarantine "/Applications/Chevron7.app"
 </details>
 
 <details open>
-<summary><strong>v0.8.0 · aktuálne vydanie: jeden súbor pre klienta ako v podpisuj.sk</strong></summary>
+<summary><strong>v0.9.0 · aktuálne vydanie: prehľadná kontrola bezpečnostných prvkov, ktorá chráni učenie detekcie</strong></summary>
+<ul>
+<li>Každý z 16 druhov prvkov má vlastnú farbu čitateľnú na papieri aj v tmavom režime; sivá patrí iba odmietnutým nálezom.</li>
+<li>Odmietnuté nálezy sú bledé, zamknuté, nereagujú na klik a sú v zbalenej skupine <strong>Odmietnuté (N)</strong>; jediná akcia je <strong>Vrátiť na kontrolu</strong>.</li>
+<li>Návrh detektora sa namiesto zmazania odmietne (aj klávesom Delete), aby sa detektor z chyby poučil; zmazať sa dá len vlastný rámec alebo potvrdený nález.</li>
+<li>Úprava potvrdeného nálezu v inšpektore už nestratí jeho tréningový príklad.</li>
+</ul>
+</details>
+
+<details>
+<summary><strong>v0.8.0 · predchádzajúce vydanie: jeden súbor pre klienta ako v podpisuj.sk</strong></summary>
 <ul>
 <li>Klient dostane jediný <code>&lt;Názov výstupu&gt;.asice</code> s PDF/A a doložkou <code>&lt;evidenčné číslo&gt;.xml.xdcf</code>, podpísanými spolu s kvalifikovanou časovou pečiatkou; doložka uvádza presne názov PDF v kontajneri.</li>
 <li>Podpísaný záznam o konverzii ostáva v Registri a uloží sa cez <strong>Uložiť záznam…</strong>; <strong>Uložiť ako…</strong> uloží kontajner pre klienta.</li>
