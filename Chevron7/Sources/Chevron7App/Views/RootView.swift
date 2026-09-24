@@ -512,6 +512,18 @@ struct RootView: View {
                 .foregroundStyle(.secondary)
                 .accessibilityLabel("Nastavenia")
                 .help("Otvoriť nastavenia")
+
+                Button {
+                    NSWorkspace.shared.open(SidebarDonateLink.url)
+                } label: {
+                    Label(SidebarDonateLink.title, systemImage: SidebarDonateLink.symbol)
+                        .font(.callout)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .accessibilityLabel(SidebarDonateLink.accessibilityLabel)
+                .help(SidebarDonateLink.help)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
