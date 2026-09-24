@@ -389,6 +389,8 @@ Result: not yet run.
 - **Register safety:** an unreadable register is never overwritten after a failed load (its own timestamped `.unreadable-*` copy is kept beside it), and the first B2 write makes a one-time `register.backup-before-b2.json` copy so a register written by an older build can be recovered.
 - **Tests never touch the real Keychain:** `makeSettingsStore(ezzkAccountController:)` now defaults every App test to an in-memory controller (`MemoryCredentialStore`), closing gap 7 above; this also stopped the hangs the owner hit once a real test EZZK credential was saved (ruling R6).
 
+- **Result 106 (ruling R17):** 106 means the number is used by several records; EZZK stores duplicates rather than refusing them. A `ReceiveConversionRecord` result 106 therefore does not say what became of the record just sent: the row becomes `.outcomeUnknown` and the lookup resolves it. A lookup result 106 means EZZK holds a record under the number: the row is `.acceptedForProcessing` with code 106 and EZZK's text, never `.rejected` under the "other code" rule of ruling R12. Not yet observed live.
+
 ### Live checks on test EZZK (account `sys_zaktest1`, `ezzk-probe`)
 
 - `GetConversionRecordEvidenceNumber` refuses with code 113 ("vyčerpaný nastavený limit aktuálne nespotrebovaných evidenčných čísiel") once the account's limit of unconsumed numbers is reached; it never returns a number already given out.

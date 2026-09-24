@@ -221,6 +221,48 @@ final class EZZKSubmissionCoordinatorTests: XCTestCase {
         XCTAssertFalse(EZZKSubmissionCoordinator.canResend(record(.queuedForSubmission)))
     }
 
+    /// Ruling R17: result 106 means the number is used by several records; EZZK stores
+    /// duplicates rather than refusing them. As a submission result it proves nothing about
+    /// this record, so the row waits for a lookup; as a lookup result EZZK holds a record.
+    func testResult106AtSubmissionIsUnknownAndResolvesToAcceptedByLookup() async throws {
+        let sentAt = date("2026-09-23T10:00:06Z")
+        let duplicate = EZZKError.serviceRejected(code: 106, message: "Evidenčné číslo je použité viackrát")
+        let submitter = FakeSubmitter(.failure(duplicate))
+        let submitted = await EZZKSubmissionCoordinator(submitter: submitter, lookup: FakeLookup(), now: { sentAt })
+            .submit(record(.signed), container: container)
+
+        XCTAssertEqual(submitted.status, .outcomeUnknown)
+        XCTAssertNil(submitted.ezzkResultCode)
+        XCTAssertEqual(submitted.ezzkResultDescription, "EZZK vrátilo kód 106: Evidenčné číslo je použité viackrát")
+
+        let later = date("2026-09-23T10:10:00Z")
+        let lookup = FakeLookup(.failure(duplicate))
+        let resolved = await EZZKSubmissionCoordinator(submitter: submitter, lookup: lookup, now: { later })
+            .resolveUnknown(submitted)
+
+        XCTAssertEqual(resolved.status, .acceptedForProcessing)
+        XCTAssertEqual(resolved.ezzkResultCode, 106)
+        XCTAssertEqual(resolved.ezzkResultDescription, "Evidenčné číslo je použité viackrát")
+        XCTAssertEqual(resolved.lastLookupAt, later)
+        XCTAssertEqual(submitter.calls, 1, "resolving never sends")
+    }
+
+    func testLookupResult106KeepsAnAcceptedRowAccepted() async throws {
+        let now = date("2026-09-23T11:00:00Z")
+        var accepted = record(.acceptedForProcessing)
+        accepted.submittedAt = date("2026-09-23T10:00:00Z")
+        accepted.ezzkResultCode = 0
+        let lookup = FakeLookup(.failure(EZZKError.serviceRejected(code: 106, message: "Evidenčné číslo je použité viackrát")))
+        let result = await EZZKSubmissionCoordinator(submitter: FakeSubmitter(.failure(EZZKError.outcomeUnknown)),
+                                                     lookup: lookup, now: { now })
+            .refreshStatus(accepted)
+
+        XCTAssertEqual(result.status, .acceptedForProcessing)
+        XCTAssertEqual(result.ezzkResultCode, 106)
+        XCTAssertEqual(result.ezzkResultDescription, "Evidenčné číslo je použité viackrát")
+        XCTAssertEqual(result.lastLookupAt, now)
+    }
+
     func testRecordUnsignedRowIsNeverSubmitted() async throws {
         let now = date("2026-09-23T10:00:06Z")
         let submitter = FakeSubmitter(.success(EZZKSOAPSubmissionReceipt(messageID: "m", submittedAt: now)))

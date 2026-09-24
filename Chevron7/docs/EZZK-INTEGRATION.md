@@ -90,11 +90,15 @@ MIRRI manual and the live service disagree, the live service wins.
 
 Result codes: 0 OK; 1 recorded but not processed yet; 101 not authorized; 104 and
 105 number not recorded; 106 the number is used by several records, so the
-execution time has to be sent; 110 empty batch; 112 the number belongs to another
+execution time has to be sent (EZZK stores duplicates rather than refusing them:
+as a `ReceiveConversionRecord` result Chevron7 treats it as an unknown outcome
+that a lookup resolves, and as a lookup result as a record EZZK holds, ruling
+R17); 110 empty batch; 112 the number belongs to another
 person; 113 the account's limit of unconsumed evidence numbers is reached (live,
 2026-09-23; the MIRRI manual describes 113 as an empty batch, which the live
 service does not). Any other code on a lookup of an `.acceptedForProcessing` row
-means EZZK processed and refused the record (for example 12 "Neznámy obsah").
+(106 excepted) means EZZK processed and refused the record (for example 12
+"Neznámy obsah").
 
 ## Evidence numbers
 
@@ -113,9 +117,9 @@ Verified live on test EZZK, 2026-09-23 (`P2E-EZZK-FINDINGS.md`, "Part B2"):
 
 `EZZKSubmissionCoordinator` (`Sources/Chevron7Kit/EZZK/EZZKSubmissionCoordinator.swift`) owns every transition a register row can make once it has a signed record. The ZaKo flow, the Register's "Odoslať"/"Overiť v EZZK" and the periodic `EZZKStatusChecker` all go through it, so a row is never sent or looked up by two paths at once (a duplicate send earns EZZK result 106).
 
-- **Send** (`submit`): a network error, an unreachable login, a refused certificate pin, or a WCF deserialization fault happens before the operation runs, so nothing was sent; the row stays `.queuedForSubmission` (or `.late`) with the reason. Anything else unexpected after the request left (`outcomeUnknown`, an unreadable reply, a 5xx) is not proven unsent, so the row becomes `.outcomeUnknown` and is never resent blindly. A clean result becomes `.acceptedForProcessing` with the WS-Addressing `MessageID` and the send time.
-- **Resolve an unknown outcome** (`resolveUnknown`): waits five minutes after the send so EZZK has registered a record it may still have been receiving. A 105 (unknown number) means EZZK never got it, so the row is requeued (`.queuedForSubmission`); found means it was accepted after all; any other code means EZZK processed and refused it (`.rejected`, with EZZK's code and text).
-- **Refresh an accepted row** (`refreshStatus`): lookup code 0 becomes `.processed`; code 1 leaves the row `.acceptedForProcessing` (still waiting); any other code (105 included) is never treated as proof the record vanished, except a code outside {0, 1, 105}, which means EZZK processed and refused it (`.rejected`).
+- **Send** (`submit`): a network error, an unreachable login, a refused certificate pin, or a WCF deserialization fault happens before the operation runs, so nothing was sent; the row stays `.queuedForSubmission` (or `.late`) with the reason. Anything else unexpected after the request left (`outcomeUnknown`, an unreadable reply, a 5xx) is not proven unsent, so the row becomes `.outcomeUnknown` and is never resent blindly. A clean result becomes `.acceptedForProcessing` with the WS-Addressing `MessageID` and the send time. A 106 result (the number is used by several records, ruling R17) proves nothing about this record, so the row becomes `.outcomeUnknown` and the lookup decides.
+- **Resolve an unknown outcome** (`resolveUnknown`): waits five minutes after the send so EZZK has registered a record it may still have been receiving. A 105 (unknown number) means EZZK never got it, so the row is requeued (`.queuedForSubmission`); found means it was accepted after all, and so does a 106 (EZZK holds records under the number; the row keeps code 106 and EZZK's text); any other code means EZZK processed and refused it (`.rejected`, with EZZK's code and text).
+- **Refresh an accepted row** (`refreshStatus`): lookup code 0 becomes `.processed`; code 1 leaves the row `.acceptedForProcessing` (still waiting); any other code (105 included) is never treated as proof the record vanished, except a code outside {0, 1, 105, 106}, which means EZZK processed and refused it (`.rejected`). A 106 keeps the row accepted with code 106 and EZZK's text.
 - **Late rows** (`markLateIfNeeded`): a `.signed`/`.queuedForSubmission`/`.submissionFailed` row whose allocation day (Bratislava) has passed becomes `.late`. EZZK still accepts late records for processing (live, 2026-09-23), so `.late` rows are sent with a warning: "Záznam sa neodoslal v deň pridelenia čísla. EZZK ho môže odmietnuť alebo evidovať ako oneskorený."
 - **Scheduling** (`nextStatusCheck`): the first check is five minutes after the send (or after the row became unknown); after that, hourly.
 - `EZZKStatusChecker` runs this every five minutes, but only in a regular launch of Chevron7 (`shouldRun`, never in the `--web-signing` accessory mode), one row at a time (`inFlight`), capped at three automatic sends per row per Bratislava day, and only for rows whose stored `ezzkMode` matches the mode currently selected; a row without a stored mode was written before part B2 (no signed record) and no path ever sends or looks it up.

@@ -29,6 +29,10 @@ public struct EZZKRecordLookupFunction: EZZKRecordLookingUp {
 public struct EZZKSubmissionCoordinator: Sendable {
     /// Unknown evidence number: EZZK has no record under it.
     static let unknownRecordCode = 105
+    /// The number is used by several records: EZZK stores duplicates rather than refusing
+    /// them (ruling R17). As a submission result it does not say what became of this
+    /// record, so the row waits for a lookup; as a lookup result EZZK holds a record.
+    static let severalRecordsCode = 106
     /// The first check (of an accepted record, or of an unknown outcome) waits this long,
     /// so EZZK has registered a record it was still receiving.
     static let firstStatusCheckDelay: TimeInterval = 5 * 60
@@ -115,7 +119,8 @@ public struct EZZKSubmissionCoordinator: Sendable {
         return updated
     }
 
-    /// Resolves `.outcomeUnknown` by lookup: found -> accepted/processed, 105 -> queued, error -> unchanged.
+    /// Resolves `.outcomeUnknown` by lookup: found -> accepted/processed, 105 -> queued,
+    /// 106 -> accepted (EZZK holds records under the number), error -> unchanged.
     /// Any other EZZK result code means EZZK processed and refused the record: `.rejected`
     /// with EZZK's code and description. Does nothing until five minutes after the row last changed, so EZZK has registered a
     /// record it may still have been receiving (a 105 before that could cause a duplicate).
@@ -136,6 +141,12 @@ public struct EZZKSubmissionCoordinator: Sendable {
             updated.status = .queuedForSubmission
             updated.ezzkResultCode = nil
             updated.ezzkResultDescription = Self.requeuedReason
+        } catch EZZKError.serviceRejected(let code, let message) where code == Self.severalRecordsCode {
+            // EZZK holds a record under the number (more than one), so the lost submission
+            // was accepted; EZZK's code and text stay on the row.
+            updated.status = .acceptedForProcessing
+            updated.ezzkResultCode = code
+            updated.ezzkResultDescription = message
         } catch EZZKError.serviceRejected(let code, let message) {
             markRejected(&updated, code: code, message: message)
         } catch {
@@ -146,8 +157,8 @@ public struct EZZKSubmissionCoordinator: Sendable {
         return updated
     }
 
-    /// For `.acceptedForProcessing`: lookup code 0 -> `.processed`; code 1 -> unchanged with `lastLookupAt`.
-    /// A result code other than 0, 1 and 105 means EZZK processed and refused the record
+    /// For `.acceptedForProcessing`: lookup code 0 -> `.processed`; code 1 -> unchanged with `lastLookupAt`;
+    /// code 106 -> still accepted, with EZZK's code and text. A result code other than 0, 1, 105 and 106 means EZZK processed and refused the record
     /// (for example 12 "Neznámy obsah"): `.rejected` with EZZK's code and description.
     /// Every other error, 105 included, keeps the status: EZZK accepted the record, so a
     /// status check never moves it back to a state that would send it again. Every attempt,
@@ -160,6 +171,11 @@ public struct EZZKSubmissionCoordinator: Sendable {
                 updated.status = .processed
                 updated.ezzkResultCode = 0
             }
+        } catch EZZKError.serviceRejected(let code, let message) where code == Self.severalRecordsCode {
+            // EZZK holds the record (under a number used more than once): still accepted,
+            // with EZZK's code and text on the row.
+            updated.ezzkResultCode = code
+            updated.ezzkResultDescription = message
         } catch EZZKError.serviceRejected(let code, let message) where code != Self.unknownRecordCode {
             markRejected(&updated, code: code, message: message)
         } catch {
@@ -213,6 +229,10 @@ public struct EZZKSubmissionCoordinator: Sendable {
 
     private func apply(_ error: EZZKError, to record: inout EvidenceRecord) {
         switch error {
+        case .serviceRejected(let code, let message) where code == Self.severalRecordsCode:
+            // EZZK may have stored this record as one more under the number, so it waits for
+            // a lookup instead of being refused or sent again.
+            markUnknown(&record, description: "EZZK vrátilo kód \(code): \(message)")
         case .serviceRejected(let code, let message):
             markRejected(&record, code: code, message: message)
             // Refused at submission: a lookup of an earlier attempt does not describe it,
