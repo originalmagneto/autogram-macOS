@@ -227,12 +227,17 @@ struct EvidenceRegisterSummary: Equatable {
     let pending: Int
     /// Refused by EZZK, failed in part A, or the record was never signed.
     let failed: Int
+    /// Demo rows: a local simulation that never reached EZZK, so none of the counts above
+    /// includes them.
+    let demo: Int
 
     init(records: [EvidenceRecord]) {
         total = records.count
-        sent = records.filter { EZZKRecordPresentation.isSent($0.status) }.count
-        failed = records.filter { Self.isFailure($0.status) }.count
-        pending = records.filter { $0.status.isSubmissionPendingState && !Self.isFailure($0.status) }.count
+        let real = records.filter { $0.ezzkMode != .demo }
+        demo = total - real.count
+        sent = real.filter { EZZKRecordPresentation.isSent($0.status) }.count
+        failed = real.filter { Self.isFailure($0.status) }.count
+        pending = real.filter { $0.status.isSubmissionPendingState && !Self.isFailure($0.status) }.count
     }
 
     private static func isFailure(_ status: EvidenceRecord.Status) -> Bool {

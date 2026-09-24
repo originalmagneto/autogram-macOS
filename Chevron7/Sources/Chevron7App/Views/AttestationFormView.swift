@@ -8,19 +8,33 @@ struct AttestationFormView: View {
     @Bindable var store: ZakoSessionStore
     @State private var savedTemplateHint = false
     @State private var showingLivePreview = true
+    @State private var availableWidth: CGFloat = .infinity
+
+    /// The preview needs room next to the form; in a narrow window it steps aside.
+    private var previewFits: Bool {
+        MacOS27Layout.showsClausePreview(availableWidth: availableWidth)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
-            HSplitView {
+            // Measures the width offered to this step. The split view itself cannot:
+            // with both panes at their minimums it reports its own, larger width.
+            Color.clear
+                .frame(maxWidth: .infinity, maxHeight: 0)
+                .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { availableWidth = $0 }
+            // A plain HStack, not HSplitView: the AppKit split view kept its panes' widths and
+            // would not let the detail column narrow, which clipped the window on both sides.
+            HStack(spacing: 0) {
                 ScrollView {
                     formContent
                         .padding(18)
                 }
-                .frame(minWidth: 460, idealWidth: 540)
+                .frame(minWidth: MacOS27Layout.clauseFormMinimumWidth, maxWidth: .infinity)
 
-                if showingLivePreview {
+                // The pane draws its own leading hairline.
+                if showingLivePreview, previewFits {
                     liveClausePreviewPane
-                        .frame(minWidth: 320, idealWidth: 380, maxWidth: 500)
+                        .frame(minWidth: MacOS27Layout.clausePreviewMinimumWidth, idealWidth: 380, maxWidth: 440)
                 }
             }
 
@@ -37,9 +51,11 @@ struct AttestationFormView: View {
                 Button {
                     showingLivePreview.toggle()
                 } label: {
-                    Label(showingLivePreview ? "Skryť náhľad" : "Živý náhľad doložky", systemImage: "sidebar.right")
+                    Label(showingLivePreview && previewFits ? "Skryť náhľad" : "Živý náhľad doložky", systemImage: "sidebar.right")
                 }
                 .controlSize(.large)
+                .disabled(!previewFits)
+                .help(previewFits ? "" : "Na živý náhľad je okno príliš úzke. Rozšírte ho.")
 
                 Button {
                     store.recomputePreflight()
@@ -65,7 +81,9 @@ struct AttestationFormView: View {
                 } label: {
                     Label("Živý náhľad doložky", systemImage: "sidebar.trailing")
                 }
-                .help(showingLivePreview ? "Skryť živý náhľad doložky" : "Zobraziť živý náhľad doložky")
+                .disabled(!previewFits)
+                .help(!previewFits ? "Na živý náhľad je okno príliš úzke. Rozšírte ho."
+                      : showingLivePreview ? "Skryť živý náhľad doložky" : "Zobraziť živý náhľad doložky")
             }
         }
         .onChange(of: store.attestation) { _, _ in
@@ -211,7 +229,7 @@ struct AttestationFormView: View {
                         }
 
                         Button {
-                            Task { await store.fetchEvidenceNumber() }
+                            Task { await store.requestEvidenceNumber() }
                         } label: {
                             if store.fetchingEvidenceNumber {
                                 ProgressView().controlSize(.small)
@@ -225,6 +243,7 @@ struct AttestationFormView: View {
                         .controlSize(.small)
                     }
                 }
+                mandateCardStatus
                 if let error = store.evidenceNumberError {
                     Text(error)
                         .font(.caption)
@@ -240,6 +259,35 @@ struct AttestationFormView: View {
                 Text("Číslo sa viaže na registráciu v evidencii záznamov. Záznam sa odošle do centrálnej evidencie do 24 hodín.")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    /// The card the number and the authorization depend on (outside Demo only).
+    @ViewBuilder
+    private var mandateCardStatus: some View {
+        if store.settingsStore.ezzkAccountController.mode != .demo {
+            switch store.mandateGate {
+            case .notRequired:
+                EmptyView()
+            case .ready(let label):
+                Label("Mandátny certifikát: \(label)", systemImage: "checkmark.seal.fill")
+                    .font(.caption)
+                    .foregroundStyle(.green)
+            case .needsUnlock:
+                Label(ZakoSessionStore.unlockCardMessage, systemImage: "key.horizontal")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            case .insertCard:
+                Label(ZakoSessionStore.insertMandateCardMessage, systemImage: "creditcard.and.123")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+            case .noMandate:
+                Label(ZakoSessionStore.noMandateMessage, systemImage: "xmark.seal.fill")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
@@ -317,9 +365,7 @@ struct AttestationFormView: View {
     }
 
     private var clausePerformingPerson: String {
-        let name = store.attestation.performingPerson.fullName.isEmpty ? "JUDr. Meno Priezvisko" : store.attestation.performingPerson.fullName
-        let sak = store.attestation.performingPerson.registrationNumber.isEmpty ? "XXXX" : store.attestation.performingPerson.registrationNumber
-        return "\(name), advokát, ev. č. SAK: \(sak)"
+        store.attestation.performingPerson.clausePreviewLine
     }
 
     private var clauseElementSummary: String {
@@ -353,8 +399,6 @@ struct AttestationFormView: View {
 
     private var generatedClausePreviewText: String {
         let name = store.attestation.originalDocumentName.isEmpty ? "Názov dokumentu" : store.attestation.originalDocumentName
-        let person = store.attestation.performingPerson.fullName.isEmpty ? "JUDr. Meno Priezvisko" : store.attestation.performingPerson.fullName
-        let sak = store.attestation.performingPerson.registrationNumber.isEmpty ? "XXXX" : store.attestation.performingPerson.registrationNumber
         let evidence = store.attestation.evidenceNumber ?? "XXXXXX"
 
         let elementSummary = store.attestation.noSecurityElementsConfirmed ? "Bez bezpečnostných prvkov (potvrdené kontrolou originálu)" : store.confirmedSecurityElements.map { "\($0.descriptionForRecord), \($0.locationDescription(pageSizePt: .zero))" }.joined(separator: "; ")
@@ -368,7 +412,7 @@ struct AttestationFormView: View {
         3. Počet listov pôvodného dokumentu: \(store.effectiveSheetCount)
         4. Počet neprázdnych strán pôvodného dokumentu: \(store.analysis.nonEmptyPages)
         5. Bezpečnostné prvky pôvodného dokumentu: \(elementSummary)
-        6. Osoba vykonávajúca konverziu: \(person), advokát, ev. č. SAK: \(sak)
+        6. Osoba vykonávajúca konverziu: \(clausePerformingPerson)
         7. Evidenčné číslo záznamu o zaručenej konverzii: \(evidence)
         8. Čas konverzie: bude určený časovou pečiatkou QTS pri autorizácii
 

@@ -48,6 +48,14 @@ final class SigningSessionStore {
     private(set) var isSigningViaMobile = false
     var existingSignatures: [DocumentSignatureInfo] = []
     var isInspectingSignatures = false
+    /// Read from the loaded file's bytes, so it holds with every provider.
+    private(set) var sourceSignatureKind: ExistingSignatureGuard.Source = .unsignedPDF
+    /// A signed PDF or a container is signed as it is: no PDF/A and no stamp baked into it.
+    var preservesSourceBytes: Bool { sourceSignatureKind != .unsignedPDF }
+    /// Only the engine draws a stamp without rewriting the PDF, as part of a PAdES signature.
+    var bakedVisualStampIsBlocked: Bool {
+        preservesSourceBytes && outputFormat == .attachedASIC
+    }
     var signedOutputURL: URL?
     var resultSignatures: [DocumentSignatureInfo] = []
     var signedPreviewDocument: PDFDocument?
@@ -244,6 +252,17 @@ final class SigningSessionStore {
         }
     }
 
+    /// A signed output can take a further signature: it joins the queue as its own
+    /// document, and its signatures decide the format (`sourceSignatureKind`).
+    var canAddFurtherSignature: Bool {
+        !isSigning && batchPhase != .preflighting && batchPhase != .ready && batchPhase != .signing
+    }
+
+    func addFurtherSignature(to url: URL) async {
+        guard canAddFurtherSignature else { return }
+        await addDocuments(at: [url], selectLast: true)
+    }
+
     func selectQueueItem(_ id: UUID) async {
         guard let item = queue.first(where: { $0.id == id }) else { return }
         selectedQueueID = id
@@ -259,6 +278,15 @@ final class SigningSessionStore {
         }
         self.document = document
         self.sourceURL = item.url
+        sourceSignatureKind = ExistingSignatureGuard.classify(
+            fileName: item.url.lastPathComponent,
+            data: (try? Data(contentsOf: item.url)) ?? Data())
+        switch sourceSignatureKind {
+        case .asicContainer: outputFormat = .attachedASIC
+        // A further PAdES signature sits next to the existing one in the same PDF.
+        case .signedPDF: outputFormat = .embeddedPAdES
+        case .unsignedPDF: break
+        }
         self.sourceBookmark = try? item.url.bookmarkData(options: .withSecurityScope,
                                                          includingResourceValuesForKeys: nil,
                                                          relativeTo: nil)
@@ -312,6 +340,13 @@ final class SigningSessionStore {
     var signingProviderIsDemo: Bool {
         signingProvider is DemoSigningProvider
     }
+
+    static let containerNeedsCardMessage =
+        "Do existujúceho kontajnera ASiC-E sa podpis mobilom pridať nedá. Podpíšte ho kartou."
+    static let containerNeedsEngineMessage =
+        "Pridať podpis do existujúceho kontajnera ASiC-E vie iba podpisový engine s kartou."
+    static let containerInBatchMessage =
+        "Kontajner ASiC-E sa v dávke podpísať nedá. Otvorte ho samostatne a pridajte podpis."
 
     var hasResolvedCertificate: Bool {
         signingProviderIsDemo || identities.contains {
@@ -392,10 +427,16 @@ final class SigningSessionStore {
 
     var canSignViaMobile: Bool {
         document != nil && !isSigning && isMobileSigningAvailable
+            && sourceSignatureKind != .asicContainer
+            // The phone path can only bake a stamp into the PDF, which a signed PDF refuses.
+            && !(preservesSourceBytes && includeVisibleSignature)
     }
 
     func sign(viaMobile: Bool = false) async {
         guard let document else { return }
+        // The panel switches this off too; a stamp that cannot be drawn must not
+        // make signing wait for the card's certificate.
+        if bakedVisualStampIsBlocked { includeVisibleSignature = false }
         lastError = nil
         isSigning = true
         isSigningViaMobile = viaMobile
@@ -423,11 +464,23 @@ final class SigningSessionStore {
             let originalPdfData = pdfData
             pdfaPrepared = false
             pdfaAfterSign = false
+            // A document that already carries a signature is signed exactly as it is:
+            // every rewrite below goes through PDFKit and would drop that signature.
+            let sourceKind = ExistingSignatureGuard.classify(
+                fileName: sourceURL?.lastPathComponent ?? "", data: pdfData)
+            let preservesSourceBytes = sourceKind != .unsignedPDF
+            if sourceKind == .asicContainer {
+                guard !viaMobile else { throw SigningError.signingFailed(Self.containerNeedsCardMessage) }
+                guard signingProvider.addsSignatureToExistingContainer else {
+                    throw SigningError.signingFailed(Self.containerNeedsEngineMessage)
+                }
+                outputFormat = .attachedASIC
+            }
             var visualStampWasPreapplied = false
             // The card path lets the Java engine draw the PAdES appearance; the AVM server
             // cannot, so signing with mobile bakes the stamp into the PDF like the ASiC-E path.
-            let preappliesVisualStamp = outputFormat == .attachedASIC
-                || (viaMobile && outputFormat == .embeddedPAdES)
+            let preappliesVisualStamp = !preservesSourceBytes
+                && (outputFormat == .attachedASIC || (viaMobile && outputFormat == .embeddedPAdES))
             if convertToPDFA, includeVisibleSignature, preappliesVisualStamp {
                 let imageData = visualArtworkOverride
                     ?? VisualSignatureStore.imageData(for: selectedVisualAppearanceID, in: settingsStore.signaturesDirectory)
@@ -451,7 +504,7 @@ final class SigningSessionStore {
             }
 
 
-            if convertToPDFA, !pdfData.isEmpty {
+            if convertToPDFA, !preservesSourceBytes, !pdfData.isEmpty {
                 statusText = "Konvertujem do PDF/A…"
                 let title = sourceURL?.deletingPathExtension().lastPathComponent ?? ""
                 // PAdES DSS rozbije vektorový incremental PDF/A: raster je jediný spoľahlivý vstup.
@@ -546,7 +599,11 @@ final class SigningSessionStore {
                                    outputFormat: outputFormat,
                                    pin: signingPIN.isEmpty ? nil : signingPIN,
                                    extraFiles: [ASiCEPackager.Entry(path: pdfName, data: data)],
-                                   visualStamp: visualStamp)
+                                   visualStamp: visualStamp,
+                                   filename: pdfName,
+                                   // The engine builds the ASiC-E around the document itself;
+                                   // a container packaged here ended up nested in the signed one.
+                                   signsExtraFilesAsDataObjects: true)
                 }
                 do {
                     signed = try await signingProvider.sign(makeRequest(with: pdfData))
@@ -877,6 +934,13 @@ final class SigningSessionStore {
             guard let batchIndex = batchItems.firstIndex(where: { $0.id == item.id }) else {
                 continue
             }
+            // A batch signs PDFs; a container's own signatures would be lost when its
+            // PDF is extracted and signed again, so it is signed on its own instead.
+            if ExistingSignatureGuard.hasContainerExtension(item.url.lastPathComponent) {
+                batchItems[batchIndex].state = .failed
+                batchItems[batchIndex].errorMessage = Self.containerInBatchMessage
+                continue
+            }
             if let sharedPlannedURL {
                 batchItems[batchIndex].plannedOutputURL = sharedPlannedURL
                 continue
@@ -1070,7 +1134,9 @@ final class SigningSessionStore {
                 try checkBatchGeneration(generation)
                 let document = try loadBatchPDF(item.url)
                 var pdfData = try batchPDFData(for: item.url, document: document)
-                if snapshot.includeVisibleSignature {
+                // A signed PDF goes in untouched: the stamp and PDF/A rewrite would drop its signature.
+                let keepsBytes = ExistingSignatureGuard.pdfContainsSignature(pdfData)
+                if snapshot.includeVisibleSignature, !keepsBytes {
                     let stamp = VisibleSignatureStamper.StampData(
                         fullName: snapshot.identityLabel,
                         timestamp: Date(),
@@ -1091,7 +1157,7 @@ final class SigningSessionStore {
                         stamper: stamper,
                         flattenAnnotations: true)
                 }
-                if snapshot.convertToPDFA {
+                if snapshot.convertToPDFA, !keepsBytes {
                     let pdfaDocument = PDFDocument(data: pdfData) ?? document
                     pdfData = try PDFAConverter().convert(
                         document: pdfaDocument,
@@ -1121,7 +1187,11 @@ final class SigningSessionStore {
                 tsaURL: snapshot.tsaURL,
                 outputFormat: .attachedASIC,
                 pin: pin,
-                extraFiles: entries))
+                extraFiles: entries,
+                filename: entries.first?.path,
+                // One ASiC-E with every PDF as its own data object, not a packaged
+                // container nested inside the signed one.
+                signsExtraFilesAsDataObjects: true))
             guard let asicData = signed.asicData else {
                 throw SigningError.signingFailed("Podpisový provider nevytvoril ASiC-E kontajner.")
             }
@@ -1237,11 +1307,14 @@ final class SigningSessionStore {
             throw SigningError.signingFailed("PDF dokument neobsahuje žiadne dáta.")
         }
         let originalPDFData = pdfData
+        // A signed PDF goes in untouched: the stamp and PDF/A rewrite would drop its signature.
+        let rewritesPDF = !ExistingSignatureGuard.pdfContainsSignature(pdfData)
         var didPreparePDFA = false
         var didFallbackToOriginal = false
         var visualStampWasPreapplied = false
         var attachedStamp: VisibleSignatureStamper.StampData?
-        if snapshot.convertToPDFA,
+        if rewritesPDF,
+           snapshot.convertToPDFA,
            snapshot.includeVisibleSignature,
            snapshot.outputFormat == .attachedASIC {
             let stamp = VisibleSignatureStamper.StampData(
@@ -1272,7 +1345,7 @@ final class SigningSessionStore {
         }
         
 
-        if snapshot.convertToPDFA {
+        if rewritesPDF, snapshot.convertToPDFA {
             let mode: PDFAConversionMode =
                 snapshot.outputFormat == .embeddedPAdES || visualStampWasPreapplied
                 ? .rasterGuaranteed
@@ -1295,7 +1368,8 @@ final class SigningSessionStore {
             }
             didPreparePDFA = true
         }
-        if !snapshot.convertToPDFA,
+        if rewritesPDF,
+           !snapshot.convertToPDFA,
            snapshot.includeVisibleSignature,
            snapshot.outputFormat == .attachedASIC {
             let imageData = snapshot.visualArtworkOverride
@@ -1352,7 +1426,9 @@ final class SigningSessionStore {
             outputFormat: snapshot.outputFormat,
             pin: pin,
             extraFiles: [ASiCEPackager.Entry(path: item.url.lastPathComponent, data: pdfData)],
-            visualStamp: visualStamp)
+            visualStamp: visualStamp,
+            filename: item.url.lastPathComponent,
+            signsExtraFilesAsDataObjects: true)
         var signed: SignedConversionResult
         do {
             try checkBatchGeneration(generation)
@@ -1381,7 +1457,9 @@ final class SigningSessionStore {
                     pin: pin,
                     extraFiles: [ASiCEPackager.Entry(
                         path: item.url.lastPathComponent, data: fallbackPDFData)],
-                    visualStamp: visualStamp))
+                    visualStamp: visualStamp,
+                    filename: item.url.lastPathComponent,
+                    signsExtraFilesAsDataObjects: true))
                 try checkBatchGeneration(generation)
             } else {
                 throw error
@@ -1551,6 +1629,7 @@ final class SigningSessionStore {
         visualArtworkOverride = nil
         visualPlacement = nil
         existingSignatures = []
+        sourceSignatureKind = .unsignedPDF
         resultSignatures = []
         signedOutputURL = nil
         signedPreviewDocument = nil

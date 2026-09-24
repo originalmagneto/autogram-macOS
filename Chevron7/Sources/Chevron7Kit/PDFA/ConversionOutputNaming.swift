@@ -6,6 +6,17 @@ import Foundation
 /// Keeps ZaKo output files next to the source document and makes every
 /// generated artifact traceable to that source.
 public enum ConversionOutputNaming {
+    /// The document name a person reads, from a file name: a name saved from the web often
+    /// keeps its URL encoding ("z%cc%8ca%cc%81dost" for "žádost"), and macOS may hand it
+    /// over decomposed. Anything that does not decode stays as it was.
+    public static func readableName(_ fileName: String) -> String {
+        var name = fileName
+        if name.contains("%"), let decoded = name.removingPercentEncoding, !decoded.isEmpty {
+            name = decoded
+        }
+        return name.precomposedStringWithCanonicalMapping
+    }
+
     public static func pdfFileName(originalDocumentName: String,
                                    requestedDocumentName: String) -> String {
         let original = documentStem(originalDocumentName, fallback: "dokument")

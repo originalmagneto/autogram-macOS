@@ -54,10 +54,17 @@ final class EZZKProductionPolicyTests: XCTestCase {
         super.tearDown()
     }
 
-    func testWithoutTheOwnerSwitchProductionIsRefused() {
+    /// Production is open for everyone: no owner switch is needed any more.
+    func testProductionIsAllowedWithoutTheOwnerSwitch() {
         let policy = EZZKProductionPolicy.current(defaults: defaults())
-        XCTAssertFalse(EZZKProductionPolicy.enabledForEveryone)
-        XCTAssertEqual(policy, .refused)
+        XCTAssertTrue(EZZKProductionPolicy.enabledForEveryone)
+        XCTAssertEqual(policy, .allowed)
+        XCTAssertNil(policy.refusal(environment: .production, submitting: true))
+    }
+
+    /// The refusal itself still works for code that builds `.refused` (tests, `ezzk-probe`).
+    func testARefusedPolicyStillRefusesProduction() {
+        let policy = EZZKProductionPolicy.refused
         XCTAssertEqual(policy.refusal(environment: .production, submitting: false), .productionAllocationDisabled)
         XCTAssertEqual(policy.refusal(environment: .production, submitting: true), .submissionUnavailable)
         XCTAssertNil(policy.refusal(environment: .sandbox, submitting: true))

@@ -103,7 +103,7 @@ public enum EZZKError: LocalizedError, Equatable, Sendable {
         case .untrustedCertificate:
             return "Certifikát testovacieho prostredia EZZK sa zmenil. Aktualizujte odtlačok v aplikácii."
         case .productionAllocationDisabled:
-            return "Pridelenie čísel na produkcii sa zapne spolu s odosielaním záznamov."
+            return "Pridelenie evidenčných čísel na Produkcii je v tejto verzii zamknuté, hoci je Produkcia zvolená v Nastaveniach. Na skúšku použite režim Demo alebo Test."
         case .submissionUnavailable:
             return "Odosielanie záznamov do produkčného EZZK zatiaľ nie je zapnuté. Príde v ďalšej verzii."
         case .evidenceNumberExpired:

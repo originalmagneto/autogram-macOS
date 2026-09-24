@@ -575,6 +575,89 @@ final class EngineBridgeSignsExtraFilesAsDataObjectsTests: XCTestCase {
     }
 }
 
+/// The main signing window: what the engine receives for one document.
+final class EngineBridgeMainWindowSourceTests: XCTestCase {
+    private func request(_ data: Data, filename: String) -> SigningRequest {
+        SigningRequest(pdfData: data, identityID: "engine:eid", includeTimestamp: false,
+                       outputFormat: .attachedASIC,
+                       extraFiles: [ASiCEPackager.Entry(path: filename, data: data)],
+                       filename: filename, signsExtraFilesAsDataObjects: true)
+    }
+
+    /// The PDF itself is the source, so the engine's ASiC-E holds it directly.
+    func testPDFIsTheSourceUnderItsOwnName() async throws {
+        let engine = RecordingSigningEngine()
+        let provider = EngineBridgeSigningProvider(engine: engine)
+
+        _ = try await provider.sign(request(TestPDFBuilder.singlePageWhitePDF(), filename: "zmluva.pdf"))
+
+        let file = try XCTUnwrap(engine.capturedRequest?.files.first)
+        XCTAssertEqual(file.sourceURL.lastPathComponent, "zmluva.pdf")
+        XCTAssertTrue(file.attachmentURLs.isEmpty)
+    }
+
+    /// An `.asice` reaches the engine as it is, which then extends the container.
+    func testContainerIsTheSourceUnderItsOwnName() async throws {
+        let engine = RecordingSigningEngine()
+        let provider = EngineBridgeSigningProvider(engine: engine)
+        let container = try EngineBridgeSigningProvider.packageContainer(entries: [
+            ASiCEPackager.Entry(path: "zmluva.pdf", data: TestPDFBuilder.singlePageWhitePDF())])
+
+        _ = try await provider.sign(request(container, filename: "zmluva.asice"))
+
+        let file = try XCTUnwrap(engine.capturedRequest?.files.first)
+        XCTAssertEqual(file.sourceURL.lastPathComponent, "zmluva.asice")
+        XCTAssertTrue(file.attachmentURLs.isEmpty)
+        XCTAssertTrue(provider.addsSignatureToExistingContainer)
+    }
+}
+
+final class MandateCertificateTests: XCTestCase {
+    func testTheMandateTokenDecides() {
+        XCTAssertTrue(MandateCertificate.matches(subject: "Marián Čuprík OPRÁVNENIE 1042",
+                                                 issuer: "CN=I.CA EU Qualified CA-SK/RSA 10/2022"))
+        XCTAssertTrue(MandateCertificate.matches(subject: "JUDr. X Y, mandátny certifikát"))
+        XCTAssertFalse(MandateCertificate.matches(subject: "Marián Čuprík",
+                                                  issuer: "CN=I.CA EU Qualified CA-SK/RSA 10/2022"))
+        XCTAssertFalse(MandateCertificate.matches(subject: "X OPRÁVNENIE 1", issuer: "CN=I.CA Public CA"))
+    }
+
+    /// A qualified QESIG certificate without the token is not an MQC any more.
+    func testEngineNoLongerTakesAnyQualifiedCertificateForAMandate() {
+        XCTAssertFalse(EngineBridgeSigningProvider.isMandateCertificate(
+            issuer: "I.CA EU Qualified CA-SK/RSA 10/2022", displayName: "Marián Čuprík", qualification: "QESIG"))
+        XCTAssertTrue(EngineBridgeSigningProvider.isMandateCertificate(
+            issuer: "I.CA EU Qualified CA-SK/RSA 10/2022", displayName: "Marián Čuprík OPRÁVNENIE 1042",
+            qualification: "QESIG"))
+    }
+
+    func testCardState() {
+        XCTAssertEqual(MandateCertificate.cardState(subjects: []), .noCard)
+        XCTAssertEqual(MandateCertificate.cardState(subjects: [("Marián Čuprík", ""),
+                                                               ("Marián Čuprík OPRÁVNENIE 1042", "")]),
+                       .mandate(label: "Marián Čuprík OPRÁVNENIE 1042"))
+        XCTAssertEqual(MandateCertificate.cardState(subjects: [("Marián Čuprík", "")]),
+                       .noMandate(labels: ["Marián Čuprík"]))
+    }
+}
+
+final class ExistingSignatureGuardTests: XCTestCase {
+    func testClassifiesFromTheBytes() throws {
+        let pdf = TestPDFBuilder.singlePageWhitePDF()
+        var signed = pdf
+        signed.append(Data("<</Type/Sig/ByteRange[0 10 20 30]>>".utf8))
+        let container = try EngineBridgeSigningProvider.packageContainer(entries: [
+            ASiCEPackager.Entry(path: "a.pdf", data: pdf)])
+
+        XCTAssertEqual(ExistingSignatureGuard.classify(fileName: "a.pdf", data: pdf), .unsignedPDF)
+        XCTAssertEqual(ExistingSignatureGuard.classify(fileName: "a.pdf", data: signed), .signedPDF)
+        XCTAssertEqual(ExistingSignatureGuard.classify(fileName: "a.asice", data: container), .asicContainer)
+        XCTAssertEqual(ExistingSignatureGuard.classify(fileName: "A.ASICE", data: container), .asicContainer)
+        // A zip under a PDF name is not treated as a container.
+        XCTAssertNotEqual(ExistingSignatureGuard.classify(fileName: "a.pdf", data: container), .asicContainer)
+    }
+}
+
 final class EngineBridgeRecordSubmissionTests: XCTestCase {
     private func recordRequest(filename: String?, timestampServers: [String]? = nil) -> SigningRequest {
         SigningRequest(pdfData: Data("<XMLDataContainer/>".utf8), identityID: "engine:eid",

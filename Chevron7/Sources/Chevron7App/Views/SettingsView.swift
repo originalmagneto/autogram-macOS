@@ -924,7 +924,10 @@ struct SettingsView: View {
             if controller.mode == .production {
                 // "Vyžiadať čísla" stays test only whatever the production policy: a production
                 // number no record uses lapses at midnight and breaks the 24-hour reporting duty.
-                Label("V produkcii sa evidenčné číslo získava iba v zaručenej konverzii.", systemImage: "lock")
+                Label(controller.productionPolicy.allowsConsequentialCalls
+                      ? "V produkcii sa evidenčné číslo získava iba v zaručenej konverzii."
+                      : "V produkcii je pridelenie evidenčného čísla zatiaľ zamknuté, aj v zaručenej konverzii. Na skúšku použite režim Demo alebo Test.",
+                      systemImage: "lock")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

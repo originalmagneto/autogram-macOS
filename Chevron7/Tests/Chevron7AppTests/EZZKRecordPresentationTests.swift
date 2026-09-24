@@ -171,6 +171,20 @@ final class EZZKRecordPresentationTests: XCTestCase {
         XCTAssertEqual(summary.sent, 3)
         XCTAssertEqual(summary.failed, 2)
         XCTAssertEqual(summary.pending, 3)
+        XCTAssertEqual(summary.demo, 0)
+    }
+
+    /// A Demo row is a local simulation: counted in the total and as Demo, never as in EZZK.
+    func testRegisterSummaryKeepsDemoRowsOutOfTheEZZKCounts() {
+        var demo = row(.acceptedForProcessing)
+        demo.ezzkMode = .demo
+        var real = row(.processed)
+        real.ezzkMode = .production
+        let summary = EvidenceRegisterSummary(records: [demo, real])
+        XCTAssertEqual(summary.total, 2)
+        XCTAssertEqual(summary.demo, 1)
+        XCTAssertEqual(summary.sent, 1)
+        XCTAssertEqual(summary.pending, 0)
     }
 
     func testTimelineShowsAcceptedAsSentAndRejectedAsFailed() {

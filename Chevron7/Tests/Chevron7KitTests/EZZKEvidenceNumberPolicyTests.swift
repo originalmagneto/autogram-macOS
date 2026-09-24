@@ -87,11 +87,11 @@ final class EZZKEvidenceNumberPolicyTests: XCTestCase {
         let nameWarning = EZZKEvidenceNumberPolicy.identityMismatch(
             clausePerson: clause, accountName: "Iná kancelária", accountICO: "42249180")
         XCTAssertEqual(nameWarning,
-                       "Doložka nezodpovedá EZZK účtu: názov osoby v doložke „Advokátska kancelária Test“ sa líši od EZZK účtu „Iná kancelária“.")
+                       "Doložka nezodpovedá EZZK účtu: názov osoby v doložke „Advokátska kancelária Test“ sa líši od EZZK účtu „Iná kancelária“. " + EZZKEvidenceNumberPolicy.mismatchHint)
 
         let icoWarning = EZZKEvidenceNumberPolicy.identityMismatch(
             clausePerson: clause, accountName: "Advokátska kancelária Test", accountICO: "11111111")
         XCTAssertEqual(icoWarning,
-                       "Doložka nezodpovedá EZZK účtu: IČO v doložke „42249180“ sa líši od IČO EZZK účtu „11111111“.")
+                       "Doložka nezodpovedá EZZK účtu: IČO v doložke „42249180“ sa líši od IČO EZZK účtu „11111111“. " + EZZKEvidenceNumberPolicy.mismatchHint)
     }
 }

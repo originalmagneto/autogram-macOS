@@ -27,6 +27,17 @@ final class MacOS27UXContractTests: XCTestCase {
         XCTAssertEqual(EvidenceRecord.submissionDeadlineInterval, 24 * 3600)
     }
 
+    /// The ZaKo form alone fits the narrowest detail column (smallest window, widest
+    /// sidebar), and the preview appears only when the form keeps its minimum.
+    func testClauseStepFitsTheNarrowestWindow() {
+        let narrowestDetail = MacOS27Layout.rootMinimumWidth - 320
+        XCTAssertLessThanOrEqual(MacOS27Layout.clauseFormMinimumWidth, narrowestDetail)
+        XCTAssertFalse(MacOS27Layout.showsClausePreview(availableWidth: narrowestDetail))
+        XCTAssertFalse(MacOS27Layout.showsClausePreview(
+            availableWidth: MacOS27Layout.clauseFormMinimumWidth + MacOS27Layout.clausePreviewMinimumWidth))
+        XCTAssertTrue(MacOS27Layout.showsClausePreview(availableWidth: 1100))
+    }
+
     func testInspectorLayoutCanCollapseWithoutWideningRoot() {
         XCTAssertEqual(MacOS27Layout.inspectorMinimumWidth, 0)
         XCTAssertLessThan(

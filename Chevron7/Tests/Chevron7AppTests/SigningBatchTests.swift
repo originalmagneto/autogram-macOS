@@ -611,6 +611,221 @@ final class SigningBatchTests: XCTestCase {
     }
 
 
+
+    // MARK: - Existing signatures and container layout
+
+    /// The engine builds the ASiC-E around the PDF itself; a container packaged by the
+    /// app first ended up nested (`kontajner.asice`) inside the signed one.
+    func testSingleASiCSigningHandsTheEngineThePDFUnderItsName() async throws {
+        let provider = RecordingSigningProvider()
+        let store = makeStore(provider: provider)
+        await store.addDocuments(at: [makePDF(named: "zmluva.pdf")], selectLast: true)
+        store.identities = await provider.availableIdentities()
+        store.selectedIdentityID = "identity"
+        store.includeQualifiedTimestamp = false
+        store.outputFormat = .attachedASIC
+
+        await store.sign()
+
+        let recorded = await provider.recordedRequests()
+        let request = try XCTUnwrap(recorded.first)
+        XCTAssertNil(store.lastError)
+        XCTAssertEqual(request.filename, "zmluva.pdf")
+        XCTAssertTrue(request.signsExtraFilesAsDataObjects)
+    }
+
+    func testCombinedASiCBatchSignsEveryPDFAsItsOwnDataObject() async throws {
+        let provider = RecordingSigningProvider()
+        let store = makeStore(provider: provider)
+        await store.addDocuments(at: [makePDF(named: "a.pdf"), makePDF(named: "b.pdf")], selectLast: false)
+        store.identities = await provider.availableIdentities()
+        store.selectedIdentityID = "identity"
+        store.includeQualifiedTimestamp = false
+        store.outputFormat = .attachedASIC
+
+        await store.prepareBatch(ids: store.queue.map(\.id))
+        await store.startBatch()
+
+        let requests = await provider.recordedRequests()
+        XCTAssertEqual(requests.count, 1)
+        let request = try XCTUnwrap(requests.first)
+        XCTAssertTrue(request.signsExtraFilesAsDataObjects)
+        XCTAssertEqual(request.filename, "a.pdf")
+        XCTAssertEqual(request.extraFiles.map(\.path), ["a.pdf", "b.pdf"])
+    }
+
+    /// Opening a signed PDF offers PAdES, so a further signature sits next to the first.
+    func testSignedPDFPreselectsPAdESAndBlocksRewrites() async {
+        let provider = RecordingSigningProvider()
+        let store = makeStore(provider: provider)
+        store.outputFormat = .attachedASIC
+        await store.addDocuments(at: [makeSignedPDF(named: "podpisane.pdf")], selectLast: true)
+
+        XCTAssertEqual(store.sourceSignatureKind, .signedPDF)
+        XCTAssertEqual(store.outputFormat, .embeddedPAdES)
+        XCTAssertTrue(store.preservesSourceBytes)
+        store.outputFormat = .attachedASIC
+        XCTAssertTrue(store.bakedVisualStampIsBlocked)
+        // The phone cannot draw a stamp without rewriting the signed PDF.
+        store.outputFormat = .embeddedPAdES
+        store.includeVisibleSignature = true
+        XCTAssertFalse(store.canSignViaMobile)
+    }
+
+    /// The reported bug: a signed PDF signed as ASiC-E with a visual stamp and PDF/A was
+    /// rewritten through PDFKit, which dropped its existing signature.
+    func testSignedPDFReachesTheProviderWithItsOriginalBytes() async throws {
+        let provider = RecordingSigningProvider()
+        let store = makeStore(provider: provider)
+        let source = makeSignedPDF(named: "podpisane.pdf")
+        let original = try Data(contentsOf: source)
+        await store.addDocuments(at: [source], selectLast: true)
+        store.identities = await provider.availableIdentities()
+        store.selectedIdentityID = "identity"
+        store.includeQualifiedTimestamp = false
+        store.outputFormat = .attachedASIC
+        store.includeVisibleSignature = true
+        store.convertToPDFA = true
+
+        await store.sign()
+
+        let recorded = await provider.recordedRequests()
+        let request = try XCTUnwrap(recorded.first, store.lastError ?? "")
+        XCTAssertNil(store.lastError)
+        XCTAssertEqual(request.pdfData, original)
+        XCTAssertNil(request.visualStamp)
+    }
+
+    /// A card PAdES signature on a signed PDF keeps the engine-drawn stamp: DSS adds it
+    /// as an incremental update, so the bytes the app hands over stay the original ones.
+    func testSignedPDFWithPAdESKeepsTheEngineStampAndOriginalBytes() async throws {
+        let provider = RecordingSigningProvider()
+        let store = makeStore(provider: provider)
+        let source = makeSignedPDF(named: "podpisane.pdf")
+        let original = try Data(contentsOf: source)
+        await store.addDocuments(at: [source], selectLast: true)
+        // A visual stamp needs the card's certificate already read.
+        let certificate = SigningIdentityInfo(
+            id: EngineBridgeSigningProvider.certificateIdentityPrefix + "1",
+            label: "Test identity", issuerSummary: "Test issuer", requiresPIN: false)
+        store.identities = [certificate]
+        store.selectedIdentityID = certificate.id
+        store.includeQualifiedTimestamp = false
+        store.includeVisibleSignature = true
+
+        await store.sign()
+
+        let recorded = await provider.recordedRequests()
+        let request = try XCTUnwrap(recorded.first, store.lastError ?? "")
+        XCTAssertEqual(request.outputFormat, .embeddedPAdES)
+        XCTAssertEqual(request.pdfData, original)
+        XCTAssertNotNil(request.visualStamp)
+    }
+
+    func testContainerIsHandedOverUnderItsOwnNameAsASiCE() async throws {
+        let provider = RecordingSigningProvider(addsSignatureToExistingContainer: true)
+        let store = makeStore(provider: provider)
+        let source = try makeContainer(named: "zmluva.asice")
+        let original = try Data(contentsOf: source)
+        await store.addDocuments(at: [source], selectLast: true)
+        store.identities = await provider.availableIdentities()
+        store.selectedIdentityID = "identity"
+        store.includeQualifiedTimestamp = false
+        XCTAssertEqual(store.sourceSignatureKind, .asicContainer)
+        XCTAssertFalse(store.canSignViaMobile)
+        store.outputFormat = .embeddedPAdES
+
+        await store.sign()
+
+        let recorded = await provider.recordedRequests()
+        let request = try XCTUnwrap(recorded.first)
+        XCTAssertNil(store.lastError)
+        XCTAssertEqual(request.outputFormat, .attachedASIC)
+        XCTAssertEqual(request.filename, "zmluva.asice")
+        XCTAssertEqual(request.pdfData, original)
+    }
+
+    /// Without the engine a container would be wrapped in a new one, losing its signatures.
+    func testContainerIsRefusedByAProviderThatCannotExtendIt() async throws {
+        let provider = RecordingSigningProvider()
+        let store = makeStore(provider: provider)
+        await store.addDocuments(at: [try makeContainer(named: "zmluva.asice")], selectLast: true)
+        store.identities = await provider.availableIdentities()
+        store.selectedIdentityID = "identity"
+        store.includeQualifiedTimestamp = false
+
+        await store.sign()
+
+        let signCount = await provider.signCount()
+        XCTAssertEqual(signCount, 0)
+        XCTAssertTrue(store.lastError?.contains(SigningSessionStore.containerNeedsEngineMessage) == true)
+    }
+
+    func testFurtherSignatureOpensTheSignedOutputAsItsOwnDocument() async throws {
+        let provider = RecordingSigningProvider()
+        let store = makeStore(provider: provider)
+        await store.addDocuments(at: [makePDF(named: "zmluva.pdf")], selectLast: true)
+        store.identities = await provider.availableIdentities()
+        store.selectedIdentityID = "identity"
+        store.includeQualifiedTimestamp = false
+        store.outputFormat = .embeddedPAdES
+        await store.sign()
+        let output = try XCTUnwrap(store.signedOutputURL)
+        XCTAssertTrue(store.canAddFurtherSignature)
+
+        await store.addFurtherSignature(to: output)
+
+        XCTAssertEqual(store.queue.count, 2)
+        XCTAssertEqual(store.sourceURL?.standardizedFileURL, output.standardizedFileURL)
+        XCTAssertEqual(store.step, .prepare)
+    }
+
+    func testBatchRefusesAContainerAndSignsThePDF() async throws {
+        let provider = RecordingSigningProvider(addsSignatureToExistingContainer: true)
+        let store = makeStore(provider: provider)
+        await store.addDocuments(at: [try makeContainer(named: "zmluva.asice"), makePDF(named: "clean.pdf")],
+                                 selectLast: false)
+        store.identities = await provider.availableIdentities()
+        store.selectedIdentityID = "identity"
+        store.includeQualifiedTimestamp = false
+        store.outputFormat = .embeddedPAdES
+
+        await store.prepareBatch(ids: store.queue.map(\.id))
+
+        XCTAssertEqual(store.batchItems.map(\.state), [.failed, .pending])
+        XCTAssertEqual(store.batchItems.first?.errorMessage, SigningSessionStore.containerInBatchMessage)
+        await store.startBatch()
+        let names = await provider.requestNames()
+        XCTAssertEqual(names, ["clean.pdf"])
+    }
+
+    func testBatchKeepsASignedPDFsBytesDespitePDFAAndStamp() async throws {
+        let provider = RecordingSigningProvider()
+        let store = makeStore(provider: provider)
+        let signed = makeSignedPDF(named: "podpisane.pdf")
+        let original = try Data(contentsOf: signed)
+        await store.addDocuments(at: [signed, makePDF(named: "clean.pdf")], selectLast: false)
+        store.identities = await provider.availableIdentities()
+        store.selectedIdentityID = "identity"
+        store.includeQualifiedTimestamp = false
+        store.outputFormat = .attachedASIC
+        store.convertToPDFA = true
+        store.includeVisibleSignature = true
+        store.visualPlacement = VisibleSignaturePlacement(
+            pageIndex: 0,
+            pageRect: CGRect(x: 350, y: 100, width: 180, height: 70),
+            rotationDegrees: 0)
+
+        await store.prepareBatch(ids: store.queue.map(\.id))
+        await store.startBatch()
+
+        let recorded = await provider.recordedRequests()
+        let request = try XCTUnwrap(recorded.first)
+        let entries = Dictionary(uniqueKeysWithValues: request.extraFiles.map { ($0.path, $0.data) })
+        XCTAssertEqual(entries["podpisane.pdf"], original)
+        XCTAssertNotEqual(entries["clean.pdf"], nil)
+    }
+
     private func makeStore(provider: RecordingSigningProvider) -> SigningSessionStore {
         let settings = makeSettingsStore()
         let defaults = UserDefaults(suiteName: "SigningBatchTests.\(UUID().uuidString)")!
@@ -619,6 +834,30 @@ final class SigningBatchTests: XCTestCase {
             signingProvider: provider,
             settingsStore: settings,
             recentDocumentStore: recent)
+    }
+
+
+    /// A PDF with a signature dictionary marker, as `ExistingSignatureGuard` reads it.
+    private func makeSignedPDF(named name: String) -> URL {
+        let url = makePDF(named: name)
+        var data = try! Data(contentsOf: url)
+        data.append(Data("\n% /ByteRange [0 0 0 0]\n".utf8))
+        try! data.write(to: url)
+        return url
+    }
+
+    private func makeContainer(named name: String) throws -> URL {
+        let pdfURL = makePDF(named: "vnutri.pdf")
+        let entries = [
+            ASiCEPackager.Entry(path: "mimetype", data: Data(ASiCEPackager.asicMimeType.utf8),
+                                storeUncompressed: true),
+            ASiCEPackager.Entry(path: "vnutri.pdf", data: try Data(contentsOf: pdfURL)),
+            ASiCEPackager.Entry(path: "META-INF/manifest.xml", data: Data(ASiCEPackager.manifestXML(
+                entries: [(path: "vnutri.pdf", mediaType: "application/pdf")]).utf8)),
+        ]
+        let url = pdfURL.deletingLastPathComponent().appendingPathComponent(name)
+        try ASiCEPackager().package(files: entries).write(to: url)
+        return url
     }
 
     private func makePDF(named name: String, pageCount: Int = 1) -> URL {
@@ -652,6 +891,7 @@ private actor RecordingSigningProvider: QualifiedSigningProviding {
     private let delayedNames: Set<String>
     private let availableDelayNanoseconds: UInt64
     private let identityAvailable: Bool
+    nonisolated let addsSignatureToExistingContainer: Bool
     private var attempts: [String: Int] = [:]
     private var resolveCalls = 0
     private var bulkInspectionCalls = 0
@@ -666,8 +906,10 @@ private actor RecordingSigningProvider: QualifiedSigningProviding {
         availableDelayNanoseconds: UInt64 = 0,
         availableIdentity: SigningIdentityInfo? = nil,
         resolvedIdentities: [SigningIdentityInfo]? = nil,
-        inputInspectionByName: [String: InputSignatureInspectionResult] = [:]
+        inputInspectionByName: [String: InputSignatureInspectionResult] = [:],
+        addsSignatureToExistingContainer: Bool = false
     ) {
+        self.addsSignatureToExistingContainer = addsSignatureToExistingContainer
         let identity = availableIdentity ?? SigningIdentityInfo(
             id: "identity", label: "Test identity", issuerSummary: "Test issuer",
             requiresPIN: identityRequiresPIN)
@@ -732,6 +974,9 @@ private actor RecordingSigningProvider: QualifiedSigningProviding {
             signedAt: Date(),
             signatureLabel: "Test signature",
             isLegallyBinding: false)
+    }
+    func recordedRequests() -> [SigningRequest] {
+        requests
     }
     func requestOutputFormats() -> [SigningOutputFormat] {
         requests.map(\.outputFormat)

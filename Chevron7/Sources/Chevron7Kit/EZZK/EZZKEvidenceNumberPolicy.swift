@@ -50,8 +50,13 @@ public enum EZZKEvidenceNumberPolicy {
             issues.append("IČO v doložke „\(clausePerson.ico)“ sa líši od IČO EZZK účtu „\(accountICO)“")
         }
         guard !issues.isEmpty else { return nil }
-        return "Doložka nezodpovedá EZZK účtu: " + issues.joined(separator: "; ") + "."
+        return "Doložka nezodpovedá EZZK účtu: " + issues.joined(separator: "; ") + ". " + mismatchHint
     }
+
+    /// Where the clause's person comes from: the office name is not on the ZaKo form.
+    public static let mismatchHint =
+        "Doložka berie údaje z Nastavení, karta Profily advokáta (ak je vyplnený Názov kancelárie, doložka uvádza ten)."
+
 
     private static func normalized(_ value: String) -> String {
         value.split(whereSeparator: \.isWhitespace).joined(separator: " ").lowercased()

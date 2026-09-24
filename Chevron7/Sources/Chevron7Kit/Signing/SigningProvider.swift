@@ -331,10 +331,15 @@ public protocol QualifiedSigningProviding: Sendable {
     func inspectSignatures(in fileURL: URL) async -> [DocumentSignatureInfo]
     func inspectInputSignatures(in fileURL: URL) async -> InputSignatureInspectionResult
     func inspectInputSignatures(in fileURLs: [URL]) async -> [URL: InputSignatureInspectionResult]
+    /// Whether `sign` adds a signature to an ASiC-E handed over as the source (named by
+    /// `SigningRequest.filename`) instead of wrapping that container in a new one.
+    var addsSignatureToExistingContainer: Bool { get }
 }
 
 extension QualifiedSigningProviding {
     public func inspectSignatures(in fileURL: URL) async -> [DocumentSignatureInfo] { [] }
+
+    public var addsSignatureToExistingContainer: Bool { false }
 
     public func inspectInputSignatures(in fileURL: URL) async -> InputSignatureInspectionResult {
         InputSignatureVerificationService.structuralInspection(at: fileURL)
@@ -898,8 +903,7 @@ public enum KeychainIdentityScanner {
     }
 
     static func looksMandate(_ text: String) -> Bool {
-        let lowered = text.lowercased()
-        return lowered.contains("mandat") || lowered.contains("mandát")
+        MandateCertificate.matches(subject: text)
     }
 
     static func looksQualified(_ text: String) -> Bool {

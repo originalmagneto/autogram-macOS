@@ -99,6 +99,13 @@ struct RootView: View {
         .contextMenu {
             if isAvailable, let url = entry.url {
                 Button {
+                    selection = .signing
+                    Task { await signingStore.addFurtherSignature(to: url) }
+                } label: {
+                    Label("Pridať ďalší podpis", systemImage: "signature")
+                }
+                .disabled(!signingStore.canAddFurtherSignature)
+                Button {
                     NSWorkspace.shared.activateFileViewerSelecting([url])
                 } label: {
                     Label("Zobraziť vo Finderi", systemImage: "folder")

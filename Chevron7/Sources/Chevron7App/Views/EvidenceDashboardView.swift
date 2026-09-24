@@ -47,9 +47,10 @@ struct EvidenceDashboardView: View {
                 Table(filteredRecords, selection: $selectedRecordID) {
                     TableColumn("Evidenčné číslo") { record in
                         HStack(spacing: 6) {
-                            if record.isOverdue { OverdueDot() }
+                            if record.isOverdue, record.ezzkMode != .demo { OverdueDot() }
                             Text(record.evidenceNumber ?? "nezískané")
                                 .font(.callout.monospacedDigit().weight(.semibold))
+                            if record.ezzkMode == .demo { DemoBadge() }
                         }
                         .contextMenu { recordContextMenu(for: record) }
                     }
@@ -250,13 +251,17 @@ struct EvidenceDashboardView: View {
 
     private var summaryHeader: some View {
         let summary = EvidenceRegisterSummary(records: records)
-        let overdue = records.filter(\.isOverdue).count
+        let overdue = records.filter { $0.isOverdue && $0.ezzkMode != .demo }.count
         return HStack(spacing: 12) {
             SummaryCard(title: "Konverzií celkovo", value: "\(summary.total)", symbol: "archivebox", tint: .accentColor)
             SummaryCard(title: "Zapísaných v EZZK", value: "\(summary.sent)", symbol: "checkmark.seal.fill", tint: .green)
             SummaryCard(title: "Čaká na odoslanie", value: "\(summary.pending)", symbol: "tray.and.arrow.up", tint: summary.pending > 0 ? .orange : .secondary)
             SummaryCard(title: "Odmietnuté alebo nepodpísané", value: "\(summary.failed)", symbol: "xmark.seal.fill", tint: summary.failed > 0 ? .red : .secondary)
             SummaryCard(title: "Po lehote 24 h", value: "\(overdue)", symbol: "clock.badge.exclamationmark", tint: overdue > 0 ? .red : .secondary)
+            if summary.demo > 0 {
+                SummaryCard(title: "Demo (mimo EZZK)", value: "\(summary.demo)", symbol: "theatermasks", tint: .secondary)
+                    .help("Demo konverzie sú lokálna simulácia. Do EZZK sa nikdy neodoslali.")
+            }
             Spacer()
             if let feedback = submitFeedback {
                 Text(feedback)
@@ -416,6 +421,20 @@ struct OverdueDot: View {
             .fill(Color.red)
             .frame(width: 8, height: 8)
             .help("Záznam prekročil zákonnú lehotu 24 h na zápis do CEZZK")
+    }
+}
+
+/// Marks a row made in EZZK Demo mode: its state is a local simulation.
+struct DemoBadge: View {
+    var body: some View {
+        Text("DEMO")
+            .font(.caption2.weight(.bold))
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(Color.secondary.opacity(0.16), in: Capsule())
+            .foregroundStyle(.secondary)
+            .help("Demo konverzia: lokálna simulácia, do EZZK sa neodoslala.")
+            .accessibilityLabel("Demo, mimo EZZK")
     }
 }
 
