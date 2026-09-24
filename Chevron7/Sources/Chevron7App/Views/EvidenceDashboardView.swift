@@ -176,8 +176,12 @@ struct EvidenceDashboardView: View {
         ) {
             Button("Zmazať záznam", role: .destructive) {
                 if let record = recordToDelete {
-                    settingsStore.statusChecker.delete(id: record.id)
-                    reload()
+                    if settingsStore.statusChecker.delete(id: record.id) {
+                        recordSaveError = nil
+                        reload()
+                    } else {
+                        recordSaveError = EZZKStatusChecker.busyDeleteMessage
+                    }
                 }
                 recordToDelete = nil
             }
@@ -231,6 +235,7 @@ struct EvidenceDashboardView: View {
         } label: {
             Label("Vymazať z evidencie…", systemImage: "trash")
         }
+        .disabled(settingsStore.statusChecker.isBusy(record.id))
     }
 
     private var detailRecord: EvidenceRecord? {
@@ -515,6 +520,7 @@ struct RecordDetailView: View {
                 } label: {
                     Label("Zmazať", systemImage: "trash")
                 }
+                .disabled(settingsStore.statusChecker.isBusy(record.id))
 
                 Button("Zavrieť") { onClose() }
                     .keyboardShortcut(.defaultAction)
@@ -525,8 +531,11 @@ struct RecordDetailView: View {
                minHeight: 400, idealHeight: 600, maxHeight: .infinity)
         .confirmationDialog("Naozaj chcete vymazať tento záznam?", isPresented: $showDeleteConfirm) {
             Button("Zmazať záznam", role: .destructive) {
-                settingsStore.statusChecker.delete(id: record.id)
-                onClose()
+                if settingsStore.statusChecker.delete(id: record.id) {
+                    onClose()
+                } else {
+                    actionMessage = EZZKStatusChecker.busyDeleteMessage
+                }
             }
             Button("Zrušiť", role: .cancel) {}
         } message: {

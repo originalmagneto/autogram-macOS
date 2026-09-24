@@ -99,6 +99,10 @@ final class EZZKStatusChecker {
     /// calls (the adapter refuses them too).
     nonisolated static let productionRefusal = EZZKError.submissionUnavailable.errorDescription ?? ""
     nonisolated static let missingRowMessage = "Záznam sa v Registri konverzií nenašiel."
+    /// Shown when "Vymazať z evidencie" is refused because ZaKo still signs the row's record
+    /// or the checker still sends it.
+    nonisolated static let busyDeleteMessage =
+        "Riadok sa práve spracúva (podpis alebo odoslanie záznamu). Vymažte ho, keď sa spracovanie skončí."
 
     /// Increases whenever a row is stored, so views that read rows from the register
     /// (which is not observable itself) redraw.
@@ -339,13 +343,17 @@ final class EZZKStatusChecker {
     }
 
     /// Deletes a register row ("Vymazať z evidencie") and drops its number from the pool,
-    /// so a deleted row's number is never offered to a new conversion.
-    func delete(id: UUID) {
+    /// so a deleted row's number is never offered to a new conversion. A row ZaKo still
+    /// signs or the checker still sends is refused: its later write would bring it back.
+    @discardableResult
+    func delete(id: UUID) -> Bool {
+        guard !isBusy(id) else { return false }
         if let number = evidenceStore.record(id: id)?.evidenceNumber {
             numberPool.remove(number)
         }
         evidenceStore.delete(id: id)
         changeCount += 1
+        return true
     }
 
     // MARK: - Internals

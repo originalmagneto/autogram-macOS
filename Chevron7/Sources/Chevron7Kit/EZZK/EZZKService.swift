@@ -111,7 +111,7 @@ public enum EZZKError: LocalizedError, Equatable, Sendable {
         case .evidenceNumberFromOtherMode:
             return "Evidenčné číslo bolo získané v inom režime EZZK. Získajte nové číslo."
         case .outcomeUnknown:
-            return "Spojenie s EZZK sa prerušilo a nie je isté, či EZZK požiadavku spracovalo. Pred opakovaním overte stav v EZZK."
+            return "EZZK neodpovedalo zrozumiteľne (prerušené spojenie alebo chyba servera) a nie je isté, či požiadavku spracovalo. Pred opakovaním overte stav v EZZK."
         case .demoSignatureOutsideDemo:
             return "Bez podpisového enginu alebo karty aplikácia podpisuje iba ukážkovo (Demo). Mimo režimu Demo preto nepridelí evidenčné číslo ani neodošle záznam. Vložte kartu SAK a skontrolujte inštaláciu Chevron7."
         }

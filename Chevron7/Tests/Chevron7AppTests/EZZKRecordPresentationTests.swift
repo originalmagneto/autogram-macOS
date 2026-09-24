@@ -238,12 +238,9 @@ final class EZZKRecordPresentationTests: XCTestCase {
     /// Ruling R18: only a record EZZK refused at submission (nothing stored) with its signed
     /// container in the register can be sent again, behind a confirmation naming EZZK's code.
     func testRegisterOffersResendOnlyForARecordRefusedAtSubmission() {
-        var refused = row(.rejected)
-        refused.ezzkResultCode = 203
-        refused.ezzkResultDescription = "Neplatný podpis záznamu"
-        refused.recordContainerPath = "Evidence/Records/x.asice"
+        let refused = rejectedAtSubmissionRow()
 
-        let offered = EvidenceRegisterDetail.actions(for: refused, currentMode: .test)
+        let offered = EvidenceRegisterDetail.actions(for: refused, currentMode: .test, now: now)
         XCTAssertTrue(offered.canResend)
         XCTAssertFalse(offered.canSend)
         XCTAssertFalse(offered.canVerify)
@@ -273,6 +270,24 @@ final class EZZKRecordPresentationTests: XCTestCase {
         XCTAssertEqual(productionActions.note, EZZKError.submissionUnavailable.errorDescription)
     }
 
+    /// A manual "Odoslať znova" on a record whose number is past its Bratislava day gets the
+    /// same lateness warning the Register shows a pending row, so the advocate is not
+    /// surprised when EZZK rejects or flags the resend as late.
+    func testResendConfirmationMentionsALateRecord() {
+        var row = rejectedAtSubmissionRow()
+        row.evidenceNumberAllocatedAt = now.addingTimeInterval(-3 * 24 * 3600)
+        let text = EvidenceRegisterDetail.resendConfirmation(for: row, now: now)
+        XCTAssertTrue(text.contains(EZZKRecordPresentation.lateWarning), text)
+    }
+
+    /// The outcome-unknown message used to name only a lost connection; a server fault
+    /// leaves the same doubt and must be named too, so the advocate does not read a
+    /// disconnect that never happened.
+    func testOutcomeUnknownNamesAServerFaultToo() {
+        let text = EZZKError.outcomeUnknown.errorDescription ?? ""
+        XCTAssertTrue(text.contains("chyba servera"), text)
+    }
+
     func testDeadlineColumn() {
         XCTAssertEqual(EvidenceRegisterDetail.deadline(for: row(.late), now: now).text, EZZKRecordPresentation.lateWarning)
         XCTAssertEqual(EvidenceRegisterDetail.deadline(for: row(.processed), now: now).text, "Spracovaný v EZZK")
@@ -300,5 +315,15 @@ final class EZZKRecordPresentationTests: XCTestCase {
                        attestationXML: "<x/>", conversionTime: now, performingPersonName: "JUDr. Test Testovací",
                        securityElementCount: 0, totalPages: 1, totalSheets: 1, ezzkMode: mode,
                        evidenceNumberAllocatedAt: now)
+    }
+
+    /// A row EZZK refused at submission (nothing stored), with its signed container still in
+    /// the register: the only state "Odoslať znova" offers (ruling R18).
+    private func rejectedAtSubmissionRow() -> EvidenceRecord {
+        var refused = row(.rejected)
+        refused.ezzkResultCode = 203
+        refused.ezzkResultDescription = "Neplatný podpis záznamu"
+        refused.recordContainerPath = "Evidence/Records/x.asice"
+        return refused
     }
 }

@@ -326,7 +326,7 @@ enum EvidenceRegisterDetail {
     /// when it has no mode (written before part B2, ruling R15), and in Production only when
     /// the production policy allows it (`productionAllowed`).
     static func actions(for record: EvidenceRecord, currentMode: AppSettings.EZZKMode,
-                        productionAllowed: Bool = false) -> Actions {
+                        productionAllowed: Bool = false, now: Date = Date()) -> Actions {
         let status = record.status
         let sendable = EZZKRecordPresentation.isSendable(status)
         let verifiable = EZZKRecordPresentation.isVerifiable(status)
@@ -349,14 +349,16 @@ enum EvidenceRegisterDetail {
         }
         if resendable {
             return Actions(canSend: false, canVerify: false, note: nil,
-                           canResend: true, resendConfirmation: resendConfirmation(for: record))
+                           canResend: true, resendConfirmation: resendConfirmation(for: record, now: now))
         }
         return Actions(canSend: sendable, canVerify: verifiable,
                        note: status == .late ? EZZKRecordPresentation.lateWarning : nil)
     }
 
-    /// "EZZK záznam odmietlo (kód N: popis). Odoslať ho znova?"
-    static func resendConfirmation(for record: EvidenceRecord) -> String {
+    /// "EZZK záznam odmietlo (kód N: popis). Odoslať ho znova?", plus `lateWarning` when the
+    /// row's number was allocated on an earlier Bratislava day: a manual resend of a record
+    /// that old is exactly the case the warning is for.
+    static func resendConfirmation(for record: EvidenceRecord, now: Date = Date()) -> String {
         let description = record.ezzkResultDescription.flatMap { $0.isEmpty ? nil : $0 }
         let reason: String
         switch (record.ezzkResultCode, description) {
@@ -365,7 +367,12 @@ enum EvidenceRegisterDetail {
         case let (nil, description?): reason = " (\(description))"
         case (nil, nil): reason = ""
         }
-        return "EZZK záznam odmietlo\(reason). Odoslať ho znova?"
+        var question = "EZZK záznam odmietlo\(reason). Odoslať ho znova?"
+        if let allocatedAt = record.evidenceNumberAllocatedAt,
+           !EZZKEvidenceNumberPolicy.isUsable(allocatedAt: allocatedAt, at: now) {
+            question += " " + EZZKRecordPresentation.lateWarning
+        }
+        return question
     }
 
     /// The Register's deadline column. EZZK expects the record on the Bratislava day the

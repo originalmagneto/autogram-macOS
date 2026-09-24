@@ -462,6 +462,27 @@ final class EvidenceSubmissionFlowTests: XCTestCase {
         XCTAssertGreaterThan(checker.changeCount, changes)
     }
 
+    /// Review focus 4: a row ZaKo still signs cannot be deleted, so the later write cannot
+    /// bring it back.
+    func testDeletingAHeldRowIsRefused() {
+        let settingsStore = makeSettingsStore()
+        let row = EvidenceRecord(status: .signed, direction: .paperToElectronic,
+                                 originalName: "Zmluva", newDocumentName: "Zmluva.pdf",
+                                 evidenceNumber: "260924-H", fingerprintSHA256Hex: "ab", attestationXML: "<x/>",
+                                 conversionTime: Date(), performingPersonName: "JUDr. Test Testovací",
+                                 securityElementCount: 0, totalPages: 1, totalSheets: 1, ezzkMode: .test,
+                                 evidenceNumberAllocatedAt: Date())
+        settingsStore.evidenceStore.upsert(row)
+        XCTAssertTrue(settingsStore.statusChecker.hold(row.id))
+
+        XCTAssertFalse(settingsStore.statusChecker.delete(id: row.id))
+        XCTAssertNotNil(settingsStore.evidenceStore.record(id: row.id))
+
+        settingsStore.statusChecker.release(row.id)
+        XCTAssertTrue(settingsStore.statusChecker.delete(id: row.id))
+        XCTAssertNil(settingsStore.evidenceStore.record(id: row.id))
+    }
+
     /// "Odoslať znova" sends a record EZZK refused at submission through the coordinator;
     /// the periodic check and "Odoslať" never resend a rejected row.
     func testRejectedRowIsResentOnlyByHand() async throws {
