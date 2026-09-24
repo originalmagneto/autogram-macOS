@@ -8,6 +8,9 @@ import UniformTypeIdentifiers
 
 struct EvidenceDashboardView: View {
     @Bindable var settingsStore: AppSettingsStore
+    /// A row another view (the sidebar's "Zaručené konverzie") asks to open; the Register
+    /// selects it, opens its detail and clears the request.
+    @Binding var requestedRecordID: UUID?
     @State private var records: [EvidenceRecord] = []
     @State private var filterText = ""
     @State private var statusFilter: EvidenceRecord.Status?
@@ -154,7 +157,9 @@ struct EvidenceDashboardView: View {
         .onAppear {
             reload()
             startClock()
+            openRequestedRecord()
         }
+        .onChange(of: requestedRecordID) { openRequestedRecord() }
         .onDisappear { refreshTimer?.invalidate() }
         // The periodic check, ZaKo and the detail sheet change rows through the checker.
         .onChange(of: settingsStore.statusChecker.changeCount) { reload() }
@@ -323,6 +328,20 @@ struct EvidenceDashboardView: View {
 
     private func reload() {
         records = settingsStore.evidenceStore.records
+    }
+
+    /// Opens the detail of the row the sidebar asked for. The rows are reloaded first,
+    /// since the sheet shows only a row in `records`; presenting waits one turn of the
+    /// main actor, so a sheet asked for while the Register first appears is not lost.
+    private func openRequestedRecord() {
+        guard let id = requestedRecordID else { return }
+        requestedRecordID = nil
+        Task { @MainActor in
+            reload()
+            guard records.contains(where: { $0.id == id }) else { return }
+            selectedRecordID = id
+            showDetail = true
+        }
     }
 
     private func startClock() {

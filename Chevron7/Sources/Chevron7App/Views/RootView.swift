@@ -29,6 +29,9 @@ struct RootView: View {
     @State private var showQueueDeleteConfirmation = false
     @AppStorage("sidebar.signedDocumentsExpanded") private var signedDocumentsExpanded = true
     @AppStorage("sidebar.recentDocumentsExpanded") private var recentDocumentsExpanded = true
+    @AppStorage("sidebar.conversionsExpanded") private var conversionsExpanded = true
+    /// A register row the sidebar asked the Register to open; the Register clears it.
+    @State private var requestedEvidenceRecordID: UUID?
     @State private var showAllSignedDocuments = false
     @State private var showAllRecentDocuments = false
     @State private var showRegisterLoadError = false
@@ -134,6 +137,63 @@ struct RootView: View {
         }
     }
 
+    /// The newest register rows. `LocalEvidenceStore` is not observable, so the body reads
+    /// the two signals that follow a register write: the status checker's change count
+    /// (sends, lookups, the periodic check, deletions) and ZaKo's step (a new row is
+    /// written straight to the register and the flow then reaches its last step).
+    private var conversionSection: SidebarConversionRows.Section {
+        _ = settingsStore.statusChecker.changeCount
+        _ = zakoStore.step
+        return SidebarConversionRows.section(from: settingsStore.evidenceStore.records, now: Date())
+    }
+
+    /// One conversion: its name, then its evidence number and EZZK state. Opens the row's
+    /// detail in the Register.
+    private func conversionRow(_ row: SidebarConversionRows.Row) -> some View {
+        Button {
+            openInRegister(row.id)
+        } label: {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 8) {
+                    Image(systemName: "building.columns")
+                        .foregroundStyle(.secondary)
+                        .frame(width: 16)
+                    Text(row.name)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .font(.callout)
+                }
+                HStack(spacing: 6) {
+                    Text(row.evidenceNumber)
+                        .monospacedDigit()
+                        .lineLimit(1)
+                    Image(systemName: row.symbol)
+                        .foregroundStyle(EvidenceDashboardView.tint(for: row.tone))
+                }
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .padding(.leading, 24)
+            }
+        }
+        .buttonStyle(.plain)
+        .help("\(row.name): \(row.stateLabel)")
+        .accessibilityLabel(row.accessibilityLabel)
+        .accessibilityHint("Otvorí detail v Registri konverzií")
+        .contextMenu {
+            Button {
+                openInRegister(row.id)
+            } label: {
+                Label("Zobraziť detail a doložku", systemImage: "doc.text")
+            }
+        }
+    }
+
+    /// Switches to the Register and, for a row, asks it to open that row's detail.
+    private func openInRegister(_ id: UUID?) {
+        selection = .evidence
+        requestedEvidenceRecordID = id
+    }
+
     private func showMoreButton(total: Int, isShowingAll: Binding<Bool>) -> some View {
         Button {
             isShowingAll.wrappedValue.toggle()
@@ -182,6 +242,33 @@ struct RootView: View {
                         historyHeader("Podpísané dokumenty") {
                             Button("Vyčistiť…", systemImage: "trash") {
                                 showSignedClearDialog = true
+                            }
+                        }
+                    }
+                }
+
+                let conversions = conversionSection
+                if !conversions.isEmpty {
+                    Section(isExpanded: $conversionsExpanded) {
+                        ForEach(conversions.rows) { row in
+                            conversionRow(row)
+                        }
+                        if conversions.hasMore {
+                            Button {
+                                openInRegister(nil)
+                            } label: {
+                                Text("Zobraziť všetky (\(conversions.total))")
+                                    .font(.caption.weight(.medium))
+                                    .foregroundStyle(Color.accentColor)
+                            }
+                            .buttonStyle(.plain)
+                            .padding(.leading, 24)
+                            .accessibilityHint("Otvorí Register konverzií")
+                        }
+                    } header: {
+                        historyHeader("Zaručené konverzie") {
+                            Button("Otvoriť Register konverzií", systemImage: SidebarSection.evidence.symbol) {
+                                openInRegister(nil)
                             }
                         }
                     }
@@ -469,7 +556,8 @@ struct RootView: View {
         case .zako:
             ZakoFlowView(store: zakoStore)
         case .evidence:
-            EvidenceDashboardView(settingsStore: settingsStore)
+            EvidenceDashboardView(settingsStore: settingsStore,
+                                  requestedRecordID: $requestedEvidenceRecordID)
         }
     }
 
