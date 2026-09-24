@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Marián Čuprík
 // SPDX-License-Identifier: EUPL-1.2
 
+import AppKit
 import Foundation
 
 enum FinderQuickActionService {
@@ -8,8 +9,56 @@ enum FinderQuickActionService {
     static let workflowResourceName = "Chevron7 Finder Quick Action"
     static let workflowInstallName = "Chevron7 Finder Quick Action.workflow"
 
+    /// Autogram macOS, this app's name before Chevron7, installed its own Quick Action
+    /// ("Podpísať s QES + QTS (Autogram)"). Once that app is gone the workflow stays in
+    /// Finder's menu and fails with "Autogram macOS ARM64 helper was not found".
+    static let legacyWorkflowNames = ["Autogram Finder Quick Action.workflow"]
+    /// Only a workflow carrying Autogram's own script is the one Autogram macOS installed.
+    static let legacyWorkflowMarker = "Contents/Resources/autogram-cli-sign.sh"
+    static let legacyBundleIdentifier = "sk.autogram.Autogram"
+
     @discardableResult
     static func installQuickAction() -> Bool {
+        retireLegacyQuickActions(in: servicesDirectory)
+        return installChevron7QuickAction()
+    }
+
+    private static var servicesDirectory: URL {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Services", isDirectory: true)
+    }
+
+    /// Moves Autogram macOS's Quick Action to the Trash when no Autogram macOS is left
+    /// to run it. The Trash keeps it restorable; a workflow without Autogram's script,
+    /// or one Autogram macOS can still run, is never touched.
+    @discardableResult
+    static func retireLegacyQuickActions(
+        in servicesDirectory: URL,
+        legacyAppInstalled: Bool = legacyAppIsInstalled(),
+        moveToTrash: (URL) throws -> Void = { try FileManager.default.trashItem(at: $0, resultingItemURL: nil) }
+    ) -> [URL] {
+        guard !legacyAppInstalled else { return [] }
+        var retired: [URL] = []
+        for name in legacyWorkflowNames {
+            let workflow = servicesDirectory.appendingPathComponent(name, isDirectory: true)
+            let marker = workflow.appendingPathComponent(legacyWorkflowMarker)
+            guard FileManager.default.fileExists(atPath: marker.path) else { continue }
+            do {
+                try moveToTrash(workflow)
+                retired.append(workflow)
+            } catch {
+                continue
+            }
+        }
+        return retired
+    }
+
+    static func legacyAppIsInstalled() -> Bool {
+        NSWorkspace.shared.urlsForApplications(withBundleIdentifier: legacyBundleIdentifier)
+            .contains { !$0.path.contains("/.Trash/") && FileManager.default.fileExists(atPath: $0.path) }
+    }
+
+    private static func installChevron7QuickAction() -> Bool {
         guard let source = Bundle.main.url(
             forResource: workflowResourceName,
             withExtension: "workflow"
@@ -17,8 +66,6 @@ enum FinderQuickActionService {
             return false
         }
 
-        let servicesDirectory = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Services", isDirectory: true)
         let destination = servicesDirectory.appendingPathComponent(workflowInstallName)
         do {
             try FileManager.default.createDirectory(

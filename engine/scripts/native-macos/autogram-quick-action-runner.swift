@@ -11,11 +11,11 @@ enum QuickActionRunnerError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidArguments(let message): message
-        case .missingHelper: "Pomocný program Autogram macOS (AutogramCLI-arm64) sa nenašiel."
+        case .missingHelper: "Pomocný program AutogramCLI-arm64 sa nenašiel."
         case .invalidPIN: "Podpisový PIN sa nepodarilo načítať."
         case .machineRequestFailed(let failure): failure.userMessage
         case .helperExitedWithoutResult(let status):
-            "Podpisový engine Autogramu skončil (stav \(status)) bez toho, aby oznámil výsledok."
+            "Podpisový engine skončil (stav \(status)) bez toho, aby oznámil výsledok."
         }
     }
 }
@@ -38,9 +38,9 @@ struct HelperFailure {
 
     var userMessage: String {
         if let slovak = Self.slovakMessages[code] {
-            return "Autogram: \(slovak) [\(code)]"
+            return "\(slovak) [\(code)]"
         }
-        var text = "Autogram: podpisový engine požiadavku nedokončil [\(code)]: \(message)"
+        var text = "Podpisový engine požiadavku nedokončil [\(code)]: \(message)"
         if let recovery, !recovery.isEmpty {
             text += " \(recovery)"
         }
