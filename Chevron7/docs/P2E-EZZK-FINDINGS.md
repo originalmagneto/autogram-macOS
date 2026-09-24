@@ -355,7 +355,12 @@ Live check with a SAK card: done 2026-09-24 (result below). This session could n
 cd <output folder>
 unzip -l *.asice
 ```
-Expected: `mimetype`, `<name>.pdf`, `<number>.xml.xdcf`, `META-INF/manifest.xml`, `META-INF/signatures001.xml`, and no `.asice` inside.
+Expected: `mimetype`, `<new document name>.pdf`, `<number>.xml.xdcf`, `META-INF/manifest.xml`, `META-INF/signatures001.xml`, and no `.asice` inside, as in the podpisuj.sk reference.
+
+```bash
+unzip -p *.asice '*.xdcf' | grep -o '<NewDocumentName>[^<]*'
+```
+Expected: exactly the name of the `.pdf` entry listed above.
 
 ```bash
 unzip -p *.asice '*.pdf' | openssl dgst -sha256 -binary | base64
@@ -373,7 +378,7 @@ unzip -p *.asice META-INF/signatures001.xml | grep -o '<xades:SignatureTimeStamp
 ```
 Expected: at least one match, confirming the signature carries a qualified timestamp (Baseline T).
 
-Result (2026-09-24, owner, I.CA SAK card): passed with source "Ukazkova_listina". The client ASiC-E held `mimetype`, the PDF, `<name>-<number>.xml.xdcf` and `META-INF`, with no nested `.asice`; the clause fingerprint equalled the PDF's SHA-256; both MIME types were present and the signature carried a `SignatureTimeStamp`. The record `1563-260924-1.record.asice` held only the record 1.0 XDC with a timestamp.
+Result (2026-09-24, owner, I.CA SAK card): passed with source "Ukazkova_listina". The client ASiC-E held `mimetype`, the PDF, `<name>-<number>.xml.xdcf` and `META-INF`, with no nested `.asice`; the clause fingerprint equalled the PDF's SHA-256; both MIME types were present and the signature carried a `SignatureTimeStamp`. The record `1563-260924-1.record.asice` held only the record 1.0 XDC with a timestamp. That run also showed a naming gap against the podpisuj.sk reference: the clause said `<NewDocumentName>Ukazkova_listina copy.pdf</NewDocumentName>` while the PDF entry was `Ukazkova_listina copy-konvertovane.pdf` and the clause entry `Ukazkova_listina copy-konvertovane-260924-BcE299bb83.xml.xdcf`. Fixed the same day: both the PDF entry and NewDocumentName (clause and record) come from one sanitized value (`ConversionOutputNaming.containerDocumentName`), and the clause entry is `<number>.xml.xdcf` (`containerClauseName`).
 
 ## Part B2 (2026-09-23)
 
