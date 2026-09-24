@@ -15,6 +15,9 @@ struct AnalysisCanvasView: View {
     @State private var pageImage: NSImage?
     @State private var pageAspect: CGFloat = 1.414
     @State private var zoomScale: CGFloat = 1.0
+    @State private var showRejectedList = false
+    /// Viewer preference: rejected findings stay on the canvas as faint dashed outlines.
+    @AppStorage(ElementOverlay.showRejectedKey) private var showRejectedOnCanvas = true
 
     struct Interaction {
         enum Kind {
@@ -119,12 +122,15 @@ struct AnalysisCanvasView: View {
         }
         .sheet(isPresented: $showPhysicalElementSheet) { PhysicalSecurityElementSheet(store: store) }
         .onKeyPress(.delete) {
-            if let id = store.selectedElementID {
+            // A pending AI suggestion is rejected, a rejected finding is left alone.
+            guard let id = store.selectedElementID else { return .ignored }
+            switch store.deleteOrRejectSecurityElement(id: id) {
+            case .ignored:
+                return .ignored
+            case .removed, .rejected:
                 store.selectedElementID = nil
-                store.removeSecurityElement(id: id)
                 return .handled
             }
-            return .ignored
         }
         .onKeyPress(.escape) {
             if store.activeTool != nil {
@@ -163,7 +169,9 @@ struct AnalysisCanvasView: View {
             VStack(spacing: 8) {
                 ForEach(0..<store.analysis.totalPages, id: \.self) { pageIndex in
                     let isSelected = store.previewPageIndex == pageIndex
-                    let countOnPage = store.securityElements.filter { $0.pageIndex == pageIndex }.count
+                    let countOnPage = store.securityElements.filter {
+                        $0.pageIndex == pageIndex && $0.reviewState != .rejected
+                    }.count
                     let page = store.document?.page(at: pageIndex)
                     let bounds = page?.bounds(for: .mediaBox) ?? CGRect(x: 0, y: 0, width: 595, height: 842)
                     let aspect = bounds.width > 0 && bounds.height > 0 ? (bounds.width / bounds.height) : (54.0 / 72.0)
@@ -615,7 +623,9 @@ struct AnalysisCanvasView: View {
             HStack(spacing: 8) {
                 Label("Nálezy", systemImage: "checklist")
                     .font(.headline)
-                Text("\(store.securityElements.filter { $0.pageIndex == store.previewPageIndex }.count) z \(store.securityElements.count) celkom")
+                // Rejected findings are counted in their own group, like on the page thumbnails.
+                let liveInDocument = store.securityElements.filter { !$0.isLockedByRejection }
+                Text("\(liveInDocument.filter { $0.pageIndex == store.previewPageIndex }.count) z \(liveInDocument.count) celkom")
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
                 Spacer()
@@ -658,46 +668,54 @@ struct AnalysisCanvasView: View {
             let pageElements = store.securityElements
                 .filter { $0.pageIndex == store.previewPageIndex }
                 .sorted { $0.boundingBox.y < $1.boundingBox.y }
+            let liveElements = pageElements.filter { !$0.isLockedByRejection }
+            let rejectedElements = pageElements.filter(\.isLockedByRejection)
 
-            if pageElements.isEmpty && !store.isAnalyzing {
+            if liveElements.contains(where: { $0.detectedByAI && $0.reviewState == .pending }) {
+                Text("Nesprávne umiestnený návrh opravte posunutím a potvrďte; odmietnite len to, čo nie je bezpečnostný prvok.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if liveElements.isEmpty && !store.isAnalyzing {
                 emptyHint
             }
 
-                    ForEach(pageElements) { element in
-                        ElementRow(element: element,
-                                   isSelected: store.selectedElementID == element.id,
-                                   isExpanded: store.selectedElementID == element.id,
-                                   onSelect: { store.selectedElementID = element.id },
-                                   onDelete: {
-                                       if store.selectedElementID == element.id {
-                                           store.selectedElementID = nil
-                                       }
-                                       store.removeSecurityElement(id: element.id)
-                                   },
-                                   onDuplicate: { _ = store.duplicateElement(id: element.id) },
-                                   onRefine: { Task { await store.refineElement(id: element.id) } },
-                                   onReviewStateChange: { state in
-                                       switch state {
-                                       case .confirmed: store.confirmSecurityElement(id: element.id)
-                                       case .rejected: store.rejectSecurityElement(id: element.id)
-                                        case .pending: store.returnSecurityElementToReview(id: element.id)
-                                       }
-                                   },
-                                   onKindChange: { kind in store.updateElementKind(id: element.id, kind: kind) },
-                                   onDescriptionChange: { text in
-                                       store.updateElementDescription(id: element.id, text: text)
-                                   })
-                        .id(element.id)
-                    }
+            ForEach(liveElements) { element in
+                elementRow(element)
+            }
 
-            if let selected = store.securityElements.first(where: { $0.id == store.selectedElementID }), selected.observation == .physicalOriginal {
-                selectedElementInspector
-            } else if store.selectedElementID != nil {
-                DisclosureGroup("Presná poloha", isExpanded: $showPrecisePlacement) {
-                    selectedElementInspector
+            if !rejectedElements.isEmpty {
+                DisclosureGroup(isExpanded: $showRejectedList) {
+                    ForEach(rejectedElements) { element in
+                        elementRow(element)
+                            .opacity(store.selectedElementID == element.id ? 0.85 : 0.6)
+                    }
+                } label: {
+                    Text("Odmietnuté (\(rejectedElements.count))")
+                        .font(.callout.weight(.medium))
+                        .foregroundStyle(.secondary)
                 }
-                .font(.caption.weight(.semibold))
-                .help("Číselné umiestnenie a klávesové posuny. Ťahanie na plátne a klik na prvok sú rýchlejšie.")
+                .help("Odmietnuté nálezy sa nedostanú do doložky a učia detektor, čo nie je bezpečnostný prvok. Nedajú sa posunúť ani zmazať, len vrátiť na kontrolu.")
+                Toggle("Zobraziť odmietnuté", isOn: $showRejectedOnCanvas)
+                    .toggleStyle(.checkbox)
+                    .font(.caption)
+                    .help("Odmietnuté nálezy sa v dokumente kreslia slabým prerušovaným obrysom a nereagujú na klik")
+            }
+
+            // A rejected finding is locked: no placement inspector and no keyboard nudges.
+            if let selected = store.securityElements.first(where: { $0.id == store.selectedElementID }),
+               !selected.isLockedByRejection {
+                if selected.observation == .physicalOriginal {
+                    selectedElementInspector
+                } else {
+                    DisclosureGroup("Presná poloha", isExpanded: $showPrecisePlacement) {
+                        selectedElementInspector
+                    }
+                    .font(.caption.weight(.semibold))
+                    .help("Číselné umiestnenie a klávesové posuny. Ťahanie na plátne a klik na prvok sú rýchlejšie.")
+                }
             }
         }
         .confirmationDialog(
@@ -718,6 +736,33 @@ struct AnalysisCanvasView: View {
         } message: {
             Text("Odmietnuté nálezy sa nedostanú do doložky a aplikácia sa z nich naučí, že nejde o bezpečnostný prvok. Potvrdené nálezy ostanú. Každý odmietnutý sa dá vrátiť na kontrolu v jeho riadku.")
         }
+    }
+
+    private func elementRow(_ element: SecurityElement) -> some View {
+        ElementRow(element: element,
+                   isSelected: store.selectedElementID == element.id,
+                   isExpanded: store.selectedElementID == element.id,
+                   onSelect: { store.selectedElementID = element.id },
+                   onDelete: {
+                       if store.selectedElementID == element.id {
+                           store.selectedElementID = nil
+                       }
+                       store.deleteOrRejectSecurityElement(id: element.id)
+                   },
+                   onDuplicate: { _ = store.duplicateElement(id: element.id) },
+                   onRefine: { Task { await store.refineElement(id: element.id) } },
+                   onReviewStateChange: { state in
+                       switch state {
+                       case .confirmed: store.confirmSecurityElement(id: element.id)
+                       case .rejected: store.rejectSecurityElement(id: element.id)
+                       case .pending: store.returnSecurityElementToReview(id: element.id)
+                       }
+                   },
+                   onKindChange: { kind in store.updateElementKind(id: element.id, kind: kind) },
+                   onDescriptionChange: { text in
+                       store.updateElementDescription(id: element.id, text: text)
+                   })
+        .id(element.id)
     }
 
     /// Review status of the current page: counts, the reviewed toggle, and the
@@ -832,7 +877,9 @@ struct AnalysisCanvasView: View {
                 HStack(spacing: 5) {
                     Image(systemName: "keyboard")
                         .font(.caption2)
-                    Text("Klávesy: ⌥+šípky (posun) · ⇧⌥+šípky (veľkosť) · ⌫ (zmazať)")
+                    Text(element.deleteAction == .reject
+                         ? "Klávesy: ⌥+šípky (posun) · ⇧⌥+šípky (veľkosť) · ⌫ (odmietnuť návrh AI)"
+                         : "Klávesy: ⌥+šípky (posun) · ⇧⌥+šípky (veľkosť) · ⌫ (zmazať)")
                         .font(.caption2)
                 }
                 .foregroundStyle(.secondary)
@@ -934,23 +981,45 @@ struct FlowChips: View {
 }
 
 struct ElementOverlay: View {
+    static let showRejectedKey = "zako.showRejectedElements"
+
     @Bindable var store: ZakoSessionStore
     let mapper: AnalysisCanvasView.CanvasMapper
     @Binding var interaction: AnalysisCanvasView.Interaction?
+    @AppStorage(ElementOverlay.showRejectedKey) private var showRejected = true
 
     private let handleRadius: CGFloat = 14
 
     var body: some View {
         GeometryReader { geometry in
             Canvas { context, _ in
-                for element in store.securityElements
-                where element.pageIndex == store.previewPageIndex && element.hasScanRegion {
+                let pageElements = store.securityElements.filter {
+                    $0.pageIndex == store.previewPageIndex && $0.hasScanRegion
+                }
+                // Rejected findings recede beneath everything else, or disappear entirely.
+                if showRejected {
+                    for element in pageElements where element.isLockedByRejection {
+                        drawRejected(context: context, element: element)
+                    }
+                }
+                for element in pageElements where !element.isLockedByRejection {
                     draw(context: context, element: element)
                 }
             }
             .contentShape(Rectangle())
             .gesture(dragGesture)
         }
+    }
+
+    /// Thin dashed grey outline, no fill, no label, no handles: a rejected finding is
+    /// context only and never reacts to the pointer.
+    private func drawRejected(context: GraphicsContext, element: SecurityElement) {
+        let rect = mapper.viewRect(for: element.boundingBox)
+        guard rect.width > 1, rect.height > 1 else { return }
+        let isSelected = store.selectedElementID == element.id
+        context.stroke(Path(roundedRect: rect, cornerRadius: 4),
+                       with: .color(Color.gray.opacity(isSelected ? 0.7 : 0.35)),
+                       style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
     }
 
     private func draw(context: GraphicsContext, element: SecurityElement) {
@@ -1035,21 +1104,18 @@ struct ElementOverlay: View {
         if interaction == nil {
             // Handles sit 5pt outside the box. Hit-test interiors first miss them,
             // and with a tool armed that used to place a new element.
-            if let selected = store.securityElements.first(where: {
-                $0.id == store.selectedElementID
-                    && $0.pageIndex == store.previewPageIndex
-                    && $0.hasScanRegion
-            }), let anchor = oppositeCornerAnchor(of: selected.boundingBox, at: value.location) {
+            // Rejected findings are excluded: they never resize, move or block drawing.
+            let interactive = store.interactiveCanvasElements(onPage: store.previewPageIndex)
+            if let selected = interactive.first(where: { $0.id == store.selectedElementID }),
+               let anchor = oppositeCornerAnchor(of: selected.boundingBox, at: value.location) {
                 interaction = .init(kind: .resizing(selected.id, anchor), startPoint: anchor)
                 return
             }
 
             // Selection can change while a drawing tool remains armed. Prefer any
             // existing corner over creating an overlapping element.
-            if let resizeTarget = store.securityElements.first(where: {
+            if let resizeTarget = interactive.first(where: {
                 $0.id != store.selectedElementID
-                    && $0.pageIndex == store.previewPageIndex
-                    && $0.hasScanRegion
                     && oppositeCornerAnchor(of: $0.boundingBox, at: value.location) != nil
             }), let anchor = oppositeCornerAnchor(of: resizeTarget.boundingBox, at: value.location) {
                 store.selectedElementID = resizeTarget.id
@@ -1058,7 +1124,7 @@ struct ElementOverlay: View {
             }
 
             if let hitID = store.elementID(at: normPoint, pageIndex: store.previewPageIndex),
-               let element = store.securityElements.first(where: { $0.id == hitID }) {
+               let element = interactive.first(where: { $0.id == hitID }) {
                 store.selectedElementID = hitID
                 if let anchor = oppositeCornerAnchor(of: element.boundingBox, at: value.location) {
                     interaction = .init(kind: .resizing(hitID, anchor), startPoint: anchor)
@@ -1115,7 +1181,7 @@ struct ElementRow: View {
                 Image(systemName: element.kind.sfSymbol)
                     .foregroundStyle(ElementKindColor.color(for: element.kind))
                     .frame(width: 16)
-                if isExpanded {
+                if isExpanded && !element.isLockedByRejection {
                     kindMenu
                 } else {
                     Text(element.kind.label)
@@ -1158,13 +1224,23 @@ struct ElementRow: View {
             }
 
             if isExpanded {
-                TextField("Popis prvku", text: Binding(
-                    get: { element.verbalDescription },
-                    set: { onDescriptionChange($0) }
-                ), axis: .vertical)
-                .lineLimit(2...4)
-                .textFieldStyle(.roundedBorder)
-                .accessibilityLabel("Popis prvku")
+                if element.isLockedByRejection {
+                    // Locked: editing would drop the negative example from the learning bank.
+                    if !element.verbalDescription.isEmpty {
+                        Text(element.verbalDescription)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2...4)
+                    }
+                } else {
+                    TextField("Popis prvku", text: Binding(
+                        get: { element.verbalDescription },
+                        set: { onDescriptionChange($0) }
+                    ), axis: .vertical)
+                    .lineLimit(2...4)
+                    .textFieldStyle(.roundedBorder)
+                    .accessibilityLabel("Popis prvku")
+                }
 
                 HStack(alignment: .center, spacing: 6) {
                     Label(element.reviewState.label, systemImage: reviewIcon)
@@ -1182,12 +1258,18 @@ struct ElementRow: View {
                         Button("Vrátiť na kontrolu") { onReviewStateChange(.pending) }
                             .buttonStyle(.bordered).controlSize(.small).fixedSize()
                     }
-                    Button { onDuplicate() } label: { Label("Duplikovať prvok", systemImage: "plus.square.on.square") }
-                        .labelStyle(.iconOnly).buttonStyle(.borderless).help("Duplikovať prvok").foregroundStyle(.secondary)
-                    Button { onRefine() } label: { Label("Spresniť rámec", systemImage: "wand.and.stars") }
-                        .labelStyle(.iconOnly).buttonStyle(.borderless).help("Spresniť rámec podľa obrysu (Apple Vision)").foregroundStyle(.secondary)
-                    Button(role: .destructive) { showDeleteConfirmation = true } label: { Label("Odstrániť prvok", systemImage: "trash") }
-                        .labelStyle(.iconOnly).buttonStyle(.borderless).help("Odstrániť prvok").foregroundStyle(.red)
+                    if !element.isLockedByRejection {
+                        Button { onDuplicate() } label: { Label("Duplikovať prvok", systemImage: "plus.square.on.square") }
+                            .labelStyle(.iconOnly).buttonStyle(.borderless).help("Duplikovať prvok").foregroundStyle(.secondary)
+                        Button { onRefine() } label: { Label("Spresniť rámec", systemImage: "wand.and.stars") }
+                            .labelStyle(.iconOnly).buttonStyle(.borderless).help("Spresniť rámec podľa obrysu (Apple Vision)").foregroundStyle(.secondary)
+                    }
+                    // A pending AI suggestion has no trash: "Odmietnuť" above teaches the detector.
+                    // Delete stays for hand-drawn elements and AI findings already confirmed.
+                    if element.deleteAction == .remove {
+                        Button(role: .destructive) { showDeleteConfirmation = true } label: { Label("Odstrániť prvok", systemImage: "trash") }
+                            .labelStyle(.iconOnly).buttonStyle(.borderless).help("Odstrániť prvok").foregroundStyle(.red)
+                    }
                 }
                 .lineLimit(1)
 

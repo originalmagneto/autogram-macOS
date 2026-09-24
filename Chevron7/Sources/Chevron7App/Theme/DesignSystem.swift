@@ -284,14 +284,38 @@ struct ConfidenceBar: View {
     }
 }
 
+/// One fixed colour per element kind for canvas boxes and the Nálezy row icons.
+/// Grey is reserved for rejected findings. The first four keep their original system
+/// colours; the other twelve are explicit mid-luminance sRGB values chosen to stay
+/// apart from each other (CIEDE2000 at least 17.5) and to reach 3:1 both on white
+/// scanned paper and on a dark inspector (#1E1E1E).
 struct ElementKindColor {
+    /// One fixed colour per kind, each at least 3:1 on white paper and on the dark
+    /// inspector (the system green and orange were only about 2.2:1 on paper).
+    static let explicitRGB: [SecurityElement.Kind: UInt32] = [
+        .officialStamp: 0x2F6FDB,      // blue
+        .handwrittenSignature: 0x2E9E4F, // green
+        .embossedSeal: 0xC8650A,       // orange
+        .initial: 0x8A4FD6,            // purple
+        .other: 0xD6718A,              // dusty rose
+        .certifiedSignature: 0x17823C, // dark green
+        .roundOfficialStamp: 0xAE8932, // gold
+        .waxSeal: 0xD01124,            // red
+        .bindingCord: 0xE07552,        // coral
+        .securityTape: 0x829C1C,       // olive green
+        .permanentBinding: 0xA35A00,   // brown
+        .watermark: 0x229FBF,          // sky
+        .securityPattern: 0x007A7A,    // teal
+        .opticallyVariable: 0xCC0085,  // magenta
+        .securityFoil: 0x30A689,       // sea green
+        .lamination: 0x706B00          // dark olive
+    ]
+
     static func color(for kind: SecurityElement.Kind) -> Color {
-        switch kind {
-        case .officialStamp: return .blue
-        case .handwrittenSignature: return .green
-        case .embossedSeal: return .orange
-        case .initial: return .purple
-        default: return .gray
-        }
+        let rgb = explicitRGB[kind] ?? 0xD6718A
+        return Color(.sRGB,
+                     red: Double((rgb >> 16) & 0xFF) / 255,
+                     green: Double((rgb >> 8) & 0xFF) / 255,
+                     blue: Double(rgb & 0xFF) / 255)
     }
 }

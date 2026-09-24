@@ -546,8 +546,10 @@ final class ZakoSessionStore {
         updateReviewState(id: id, state: .confirmed)
     }
 
+    /// A rejected finding no longer reacts on the canvas, so it also leaves the selection.
     func rejectSecurityElement(id: UUID) {
         updateReviewState(id: id, state: .rejected)
+        if selectedElementID == id { selectedElementID = nil }
     }
 
     func returnSecurityElementToReview(id: UUID) {
@@ -616,6 +618,15 @@ final class ZakoSessionStore {
         recordReviewDecision(securityElements[index], state: state)
     }
 
+    /// Index of an element whose content may change. A rejected element is locked: any
+    /// edit would drop its negative example from the bank (`securityElementsChanged`),
+    /// so only "Vrátiť na kontrolu" may touch it.
+    private func editableIndex(of id: UUID) -> Int? {
+        guard let index = securityElements.firstIndex(where: { $0.id == id }),
+              !securityElements[index].isLockedByRejection else { return nil }
+        return index
+    }
+
     private func enqueueBankWork(_ operation: @escaping @Sendable () async throws -> Void) {
         let previous = bankWork
         bankWork = Task { [weak self] in
@@ -649,6 +660,14 @@ final class ZakoSessionStore {
         let bank = exampleBank
         if !changed.isEmpty {
             enqueueBankWork { for element in changed { try await bank.remove(id: element.id) } }
+        }
+        // An edit that keeps a finding confirmed (numeric box, snap or refine)
+        // must still teach the detector: record it again with its new content. Review-state
+        // changes record themselves in `updateReviewState`.
+        for prior in changed where prior.reviewState == .confirmed {
+            if let current = securityElements.first(where: { $0.id == prior.id }), current.reviewState == .confirmed {
+                recordReviewDecision(current, state: .confirmed)
+            }
         }
     }
 
@@ -735,7 +754,7 @@ final class ZakoSessionStore {
     }
 
     func updatePhysicalElement(id: UUID, location: String, newDocumentPageIndex: Int?) {
-        guard let index = securityElements.firstIndex(where: { $0.id == id }) else { return }
+        guard let index = editableIndex(of: id) else { return }
         securityElements[index].originalLocation = location
         securityElements[index].newDocumentPageIndex = newDocumentPageIndex
         invalidateReview(for: index)
@@ -769,9 +788,8 @@ final class ZakoSessionStore {
 
     @discardableResult
     func duplicateElement(id: UUID) -> UUID? {
-        guard let source = securityElements.first(where: { $0.id == id }),
-              let index = securityElements.firstIndex(where: { $0.id == id }) else { return nil }
-        var copy = source
+        guard let index = editableIndex(of: id) else { return nil }
+        var copy = securityElements[index]
         copy.id = UUID()
         copy.detectedByAI = false
         copy.reviewState = .pending
@@ -785,12 +803,40 @@ final class ZakoSessionStore {
     }
 
     func removeSecurityElement(id: UUID) {
+        guard editableIndex(of: id) != nil else { return }
         if lastDeletedElement == nil, let removed = securityElements.first(where: { $0.id == id }) {
             lastDeletedElement = (removed, securityElements.firstIndex(where: { $0.id == id }) ?? 0)
         }
         securityElements.removeAll { $0.id == id }
         touchReview()
         recomputePreflight()
+    }
+
+    enum DeleteOutcome: Equatable { case removed, rejected, ignored }
+
+    /// The delete action of the Nálezy row and the Delete key. A pending AI suggestion is
+    /// rejected instead, so the detector learns from the mistake; a rejected finding stays
+    /// as the negative example it is; anything else (hand-drawn, or an AI finding the
+    /// advocate already confirmed) is removed and can be restored with undo.
+    @discardableResult
+    func deleteOrRejectSecurityElement(id: UUID) -> DeleteOutcome {
+        guard let element = securityElements.first(where: { $0.id == id }) else { return .ignored }
+        switch element.deleteAction {
+        case .none:
+            return .ignored
+        case .reject:
+            rejectSecurityElement(id: id)
+            return .rejected
+        case .remove:
+            removeSecurityElement(id: id)
+            return .removed
+        }
+    }
+
+    /// Scan boxes of one page that react to clicks and drags on the canvas. Rejected
+    /// findings are drawn beneath the rest but never hit-tested, resized or snapped.
+    func interactiveCanvasElements(onPage pageIndex: Int) -> [SecurityElement] {
+        securityElements.filter { $0.pageIndex == pageIndex && $0.hasScanRegion && !$0.isLockedByRejection }
     }
 
     func undoDelete() {
@@ -833,7 +879,7 @@ final class ZakoSessionStore {
     /// the advocate can adjust it by hand.
     @discardableResult
     func snapPlacedElement(id: UUID, at point: NormalizedPoint) async -> Bool {
-        guard let element = securityElements.first(where: { $0.id == id }), element.hasScanRegion,
+        guard let element = editableIndex(of: id).map({ securityElements[$0] }), element.hasScanRegion,
               await ensureSnapAssets(), let image = renderedPage(element.pageIndex) else { return false }
         let box = UncheckedSendableImage(image)
         guard let rect = try? await snapper.snap(pageImage: box.image, seed: point) else { return false }
@@ -842,7 +888,7 @@ final class ZakoSessionStore {
     }
 
     func refineElement(id: UUID) async {
-        guard let element = securityElements.first(where: { $0.id == id }), element.hasScanRegion,
+        guard let element = editableIndex(of: id).map({ securityElements[$0] }), element.hasScanRegion,
               await ensureSnapAssets(), let image = renderedPage(element.pageIndex) else { return }
         let box = UncheckedSendableImage(image)
         guard let rect = try? await snapper.refine(pageImage: box.image, box: element.boundingBox) else { return }
@@ -867,13 +913,13 @@ final class ZakoSessionStore {
     }
 
     func drawElement(id: UUID, from anchor: NormalizedPoint, to corner: NormalizedPoint) {
-        guard let index = securityElements.firstIndex(where: { $0.id == id }) else { return }
+        guard let index = editableIndex(of: id) else { return }
         securityElements[index].boundingBox = ElementGeometry.resized(from: anchor, to: corner)
         invalidateReview(for: index)
     }
 
     func moveElement(id: UUID, center: NormalizedPoint) {
-        guard let index = securityElements.firstIndex(where: { $0.id == id }) else { return }
+        guard let index = editableIndex(of: id) else { return }
         let previous = securityElements[index]
         securityElements[index].boundingBox =
             ElementGeometry.moved(securityElements[index].boundingBox, center: center)
@@ -885,18 +931,19 @@ final class ZakoSessionStore {
 
     func elementID(at point: NormalizedPoint, pageIndex: Int) -> UUID? {
         ElementGeometry.hitTest(
-            elements: securityElements.filter(\.hasScanRegion).map { ($0.id, $0.pageIndex, $0.boundingBox) },
+            elements: interactiveCanvasElements(onPage: pageIndex).map { ($0.id, $0.pageIndex, $0.boundingBox) },
             point: point,
             pageIndex: pageIndex)
     }
 
     func isResizeHandle(_ id: UUID, at point: NormalizedPoint) -> Bool {
-        guard let element = securityElements.first(where: { $0.id == id }) else { return false }
+        guard let index = editableIndex(of: id) else { return false }
+        let element = securityElements[index]
         return ElementGeometry.isInResizeHandle(element.boundingBox, point)
     }
 
     func updateElementPage(id: UUID, pageIndex: Int) {
-        if let index = securityElements.firstIndex(where: { $0.id == id }) {
+        if let index = editableIndex(of: id) {
             let previous = securityElements[index]
             securityElements[index].pageIndex = pageIndex
             if previous.verbalDescription == previous.locationDescription(pageSizePt: .zero) + "." {
@@ -907,7 +954,7 @@ final class ZakoSessionStore {
     }
 
     func updateElementKind(id: UUID, kind: SecurityElement.Kind) {
-        if let index = securityElements.firstIndex(where: { $0.id == id }) {
+        if let index = editableIndex(of: id) {
             let previous = securityElements[index]
             if previous.verbalDescription == previous.locationDescription(pageSizePt: .zero) + "." { securityElements[index].verbalDescription = "" }
             securityElements[index].kind = kind
@@ -916,14 +963,14 @@ final class ZakoSessionStore {
     }
 
     func updateElementDescription(id: UUID, text: String) {
-        if let index = securityElements.firstIndex(where: { $0.id == id }) {
+        if let index = editableIndex(of: id) {
             securityElements[index].verbalDescription = text
             invalidateReview(for: index)
         }
     }
 
     func updateElementBoundingBox(id: UUID, boundingBox: NormalizedRect) {
-        guard let index = securityElements.firstIndex(where: { $0.id == id }) else { return }
+        guard let index = editableIndex(of: id) else { return }
         let clamped = NormalizedRect(
             x: min(max(boundingBox.x, 0), 1),
             y: min(max(boundingBox.y, 0), 1),
