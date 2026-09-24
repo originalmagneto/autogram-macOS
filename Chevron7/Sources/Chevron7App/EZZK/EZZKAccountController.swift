@@ -132,10 +132,14 @@ final class EZZKAccountController {
     }
 
     /// Looks a number up in one EZZK mode's environment, whatever the current mode is.
-    func lookUp(evidenceNumber: String, in mode: AppSettings.EZZKMode) async throws -> EZZKRecordLookup {
+    /// `executionTime` distinguishes records EZZK stores under one number used more than
+    /// once (result 106): pass it on a second attempt after a first 106.
+    func lookUp(evidenceNumber: String, in mode: AppSettings.EZZKMode,
+               executionTime: Date? = nil) async throws -> EZZKRecordLookup {
         guard let environment = mode.environment else { throw EZZKError.notConfigured }
         return try await client(for: environment)
-            .publicRecord(evidenceNumber: evidenceNumber.trimmingCharacters(in: .whitespacesAndNewlines))
+            .publicRecord(evidenceNumber: evidenceNumber.trimmingCharacters(in: .whitespacesAndNewlines),
+                         executionTime: executionTime)
     }
 
     /// Raw list of the person's unconsumed numbers, for the test environment only.

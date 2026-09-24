@@ -3,21 +3,24 @@
 
 import Foundation
 
-/// Looks up a conversion record in EZZK by its evidence number.
+/// Looks up a conversion record in EZZK by its evidence number. `executionTime` is nil for
+/// the first attempt; when EZZK answers 106 (several records share the number) the caller
+/// asks again with the record's conversion time, which is the only thing that tells the
+/// duplicates apart.
 public protocol EZZKRecordLookingUp: Sendable {
-    func publicRecord(evidenceNumber: String) async throws -> EZZKRecordLookup
+    func publicRecord(evidenceNumber: String, executionTime: Date?) async throws -> EZZKRecordLookup
 }
 
 /// Wraps a lookup closure, so the app can hand over the account controller's lookup.
 public struct EZZKRecordLookupFunction: EZZKRecordLookingUp {
-    private let lookup: @Sendable (String) async throws -> EZZKRecordLookup
+    private let lookup: @Sendable (String, Date?) async throws -> EZZKRecordLookup
 
-    public init(_ lookup: @escaping @Sendable (String) async throws -> EZZKRecordLookup) {
+    public init(_ lookup: @escaping @Sendable (String, Date?) async throws -> EZZKRecordLookup) {
         self.lookup = lookup
     }
 
-    public func publicRecord(evidenceNumber: String) async throws -> EZZKRecordLookup {
-        try await lookup(evidenceNumber)
+    public func publicRecord(evidenceNumber: String, executionTime: Date?) async throws -> EZZKRecordLookup {
+        try await lookup(evidenceNumber, executionTime)
     }
 }
 
@@ -120,7 +123,9 @@ public struct EZZKSubmissionCoordinator: Sendable {
     }
 
     /// Resolves `.outcomeUnknown` by lookup: found -> accepted/processed, 105 -> queued,
-    /// 106 -> accepted (EZZK holds records under the number), error -> unchanged.
+    /// 106 -> accepted (EZZK holds records under the number), error -> unchanged. A 106 on
+    /// the first attempt is asked again with the record's conversion time (`lookUpRecord`);
+    /// only a second 106 settles the row this way.
     /// Any other EZZK result code means EZZK processed and refused the record: `.rejected`
     /// with EZZK's code and description. Does nothing until five minutes after the row last changed, so EZZK has registered a
     /// record it may still have been receiving (a 105 before that could cause a duplicate).
@@ -131,7 +136,7 @@ public struct EZZKSubmissionCoordinator: Sendable {
         guard current >= record.updatedAt.addingTimeInterval(Self.firstStatusCheckDelay) else { return record }
         var updated = record
         do {
-            let result = try await lookup.publicRecord(evidenceNumber: number)
+            let result = try await lookUpRecord(record, number: number)
             // EZZK has the record, so the lost submission was accepted, as with a receipt.
             updated.status = result.isProcessed ? .processed : .acceptedForProcessing
             updated.ezzkResultCode = 0
@@ -158,7 +163,9 @@ public struct EZZKSubmissionCoordinator: Sendable {
     }
 
     /// For `.acceptedForProcessing`: lookup code 0 -> `.processed`; code 1 -> unchanged with `lastLookupAt`;
-    /// code 106 -> still accepted, with EZZK's code and text. A result code other than 0, 1, 105 and 106 means EZZK processed and refused the record
+    /// code 106 -> still accepted, with EZZK's code and text (unless a second lookup with the
+    /// record's conversion time settles it, see `lookUpRecord`). A result code other than
+    /// 0, 1, 105 and 106 means EZZK processed and refused the record
     /// (for example 12 "Neznámy obsah"): `.rejected` with EZZK's code and description.
     /// Every other error, 105 included, keeps the status: EZZK accepted the record, so a
     /// status check never moves it back to a state that would send it again. Every attempt,
@@ -167,7 +174,7 @@ public struct EZZKSubmissionCoordinator: Sendable {
         guard record.status == .acceptedForProcessing, let number = evidenceNumber(of: record) else { return record }
         var updated = record
         do {
-            if try await lookup.publicRecord(evidenceNumber: number).isProcessed {
+            if try await lookUpRecord(record, number: number).isProcessed {
                 updated.status = .processed
                 updated.ezzkResultCode = 0
                 // An earlier 106 text no longer describes the row.
@@ -270,6 +277,30 @@ public struct EZZKSubmissionCoordinator: Sendable {
         record.ezzkResultDescription = description
         // A new check cycle starts: the first lookup waits five minutes after this attempt.
         record.lastLookupAt = nil
+    }
+
+    /// Looks a record up, and once more with its conversion time when the first answer is
+    /// 106: the number is shared by several records, and the conversion time is the only
+    /// thing that tells them apart. A second 106 propagates unchanged, so the caller's
+    /// existing 106 handling (ruling R17) settles the row. The first 106 already proved the
+    /// number is occupied, so a 105 on the timed retry only means this exact timestamp did
+    /// not match what EZZK stored, not that the record is gone: it is not read as "unknown",
+    /// which would requeue the row for a resend and risk storing a duplicate. Every other
+    /// retry error (a refusal, a different code, a network failure) is real information and
+    /// propagates as it would from a single lookup.
+    private func lookUpRecord(_ record: EvidenceRecord, number: String) async throws -> EZZKRecordLookup {
+        do {
+            return try await lookup.publicRecord(evidenceNumber: number, executionTime: nil)
+        } catch let firstError as EZZKError {
+            guard case .serviceRejected(let code, _) = firstError, code == Self.severalRecordsCode else {
+                throw firstError
+            }
+            do {
+                return try await lookup.publicRecord(evidenceNumber: number, executionTime: record.conversionTime)
+            } catch EZZKError.serviceRejected(let retryCode, _) where retryCode == Self.unknownRecordCode {
+                throw firstError
+            }
+        }
     }
 
     private func evidenceNumber(of record: EvidenceRecord) -> String? {

@@ -652,7 +652,7 @@ private final class ScriptedLookup: EZZKRecordLookingUp, @unchecked Sendable {
     var calls: Int { lock.withLock { asked.count } }
     var numbers: [String] { lock.withLock { asked } }
 
-    func publicRecord(evidenceNumber: String) async throws -> EZZKRecordLookup {
+    func publicRecord(evidenceNumber: String, executionTime: Date?) async throws -> EZZKRecordLookup {
         let next: Result<EZZKRecordLookup, Error> = lock.withLock {
             asked.append(evidenceNumber)
             // The last scripted reply repeats, so a test states only what differs.
@@ -678,7 +678,7 @@ private final class SuspendingLookup: EZZKRecordLookingUp, @unchecked Sendable {
 
     var numbers: [String] { lock.withLock { asked } }
 
-    func publicRecord(evidenceNumber: String) async throws -> EZZKRecordLookup {
+    func publicRecord(evidenceNumber: String, executionTime: Date?) async throws -> EZZKRecordLookup {
         let hold: Bool = lock.withLock {
             asked.append(evidenceNumber)
             defer { held = true }

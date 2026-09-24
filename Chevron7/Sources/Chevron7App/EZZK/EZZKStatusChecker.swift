@@ -147,10 +147,10 @@ final class EZZKStatusChecker {
             makeCoordinator: { mode in
                 let lookup: EZZKRecordLookupFunction
                 if mode == .demo {
-                    lookup = EZZKRecordLookupFunction { _ in EZZKRecordLookup(isProcessed: true, info: nil) }
+                    lookup = EZZKRecordLookupFunction { _, _ in EZZKRecordLookup(isProcessed: true, info: nil) }
                 } else {
-                    lookup = EZZKRecordLookupFunction { number in
-                        try await controller.lookUp(evidenceNumber: number, in: mode)
+                    lookup = EZZKRecordLookupFunction { number, time in
+                        try await controller.lookUp(evidenceNumber: number, in: mode, executionTime: time)
                     }
                 }
                 return EZZKSubmissionCoordinator(submitter: controller.service(for: mode), lookup: lookup)
