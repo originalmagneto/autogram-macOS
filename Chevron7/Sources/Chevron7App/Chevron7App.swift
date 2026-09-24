@@ -36,7 +36,6 @@ final class Chevron7AppModel {
             await settings.signingProvider.availableIdentities()
         }
         updater = AppUpdater()
-        updater.startIfNeeded()
         let signing = signingStore
         let zako = zakoStore
         let browserSigning = webSigning
@@ -56,9 +55,14 @@ final class Chevron7AppModel {
         // Chevron7 runs (ruling R13); a web-signing launch starts the check only once the
         // app becomes regular. The process ending stops it.
         let checker = settings.statusChecker
+        let appUpdater = updater
         checker.startIfAllowed(launchMode: AppLaunchMode.current, isRegularApp: false)
+        if AppLaunchMode.current != .webSigning {
+            appUpdater.startIfNeeded()
+        }
         AppDelegate.onBecomeRegular = {
             checker.startIfAllowed(launchMode: AppLaunchMode.current, isRegularApp: true)
+            appUpdater.startIfNeeded()
         }
 
         // Browser requests reach the app through the Safari extension and the
