@@ -113,6 +113,7 @@ Chevron7 nie je spojený so Slovensko.Digital ani ním podporovaný a nemá nič
 - Doložka má štruktúrovaný živý náhľad (osem polí podľa zákona) a prepínač v toolbare.
 - Register má filter stavu, detail, odoslanie do EZZK a overenie stavu v EZZK v toolbare; záznam, ktorý EZZK odmietlo pri odoslaní, sa dá po potvrdení odoslať znova. Pri autorizácii sa pole PIN zameria samo.
 - Počas podpisovania a autorizácie sú zablokované akcie, ktoré by vynulovali rozpracovanú operáciu. Bočný panel má zbaliteľné sekcie podpísaných a nedávnych dokumentov; podpísané kópie sa dajú odstrániť aj so súborom do Koša.
+- Sekcia **Zaručené konverzie** v bočnom paneli ukazuje posledných päť konverzií s evidenčným číslom a stavom v EZZK; klik otvorí detail v Registri, **Zobraziť všetky** celý Register. Dole v paneli je nenápadný odkaz **Podporiť vývoj** (Buy Me a Coffee).
 
 ## AI Vision: vrstvená detekcia bezpečnostných prvkov
 
@@ -301,7 +302,9 @@ Podrobnosti: [pravidlá tréningového datasetu](Chevron7/docs/security-element-
 
 <p>Prihlasovacie údaje sa zadávajú v <strong>Nastaveniach, karta EZZK</strong>, pre zvolené prostredie: Demo (lokálne), Test alebo Produkcia. Heslo sa uloží do Keychainu až vtedy, keď ho EZZK prijme; prihlasovací token existuje len v pamäti aplikácie. Testovacie prostredie má vlastný certifikát, ktorému aplikácia dôveruje len podľa pripnutého odtlačku.</p>
 
-<p><strong>Čo funguje kde:</strong> na Teste prihlásenie, čas servera, pridelenie evidenčných čísel, odoslanie podpísaného záznamu cez <code>ReceiveConversionRecord</code> aj overenie jeho stavu. Na Produkcii zatiaľ len prihlásenie, čas servera a verejné overenie záznamu; pridelenie čísla a odoslanie záznamu sa otvoria v ďalšej časti, po overení celého postupu kartou SAK na Teste. Bez evidenčného čísla aplikácia nepovolí autorizáciu, a číslo z iného dňa alebo z iného režimu odmietne ešte pred podpisom, lebo EZZK nepoužité čísla o polnoci spotrebuje.</p>
+<p><strong>Čo funguje kde:</strong> na Teste prihlásenie, čas servera, pridelenie evidenčných čísel, odoslanie podpísaného záznamu cez <code>ReceiveConversionRecord</code> aj overenie jeho stavu. Na Produkcii zatiaľ len prihlásenie, čas servera a verejné overenie záznamu. Celý postup kartou SAK na Teste prešiel; pridelenie čísla a odoslanie záznamu na Produkcii sa zapnú pre všetkých po prvej overenej ostrej konverzii. Bez evidenčného čísla aplikácia nepovolí autorizáciu, a číslo z iného dňa alebo z iného režimu odmietne ešte pred podpisom, lebo EZZK nepoužité čísla o polnoci spotrebuje.</p>
+
+<p><strong>Ochrany pred chybou:</strong> mimo režimu Demo aplikácia nepridelí evidenčné číslo ani neautorizuje, ak podpisuje iba ukážkovo (bez podpisového enginu alebo bez karty), lebo nepoužité číslo by o polnoci prepadlo bez záznamu. Riadok Registra, ktorého záznam sa práve podpisuje alebo odosiela, sa nedá vymazať. Ak EZZK pri overení odpovie, že pod číslom eviduje viac záznamov (kód 106), aplikácia sa spýta znova s časom konverzie, aby sa stav ustálil.</p>
 
 <p><strong>Záznam o konverzii:</strong> po podpise doložky sa rovnakým PIN podpíše aj záznam record 1.0 v kontajneri XDC a ASiC-E, mimo režimu Demo vždy s kvalifikovanou časovou pečiatkou. Klient dostane jediný súbor: ASiC-E, v ktorom sú PDF/A a doložka podpísané spolu. Ako v kontajneroch z podpisuj.sk sa PDF/A v ňom volá podľa poľa „Názov výstupu (PDF/A)“ (s príponou <code>.pdf</code>), doložka <code>&lt;číslo&gt;.xml.xdcf</code> a doložka aj záznam uvádzajú ako názov nového dokumentu presne názov tohto PDF; súbor pri zdroji sa volá <code>&lt;názov výstupu&gt;.asice</code> a nikdy neprepíše existujúci súbor. Podpísaný záznam ostáva len v Registri konverzií; v kontextovej ponuke riadka alebo v jeho detaile ho uložíte cez <strong>Uložiť záznam…</strong> ako <code>&lt;číslo&gt;.record.asice</code>. Aplikácia záznam odošle hneď a potom každých päť minút skúša čakajúce odoslania a overuje stav v EZZK (Prijatý na spracovanie, Spracovaný, Odmietnutý). Pri prerušenom spojení záznam znova neposiela naslepo: najprv overí, či ho EZZK už má, lebo EZZK duplicity ukladá. Záznam odoslaný po polnoci dňa pridelenia sa označí ako oneskorený, EZZK ho však prijme. Ak sa záznam nepodarí podpísať, výstupy pre klienta ostanú a riadok v registri má stav Záznam nepodpísaný.</p>
 
@@ -495,7 +498,17 @@ xattr -d com.apple.quarantine "/Applications/Chevron7.app"
 </details>
 
 <details open>
-<summary><strong>v0.9.0 · aktuálne vydanie: prehľadná kontrola bezpečnostných prvkov, ktorá chráni učenie detekcie</strong></summary>
+<summary><strong>v0.10.0 · aktuálne vydanie: posledné konverzie v bočnom paneli a príprava ostrého EZZK</strong></summary>
+<ul>
+<li>Sekcia <strong>Zaručené konverzie</strong> v bočnom paneli s posledných päť konverziami, ich evidenčným číslom a stavom v EZZK; klik otvorí detail v Registri.</li>
+<li>Nenápadný odkaz <strong>Podporiť vývoj</strong> (Buy Me a Coffee) dole v bočnom paneli.</li>
+<li>Jedna produkčná politika pre pridelenie čísla a odoslanie záznamu na ostrom EZZK; pre všetkých ostáva zatiaľ vypnutá, kým neprejde prvá overená ostrá konverzia.</li>
+<li>Mimo Demo sa s ukážkovým podpisom nepridelí číslo ani neodošle záznam, riadok v spracovaní sa nedá vymazať a kód 106 sa ustáli opätovným overením s časom konverzie.</li>
+</ul>
+</details>
+
+<details>
+<summary><strong>v0.9.0 · predchádzajúce vydanie: prehľadná kontrola bezpečnostných prvkov, ktorá chráni učenie detekcie</strong></summary>
 <ul>
 <li>Každý z 16 druhov prvkov má vlastnú farbu čitateľnú na papieri aj v tmavom režime; sivá patrí iba odmietnutým nálezom.</li>
 <li>Odmietnuté nálezy sú bledé, zamknuté, nereagujú na klik a sú v zbalenej skupine <strong>Odmietnuté (N)</strong>; jediná akcia je <strong>Vrátiť na kontrolu</strong>.</li>
@@ -655,7 +668,7 @@ swift run ezzk-probe <login|time|numbers|consume|lookup|record|receive> [číslo
 <tr><td>Podpis mobilom</td><td>Dokument dočasne na <code>autogram.slovensko.digital</code>, zašifrovaný kľúčom z tohto Macu, zmazaný po podpise alebo do 24 hodín. Bez registrácie a bez API kľúča.</td></tr>
 </table>
 
-Aktuálny ZaKo profil je implementačný P2E pilot s PDF/A-2b. Lokálny `PDFAValidator` nie je náhradou za veraPDF alebo Acrobat Preflight. Produkcia EZZK je zatiaľ len na čítanie: podpísaný záznam a jeho odoslanie fungujú na Teste, pridelenie evidenčného čísla a odoslanie na Produkcii sa otvoria až po overení kartou SAK. Aktívne formuláre a externé požiadavky treba overiť samostatne.
+Aktuálny ZaKo profil je implementačný P2E pilot s PDF/A-2b. Lokálny `PDFAValidator` nie je náhradou za veraPDF alebo Acrobat Preflight. Produkcia EZZK je zatiaľ len na čítanie: podpísaný záznam a jeho odoslanie fungujú na Teste, pridelenie evidenčného čísla a odoslanie na Produkcii sa zapnú po prvej overenej ostrej konverzii. Aktívne formuláre a externé požiadavky treba overiť samostatne.
 
 ## Architektúra
 
@@ -680,7 +693,8 @@ Kompletná implementačná dokumentácia je v [`docs/PHASES.md`](docs/PHASES.md)
 
 Aplikácia je open source a zostane zadarmo. Dobrovoľný príspevok cez
 [Buy Me a Coffee](https://buymeacoffee.com/chevron7) ide na konkrétnu vec: na
-členstvo v Apple Developer Program.
+členstvo v Apple Developer Program. V aplikácii ho nájdete dole v bočnom paneli
+(**Podporiť vývoj**) aj v ponuke **Pomoc**.
 
 Bez neho sa buildy podpisujú ad-hoc, a Safari načíta rozšírenie len pri zapnutom
 **Develop > Allow Unsigned Extensions**, ktoré si navyše nepamätá po reštarte.
