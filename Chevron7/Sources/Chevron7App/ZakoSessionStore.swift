@@ -661,6 +661,14 @@ final class ZakoSessionStore {
         if !changed.isEmpty {
             enqueueBankWork { for element in changed { try await bank.remove(id: element.id) } }
         }
+        // An edit that keeps a finding confirmed (numeric box, snap, refine, kind or text)
+        // must still teach the detector: record it again with its new content. Review-state
+        // changes record themselves in `updateReviewState`.
+        for prior in changed where prior.reviewState == .confirmed {
+            if let current = securityElements.first(where: { $0.id == prior.id }), current.reviewState == .confirmed {
+                recordReviewDecision(current, state: .confirmed)
+            }
+        }
     }
 
     /// A confirmed finding is content even when the low-ink scan was classified blank.

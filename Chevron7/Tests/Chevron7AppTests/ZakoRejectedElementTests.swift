@@ -119,4 +119,26 @@ final class ZakoRejectedElementTests: XCTestCase {
         store.moveElement(id: noise.id, center: .init(x: 0.5, y: 0.5))
         XCTAssertEqual(try XCTUnwrap(store.securityElements.first).boundingBox.midX, 0.5, accuracy: 0.001)
     }
+
+    /// A confirmed finding the advocate reshapes stays confirmed, so the bank must keep a
+    /// positive example for it (with the new geometry), not silently lose it.
+    func testEditingAConfirmedElementKeepsItsPositiveExample() async throws {
+        let (store, bank) = try makeStore(learn: true)
+        let stamp = SecurityElement(kind: .officialStamp, pageIndex: 0,
+                                    boundingBox: .init(x: 0.1, y: 0.1, width: 0.2, height: 0.2), confidence: 0.8)
+        store.securityElements = [stamp]
+        store.confirmSecurityElement(id: stamp.id)
+        await store.waitForBankWrites()
+        let confirmed = await bank.entries()
+        XCTAssertEqual(confirmed.first { $0.id == stamp.id }?.label, .kind(.officialStamp))
+
+        // The numeric inspector keeps the finding confirmed (a drag returns it to review).
+        store.updateElementBoundingBox(id: stamp.id, boundingBox: .init(x: 0.3, y: 0.3, width: 0.25, height: 0.2))
+        await store.waitForBankWrites()
+
+        XCTAssertEqual(store.securityElements.first?.reviewState, .confirmed)
+        let edited = await bank.entries()
+        XCTAssertEqual(edited.first { $0.id == stamp.id }?.label, .kind(.officialStamp),
+                       "The edited confirmed element must still teach the detector")
+    }
 }
