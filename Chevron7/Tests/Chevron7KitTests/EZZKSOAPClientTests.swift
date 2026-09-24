@@ -199,6 +199,34 @@ final class EZZKSOAPClientTests: XCTestCase {
         XCTAssertEqual(transport.requests.count, 2)
     }
 
+    /// A WCF fault on HTTP 500 may come from the backend after the operation already ran,
+    /// so a fault on a consequential request is not proof EZZK refused it.
+    func testServerFaultOnReceiveIsOutcomeUnknownAndNotRepeated() async {
+        let record = EZZKRecordAttachment(evidenceNumber: "1563-260924-1", mimeType: "application/vnd.etsi.asic-e+zip",
+                                          data: Data("asic".utf8))
+        let transport = SOAPScriptedTransport([
+            .ok(EZZKSOAPFixtures.loginSucceeded()),
+            .reply(status: 500, body: EZZKSOAPFixtures.fault(subcode: "InternalServiceFault",
+                                                             reason: "Timeout expired."), headers: [:])
+        ])
+
+        await assertThrows(EZZKError.outcomeUnknown) {
+            _ = try await self.makeClient(transport).receive(records: [record], person: self.person)
+        }
+        XCTAssertEqual(transport.requests.count, 2)
+    }
+
+    func testServerFaultOnAReadKeepsTheServiceRejection() async {
+        let transport = SOAPScriptedTransport([
+            .reply(status: 500, body: EZZKSOAPFixtures.fault(subcode: "InternalServiceFault",
+                                                             reason: "Timeout expired."), headers: [:])
+        ])
+
+        await assertThrows(EZZKError.serviceRejected(code: 500, message: "Timeout expired.")) {
+            _ = try await self.makeClient(transport).publicRecord(evidenceNumber: "1563-260924-1")
+        }
+    }
+
     func testGatewayTimeoutOnPublicRecordStaysNetworkFailure() async {
         let transport = SOAPScriptedTransport([
             .reply(status: 504, body: "Gateway Timeout", headers: [:])

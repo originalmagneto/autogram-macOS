@@ -187,6 +187,12 @@ public actor EZZKSOAPClient {
             // A gateway or backend timeout (502/504) may mean EZZK already processed a
             // consequential request even though no readable reply came back.
             throw EZZKError.outcomeUnknown
+        } catch EZZKError.serviceRejected where request.isConsequential && response.statusCode >= 500 {
+            // A server fault (HTTP 500 with a readable WCF fault) can come from the backend
+            // after the operation ran, so it is no proof EZZK refused a consequential
+            // request. `invalidRequest` (DeserializationFailed, ActionMismatch) is not
+            // caught here: WCF refuses such a body before the operation runs.
+            throw EZZKError.outcomeUnknown
         }
     }
 
