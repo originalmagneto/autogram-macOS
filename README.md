@@ -71,7 +71,7 @@ Chevron7 nie je spojený so Slovensko.Digital ani ním podporovaný a nemá nič
 </tr>
 <tr>
 <td><strong>Integrácie</strong></td>
-<td>eID, advokátske preukazy, PKCS#11, Keychain, Finder Quick Action, podpis mobilom cez Autogram v mobile (NFC eID na iPhone), EZZK cez SOAP s vlastným prihlásením advokáta (produkcia zatiaľ len na čítanie).</td>
+<td>eID, advokátske preukazy, PKCS#11, Keychain, Finder Quick Action, podpis mobilom cez Autogram v mobile (NFC eID na iPhone), EZZK cez SOAP s vlastným prihlásením advokáta (Test aj Produkcia).</td>
 <td>natívny pracovný tok</td>
 </tr>
 </table>
@@ -98,7 +98,7 @@ Chevron7 nie je spojený so Slovensko.Digital ani ním podporovaný a nemá nič
 <li>Katalóg 16 druhov bezpečnostných prvkov, AI návrhy a povinná manuálna kontrola vrátane šnúrok, pások a pečatí.</li>
 <li>PDF/A-2b, osvedčovacia doložka, XML a lokálna evidencia.</li>
 <li>Mandátny certifikát, evidenčné číslo priamo z EZZK a kontrola, či číslo nie je z iného dňa alebo z iného režimu.</li>
-<li>Záznam o zaručenej konverzii (record 1.0) sa podpíše rovnakým PIN hneď po doložke, s kvalifikovanou časovou pečiatkou, a sám sa odošle do EZZK. Register ukazuje, či ho EZZK prijalo, spracovalo alebo odmietlo. Na Produkcii je odoslanie zatiaľ zamknuté.</li>
+<li>Záznam o zaručenej konverzii (record 1.0) sa podpíše rovnakým PIN hneď po doložke, s kvalifikovanou časovou pečiatkou, a sám sa odošle do EZZK. Register ukazuje, či ho EZZK prijalo, spracovalo alebo odmietlo. Funguje na Teste aj na Produkcii.</li>
 </ul>
 </td>
 </tr>
@@ -498,7 +498,17 @@ xattr -d com.apple.quarantine "/Applications/Chevron7.app"
 </details>
 
 <details open>
-<summary><strong>v0.11.0 · aktuálne vydanie: uhladený bočný panel s tlačidlom Buy me a coffee</strong></summary>
+<summary><strong>v0.12.0 · aktuálne vydanie: ostré EZZK pre všetkých a ZaKo len s mandátnym certifikátom</strong></summary>
+<ul>
+<li>Produkcia EZZK je zapnutá pre všetkých: evidenčné číslo sa pridelí a záznam o konverzii odošle s vlastným EZZK účtom advokáta.</li>
+<li>Zaručená konverzia ide len s mandátnym certifikátom (MQC): číslo sa pridelí a konverzia autorizuje iba s vloženou kartou s MQC; aplikácia vyzve na vloženie karty a PIN si vypýta raz za spustenie.</li>
+<li>Pridanie podpisu k už podpísanému PDF alebo kontajneru ASiC-E zachová pôvodné podpisy; ASiC-E z hlavného okna obsahuje PDF priamo, bez vnoreného kontajnera.</li>
+<li><strong>Pridať ďalší podpis</strong> po podpise aj v bočnom paneli; Demo konverzie sú v Registri označené a nerátajú sa medzi zapísané v EZZK.</li>
+</ul>
+</details>
+
+<details>
+<summary><strong>v0.11.0 · predchádzajúce vydanie: uhladený bočný panel s tlačidlom Buy me a coffee</strong></summary>
 <ul>
 <li>Oficiálne žlté tlačidlo <strong>Buy me a coffee</strong> dole v bočnom paneli, rovnaké ako na webe.</li>
 <li>Riadky zaručených konverzií začínajú farebným symbolom stavu v EZZK; ikony celého panela ležia v jednom stĺpci.</li>
@@ -676,7 +686,7 @@ swift run ezzk-probe <login|time|numbers|consume|lookup|record|receive> [číslo
 <tr><td>Podpis mobilom</td><td>Dokument dočasne na <code>autogram.slovensko.digital</code>, zašifrovaný kľúčom z tohto Macu, zmazaný po podpise alebo do 24 hodín. Bez registrácie a bez API kľúča.</td></tr>
 </table>
 
-Aktuálny ZaKo profil je implementačný P2E pilot s PDF/A-2b. Lokálny `PDFAValidator` nie je náhradou za veraPDF alebo Acrobat Preflight. Produkcia EZZK je zatiaľ len na čítanie: podpísaný záznam a jeho odoslanie fungujú na Teste, pridelenie evidenčného čísla a odoslanie na Produkcii sa zapnú po prvej overenej ostrej konverzii. Aktívne formuláre a externé požiadavky treba overiť samostatne.
+Aktuálny ZaKo profil je implementačný P2E pilot s PDF/A-2b. Lokálny `PDFAValidator` nie je náhradou za veraPDF alebo Acrobat Preflight. Produkcia EZZK je od v0.12.0 zapnutá pre všetkých: evidenčné číslo sa pridelí a záznam odošle s vlastným EZZK účtom advokáta, a to iba s vloženou kartou s mandátnym certifikátom (MQC). Aktívne formuláre a externé požiadavky treba overiť samostatne.
 
 ## Architektúra
 

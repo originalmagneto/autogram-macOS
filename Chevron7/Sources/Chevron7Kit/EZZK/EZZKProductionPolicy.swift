@@ -10,9 +10,10 @@ import Foundation
 /// unlocks calls with the EZZK account the person already signed in with, so it grants nobody
 /// access they do not have.
 public struct EZZKProductionPolicy: Sendable, Equatable {
-    /// Flipped to true by the release that enables production for everyone, after the owner's
-    /// first live production conversion was processed (spec "Rollout", step 3).
-    public static let enabledForEveryone = false
+    /// True since the release that enabled production for everyone (spec "Rollout", step 3,
+    /// on the owner's decision, 2026-09-24). The owner switch stays readable but no longer
+    /// changes anything; tests and `ezzk-probe` still build `.refused` explicitly.
+    public static let enabledForEveryone = true
     public static let ownerSwitchKey = "EZZKProductionOwnerSwitch"
 
     public let allowsConsequentialCalls: Bool

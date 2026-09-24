@@ -19,7 +19,7 @@ everyone), which waits for the owner's live production conversion:
 - The advocate signs in with their own EZZK name and password and Chevron7 verifies it against EZZK.
 - Chevron7 reads the EZZK server time, allocates and reuses evidence numbers, and looks records up; on production, allocating and reusing a number is a consequential call gated by `EZZKProductionPolicy` (see "Production and the owner switch" below).
 - ZaKo signs the conversion record (form `50349287.ConversionRecordOfPaperToElectronicDocument.sk` 1.0) with the mandate certificate and a qualified timestamp into its own ASiC-E, and sends it with `ReceiveConversionRecord`.
-- Production always allows sign in, server time and public record lookup. Allocation and submission there are refused for everyone by default and open only on a Mac with the owner switch set, until the owner's own live conversion is processed and a later release enables production for everyone.
+- Production always allows sign in, server time and public record lookup. Allocation and submission there are open for everyone since v0.12.0 (`EZZKProductionPolicy.enabledForEveryone`); ZaKo allocates and signs only with a card carrying a mandate certificate.
 - `ezzk-probe` exercises the same service from the command line, including reading a record back and submitting one; it never allocates, consumes or sends on production, whichever environment its credentials belong to.
 
 Record form version 1.2, effective 2027-01-01, is not built yet.
@@ -64,7 +64,9 @@ client and the service adapter, at `EZZKStatusChecker`, at the Register's and
 ZaKo's Done screen actions, and in Settings; every test and `ezzk-probe` default
 to refused, so no forgotten call site can reach production by accident.
 
-Production stays refused for everyone until the owner turns it on for this Mac:
+Since v0.12.0 production is open for everyone (`enabledForEveryone` is true), so the
+switch below no longer changes anything; it is kept for a build that closes production
+again. Before that release production stayed refused until the owner turned it on for this Mac:
 
 ```
 defaults write app.slovensko.chevron7 EZZKProductionOwnerSwitch -bool YES
