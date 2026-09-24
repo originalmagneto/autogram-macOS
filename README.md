@@ -113,7 +113,7 @@ Chevron7 nie je spojený so Slovensko.Digital ani ním podporovaný a nemá nič
 - Doložka má štruktúrovaný živý náhľad (osem polí podľa zákona) a prepínač v toolbare.
 - Register má filter stavu, detail, odoslanie do EZZK a overenie stavu v EZZK v toolbare; záznam, ktorý EZZK odmietlo pri odoslaní, sa dá po potvrdení odoslať znova. Pri autorizácii sa pole PIN zameria samo.
 - Počas podpisovania a autorizácie sú zablokované akcie, ktoré by vynulovali rozpracovanú operáciu. Bočný panel má zbaliteľné sekcie podpísaných a nedávnych dokumentov; podpísané kópie sa dajú odstrániť aj so súborom do Koša.
-- Sekcia **Zaručené konverzie** v bočnom paneli ukazuje posledných päť konverzií s evidenčným číslom a stavom v EZZK; klik otvorí detail v Registri, **Zobraziť všetky** celý Register. Dole v paneli je nenápadný odkaz **Podporiť vývoj** (Buy Me a Coffee).
+- Sekcia **Zaručené konverzie** v bočnom paneli ukazuje posledných päť konverzií s evidenčným číslom a stavom v EZZK; klik otvorí detail v Registri, **Zobraziť všetky** celý Register. Dole v paneli je žlté tlačidlo **Buy me a coffee** na dobrovoľnú podporu vývoja. Ikony v celom paneli ležia v jednom stĺpci a riadky konverzií začínajú farebným symbolom stavu.
 
 ## AI Vision: vrstvená detekcia bezpečnostných prvkov
 
@@ -498,7 +498,15 @@ xattr -d com.apple.quarantine "/Applications/Chevron7.app"
 </details>
 
 <details open>
-<summary><strong>v0.10.0 · aktuálne vydanie: posledné konverzie v bočnom paneli a príprava ostrého EZZK</strong></summary>
+<summary><strong>v0.11.0 · aktuálne vydanie: uhladený bočný panel s tlačidlom Buy me a coffee</strong></summary>
+<ul>
+<li>Oficiálne žlté tlačidlo <strong>Buy me a coffee</strong> dole v bočnom paneli, rovnaké ako na webe.</li>
+<li>Riadky zaručených konverzií začínajú farebným symbolom stavu v EZZK; ikony celého panela ležia v jednom stĺpci.</li>
+</ul>
+</details>
+
+<details>
+<summary><strong>v0.10.0 · predchádzajúce vydanie: posledné konverzie v bočnom paneli a príprava ostrého EZZK</strong></summary>
 <ul>
 <li>Sekcia <strong>Zaručené konverzie</strong> v bočnom paneli s posledných päť konverziami, ich evidenčným číslom a stavom v EZZK; klik otvorí detail v Registri.</li>
 <li>Nenápadný odkaz <strong>Podporiť vývoj</strong> (Buy Me a Coffee) dole v bočnom paneli.</li>
@@ -691,10 +699,14 @@ Kompletná implementačná dokumentácia je v [`docs/PHASES.md`](docs/PHASES.md)
 
 ## Podporiť vývoj
 
+<p align="center">
+  <a href="https://www.buymeacoffee.com/chevron7"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me a Coffee" height="60" width="217"></a>
+</p>
+
 Aplikácia je open source a zostane zadarmo. Dobrovoľný príspevok cez
 [Buy Me a Coffee](https://buymeacoffee.com/chevron7) ide na konkrétnu vec: na
-členstvo v Apple Developer Program. V aplikácii ho nájdete dole v bočnom paneli
-(**Podporiť vývoj**) aj v ponuke **Pomoc**.
+členstvo v Apple Developer Program. V aplikácii je rovnaké žlté tlačidlo dole v
+bočnom paneli a odkaz **Podporiť vývoj…** aj v ponuke **Pomoc**.
 
 Bez neho sa buildy podpisujú ad-hoc, a Safari načíta rozšírenie len pri zapnutom
 **Develop > Allow Unsigned Extensions**, ktoré si navyše nepamätá po reštarte.

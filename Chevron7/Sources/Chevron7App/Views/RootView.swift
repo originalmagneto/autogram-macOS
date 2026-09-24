@@ -62,7 +62,7 @@ struct RootView: View {
                 HStack(spacing: 8) {
                     Image(systemName: entry.method.sfSymbol)
                         .foregroundStyle(.secondary)
-                        .frame(width: 16)
+                        .frame(width: SidebarMetrics.iconWidth)
                     Text(entry.displayName)
                         .lineLimit(1)
                         .truncationMode(.middle)
@@ -77,18 +77,18 @@ struct RootView: View {
                 }
                 .font(.caption2)
                 .foregroundStyle(.secondary)
-                .padding(.leading, 24)
+                .padding(.leading, SidebarMetrics.iconWidth + 8)
 
                 if !entry.wasSavedLocally {
                     Text("Neuložené lokálne")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
-                        .padding(.leading, 24)
+                        .padding(.leading, SidebarMetrics.iconWidth + 8)
                 } else if !isAvailable {
                     Text("Súbor už neexistuje")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
-                        .padding(.leading, 24)
+                        .padding(.leading, SidebarMetrics.iconWidth + 8)
                 }
             }
         }
@@ -153,27 +153,24 @@ struct RootView: View {
         Button {
             openInRegister(row.id)
         } label: {
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 8) {
-                    Image(systemName: "building.columns")
-                        .foregroundStyle(.secondary)
-                        .frame(width: 16)
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                // The EZZK state leads the row: it is what the advocate scans for.
+                Image(systemName: row.symbol)
+                    .foregroundStyle(EvidenceDashboardView.tint(for: row.tone))
+                    .frame(width: SidebarMetrics.iconWidth)
+                VStack(alignment: .leading, spacing: 1) {
                     Text(row.name)
+                        .font(.callout)
                         .lineLimit(1)
                         .truncationMode(.middle)
-                        .font(.callout)
-                }
-                HStack(spacing: 6) {
                     Text(row.evidenceNumber)
-                        .monospacedDigit()
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(.secondary)
                         .lineLimit(1)
-                    Image(systemName: row.symbol)
-                        .foregroundStyle(EvidenceDashboardView.tint(for: row.tone))
                 }
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .padding(.leading, 24)
             }
+            .padding(.vertical, 1)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .help("\(row.name): \(row.stateLabel)")
@@ -203,7 +200,7 @@ struct RootView: View {
                 .foregroundStyle(Color.accentColor)
         }
         .buttonStyle(.plain)
-        .padding(.leading, 24)
+        .padding(.leading, SidebarMetrics.iconWidth + 8)
     }
 
     private var signingStore: SigningSessionStore { model.signingStore }
@@ -262,7 +259,7 @@ struct RootView: View {
                                     .foregroundStyle(Color.accentColor)
                             }
                             .buttonStyle(.plain)
-                            .padding(.leading, 24)
+                            .padding(.leading, SidebarMetrics.iconWidth + 8)
                             .accessibilityHint("Otvorí Register konverzií")
                         }
                     } header: {
@@ -286,7 +283,7 @@ struct RootView: View {
                                 HStack(spacing: 8) {
                                     Image(systemName: isAvailable ? "clock.arrow.circlepath" : "doc.badge.ellipsis")
                                         .foregroundStyle(.secondary)
-                                        .frame(width: 16)
+                                        .frame(width: SidebarMetrics.iconWidth)
                                     Text(entry.displayName)
                                         .lineLimit(1)
                                         .truncationMode(.middle)
@@ -335,7 +332,7 @@ struct RootView: View {
                                 HStack(spacing: 8) {
                                     Image(systemName: queueIcon(item.status))
                                         .foregroundStyle(queueColor(item.status))
-                                        .frame(width: 16)
+                                        .frame(width: SidebarMetrics.iconWidth)
                                     Text(item.displayName)
                                         .lineLimit(1)
                                         .truncationMode(.middle)
@@ -493,41 +490,43 @@ struct RootView: View {
                     detail: badge.detail
                 )
 
-                Button {
-                    openMoreFiles()
-                } label: {
-                    Label("Pridať súbory…", systemImage: "plus")
-                        .font(.callout)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 6) {
+                    Button {
+                        openMoreFiles()
+                    } label: {
+                        sidebarFooterLabel("Pridať súbory…", systemImage: "plus")
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
 
-                OpenSettingsButton {
-                    Label("Nastavenia", systemImage: "gearshape")
-                        .font(.callout)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    OpenSettingsButton {
+                        sidebarFooterLabel("Nastavenia", systemImage: "gearshape")
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+                    .accessibilityLabel("Nastavenia")
+                    .help("Otvoriť nastavenia")
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
-                .accessibilityLabel("Nastavenia")
-                .help("Otvoriť nastavenia")
 
-                Button {
-                    NSWorkspace.shared.open(SidebarDonateLink.url)
-                } label: {
-                    Label(SidebarDonateLink.title, systemImage: SidebarDonateLink.symbol)
-                        .font(.callout)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
-                .accessibilityLabel(SidebarDonateLink.accessibilityLabel)
-                .help(SidebarDonateLink.help)
+                DonateButton()
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
         }
+    }
+
+    /// A footer action with its icon in the same fixed-width column as every other
+    /// sidebar icon, so the labels line up.
+    private func sidebarFooterLabel(_ title: String, systemImage: String) -> some View {
+        Label {
+            Text(title)
+        } icon: {
+            Image(systemName: systemImage)
+                .frame(width: SidebarMetrics.iconWidth)
+        }
+        .font(.callout)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
     }
 
     private var subtitle: String {
@@ -657,5 +656,101 @@ struct RootView: View {
 
     private func toggleSidebar() {
         NSApp.sendAction(#selector(NSSplitViewController.toggleSidebar(_:)), to: nil, from: nil)
+    }
+}
+
+
+/// Shared sidebar measurements, so section rows and footer actions align.
+enum SidebarMetrics {
+    static let iconWidth: CGFloat = 18
+}
+
+/// The voluntary contribution link: a small button in Buy Me a Coffee's own yellow, so it
+/// is recognisable and findable without competing with the navigation above it.
+private struct DonateButton: View {
+    @State private var isHovering = false
+
+    /// The official button image when the app bundle carries it; SwiftPM test and
+    /// preview builds do not, and fall back to the drawn yellow button below.
+    private static let officialButton: NSImage? = Bundle.main
+        .url(forResource: SidebarDonateLink.buttonImageName, withExtension: "png")
+        .flatMap(NSImage.init(contentsOf:))
+
+    var body: some View {
+        if let image = Self.officialButton {
+            Button {
+                NSWorkspace.shared.open(SidebarDonateLink.url)
+            } label: {
+                // The image carries the brand yellow itself, so centring it on a bar of the
+                // same yellow widens the button to the sidebar without stretching the logo.
+                Image(nsImage: image)
+                    .resizable()
+                    .interpolation(.high)
+                    .aspectRatio(contentMode: .fit)
+                    .frame(height: 28)
+                    .frame(maxWidth: .infinity)
+                    .background(
+                        RoundedRectangle(cornerRadius: 7, style: .continuous)
+                            .fill(yellow)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 7, style: .continuous)
+                            .strokeBorder(Color.black.opacity(isHovering ? 0.35 : 0.12))
+                    )
+                    .shadow(color: .black.opacity(isHovering ? 0.16 : 0.06), radius: isHovering ? 3 : 1.5, y: 1)
+                    .animation(.easeOut(duration: 0.12), value: isHovering)
+                    .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .onHover { isHovering = $0 }
+            .accessibilityLabel(SidebarDonateLink.accessibilityLabel)
+            .help(SidebarDonateLink.help)
+        } else {
+            drawnButton
+        }
+    }
+
+    private var drawnButton: some View {
+        Button {
+            NSWorkspace.shared.open(SidebarDonateLink.url)
+        } label: {
+            HStack(spacing: 7) {
+                Image(systemName: SidebarDonateLink.symbol)
+                    .font(.callout.weight(.semibold))
+                Text(SidebarDonateLink.title)
+                    .font(.callout.weight(.semibold))
+                Spacer(minLength: 0)
+                Image(systemName: "arrow.up.right")
+                    .font(.caption2.weight(.bold))
+                    .opacity(isHovering ? 0.9 : 0.45)
+            }
+            .foregroundStyle(ink)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .frame(maxWidth: .infinity)
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(yellow.opacity(isHovering ? 1 : 0.92))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .strokeBorder(ink.opacity(0.08))
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovering = $0 }
+        .accessibilityLabel(SidebarDonateLink.accessibilityLabel)
+        .help(SidebarDonateLink.help)
+    }
+
+    private var yellow: Color {
+        let c = SidebarDonateLink.brandYellow
+        return Color(.sRGB, red: c.red, green: c.green, blue: c.blue)
+    }
+
+    private var ink: Color {
+        let c = SidebarDonateLink.brandInk
+        return Color(.sRGB, red: c.red, green: c.green, blue: c.blue)
     }
 }

@@ -17,7 +17,7 @@ final class SidebarDonateLinkTests: XCTestCase {
 
     func testWording() {
         XCTAssertEqual(SidebarDonateLink.title, "Podporiť vývoj")
-        XCTAssertEqual(SidebarDonateLink.symbol, "cup.and.saucer")
+        XCTAssertEqual(SidebarDonateLink.symbol, "cup.and.heat.waves.fill")
         XCTAssertEqual(SidebarDonateLink.help,
                        "Chevron7 je zadarmo. Príspevok cez Buy Me a Coffee pomáha platiť vývoj a podpisovanie aplikácie.")
         XCTAssertEqual(SidebarDonateLink.accessibilityLabel, "Podporiť vývoj Chevron7 cez Buy Me a Coffee")
