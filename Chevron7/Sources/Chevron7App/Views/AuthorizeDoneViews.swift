@@ -131,8 +131,9 @@ struct AuthorizeView: View {
              "Bezpečnostné prvky potvrdené (\(store.confirmedSecurityElements.count))", "shield.checkerboard"),
             (store.unreviewedNonEmptyPages.isEmpty && store.analysis.nonEmptyPages > 0,
              "Všetky neprázdne strany skontrolované", "doc.text.magnifyingglass"),
-            ((store.attestation.evidenceNumber ?? "").trimmingCharacters(in: .whitespaces).isEmpty == false,
-             "Evidenčné číslo z EZZK", "number.square.fill"),
+            // Authorization allocates the number itself, so this item never blocks.
+            (true, store.attestation.evidenceNumber.map { "Evidenčné číslo z EZZK: \($0)" }
+                ?? "Evidenčné číslo pridelí EZZK pri autorizácii", "number.square.fill"),
             (!store.attestation.performingPerson.fullName.trimmingCharacters(in: .whitespaces).isEmpty,
              "Osoba vykonávajúca konverziu vyplnená", "person.crop.circle"),
             (!store.attestation.performingPerson.registrationNumber.trimmingCharacters(in: .whitespaces).isEmpty,
@@ -215,6 +216,15 @@ struct AuthorizeView: View {
 
             if !store.signingProviderIsDemo {
                 Label(authorizationCardHint, systemImage: "key.horizontal")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            // Here, not in the action bar: squeezed between the buttons this text wrapped
+            // word by word and grew the window past the screen, hiding "Autorizovať".
+            if store.showsMobileOutsideDemoNotice {
+                Label(ZakoSessionStore.mobileOutsideDemoMessage, systemImage: "iphone.slash")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -308,11 +318,6 @@ struct AuthorizeView: View {
             .controlSize(.large)
             .disabled(store.isAuthorizing || !store.isMobilePreflightComplete)
             .help("Vyžaduje mandátny certifikát na občianskom preukaze. Bez neho sa konverzia odmietne.")
-        } else if store.showsMobileOutsideDemoNotice {
-            Text(ZakoSessionStore.mobileOutsideDemoMessage)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
         }
     }
 }
