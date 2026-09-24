@@ -27,7 +27,7 @@ final class ZakoEvidenceNumberTests: XCTestCase {
         // In-memory credentials and a transport with no replies: no Keychain, no network.
         let transport = ScriptedTransport([])
         let controller = EZZKAccountController(mode: .demo, credentialStore: MemoryCredentialStore(),
-                                               transportFactory: { _ in transport })
+                                               transportFactory: { _ in transport }, productionPolicy: .refused)
         let settingsStore = makeSettingsStore(ezzkAccountController: controller)
         let store = ZakoSessionStore(settingsStore: settingsStore)
         await store.fetchEvidenceNumber()
@@ -81,7 +81,7 @@ final class ZakoEvidenceNumberTests: XCTestCase {
         try credentialStore.save(EZZKSOAPCredentials(login: "ucet", password: "heslo"), environment: .sandbox)
         let transport = ScriptedTransport([loginSucceeded, numbersReply, serverTimeReply])
         let controller = EZZKAccountController(mode: .test, credentialStore: credentialStore,
-                                               transportFactory: { _ in transport })
+                                               transportFactory: { _ in transport }, productionPolicy: .refused)
         let settingsStore = makeSettingsStore(ezzkAccountController: controller)
         settingsStore.settings.ezzkPersonName = "Advokátska kancelária Test"
         settingsStore.settings.ezzkICO = "12345678"
@@ -139,7 +139,7 @@ final class ZakoEvidenceNumberTests: XCTestCase {
         try credentialStore.save(EZZKSOAPCredentials(login: "ucet", password: "heslo"), environment: .sandbox)
         let transport = ScriptedTransport([loginSucceeded, numbersReply, serverTimeReply])
         let controller = EZZKAccountController(mode: .test, credentialStore: credentialStore,
-                                               transportFactory: { _ in transport })
+                                               transportFactory: { _ in transport }, productionPolicy: .refused)
         let settingsStore = makeSettingsStore(ezzkAccountController: controller)
         settingsStore.settings.ezzkPersonName = "Advokátska kancelária Test"
         settingsStore.settings.ezzkICO = "12345678"
@@ -162,7 +162,7 @@ final class ZakoEvidenceNumberTests: XCTestCase {
         let secondNumber = numbersReply.replacingOccurrences(of: "260917-A", with: "260917-B")
         let transport = ScriptedTransport([loginSucceeded, numbersReply, serverTimeReply, secondNumber, serverTimeReply])
         let controller = EZZKAccountController(mode: .test, credentialStore: credentialStore,
-                                               transportFactory: { _ in transport })
+                                               transportFactory: { _ in transport }, productionPolicy: .refused)
         let settingsStore = makeSettingsStore(ezzkAccountController: controller)
         settingsStore.settings.ezzkPersonName = "Advokátska kancelária Test"
         settingsStore.settings.ezzkICO = "12345678"
@@ -190,7 +190,7 @@ final class ZakoEvidenceNumberTests: XCTestCase {
         try credentialStore.save(EZZKSOAPCredentials(login: "ucet", password: "heslo"), environment: .sandbox)
         let transport = ScriptedTransport([loginSucceeded, numberLimitReply])
         let controller = EZZKAccountController(mode: .test, credentialStore: credentialStore,
-                                               transportFactory: { _ in transport })
+                                               transportFactory: { _ in transport }, productionPolicy: .refused)
         let settingsStore = makeSettingsStore(ezzkAccountController: controller)
         settingsStore.settings.ezzkPersonName = "Advokátska kancelária Test"
         settingsStore.settings.ezzkICO = "12345678"

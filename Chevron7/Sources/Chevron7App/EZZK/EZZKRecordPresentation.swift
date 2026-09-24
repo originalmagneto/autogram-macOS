@@ -130,9 +130,12 @@ struct ZakoDonePresentation: Equatable {
     ///   - nextStatusCheck: when the row's next lookup is due (`EZZKStatusChecker.nextStatusCheck`).
     ///   - currentMode: the controller's EZZK mode; a row of another mode gets no action.
     ///     Nil skips that check.
+    ///   - productionAllowed: the production policy; a production row is sent or looked up
+    ///     only when it allows consequential calls.
     init(record: EvidenceRecord?, lastError: String?, lastErrorStatus: EvidenceRecord.Status?,
          nextStatusCheck: Date?, now: Date,
-         currentMode: AppSettings.EZZKMode? = nil) {
+         currentMode: AppSettings.EZZKMode? = nil,
+         productionAllowed: Bool = false) {
         guard let record else {
             title = "Konverzia nie je zapísaná v Registri konverzií"
             symbol = "exclamationmark.triangle.fill"
@@ -181,13 +184,13 @@ struct ZakoDonePresentation: Equatable {
             lines.append(mode == nil ? EZZKStatusChecker.preB2RowMessage : EZZKStatusChecker.recordFromOtherModeMessage)
             action = .none
         } else if EZZKRecordPresentation.isSendable(status) {
-            if mode == .production {
+            if mode == .production, !productionAllowed {
                 lines.append(EZZKError.submissionUnavailable.errorDescription ?? "")
                 action = .none
             } else {
                 action = .send
             }
-        } else if EZZKRecordPresentation.isVerifiable(status), mode != .production {
+        } else if EZZKRecordPresentation.isVerifiable(status), mode != .production || productionAllowed {
             action = .verify(availableAt: status == .outcomeUnknown ? nextStatusCheck : nil)
         } else {
             action = .none
@@ -320,8 +323,10 @@ enum EvidenceRegisterDetail {
     }
 
     /// A row is sent or looked up only in the EZZK mode that allocated its number, never
-    /// when it has no mode (written before part B2, ruling R15), and never in Production yet.
-    static func actions(for record: EvidenceRecord, currentMode: AppSettings.EZZKMode) -> Actions {
+    /// when it has no mode (written before part B2, ruling R15), and in Production only when
+    /// the production policy allows it (`productionAllowed`).
+    static func actions(for record: EvidenceRecord, currentMode: AppSettings.EZZKMode,
+                        productionAllowed: Bool = false) -> Actions {
         let status = record.status
         let sendable = EZZKRecordPresentation.isSendable(status)
         let verifiable = EZZKRecordPresentation.isVerifiable(status)
@@ -339,7 +344,7 @@ enum EvidenceRegisterDetail {
         if mode != currentMode {
             return Actions(canSend: false, canVerify: false, note: EZZKStatusChecker.recordFromOtherModeMessage)
         }
-        if mode == .production {
+        if mode == .production, !productionAllowed {
             return Actions(canSend: false, canVerify: false, note: EZZKError.submissionUnavailable.errorDescription)
         }
         if resendable {

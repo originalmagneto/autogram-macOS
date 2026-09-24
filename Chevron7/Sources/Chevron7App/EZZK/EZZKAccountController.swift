@@ -24,6 +24,9 @@ final class EZZKAccountController {
 
     /// Not `private` so tests can confirm which store a controller actually uses.
     let credentialStore: any EZZKSOAPCredentialStoring
+    /// Whether numbers may be allocated and records sent on production. Read once at launch
+    /// (the owner switch needs a relaunch) and handed to every SOAP client and the checker.
+    let productionPolicy: EZZKProductionPolicy
     private let transportFactory: @Sendable (EZZKEnvironment) -> any EZZKHTTPTransport
     @ObservationIgnored private var personProvider: @MainActor () -> EZZKPerson = {
         EZZKPerson(corporateBodyFullName: "", ico: "")
@@ -40,9 +43,11 @@ final class EZZKAccountController {
          credentialStore: any EZZKSOAPCredentialStoring = EZZKSOAPCredentialStore(),
          transportFactory: @escaping @Sendable (EZZKEnvironment) -> any EZZKHTTPTransport = {
              URLSessionEZZKSOAPTransport(environment: $0)
-         }) {
+         },
+         productionPolicy: EZZKProductionPolicy = .current(defaults: .standard)) {
         self.mode = mode
         self.credentialStore = credentialStore
+        self.productionPolicy = productionPolicy
         self.transportFactory = transportFactory
         reloadStoredLogin()
     }
@@ -91,7 +96,7 @@ final class EZZKAccountController {
         state = .verifying
         let candidate = EZZKSOAPCredentials(login: login, password: password)
         let verification = EZZKSOAPClient(environment: environment, transport: transport(for: environment),
-                                          credentials: { candidate })
+                                          credentials: { candidate }, productionPolicy: productionPolicy)
         do {
             let accountName = try await verification.logIn()
             guard operation == generation else { return }
@@ -150,7 +155,8 @@ final class EZZKAccountController {
         if let client = clients[environment] { return client }
         let store = credentialStore
         let client = EZZKSOAPClient(environment: environment, transport: transport(for: environment),
-                                    credentials: { try store.load(environment: environment) })
+                                    credentials: { try store.load(environment: environment) },
+                                    productionPolicy: productionPolicy)
         clients[environment] = client
         return client
     }

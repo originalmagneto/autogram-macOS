@@ -49,7 +49,7 @@ final class EZZKStatusChecker {
         var skipped = 0
         /// Rows written before part B2 (no EZZK mode): never sent.
         var legacy = 0
-        /// Production rows: not sent while production submission is refused (B3).
+        /// Production rows: not sent while the production policy refuses submission (B3).
         var production = 0
         /// Set when nothing could be done at all (the register is unreadable).
         var refusal: String?
@@ -95,7 +95,8 @@ final class EZZKStatusChecker {
     /// Ruling R15: a row written before part B2 has no EZZK mode and no signed record.
     nonisolated static let preB2RowMessage =
         "Záznam vznikol pred odosielaním do EZZK v Chevron7, preto ho aplikácia neodosiela."
-    /// Production submission stays refused until part B3 (the adapter refuses it too).
+    /// Why production rows are left alone while the production policy refuses consequential
+    /// calls (the adapter refuses them too).
     nonisolated static let productionRefusal = EZZKError.submissionUnavailable.errorDescription ?? ""
     nonisolated static let missingRowMessage = "Záznam sa v Registri konverzií nenašiel."
 
@@ -110,8 +111,8 @@ final class EZZKStatusChecker {
     /// mode's environment, whatever the controller's mode is by the time they run.
     @ObservationIgnored private let makeCoordinator: (AppSettings.EZZKMode) -> EZZKSubmissionCoordinator
     @ObservationIgnored private let now: @Sendable () -> Date
-    /// False until part B3 enables production: production rows are then neither sent nor
-    /// looked up by any path, and carry `productionRefusal`.
+    /// The production policy of the account controller: while it is false, production rows
+    /// are neither sent nor looked up by any path, and carry `productionRefusal`.
     @ObservationIgnored private let sendsInProduction: Bool
     @ObservationIgnored private var inFlight: Set<UUID> = []
     @ObservationIgnored private var automaticAttempts: [UUID: [Date]] = [:]
@@ -134,7 +135,8 @@ final class EZZKStatusChecker {
     /// The app's checker: submits with the account controller's service for the current
     /// mode. Demo sends to the local `MockEZZKService` and has nothing to look up, so a
     /// lookup there answers "processed" (ruling R4); outside Demo the lookup is the
-    /// controller's public `GetConversionRecord`.
+    /// controller's public `GetConversionRecord`. Production rows follow the controller's
+    /// production policy.
     convenience init(evidenceStore: LocalEvidenceStore,
                      numberPool: EvidenceNumberPool,
                      controller: EZZKAccountController) {
@@ -152,7 +154,13 @@ final class EZZKStatusChecker {
                     }
                 }
                 return EZZKSubmissionCoordinator(submitter: controller.service(for: mode), lookup: lookup)
-            })
+            },
+            sendsInProduction: controller.productionPolicy.allowsConsequentialCalls)
+    }
+
+    /// The reason the checker leaves rows of this mode alone, or nil when it may act on them.
+    func refusalReason(forMode mode: AppSettings.EZZKMode) -> String? {
+        mode == .production && !sendsInProduction ? Self.productionRefusal : nil
     }
 
     // MARK: - Periodic check
@@ -207,7 +215,7 @@ final class EZZKStatusChecker {
             // waits; the rest of the pass then belongs to the old mode and stops.
             guard currentMode() == mode else { return }
             guard Self.hasEvidenceNumber(snapshot), snapshot.ezzkMode == mode,
-                  mode != .production || sendsInProduction,
+                  refusalReason(forMode: mode) == nil,
                   !inFlight.contains(snapshot.id) else { continue }
             switch snapshot.status {
             case .signed, .queuedForSubmission, .submissionFailed, .late:
@@ -347,7 +355,7 @@ final class EZZKStatusChecker {
         guard let record = evidenceStore.record(id: id) else { return Self.missingRowMessage }
         guard let mode = record.ezzkMode else { return Self.preB2RowMessage }
         if mode != currentMode() { return Self.recordFromOtherModeMessage }
-        if mode == .production, !sendsInProduction { return Self.productionRefusal }
+        if let reason = refusalReason(forMode: mode) { return reason }
         if inFlight.contains(id) { return Self.rowBusyMessage }
         return nil
     }

@@ -665,7 +665,8 @@ struct SettingsView: View {
             .pickerStyle(.segmented)
             .disabled(controller.state == .verifying || ezzkLookupInProgress || ezzkNumbersInProgress)
 
-            Text(ezzkModeExplanation(controller.mode))
+            Text(ezzkModeExplanation(controller.mode,
+                                     productionAllowed: controller.productionPolicy.allowsConsequentialCalls))
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -682,12 +683,14 @@ struct SettingsView: View {
         .glassCard(cornerRadius: 12, padding: 12)
     }
 
-    private func ezzkModeExplanation(_ mode: AppSettings.EZZKMode) -> String {
+    private func ezzkModeExplanation(_ mode: AppSettings.EZZKMode, productionAllowed: Bool) -> String {
         switch mode {
         case .demo:
             "Demo používa iba lokálnu simuláciu, nič sa neposiela do EZZK."
         case .test:
             "Testovacie prostredie EZZK na overenie integrácie. Čísla ani záznamy nemajú právne účinky."
+        case .production where productionAllowed:
+            "Ostré EZZK: čísla aj záznamy majú právne účinky. Každá konverzia sa zapíše do centrálnej evidencie."
         case .production:
             "Ostré EZZK. Zatiaľ iba overenie prihlásenia, čas servera a vyhľadanie záznamu."
         }
@@ -919,7 +922,9 @@ struct SettingsView: View {
                 .font(.headline)
 
             if controller.mode == .production {
-                Label(EZZKError.productionAllocationDisabled.errorDescription ?? "", systemImage: "lock")
+                // "Vyžiadať čísla" stays test only whatever the production policy: a production
+                // number no record uses lapses at midnight and breaks the 24-hour reporting duty.
+                Label("V produkcii sa evidenčné číslo získava iba v zaručenej konverzii.", systemImage: "lock")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -979,7 +984,9 @@ struct SettingsView: View {
             Label("Odosielanie záznamov", systemImage: "arrow.up.doc")
                 .font(.headline)
 
-            let status = ezzkSubmissionStatus(settingsStore.ezzkAccountController.mode)
+            let controller = settingsStore.ezzkAccountController
+            let status = ezzkSubmissionStatus(controller.mode,
+                                              productionAllowed: controller.productionPolicy.allowsConsequentialCalls)
             Label(status.title, systemImage: status.symbol)
                 .font(.callout)
                 .foregroundStyle(.secondary)
@@ -993,7 +1000,8 @@ struct SettingsView: View {
         .glassCard(cornerRadius: 12, padding: 12)
     }
 
-    private func ezzkSubmissionStatus(_ mode: AppSettings.EZZKMode) -> (title: String, symbol: String, detail: String) {
+    private func ezzkSubmissionStatus(_ mode: AppSettings.EZZKMode,
+                                      productionAllowed: Bool) -> (title: String, symbol: String, detail: String) {
         switch mode {
         case .demo:
             ("Lokálna simulácia", "desktopcomputer",
@@ -1001,6 +1009,9 @@ struct SettingsView: View {
         case .test:
             ("Zapnuté automaticky", "checkmark.circle",
              "Po autorizácii sa záznam o konverzii podpíše rovnakým PIN a hneď odošle do testovacieho EZZK. Čakajúce odoslania a stav spracovania aplikácia overuje každých päť minút; výsledok je v Registri konverzií.")
+        case .production where productionAllowed:
+            ("Zapnuté automaticky", "checkmark.circle",
+             "Po autorizácii sa záznam o konverzii podpíše rovnakým PIN a hneď odošle do ostrého EZZK. Čakajúce odoslania a stav spracovania aplikácia overuje každých päť minút; výsledok je v Registri konverzií.")
         case .production:
             ("Príde v ďalšej verzii", "lock",
              "Na produkcii sú pridelenie čísla aj odoslanie záznamu zatiaľ zamknuté. Zapnú sa po overení celého postupu na testovacom EZZK.")

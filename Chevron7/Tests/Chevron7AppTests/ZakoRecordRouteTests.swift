@@ -188,7 +188,7 @@ final class ZakoRecordRouteTests: XCTestCase {
         try requireXMLLint()
         let transport = ScriptedTransport([Self.optionsReply])
         let controller = EZZKAccountController(mode: .test, credentialStore: MemoryCredentialStore(),
-                                               transportFactory: { _ in transport })
+                                               transportFactory: { _ in transport }, productionPolicy: .refused)
         let settingsStore = makeSettingsStore(ezzkAccountController: controller)
         let provider = RecordRefusingProvider()
         settingsStore.useRealSigningProvider(provider)
@@ -239,7 +239,7 @@ final class ZakoRecordRouteTests: XCTestCase {
         try requireXMLLint()
         let transport = ScriptedTransport([Self.optionsReply])
         let controller = EZZKAccountController(mode: .test, credentialStore: MemoryCredentialStore(),
-                                               transportFactory: { _ in transport })
+                                               transportFactory: { _ in transport }, productionPolicy: .refused)
         let settingsStore = makeSettingsStore(ezzkAccountController: controller)
         settingsStore.useRealSigningProvider(RecordRefusingProvider())
         let store = try makeReadyStore(settingsStore: settingsStore)
@@ -263,7 +263,7 @@ final class ZakoRecordRouteTests: XCTestCase {
         try requireXMLLint()
         let transport = ScriptedTransport([Self.optionsReply])
         let controller = EZZKAccountController(mode: .test, credentialStore: MemoryCredentialStore(),
-                                               transportFactory: { _ in transport })
+                                               transportFactory: { _ in transport }, productionPolicy: .refused)
         let settingsStore = makeSettingsStore(ezzkAccountController: controller)
         let provider = RecordRefusingProvider()
         settingsStore.useRealSigningProvider(provider)

@@ -69,7 +69,7 @@ final class ZakoMobileAvailabilityTests: XCTestCase {
     private func makeTestModeSettingsStore() -> (AppSettingsStore, EZZKAccountController) {
         let transport = ScriptedTransport([])
         let controller = EZZKAccountController(mode: .test, credentialStore: MemoryCredentialStore(),
-                                               transportFactory: { _ in transport })
+                                               transportFactory: { _ in transport }, productionPolicy: .refused)
         let settingsStore = makeSettingsStore(ezzkAccountController: controller)
         return (settingsStore, controller)
     }

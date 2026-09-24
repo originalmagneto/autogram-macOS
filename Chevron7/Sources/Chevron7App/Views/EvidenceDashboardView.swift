@@ -553,7 +553,9 @@ struct RecordDetailView: View {
     /// State, submission facts, what the row needs and the "Odoslať" / "Overiť v EZZK" actions.
     private func submissionCard(_ record: EvidenceRecord) -> some View {
         let actions = EvidenceRegisterDetail.actions(for: record,
-                                                     currentMode: settingsStore.ezzkAccountController.mode)
+                                                     currentMode: settingsStore.ezzkAccountController.mode,
+                                                     productionAllowed: settingsStore.ezzkAccountController
+                                                         .productionPolicy.allowsConsequentialCalls)
         let explanation = EZZKRecordPresentation.stateExplanation(for: record)
             .filter { $0 != actions.note && $0 != record.ezzkResultDescription }
         let nextCheck = settingsStore.statusChecker.nextStatusCheck(for: record)
