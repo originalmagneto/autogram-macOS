@@ -28,6 +28,28 @@ public struct AdvocateProfile: Codable, Hashable, Identifiable, Sendable {
     }
 
     public static let empty = AdvocateProfile()
+
+    /// Item 6 of the clause preview: the person, their function once (a name typed as
+    /// "Mgr. X, advokát" already carries it) and, when set, the office the clause names
+    /// as the legal subject, which is what EZZK compares with the account.
+    public var clausePreviewLine: String {
+        let name = fullName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let shownName = name.isEmpty ? "JUDr. Meno Priezvisko" : name
+        let function = position.trimmingCharacters(in: .whitespacesAndNewlines)
+        let sak = registrationNumber.trimmingCharacters(in: .whitespacesAndNewlines)
+        var parts = [shownName]
+        if !function.isEmpty,
+           !shownName.lowercased().hasSuffix(", " + function.lowercased()) {
+            parts.append(function)
+        }
+        parts.append("ev. č. SAK: " + (sak.isEmpty ? "XXXX" : sak))
+        var line = parts.joined(separator: ", ")
+        let office = officeName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !office.isEmpty, office.lowercased() != name.lowercased() {
+            line += " (" + office + ")"
+        }
+        return line
+    }
 }
 
 public struct AttestationData: Codable, Hashable, Sendable {
