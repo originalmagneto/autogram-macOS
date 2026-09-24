@@ -498,7 +498,16 @@ xattr -d com.apple.quarantine "/Applications/Chevron7.app"
 </details>
 
 <details open>
-<summary><strong>v0.12.0 · aktuálne vydanie: ostré EZZK pre všetkých a ZaKo len s mandátnym certifikátom</strong></summary>
+<summary><strong>v0.13.0 · aktuálne vydanie: evidenčné číslo automaticky pri autorizácii</strong></summary>
+<ul>
+<li>Evidenčné číslo pridelí EZZK samo pri autorizácii, tesne pred podpisom; tlačidlo <strong>Získať číslo</strong> zmizlo.</li>
+<li>Krok autorizácie sa mimo Demo už nerozťahuje za okraj okna, tlačidlo <strong>Autorizovať</strong> aj výzva na PIN sú dostupné.</li>
+<li>Demo čísla majú tvar <code>DEMO-rrmmdd-n</code> a nikdy nezablokujú skutočné číslo z Produkcie.</li>
+</ul>
+</details>
+
+<details>
+<summary><strong>v0.12.0 · predchádzajúce vydanie: ostré EZZK pre všetkých a ZaKo len s mandátnym certifikátom</strong></summary>
 <ul>
 <li>Produkcia EZZK je zapnutá pre všetkých: evidenčné číslo sa pridelí a záznam o konverzii odošle s vlastným EZZK účtom advokáta.</li>
 <li>Zaručená konverzia ide len s mandátnym certifikátom (MQC): číslo sa pridelí a konverzia autorizuje iba s vloženou kartou s MQC; aplikácia vyzve na vloženie karty a PIN si vypýta raz za spustenie.</li>
