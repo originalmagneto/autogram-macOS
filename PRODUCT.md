@@ -42,17 +42,17 @@ The site succeeds when a Mac user who needs to sign understands in seconds that 
 - Documents: PDFs mostly; outputs PAdES PDF, ASiC-E containers, XDCF on state portals, PDF/A-2b plus XML clause for ZaKo.
 - Entry points: open or drop a file in the app, `Cmd+O`, Finder Quick Action on a PDF, batch signing, a signing request raised from a state portal in Safari.
 - Signing devices: Slovak eID (BOK entered in the eID client's virtual keyboard), I.CA SecureStore, SAK advocate cards, Disig and other PKCS#11 tokens, Keychain identities, iPhone with Autogram v mobile over NFC.
-- ZaKo workflow: import and origin confirmation, page analysis, AI-suggested security elements with mandatory review, attestation clause, evidence number from EZZK, authorization with a mandate certificate, local register.
+- ZaKo workflow: import and origin confirmation, page analysis, AI-suggested security elements with mandatory review, attestation clause, authorization with a mandate certificate (which allocates the evidence number from EZZK and sends the signed conversion record to CEZZK), local register.
 
 ## Capabilities and Constraints
 
-Shipped (per README, release v0.4.0 of 2026-09-15, published as "Autogram macOS" before the rename):
+Shipped (per README, release v0.13.0 of 2026-09-24):
 
 - Signing: KEP, PAdES, ASiC-E, qualified timestamp, visible signature, batch signing with one full DSS validation, safe cancel.
 - Mobile signing through the Autogram v mobile app and the relay run by Slovensko.Digital; the server decrypts the document only in memory at signing and deletes it within 24 hours.
 - Safari extension for state portals: the portal decides the format; confirmation required for every request, with a card or with a phone.
 - Guaranteed conversion (ZaKo): 16 kinds of security elements, three-layer on-device detection (candidates, feature-print kNN plus on-device Foundation Model, human review), learning from confirmed and rejected findings, Create ML export, PDF/A-2b, clause, mandate certificate, EZZK evidence numbers.
-- EZZK: test environment fully works; production is read-only (login, server time, public record lookup) until the signed record submission exists. Sending records to CEZZK is not finished.
+- EZZK: production and test environments work with the advocate's own EZZK account: the evidence number is allocated at authorization, the signed conversion record is sent to CEZZK and its processing state shows in the register. A guaranteed conversion needs a card with a mandate certificate.
 - Register: local records, status filter, search, CSV export.
 - Zero Swift package dependencies; signing engine bundled with its own Java runtime.
 
