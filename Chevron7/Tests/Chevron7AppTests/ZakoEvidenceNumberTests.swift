@@ -8,11 +8,19 @@ import Chevron7Kit
 
 @MainActor
 final class ZakoEvidenceNumberTests: XCTestCase {
+    /// These tests are about the number pool and EZZK, so the reader holds a card with an MQC
+    /// (ZaKo allocates a real number only for one).
+    private func makeStoreWithMandateCard(_ settingsStore: AppSettingsStore) -> ZakoSessionStore {
+        let store = ZakoSessionStore(settingsStore: settingsStore)
+        store.readMandateCardState = { .mandate(label: "JUDr. Test Testovací OPRÁVNENIE 1") }
+        return store
+    }
+
     func testFetchedNumberRecordsItsAllocationTime() async {
         let settingsStore = makeSettingsStore()
         // Never reach EZZK from a unit test, whatever the developer selected in the app.
         settingsStore.ezzkAccountController.setMode(.demo)
-        let store = ZakoSessionStore(settingsStore: settingsStore)
+        let store = makeStoreWithMandateCard(settingsStore)
 
         await store.fetchEvidenceNumber()
 
@@ -29,7 +37,7 @@ final class ZakoEvidenceNumberTests: XCTestCase {
         let controller = EZZKAccountController(mode: .demo, credentialStore: MemoryCredentialStore(),
                                                transportFactory: { _ in transport }, productionPolicy: .refused)
         let settingsStore = makeSettingsStore(ezzkAccountController: controller)
-        let store = ZakoSessionStore(settingsStore: settingsStore)
+        let store = makeStoreWithMandateCard(settingsStore)
         await store.fetchEvidenceNumber()
         XCTAssertNotNil(store.attestation.evidenceNumber)
         XCTAssertEqual(store.attestation.evidenceNumberMode, .demo)
@@ -54,7 +62,7 @@ final class ZakoEvidenceNumberTests: XCTestCase {
         settingsStore.ezzkAccountController.setMode(.demo)
         settingsStore.settings.ezzkPersonName = "Advokát Test"
         settingsStore.settings.ezzkICO = "22222222"
-        let store = ZakoSessionStore(settingsStore: settingsStore)
+        let store = makeStoreWithMandateCard(settingsStore)
         store.attestation.performingPerson = AdvocateProfile(fullName: "Iná osoba", ico: "11111111")
 
         XCTAssertNil(store.ezzkIdentityWarning)
@@ -67,7 +75,7 @@ final class ZakoEvidenceNumberTests: XCTestCase {
         settingsStore.ezzkAccountController.setMode(.test)
         settingsStore.settings.ezzkPersonName = "Advokát Test"
         settingsStore.settings.ezzkICO = "22222222"
-        let store = ZakoSessionStore(settingsStore: settingsStore)
+        let store = makeStoreWithMandateCard(settingsStore)
         store.attestation.performingPerson = AdvocateProfile(fullName: "Iná osoba", ico: "11111111")
 
         XCTAssertNotNil(store.ezzkIdentityWarning)
@@ -85,7 +93,7 @@ final class ZakoEvidenceNumberTests: XCTestCase {
         let settingsStore = makeSettingsStore(ezzkAccountController: controller)
         settingsStore.settings.ezzkPersonName = "Advokátska kancelária Test"
         settingsStore.settings.ezzkICO = "12345678"
-        let firstDocument = ZakoSessionStore(settingsStore: settingsStore)
+        let firstDocument = makeStoreWithMandateCard(settingsStore)
 
         await firstDocument.fetchEvidenceNumber()
 
@@ -95,7 +103,7 @@ final class ZakoEvidenceNumberTests: XCTestCase {
 
         // A second document, in the same session: it must reuse the pooled number instead
         // of allocating a new one.
-        let secondDocument = ZakoSessionStore(settingsStore: settingsStore)
+        let secondDocument = makeStoreWithMandateCard(settingsStore)
         await secondDocument.fetchEvidenceNumber()
 
         XCTAssertEqual(secondDocument.attestation.evidenceNumber, "260917-A")
@@ -125,7 +133,7 @@ final class ZakoEvidenceNumberTests: XCTestCase {
                 securityElementCount: 0, totalPages: 1, totalSheets: 1, ezzkMode: .demo,
                 evidenceNumberAllocatedAt: Date()))
         }
-        let store = ZakoSessionStore(settingsStore: settingsStore)
+        let store = makeStoreWithMandateCard(settingsStore)
 
         await store.fetchEvidenceNumber()
 
@@ -145,7 +153,7 @@ final class ZakoEvidenceNumberTests: XCTestCase {
         settingsStore.settings.ezzkICO = "12345678"
 
         let requested = try await settingsStore.requestTestNumbersIntoPool()
-        let store = ZakoSessionStore(settingsStore: settingsStore)
+        let store = makeStoreWithMandateCard(settingsStore)
         await store.fetchEvidenceNumber()
 
         XCTAssertEqual(requested, ["260917-A"])
@@ -166,7 +174,7 @@ final class ZakoEvidenceNumberTests: XCTestCase {
         let settingsStore = makeSettingsStore(ezzkAccountController: controller)
         settingsStore.settings.ezzkPersonName = "Advokátska kancelária Test"
         settingsStore.settings.ezzkICO = "12345678"
-        let firstDocument = ZakoSessionStore(settingsStore: settingsStore)
+        let firstDocument = makeStoreWithMandateCard(settingsStore)
         await firstDocument.fetchEvidenceNumber()
         XCTAssertEqual(firstDocument.attestation.evidenceNumber, "260917-A")
         let row = EvidenceRecord(status: .recordUnsigned, direction: .paperToElectronic,
@@ -178,7 +186,7 @@ final class ZakoEvidenceNumberTests: XCTestCase {
         settingsStore.evidenceStore.upsert(row)
 
         settingsStore.statusChecker.delete(id: row.id)
-        let secondDocument = ZakoSessionStore(settingsStore: settingsStore)
+        let secondDocument = makeStoreWithMandateCard(settingsStore)
         await secondDocument.fetchEvidenceNumber()
 
         XCTAssertEqual(secondDocument.attestation.evidenceNumber, "260917-B")
@@ -194,7 +202,7 @@ final class ZakoEvidenceNumberTests: XCTestCase {
         let settingsStore = makeSettingsStore(ezzkAccountController: controller)
         settingsStore.settings.ezzkPersonName = "Advokátska kancelária Test"
         settingsStore.settings.ezzkICO = "12345678"
-        let store = ZakoSessionStore(settingsStore: settingsStore)
+        let store = makeStoreWithMandateCard(settingsStore)
 
         await store.fetchEvidenceNumber()
 
@@ -209,7 +217,7 @@ final class ZakoEvidenceNumberTests: XCTestCase {
     func testFetchRefusesWhenTheRegisterCannotBeRead() async throws {
         let settingsStore = try makeSettingsStoreWithUnreadableRegister()
         XCTAssertNotNil(settingsStore.evidenceStore.loadError)
-        let store = ZakoSessionStore(settingsStore: settingsStore)
+        let store = makeStoreWithMandateCard(settingsStore)
 
         await store.fetchEvidenceNumber()
 
@@ -225,7 +233,7 @@ final class ZakoEvidenceNumberTests: XCTestCase {
                                                transportFactory: { _ in transport }, productionPolicy: .refused)
         let settingsStore = makeSettingsStore(ezzkAccountController: controller)
         settingsStore.useRealSigningProvider(DemoSigningProvider())
-        let store = ZakoSessionStore(settingsStore: settingsStore)
+        let store = makeStoreWithMandateCard(settingsStore)
 
         await store.fetchEvidenceNumber()
 
@@ -240,7 +248,7 @@ final class ZakoEvidenceNumberTests: XCTestCase {
                                                transportFactory: { _ in transport }, productionPolicy: .refused)
         let settingsStore = makeSettingsStore(ezzkAccountController: controller)
         settingsStore.useRealSigningProvider(DemoSigningProvider())
-        let store = ZakoSessionStore(settingsStore: settingsStore)
+        let store = makeStoreWithMandateCard(settingsStore)
         store.attestation.evidenceNumber = "260924-X"
         store.attestation.evidenceNumberMode = .test
         store.attestation.evidenceNumberAllocatedAt = Date()

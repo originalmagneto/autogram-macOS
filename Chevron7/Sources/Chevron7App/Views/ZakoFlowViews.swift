@@ -23,6 +23,10 @@ struct ZakoFlowView: View {
             .onDrop(of: [UTType.pdf, .jpeg, .png, .tiff], isTargeted: $isTargeted) { providers in
                 handleDrop(providers)
             }
+            .sheet(item: $store.cardPrompt) { prompt in
+                ZakoCardPromptSheet(store: store, prompt: prompt)
+                    .interactiveDismissDisabled()
+            }
             .toolbar {
                 if store.step != .intake {
                     ToolbarItem(placement: .navigation) {

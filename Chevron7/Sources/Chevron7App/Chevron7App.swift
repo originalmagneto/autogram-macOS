@@ -37,7 +37,11 @@ final class Chevron7AppModel {
         let signing = signingStore
         let zako = zakoStore
         let browserSigning = webSigning
-        cardReader.onRefresh = { signing.applyReaderIdentities($0) }
+        cardReader.onRefresh = {
+            signing.applyReaderIdentities($0)
+            // ZaKo's clause step gates the evidence number on the card, so it hears the reader too.
+            zako.applyReaderIdentities($0)
+        }
         cardReader.isPaused = {
             signing.isSigning || signing.isResolvingCertificate
                 || signing.batchPhase == .preflighting || signing.batchPhase == .signing

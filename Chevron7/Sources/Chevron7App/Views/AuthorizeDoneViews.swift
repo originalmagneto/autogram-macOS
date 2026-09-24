@@ -8,7 +8,6 @@ import UniformTypeIdentifiers
 
 struct AuthorizeView: View {
     @Bindable var store: ZakoSessionStore
-    @FocusState private var pinFocused: Bool
 
     var body: some View {
         VStack(spacing: 0) {
@@ -71,16 +70,6 @@ struct AuthorizeView: View {
             if let session = store.mobileSigning.session {
                 MobileSigningSheet(session: session) { store.mobileSigning.cancel() }
                     .interactiveDismissDisabled()
-            }
-        }
-        .onAppear {
-            if !store.signingProviderIsDemo, store.signingPIN.isEmpty {
-                pinFocused = true
-            }
-        }
-        .onChange(of: store.selectedIdentityID) { _, _ in
-            if !store.signingProviderIsDemo, store.signingPIN.isEmpty {
-                pinFocused = true
             }
         }
         .task { await store.refreshIdentities() }
@@ -225,30 +214,7 @@ struct AuthorizeView: View {
             }
 
             if !store.signingProviderIsDemo {
-                HStack(spacing: 8) {
-                    SecureField("PIN karty", text: $store.signingPIN)
-                        .textFieldStyle(.roundedBorder)
-                        .focused($pinFocused)
-                        .onSubmit {
-                            Task {
-                                await store.resolveCertificateForAuthorization(force: true)
-                            }
-                        }
-
-                    Button {
-                        Task {
-                            await store.resolveCertificateForAuthorization(force: true)
-                        }
-                    } label: {
-                        Label("Načítať certifikáty", systemImage: "arrow.clockwise")
-                    }
-                    .controlSize(.small)
-                    .disabled(store.signingPIN.isEmpty || store.isResolvingCertificate)
-                    .help("Načítať certifikáty z vloženej karty")
-                }
-
-                Label("Po zadaní PIN-u načítajte certifikáty ešte pred autorizáciou.",
-                      systemImage: "key.horizontal")
+                Label(authorizationCardHint, systemImage: "key.horizontal")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -286,10 +252,21 @@ struct AuthorizeView: View {
         .frame(minWidth: 280, idealWidth: 380, maxWidth: .infinity, alignment: .leading)
     }
 
+    private var authorizationCardHint: String {
+        switch store.mandateGate {
+        case .ready(let label) where store.hasResolvedCertificate:
+            "Podpíše sa mandátnym certifikátom \(label)."
+        case .noMandate:
+            ZakoSessionStore.noMandateMessage
+        default:
+            "Po kliknutí na Autorizovať aplikácia skontroluje kartu, vyžiada PIN alebo BOK a načíta mandátny certifikát."
+        }
+    }
+
     @ViewBuilder
     private var authorizeButton: some View {
         Button {
-            Task { await store.authorizeAndSign() }
+            Task { await store.beginAuthorization() }
         } label: {
             HStack(spacing: 8) {
                 if store.isAuthorizing {
@@ -305,7 +282,8 @@ struct AuthorizeView: View {
         .buttonStyle(.borderedProminent)
         .controlSize(.large)
         .tint(.indigo)
-        .disabled(store.isAuthorizing || store.isResolvingCertificate || !store.isPreflightComplete)
+        .disabled(store.isAuthorizing || store.isResolvingCertificate || store.cardPrompt != nil
+                  || !store.canBeginAuthorization)
         .keyboardShortcut(.defaultAction)
     }
 

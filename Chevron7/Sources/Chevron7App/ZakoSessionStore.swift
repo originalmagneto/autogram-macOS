@@ -70,7 +70,17 @@ final class ZakoSessionStore {
     var usesQualifiedTimestamp: Bool { showsQualifiedTimestampToggle ? includeQualifiedTimestamp : true }
     var allowNonMandateOverride = false
     private var mandateOverrideIdentityID: String?
+    /// Kept for the whole app run once typed (the owner's choice), only in memory; cleared
+    /// when the card leaves the reader or the card refuses it, so it never reaches another card.
     var signingPIN = ""
+    /// What CryptoTokenKit reports about the inserted card, read without a PIN.
+    private(set) var mandateCardState: MandateCertificate.CardState = .noCard
+    /// Reads `mandateCardState`; tests substitute it.
+    var readMandateCardState: () -> MandateCertificate.CardState = { MandateCertificate.currentCardState() }
+    /// The card step the view presents while a guarded action waits for it.
+    var cardPrompt: ZakoCardPrompt?
+    /// The action the card flow completes once the mandate certificate is confirmed.
+    var pendingCardAction: ZakoCardAction?
     private var isRefreshingIdentities = false
     private(set) var isResolvingCertificate = false
     var certificateLoadError: String?
@@ -493,9 +503,9 @@ final class ZakoSessionStore {
         var data = attestation
         data.performingPerson = profile
         data.originalDocumentOrder = 1
-        data.originalDocumentName = sourceNameOverride
+        data.originalDocumentName = ConversionOutputNaming.readableName(sourceNameOverride
             ?? sourceURL?.deletingPathExtension().lastPathComponent
-            ?? analysis.suggestedTitle ?? ""
+            ?? analysis.suggestedTitle ?? "")
         data.newDocumentName = (data.originalDocumentName.isEmpty ? "dokument" : data.originalDocumentName) + ".pdf"
         data.numberOfSheets = effectiveSheetCount
         data.sheetCountingMethod = sheetMethod
@@ -988,7 +998,22 @@ final class ZakoSessionStore {
         isRefreshingIdentities = true
         defer { isRefreshingIdentities = false }
 
-        identities = await signingProvider.availableIdentities()
+        applyReaderIdentities(await signingProvider.availableIdentities())
+        if !identities.isEmpty, !signingPIN.isEmpty, !hasResolvedCertificate {
+            await resolveCertificateForAuthorization()
+        }
+    }
+
+    /// Takes what the reader reports, from `refreshIdentities` or the shared
+    /// `CardReaderStatus` poll, so the clause step knows the card too.
+    func refreshMandateCardState() {
+        mandateCardState = readMandateCardState()
+    }
+
+    func applyReaderIdentities(_ discovered: [SigningIdentityInfo]) {
+        refreshMandateCardState()
+        guard !isAuthorizing, !isResolvingCertificate else { return }
+        if identities != discovered { identities = discovered }
         if identities.isEmpty {
             if !signingPIN.isEmpty { signingPIN = "" }
             certificateLoadError = nil
@@ -1000,9 +1025,6 @@ final class ZakoSessionStore {
             selectedIdentityID = identities.first(where: { $0.isMandateCertificate })?.id
                 ?? identities.first?.id
         }
-        if !signingPIN.isEmpty, !hasResolvedCertificate {
-            await resolveCertificateForAuthorization()
-        }
     }
 
     var hasResolvedCertificate: Bool {
@@ -1012,7 +1034,8 @@ final class ZakoSessionStore {
     }
 
     func resolveCertificateForAuthorization(force: Bool = false) async {
-        guard !signingProviderIsDemo, !signingPIN.isEmpty, !isResolvingCertificate else { return }
+        guard !signingProviderIsDemo, !signingPIN.isEmpty || !cardNeedsTypedPIN,
+              !isResolvingCertificate else { return }
         guard force || !hasResolvedCertificate else { return }
         guard force || lastCertificateLoadPIN != signingPIN else { return }
 
@@ -1036,8 +1059,14 @@ final class ZakoSessionStore {
                 ?? resolved.first?.id
             certificateLoadError = nil
         } else {
-            certificateLoadError = "Načítanie certifikátov z karty zlyhalo."
+            certificateLoadError = (signingProvider as? EngineBridgeSigningProvider)?.lastResolveError
+                ?? "Načítanie certifikátov z karty zlyhalo."
         }
+    }
+
+    /// An eID asks for its BOK in the eID client's own window; other cards take the PIN here.
+    var cardNeedsTypedPIN: Bool {
+        !(identities.first?.usesProtectedAuthenticationPath ?? false)
     }
 
     /// Synthetic identita = typ certifikátu ešte nie je overený (čaká na PIN).
@@ -1054,14 +1083,14 @@ final class ZakoSessionStore {
         return identity.isMandateCertificate && identity.isQualified && identity.hasPrivateKey
     }
 
+    /// Only the Demo signing provider, whose identities are never mandate certificates,
+    /// may go on without one. A real card signs a conversion with its MQC or not at all.
     var requiresMandateOverride: Bool {
-        guard !signingProviderIsDemo else { return !hasValidMandateOverride }
-        if isCertificateTypePending { return false }
-        return !mandateRequirementSatisfied && !hasValidMandateOverride
+        signingProviderIsDemo && !hasValidMandateOverride
     }
 
     var hasValidMandateOverride: Bool {
-        allowNonMandateOverride && mandateOverrideIdentityID == selectedIdentityID
+        signingProviderIsDemo && allowNonMandateOverride && mandateOverrideIdentityID == selectedIdentityID
     }
 
     func setMandateOverride(_ enabled: Bool) {
@@ -1122,6 +1151,15 @@ final class ZakoSessionStore {
         if mode != .demo, signingProviderIsDemo {
             evidenceNumberError = EZZKError.demoSignatureOutsideDemo.errorDescription
             lastError = evidenceNumberError
+            recomputePreflight()
+            return
+        }
+        // A real number is allocated only for someone who can sign it with an MQC: an unused
+        // one lapses at midnight. `requestEvidenceNumber` walks the card flow first.
+        if mode != .demo, !signingProviderIsDemo { refreshMandateCardState() }
+        if mode != .demo, let refusal = mandateGate.evidenceNumberRefusal {
+            evidenceNumberError = refusal
+            lastError = refusal
             recomputePreflight()
             return
         }
@@ -1241,6 +1279,12 @@ final class ZakoSessionStore {
         // not read would keep the row only in memory, so nothing is signed or sent.
         if let loadError = evidenceStore.loadError {
             lastError = loadError
+            return
+        }
+        // A real card authorizes only with its mandate certificate (the phone's is checked
+        // after it signs).
+        if !viaMobile, !signingProviderIsDemo, !mandateRequirementSatisfied {
+            lastError = Self.noMandateMessage
             return
         }
         guard viaMobile ? isMobilePreflightComplete : isPreflightComplete else { return }
@@ -1650,7 +1694,6 @@ func resetSession(keepingProfile: Bool) {
         manualSheetCount = nil
         identities = []
         selectedIdentityID = nil
-        signingPIN = ""
         allowNonMandateOverride = false
         mandateOverrideIdentityID = nil
         evidenceNumberRequested = false
