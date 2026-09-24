@@ -355,7 +355,12 @@ Live check with a SAK card: done 2026-09-24 (result below). This session could n
 cd <output folder>
 unzip -l *.asice
 ```
-Expected: `mimetype`, `<name>.pdf`, `<number>.xml.xdcf`, `META-INF/manifest.xml`, `META-INF/signatures001.xml`, and no `.asice` inside.
+Expected: `mimetype`, `<new document name>.pdf`, `<number>.xml.xdcf`, `META-INF/manifest.xml`, `META-INF/signatures001.xml`, and no `.asice` inside, as in the podpisuj.sk reference.
+
+```bash
+unzip -p *.asice '*.xdcf' | grep -o '<NewDocumentName>[^<]*'
+```
+Expected: exactly the name of the `.pdf` entry listed above.
 
 ```bash
 unzip -p *.asice '*.pdf' | openssl dgst -sha256 -binary | base64
@@ -373,7 +378,7 @@ unzip -p *.asice META-INF/signatures001.xml | grep -o '<xades:SignatureTimeStamp
 ```
 Expected: at least one match, confirming the signature carries a qualified timestamp (Baseline T).
 
-Result (2026-09-24, owner, I.CA SAK card): passed with source "Ukazkova_listina". The client ASiC-E held `mimetype`, the PDF, `<name>-<number>.xml.xdcf` and `META-INF`, with no nested `.asice`; the clause fingerprint equalled the PDF's SHA-256; both MIME types were present and the signature carried a `SignatureTimeStamp`. The record `1563-260924-1.record.asice` held only the record 1.0 XDC with a timestamp.
+Result (2026-09-24, owner, I.CA SAK card): passed with source "Ukazkova_listina". The client ASiC-E held `mimetype`, the PDF, `<name>-<number>.xml.xdcf` and `META-INF`, with no nested `.asice`; the clause fingerprint equalled the PDF's SHA-256; both MIME types were present and the signature carried a `SignatureTimeStamp`. The record `1563-260924-1.record.asice` held only the record 1.0 XDC with a timestamp. That run also showed a naming gap against the podpisuj.sk reference: the clause said `<NewDocumentName>Ukazkova_listina copy.pdf</NewDocumentName>` while the PDF entry was `Ukazkova_listina copy-konvertovane.pdf` and the clause entry `Ukazkova_listina copy-konvertovane-260924-BcE299bb83.xml.xdcf`. Fixed the same day: both the PDF entry and NewDocumentName (clause and record) come from one sanitized value (`ConversionOutputNaming.containerDocumentName`), and the clause entry is `<number>.xml.xdcf` (`containerClauseName`).
 
 ## Part B2 (2026-09-23)
 
@@ -383,7 +388,7 @@ Result (2026-09-24, owner, I.CA SAK card): passed with source "Ukazkova_listina"
 - **Record schema derivation:** the official record 1.0 `schema.xsd` does not compile in libxml2 (`xmllint`): the `IdentifierValue` pattern escapes `/` as `\/` and the record's identifier pattern differs from the clause's (8 or 12 digits, not 8 to 12). `docs/reference/forms/record-1.0/schema.validation.xsd` is a derived copy in which only that one pattern is rewritten to `https://data\.gov\.sk/id/legal-subject/([0-9]{8}|[0-9]{12})`; the XDC itself keeps referencing and digesting the official `schema.xsd`. A test pins that the two files differ only in that pattern.
 - **Engine local route for the record:** a sign request whose single source is an `.xdcf` holding an `XMLDataContainer` root, with no attachments and no eForm, is signed locally (`SigningParameters.isPlainRecordXdc()`): `autoLoadEform=false`, `fsFormId=null`, `plainXmlEnabled=true`, ASiC-E, XAdES, bare MIME `application/vnd.gov.sk.xmldatacontainer+xml`, no network call to slovensko.sk. This mirrors the record EZZK accepted on 2026-08-24.
 - **Qualified timestamp by construction:** outside Demo, ZaKo passes only the built-in qualified authorities (`TimestampAuthority.qualifiedURLs`) to the engine for both the client and the record signature, so a Baseline T output with a cryptographically valid timestamp is a build property rather than something inspected after signing. The QTS toggle is shown only in Demo.
-- **Storage:** the signed record container is written to `Evidence/records/<record id>.asice` (the copy submission reads, `LocalEvidenceStore.storeRecordContainer`) and next to the client outputs as `<number>.record.asice` (the advocate's archive copy). A record-signing failure leaves the client outputs delivered but marks the row `.recordUnsigned`; nothing is sent.
+- **Storage:** the signed record container is written to `Evidence/records/<record id>.asice` (the copy submission reads, `LocalEvidenceStore.storeRecordContainer`) and nowhere else; the Register saves it as `<number>.record.asice` ("Uložiť záznam…"). Since 2026-09-24 the folder next to the source holds only the client ASiC-E after a card signature (no loose PDF/A, clause XDCF or record copy). A record-signing failure leaves the client outputs delivered but marks the row `.recordUnsigned`; nothing is sent.
 - **Evidence numbers reused, not just allocated:** `EvidenceNumberPool` remembers every number this app allocated and has not used yet, per EZZK mode and Bratislava day, and a fresh conversion reuses one before asking EZZK for a new one.
 - **Submission states owned by one coordinator:** `EZZKSubmissionCoordinator` (rulings R9 to R12 and R16 in the plan ledger) decides every transition; `EZZKStatusChecker` runs it for every register row every five minutes, but only in a regular launch of Chevron7 (ruling R13, never in the `--web-signing` accessory mode), one row at a time, per-row EZZK mode, capped automatic sends per day (ruling R14), and never for a row written before part B2 (ruling R15, no stored `ezzkMode`) or a production row (ruling R16 is about late rows; production stays refused independently until B3).
 - **Register safety:** an unreadable register is never overwritten after a failed load (its own timestamped `.unreadable-*` copy is kept beside it), and the first B2 write makes a one-time `register.backup-before-b2.json` copy so a register written by an older build can be recovered.

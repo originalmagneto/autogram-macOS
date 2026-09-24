@@ -16,7 +16,7 @@ final class EZZKRecordPresentationTests: XCTestCase {
     func testDoneClaimsSuccessOnlyWhenEZZKHasTheRecord() {
         for status in EvidenceRecord.Status.allCases {
             let done = ZakoDonePresentation(record: row(status), lastError: nil, lastErrorStatus: nil,
-                                            archiveCopyError: nil, nextStatusCheck: nil, now: now)
+                                            nextStatusCheck: nil, now: now)
             let succeeded = status == .acceptedForProcessing || status == .processed || status == .submitted
             XCTAssertEqual(done.tone == .success, succeeded, "\(status)")
             if !succeeded {
@@ -27,16 +27,16 @@ final class EZZKRecordPresentationTests: XCTestCase {
 
     func testDoneReadsTheModeTheRowWasSignedIn() {
         let test = ZakoDonePresentation(record: row(.queuedForSubmission, mode: .test), lastError: nil,
-                                        lastErrorStatus: nil, archiveCopyError: nil, nextStatusCheck: nil, now: now)
+                                        lastErrorStatus: nil, nextStatusCheck: nil, now: now)
         XCTAssertTrue(test.lines.contains("Režim EZZK pri podpise: Test"), "\(test.lines)")
         XCTAssertEqual(test.action, .send)
 
         let demo = ZakoDonePresentation(record: row(.queuedForSubmission, mode: .demo), lastError: nil,
-                                        lastErrorStatus: nil, archiveCopyError: nil, nextStatusCheck: nil, now: now)
+                                        lastErrorStatus: nil, nextStatusCheck: nil, now: now)
         XCTAssertEqual(demo.action, .send)
 
         let production = ZakoDonePresentation(record: row(.queuedForSubmission, mode: .production), lastError: nil,
-                                              lastErrorStatus: nil, archiveCopyError: nil, nextStatusCheck: nil, now: now)
+                                              lastErrorStatus: nil, nextStatusCheck: nil, now: now)
         XCTAssertEqual(production.action, .none, "production stays refused")
         XCTAssertTrue(production.lines.contains(EZZKError.submissionUnavailable.errorDescription ?? "-"))
     }
@@ -83,30 +83,29 @@ final class EZZKRecordPresentationTests: XCTestCase {
     }
 
     /// The flow's last error describes the row as ZaKo last saw it; once the periodic check
-    /// moved the row on, only the archive copy failure still applies.
+    /// moved the row on, none of it applies.
     func testDoneShowsTheFlowsErrorOnlyWhileItStillDescribesTheRow() {
-        let copyError = "Záznam o konverzii je uložený v Registri, ale jeho kópiu sa nepodarilo uložiť k výstupom: disk"
         var unknown = row(.outcomeUnknown)
         unknown.ezzkResultDescription = "Výsledok neznámy"
-        let stillUnknown = ZakoDonePresentation(record: unknown, lastError: "Výsledok neznámy\n" + copyError,
-                                                lastErrorStatus: .outcomeUnknown, archiveCopyError: copyError,
+        let stillUnknown = ZakoDonePresentation(record: unknown, lastError: "Výsledok neznámy\nSpojenie prerušené",
+                                                lastErrorStatus: .outcomeUnknown,
                                                 nextStatusCheck: nil, now: now)
-        XCTAssertEqual(stillUnknown.error, copyError, "the row's own description is already a line")
+        XCTAssertEqual(stillUnknown.error, "Spojenie prerušené", "the row's own description is already a line")
 
-        let movedOn = ZakoDonePresentation(record: row(.acceptedForProcessing), lastError: "Výsledok neznámy\n" + copyError,
-                                           lastErrorStatus: .outcomeUnknown, archiveCopyError: copyError,
+        let movedOn = ZakoDonePresentation(record: row(.acceptedForProcessing), lastError: "Výsledok neznámy\nSpojenie prerušené",
+                                           lastErrorStatus: .outcomeUnknown,
                                            nextStatusCheck: nil, now: now)
-        XCTAssertEqual(movedOn.error, copyError)
+        XCTAssertNil(movedOn.error)
 
         let refused = ZakoDonePresentation(record: row(.queuedForSubmission), lastError: EZZKStatusChecker.rowBusyMessage,
-                                           lastErrorStatus: .queuedForSubmission, archiveCopyError: nil,
+                                           lastErrorStatus: .queuedForSubmission,
                                            nextStatusCheck: nil, now: now)
         XCTAssertEqual(refused.error, EZZKStatusChecker.rowBusyMessage)
     }
 
     func testDoneWithoutARowSaysSoAndOffersNothing() {
         let done = ZakoDonePresentation(record: nil, lastError: "Register konverzií sa nepodarilo načítať.",
-                                        lastErrorStatus: nil, archiveCopyError: nil, nextStatusCheck: nil, now: now)
+                                        lastErrorStatus: nil, nextStatusCheck: nil, now: now)
         XCTAssertNotEqual(done.tone, .success)
         XCTAssertEqual(done.action, .none)
         XCTAssertEqual(done.error, "Register konverzií sa nepodarilo načítať.")
@@ -129,34 +128,40 @@ final class EZZKRecordPresentationTests: XCTestCase {
         XCTAssertFalse(EZZKRecordPresentation.stateExplanation(for: unsigned).joined().contains("Neodovzdávajte"))
     }
 
-    /// A retry that leaves the row as it was replaces the flow's error, but the failed
-    /// archive copy is still true.
-    func testDoneKeepsTheArchiveCopyErrorAfterARetry() {
-        let copyError = "Záznam o konverzii je uložený v Registri, ale jeho kópiu sa nepodarilo uložiť k výstupom: disk"
-        var queued = row(.queuedForSubmission)
-        queued.ezzkResultDescription = "Sieťová chyba pri spojení s EZZK: offline"
-        let done = ZakoDonePresentation(record: queued, lastError: "Sieťová chyba pri spojení s EZZK: offline",
-                                        lastErrorStatus: .queuedForSubmission, archiveCopyError: copyError,
-                                        nextStatusCheck: nil, now: now)
-        XCTAssertEqual(done.error, copyError)
-    }
-
     func testDoneOffersNoActionForARowOfAnotherMode() {
         for status in [EvidenceRecord.Status.queuedForSubmission, .outcomeUnknown, .acceptedForProcessing] {
             let done = ZakoDonePresentation(record: row(status, mode: .test), lastError: nil, lastErrorStatus: nil,
-                                            archiveCopyError: nil, nextStatusCheck: nil, now: now,
+                                            nextStatusCheck: nil, now: now,
                                             currentMode: .demo)
             XCTAssertEqual(done.action, .none, "\(status)")
             XCTAssertFalse(done.isActionEnabled)
             XCTAssertTrue(done.lines.contains(EZZKStatusChecker.recordFromOtherModeMessage), "\(done.lines)")
         }
         let sameMode = ZakoDonePresentation(record: row(.queuedForSubmission, mode: .test), lastError: nil,
-                                            lastErrorStatus: nil, archiveCopyError: nil, nextStatusCheck: nil,
+                                            lastErrorStatus: nil, nextStatusCheck: nil,
                                             now: now, currentMode: .test)
         XCTAssertEqual(sameMode.action, .send)
     }
 
     // MARK: - Register konverzií
+
+    /// "Uložiť záznam…": the signed record lives only in the register, so the Register hands
+    /// out its stored bytes under the name EZZK knows it by, and offers nothing without one.
+    func testRegisterSavesTheStoredRecordUnderItsEvidenceNumber() throws {
+        let store = makeSettingsStore().evidenceStore
+        var signed = row(.acceptedForProcessing)
+        signed.evidenceNumber = "1563-260924-7"
+        XCTAssertNil(EvidenceRegisterDetail.storedRecordContainer(for: signed, in: store),
+                     "a row without a signed record offers nothing to save")
+
+        signed.recordContainerPath = try store.storeRecordContainer(Data("zip".utf8), for: signed.id)
+        let saved = try XCTUnwrap(EvidenceRegisterDetail.storedRecordContainer(for: signed, in: store))
+        XCTAssertEqual(saved.fileName, "1563-260924-7.record.asice")
+        XCTAssertEqual(saved.data, Data("zip".utf8))
+
+        signed.recordContainerPath = "../register.json"
+        XCTAssertNil(EvidenceRegisterDetail.storedRecordContainer(for: signed, in: store))
+    }
 
     func testRegisterSummaryCountsAcceptedAndProcessedAsSentAndRejectedAsFailed() {
         let rows = [row(.acceptedForProcessing), row(.processed), row(.submitted), row(.rejected),
@@ -285,7 +290,7 @@ final class EZZKRecordPresentationTests: XCTestCase {
     // MARK: - Fixtures
 
     private func presentation(_ record: EvidenceRecord, nextStatusCheck: Date? = nil) -> ZakoDonePresentation {
-        ZakoDonePresentation(record: record, lastError: nil, lastErrorStatus: nil, archiveCopyError: nil,
+        ZakoDonePresentation(record: record, lastError: nil, lastErrorStatus: nil,
                              nextStatusCheck: nextStatusCheck, now: now)
     }
 

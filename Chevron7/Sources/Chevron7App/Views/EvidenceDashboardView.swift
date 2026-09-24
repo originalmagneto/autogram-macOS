@@ -4,6 +4,7 @@
 import SwiftUI
 import Chevron7Kit
 import AppKit
+import UniformTypeIdentifiers
 
 struct EvidenceDashboardView: View {
     @Bindable var settingsStore: AppSettingsStore
@@ -19,6 +20,7 @@ struct EvidenceDashboardView: View {
     @State private var recordToDelete: EvidenceRecord?
     @State private var showDeleteConfirmation = false
     @State private var exportError: String?
+    @State private var recordSaveError: String?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -212,6 +214,15 @@ struct EvidenceDashboardView: View {
             Label("Kopírovať SHA-256 odtlačok", systemImage: "number.square")
         }
 
+        if record.recordContainerPath != nil {
+            Button {
+                recordSaveError = nil
+                RecordContainerExport.save(record, from: settingsStore.evidenceStore) { recordSaveError = $0 }
+            } label: {
+                Label("Uložiť záznam…", systemImage: "square.and.arrow.down")
+            }
+        }
+
         Divider()
 
         Button(role: .destructive) {
@@ -253,6 +264,11 @@ struct EvidenceDashboardView: View {
                     Button("Skúsiť znova", action: exportCSV)
                         .buttonStyle(.link)
                 }
+            }
+            if let recordSaveError {
+                Text(recordSaveError)
+                    .font(.caption)
+                    .foregroundStyle(.red)
             }
         }
         .padding(.horizontal, 18)
@@ -341,6 +357,30 @@ struct EvidenceDashboardView: View {
                 try Data(settingsStore.evidenceStore.exportCSV().utf8).write(to: url, options: [.atomic])
             } catch {
                 exportError = "Export sa nepodaril: \(error.localizedDescription)"
+            }
+        }
+    }
+}
+
+/// "Uložiť záznam…" in the Register: the signed conversion record is kept only in the
+/// register (`Evidence/records/<id>.asice`), so the advocate saves a copy from there.
+@MainActor
+enum RecordContainerExport {
+    static func save(_ record: EvidenceRecord, from store: LocalEvidenceStore,
+                     onError: @escaping (String) -> Void) {
+        guard let stored = EvidenceRegisterDetail.storedRecordContainer(for: record, in: store) else {
+            onError(EvidenceRegisterDetail.recordContainerMissingMessage)
+            return
+        }
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [UTType(filenameExtension: "asice") ?? .data]
+        panel.nameFieldStringValue = stored.fileName
+        panel.begin { response in
+            guard response == .OK, let url = panel.url else { return }
+            do {
+                try stored.data.write(to: url, options: [.atomic])
+            } catch {
+                onError("Záznam sa nepodarilo uložiť: \(error.localizedDescription)")
             }
         }
     }
@@ -459,6 +499,16 @@ struct RecordDetailView: View {
                 }
 
                 Spacer()
+
+                if record.recordContainerPath != nil {
+                    Button {
+                        actionMessage = nil
+                        RecordContainerExport.save(record, from: settingsStore.evidenceStore) { actionMessage = $0 }
+                    } label: {
+                        Label("Uložiť záznam…", systemImage: "square.and.arrow.down")
+                    }
+                    .help("Uložiť podpísaný záznam o konverzii (ASiC-E), ktorý sa odosiela do EZZK")
+                }
 
                 Button(role: .destructive) {
                     showDeleteConfirm = true

@@ -36,6 +36,24 @@ public enum ConversionOutputNaming {
         return "\(pdfStem)-\(evidence).xml.xdcf"
     }
 
+    /// The PDF/A's name inside the client ASiC-E, which the clause and the record carry as
+    /// NewDocumentName: the advocate's "Názov výstupu (PDF/A)", sanitized, with ".pdf" ensured
+    /// (as in the podpisuj.sk reference, the two are one value). `fallback` is used when the
+    /// requested name sanitizes to nothing.
+    public static func containerDocumentName(newDocumentName: String, fallback: String) -> String {
+        var name = ASiCEPackager.sanitizedFileName(newDocumentName)
+        if name.isEmpty { name = ASiCEPackager.sanitizedFileName(fallback) }
+        if name.isEmpty { name = "dokument" }
+        return (name as NSString).pathExtension.lowercased() == "pdf" ? name : "\(name).pdf"
+    }
+
+    /// The clause's name inside the client ASiC-E: "<evidence number>.xml.xdcf", as in the
+    /// podpisuj.sk reference, or "dolozka.xml.xdcf" without a usable number.
+    public static func containerClauseName(evidenceNumber: String?) -> String {
+        let evidence = evidenceNumber.map(ASiCEPackager.sanitizedFileName) ?? ""
+        return "\(evidence.isEmpty ? "dolozka" : evidence).xml.xdcf"
+    }
+
     public static func asicFileName(pdfFileName: String) -> String {
         "\(documentStem(pdfFileName, fallback: "konverzia")).asice"
     }

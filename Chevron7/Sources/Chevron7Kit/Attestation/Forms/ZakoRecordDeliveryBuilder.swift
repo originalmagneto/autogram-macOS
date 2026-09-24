@@ -37,6 +37,12 @@ public struct ZakoRecordDeliveryBuilder: Sendable {
         return ZakoRecordDelivery(recordXML: xml,
                                   recordXDCF: XMLDataContainerBuilder.build(formXML: xml, form: .record_1_0),
                                   entryName: "\(model.evidenceNumber).record.xml.xdcf",
-                                  containerName: "\(model.evidenceNumber).record.asice")
+                                  containerName: Self.containerName(evidenceNumber: model.evidenceNumber))
+    }
+
+    /// The signed record's container name (`<number>.record.asice`), also used when the
+    /// Register saves the stored record.
+    public static func containerName(evidenceNumber: String) -> String {
+        "\(evidenceNumber).record.asice"
     }
 }
