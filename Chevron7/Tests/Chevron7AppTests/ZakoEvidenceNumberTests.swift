@@ -107,6 +107,53 @@ final class ZakoEvidenceNumberTests: XCTestCase {
                        "the second fetch must reuse the pooled number without another request")
     }
 
+    /// The Demo simulator counts from 1 again after every launch; a number the register
+    /// already holds must not be handed to a second document.
+    func testDemoSkipsNumbersTheRegisterAlreadyHolds() async {
+        let settingsStore = makeSettingsStore()
+        settingsStore.ezzkAccountController.setMode(.demo)
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyMMdd"
+        let day = formatter.string(from: Date())
+        for suffix in [1, 2] {
+            settingsStore.evidenceStore.upsert(EvidenceRecord(
+                status: .acceptedForProcessing, direction: .paperToElectronic,
+                originalName: "Zmluva \(suffix)", newDocumentName: "Zmluva \(suffix).pdf",
+                evidenceNumber: "1563-\(day)-\(suffix)", fingerprintSHA256Hex: "ab", attestationXML: "<x/>",
+                conversionTime: Date(), performingPersonName: "JUDr. Test Testovací",
+                securityElementCount: 0, totalPages: 1, totalSheets: 1, ezzkMode: .demo,
+                evidenceNumberAllocatedAt: Date()))
+        }
+        let store = ZakoSessionStore(settingsStore: settingsStore)
+
+        await store.fetchEvidenceNumber()
+
+        XCTAssertEqual(store.attestation.evidenceNumber, "1563-\(day)-3")
+    }
+
+    /// A number requested from Settings is held by EZZK until a record uses it, so ZaKo
+    /// must take it from the pool instead of asking again (which EZZK refuses with 113).
+    func testNumberRequestedInSettingsIsUsedByTheNextConversion() async throws {
+        let credentialStore = MemoryCredentialStore()
+        try credentialStore.save(EZZKSOAPCredentials(login: "ucet", password: "heslo"), environment: .sandbox)
+        let transport = ScriptedTransport([loginSucceeded, numbersReply, serverTimeReply])
+        let controller = EZZKAccountController(mode: .test, credentialStore: credentialStore,
+                                               transportFactory: { _ in transport })
+        let settingsStore = makeSettingsStore(ezzkAccountController: controller)
+        settingsStore.settings.ezzkPersonName = "Advokátska kancelária Test"
+        settingsStore.settings.ezzkICO = "12345678"
+
+        let requested = try await settingsStore.requestTestNumbersIntoPool()
+        let store = ZakoSessionStore(settingsStore: settingsStore)
+        await store.fetchEvidenceNumber()
+
+        XCTAssertEqual(requested, ["260917-A"])
+        XCTAssertEqual(store.attestation.evidenceNumber, "260917-A")
+        XCTAssertEqual(store.attestation.evidenceNumberMode, .test)
+        XCTAssertEqual(transport.requestCount, 3, "ZaKo must not ask EZZK for another number")
+    }
+
     /// A number whose register row the advocate deleted is never offered again: the next
     /// document asks EZZK for a new one.
     func testDeletedRowsNumberIsNotReused() async throws {

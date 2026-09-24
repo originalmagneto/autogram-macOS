@@ -963,7 +963,7 @@ struct SettingsView: View {
         ezzkNumbersError = nil
         defer { ezzkNumbersInProgress = false }
         do {
-            let numbers = try await controller.requestTestNumbers()
+            let numbers = try await settingsStore.requestTestNumbersIntoPool()
             if controller.mode == requestedMode {
                 ezzkTestNumbers = numbers
             }
@@ -979,17 +979,32 @@ struct SettingsView: View {
             Label("Odosielanie záznamov", systemImage: "arrow.up.doc")
                 .font(.headline)
 
-            Label("Príde v ďalšej verzii", systemImage: "lock")
+            let status = ezzkSubmissionStatus(settingsStore.ezzkAccountController.mode)
+            Label(status.title, systemImage: status.symbol)
                 .font(.callout)
                 .foregroundStyle(.secondary)
 
-            Text("Chevron7 zatiaľ nevytvára samostatný podpísaný záznam, ktorý EZZK prijíma. Záznamy ostávajú v Registri konverzií vo fronte odoslania.")
+            Text(status.detail)
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .glassCard(cornerRadius: 12, padding: 12)
+    }
+
+    private func ezzkSubmissionStatus(_ mode: AppSettings.EZZKMode) -> (title: String, symbol: String, detail: String) {
+        switch mode {
+        case .demo:
+            ("Lokálna simulácia", "desktopcomputer",
+             "Podpísaný záznam o konverzii sa vytvorí, ale do EZZK sa neodošle. Stav v Registri konverzií je iba ukážkový.")
+        case .test:
+            ("Zapnuté automaticky", "checkmark.circle",
+             "Po autorizácii sa záznam o konverzii podpíše rovnakým PIN a hneď odošle do testovacieho EZZK. Čakajúce odoslania a stav spracovania aplikácia overuje každých päť minút; výsledok je v Registri konverzií.")
+        case .production:
+            ("Príde v ďalšej verzii", "lock",
+             "Na produkcii sú pridelenie čísla aj odoslanie záznamu zatiaľ zamknuté. Zapnú sa po overení celého postupu na testovacom EZZK.")
+        }
     }
 
     private var ezzkMigrationCard: some View {

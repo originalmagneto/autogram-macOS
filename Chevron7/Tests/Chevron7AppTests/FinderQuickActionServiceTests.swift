@@ -66,6 +66,57 @@ final class FinderQuickActionServiceTests: XCTestCase {
         XCTAssertEqual(retire(legacyAppInstalled: false), [])
     }
 
+    private var chevron7Key: String { "(null) - \(FinderQuickActionService.menuTitle) - runWorkflowAsService" }
+
+    private func modes(_ statuses: [String: Any], _ key: String) -> [String: Int]? {
+        (statuses[key] as? [String: Any])?["presentation_modes"] as? [String: Int]
+    }
+
+    func testFreshInstallIsShownInFindersQuickActionsAndContextMenu() {
+        let statuses = FinderQuickActionService.servicesStatus(updating: [:])
+
+        XCTAssertEqual(modes(statuses, chevron7Key), [
+            "ContextMenu": 1, "FinderPreview": 1, "ServicesMenu": 1, "TouchBar": 1
+        ])
+    }
+
+    func testEntryWrittenByEarlierBuildsIsUpgraded() {
+        // Earlier builds wrote only the pre-Mojave keys, which Finder's Quick Actions ignore.
+        let old: [String: Any] = [chevron7Key: ["enabled_context_menu": 1, "enabled_services_menu": 1]]
+
+        let statuses = FinderQuickActionService.servicesStatus(updating: old)
+
+        XCTAssertEqual(modes(statuses, chevron7Key)?["FinderPreview"], 1)
+        XCTAssertEqual(modes(statuses, chevron7Key)?["ContextMenu"], 1)
+    }
+
+    func testPersonsOwnChoiceIsKept() {
+        let chosen: [String: Any] = [chevron7Key: ["presentation_modes": [
+            "ContextMenu": 0, "FinderPreview": 0, "ServicesMenu": 1, "TouchBar": 0
+        ]]]
+
+        let statuses = FinderQuickActionService.servicesStatus(updating: chosen)
+
+        XCTAssertEqual(modes(statuses, chevron7Key)?["FinderPreview"], 0)
+    }
+
+    func testOtherServicesAreUntouchedAndRetiredAutogramEntryIsDropped() {
+        let autogramKey = "(null) - Podpísať s QES + QTS (Autogram) - runWorkflowAsService"
+        let other: [String: Any] = [
+            "(null) - Word to PDF - runWorkflowAsService": ["presentation_modes": ["TouchBar": 0]],
+            autogramKey: ["enabled_context_menu": 1]
+        ]
+
+        let statuses = FinderQuickActionService.servicesStatus(updating: other, droppingLegacyEntries: true)
+
+        XCTAssertEqual(modes(statuses, "(null) - Word to PDF - runWorkflowAsService"), ["TouchBar": 0])
+        XCTAssertNil(statuses[autogramKey])
+        XCTAssertEqual(
+            FinderQuickActionService.servicesStatus(updating: other, droppingLegacyEntries: false)[autogramKey] as? [String: Int],
+            ["enabled_context_menu": 1]
+        )
+    }
+
     func testMissingServicesFolderRetiresNothing() throws {
         try FileManager.default.removeItem(at: services)
 

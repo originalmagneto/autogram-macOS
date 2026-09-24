@@ -116,4 +116,25 @@ final class ZakoReviewNavigationTests: XCTestCase {
         XCTAssertEqual(store.securityElements.filter { $0.pageIndex == 0 }.map(\.reviewState), [.confirmed, .confirmed])
         XCTAssertEqual(store.securityElements.first { $0.id == other.id }?.reviewState, .pending)
     }
+
+    /// Nonsense suggestions go in one step: every finding still waiting is rejected, on one
+    /// page or in the whole document, and one already confirmed stays as it is.
+    func testRejectAllPendingOnAPageOrInTheWholeDocument() throws {
+        let store = try makeTwoPageStore()
+        let a = SecurityElement(kind: .officialStamp, pageIndex: 0, boundingBox: .init(x: 0.1, y: 0.1, width: 0.2, height: 0.2), confidence: 0.9)
+        let b = SecurityElement(kind: .handwrittenSignature, pageIndex: 0, boundingBox: .init(x: 0.5, y: 0.1, width: 0.2, height: 0.1), confidence: 0.9)
+        let kept = SecurityElement(kind: .initial, pageIndex: 1, boundingBox: .init(x: 0.1, y: 0.5, width: 0.1, height: 0.1), confidence: 0.9)
+        let other = SecurityElement(kind: .initial, pageIndex: 1, boundingBox: .init(x: 0.1, y: 0.1, width: 0.1, height: 0.1), confidence: 0.9)
+        store.securityElements = [a, b, kept, other]
+        store.confirmSecurityElement(id: kept.id)
+
+        XCTAssertEqual(store.rejectAllPendingElements(onPage: 0), 2)
+        XCTAssertEqual(store.securityElements.filter { $0.pageIndex == 0 }.map(\.reviewState), [.rejected, .rejected])
+        XCTAssertEqual(store.securityElements.first { $0.id == other.id }?.reviewState, .pending)
+
+        XCTAssertEqual(store.rejectAllPendingElements(), 1)
+        XCTAssertEqual(store.securityElements.first { $0.id == other.id }?.reviewState, .rejected)
+        XCTAssertEqual(store.securityElements.first { $0.id == kept.id }?.reviewState, .confirmed)
+        XCTAssertEqual(store.pendingElementCount(onPage: nil), 0)
+    }
 }

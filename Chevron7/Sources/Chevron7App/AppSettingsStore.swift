@@ -59,6 +59,20 @@ final class AppSettingsStore {
             })
     }
 
+    /// Numbers asked for from Settings join the pool ZaKo draws from. EZZK holds each one
+    /// until a record uses it, so a number kept only on screen would make the next
+    /// conversion's request fail with code 113.
+    func requestTestNumbersIntoPool() async throws -> [String] {
+        let controller = ezzkAccountController
+        let mode = controller.mode
+        let numbers = try await controller.requestTestNumbers()
+        let allocatedAt = (try? await controller.service(for: mode).serverTime()) ?? Date()
+        for number in numbers {
+            evidenceNumberPool.add(EvidenceNumberPool.Entry(number: number, mode: mode, allocatedAt: allocatedAt))
+        }
+        return numbers
+    }
+
     func useRealSigningProvider(_ provider: any QualifiedSigningProviding) {
         signingProvider = provider
     }
