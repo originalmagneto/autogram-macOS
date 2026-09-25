@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: EUPL-1.2
 
 import Foundation
+import Chevron7Kit
 
 /// Turns the technical `detectionSource` audit string into something a notary
 /// can read. The stored string stays untouched: it is evidence.
@@ -16,7 +17,8 @@ enum DetectionSourceLabel {
 
     static func slovak(_ source: String?) -> String {
         guard let source, !source.isEmpty else { return "Označené ručne" }
-        var result = source
+        if source == ReviewedPageRecall.detectionSource { return "vaša skoršia kontrola tejto strany" }
+        var result = source.replacingOccurrences(of: "kNN(exact)", with: "rovnaké ako vaše skoršie rozhodnutie")
         // "kNN(n=5)" carries a count, so it is rewritten by pattern rather than
         // by literal replacement.
         if let range = result.range(of: #"kNN\(n=(\d+)\)"#, options: .regularExpression) {

@@ -22,4 +22,13 @@ final class DetectionSourceLabelTests: XCTestCase {
     func testFoundationModelIsNamed() {
         XCTAssertEqual(DetectionSourceLabel.slovak("builtIn; fm"), "heuristika; on-device model")
     }
+
+    func testRecalledReviewIsNamed() {
+        XCTAssertEqual(DetectionSourceLabel.slovak("reviewedPage"), "vaša skoršia kontrola tejto strany")
+    }
+
+    func testExactMatchWithAnEarlierDecisionIsNamed() {
+        XCTAssertEqual(DetectionSourceLabel.slovak("contour; kNN(exact)"),
+                       "kontúry; rovnaké ako vaše skoršie rozhodnutie")
+    }
 }

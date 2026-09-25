@@ -102,6 +102,8 @@ final class ReviewLearningTests: XCTestCase {
         let again = suggestions(provider, document, analyses).filter { $0.pageIndex == 0 && $0.boundingBox == fixedBox }
         XCTAssertFalse(again.isEmpty)
         XCTAssertTrue(again.allSatisfy { $0.kind == .waxSeal }, "\(again.map(\.kind))")
+        XCTAssertTrue(again.allSatisfy { $0.detectionSource?.hasSuffix("kNN(exact)") == true },
+                      "\(again.map(\.detectionSource))")
     }
 
     func testRecorderEmbedsCropsAtTheDetectorsRenderWidthByDefault() throws {

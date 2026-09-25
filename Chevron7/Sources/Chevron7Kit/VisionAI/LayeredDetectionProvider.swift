@@ -288,6 +288,7 @@ public struct LayeredDetectionProvider: SecurityElementsProviding {
 
     static func sourceString(candidate: DetectionCandidate, judgement: ElementJudgement) -> String {
         switch judgement.decidedBy {
+        case .featurePrintKNN where judgement.isExactMatch: return "\(candidate.sourceLabel); kNN(exact)"
         case .featurePrintKNN: return "\(candidate.sourceLabel); kNN(n=\(judgement.supportCount))"
         case .foundationModel: return "\(candidate.sourceLabel); fm"
         case .builtInHint: return "\(candidate.sourceLabel); builtInHint"
