@@ -444,6 +444,9 @@ struct DoneView: View {
                 .frame(maxWidth: 520)
             }
 
+            DetectorTrainingOfferBanner(settingsStore: store.settingsStore)
+                .frame(maxWidth: 520)
+
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

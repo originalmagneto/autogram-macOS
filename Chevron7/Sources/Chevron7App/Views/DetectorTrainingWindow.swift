@@ -345,3 +345,65 @@ struct DetectorTrainingView: View {
         }
     }
 }
+
+/// Quiet offer on ZaKo's Done screen after a conversion. Never interrupts:
+/// it appears only when the readiness report says an offer is due.
+struct DetectorTrainingOfferBanner: View {
+    @Bindable var settingsStore: AppSettingsStore
+    @Environment(\.openWindow) private var openWindow
+    @State private var offerDue = false
+
+    var body: some View {
+        Group {
+            if offerDue {
+                HStack(spacing: 12) {
+                    Text("Máte dosť skontrolovaných strán na natrénovanie vlastného detektora.")
+                        .font(.callout)
+                    Button("Pozrieť") {
+                        offerDue = false
+                        openWindow(id: DetectorTrainingWindow.id)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                    Button("Neskôr") {
+                        snooze()
+                        offerDue = false
+                    }
+                    .controlSize(.small)
+                    Button("Nepripomínať") {
+                        settingsStore.settings.detectorTrainingOffersEnabled = false
+                        offerDue = false
+                    }
+                    .controlSize(.small)
+                }
+                .padding(10)
+                .glassCard(cornerRadius: 10, padding: 0)
+            }
+        }
+        .task { await refresh() }
+    }
+
+    private func refresh() async {
+        let bank = settingsStore.exampleBank
+        guard let pages = try? await bank.reviewedPages() else { return }
+        let bankDir = await bank.directory
+        let root = ModelRegistry.modelsDirectory(in: bankDir)
+        guard let state = try? TrainingState.load(from: root) else { return }
+        let settings = settingsStore.settings
+        offerDue = DetectorTrainingReadiness.report(
+            pages: pages, lastRunAt: state.lastRunAt,
+            learnOn: settings.learnFromReviews,
+            offersEnabled: settings.detectorTrainingOffersEnabled,
+            snoozedUntil: state.snoozedUntil).offerDue
+    }
+
+    private func snooze() {
+        Task {
+            let bank = settingsStore.exampleBank
+            let root = ModelRegistry.modelsDirectory(in: await bank.directory)
+            guard var state = try? TrainingState.load(from: root) else { return }
+            state.snoozedUntil = Date().addingTimeInterval(7 * 24 * 3600)
+            try? TrainingState.save(state, in: root)
+        }
+    }
+}
