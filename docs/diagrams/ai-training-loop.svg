@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1040 740" role="img" aria-labelledby="ai-training-loop-title ai-training-loop-desc">
+<title id="ai-training-loop-title">Trénovanie vlastného detektora</title>
+<desc id="ai-training-loop-desc">Cyklus: kontrola ukladá strany do banky, ponuka meria bránu, tréning beží na Macu, overenie porovnáva gain, aktivácia čaká na človeka a návrhy sa vracajú do kontroly.</desc>
+<defs>
+<marker id="arr-muted" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#565b70"/></marker>
+<marker id="arr-soft" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#8d97ab"/></marker>
+</defs>
+<rect width="1040" height="740" fill="#faf8f2"/>
+<path d="M 600.000 113.726 A 240 240 0 0 1 704.969 187.073" fill="none" stroke="#565b70" stroke-width="1.2" marker-end="url(#arr-muted)"/>
+<path d="M 743.285 252.000 A 240 240 0 0 1 743.722 426.882" fill="none" stroke="#565b70" stroke-width="1.2" marker-end="url(#arr-muted)"/>
+<path d="M 705.731 492.000 A 240 240 0 0 1 601.130 565.871" fill="none" stroke="#565b70" stroke-width="1.2" marker-end="url(#arr-muted)"/>
+<path d="M 440.000 566.274 A 240 240 0 0 1 335.031 492.927" fill="none" stroke="#565b70" stroke-width="1.2" marker-end="url(#arr-muted)"/>
+<path d="M 296.715 428.000 A 240 240 0 0 1 333.511 188.931" fill="none" stroke="#565b70" stroke-width="1.2" marker-end="url(#arr-muted)"/>
+<path d="M 296.715 252.000 A 240 240 0 0 1 438.870 114.129" fill="none" stroke="#565b70" stroke-width="1.2" marker-end="url(#arr-muted)"/>
+<line x1="520.00" y1="132.00" x2="520.00" y2="282.00" stroke="#8d97ab" stroke-width="1" stroke-dasharray="5,4" marker-end="url(#arr-soft)"/>
+<line x1="367.58" y1="428.00" x2="424.74" y2="395.00" stroke="#8d97ab" stroke-width="1" stroke-dasharray="5,4" marker-end="url(#arr-soft)"/>
+<rect x="493.00" y="191.00" width="54.00" height="12" rx="2" fill="#faf8f2"/><text x="520.00" y="200.00" fill="#8d97ab" font-size="8" font-family="ui-monospace, 'SF Mono', Menlo, monospace" text-anchor="middle" letter-spacing="0.06em">STRANY</text>
+<rect x="372.66" y="395.50" width="47.00" height="12" rx="2" fill="#faf8f2"/><text x="396.16" y="404.50" fill="#8d97ab" font-size="8" font-family="ui-monospace, 'SF Mono', Menlo, monospace" text-anchor="middle" letter-spacing="0.06em">MODEL</text>
+<rect x="440.00" y="68.00" width="160" height="64" rx="6" fill="#faf8f2"/>
+<rect x="440.00" y="68.00" width="160" height="64" rx="6" fill="#faf8f2" stroke="#0a0b1a" stroke-width="1"/>
+<text x="520.00" y="98.00" fill="#0a0b1a" font-size="12" font-weight="600" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif" text-anchor="middle">Kontrola</text>
+<text x="520.00" y="116.00" fill="#565b70" font-size="9" font-family="ui-monospace, 'SF Mono', Menlo, monospace" text-anchor="middle">strany do banky</text>
+<rect x="647.85" y="188.00" width="160" height="64" rx="6" fill="#faf8f2"/>
+<rect x="647.85" y="188.00" width="160" height="64" rx="6" fill="#faf8f2" stroke="#0a0b1a" stroke-width="1"/>
+<text x="727.85" y="218.00" fill="#0a0b1a" font-size="12" font-weight="600" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif" text-anchor="middle">Ponuka</text>
+<text x="727.85" y="236.00" fill="#565b70" font-size="9" font-family="ui-monospace, 'SF Mono', Menlo, monospace" text-anchor="middle">brána 40 z 8</text>
+<rect x="647.85" y="428.00" width="160" height="64" rx="6" fill="#faf8f2"/>
+<rect x="647.85" y="428.00" width="160" height="64" rx="6" fill="#faf8f2" stroke="#0a0b1a" stroke-width="1"/>
+<text x="727.85" y="458.00" fill="#0a0b1a" font-size="12" font-weight="600" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif" text-anchor="middle">Tréning</text>
+<text x="727.85" y="476.00" fill="#565b70" font-size="9" font-family="ui-monospace, 'SF Mono', Menlo, monospace" text-anchor="middle">Mac · 50 iterácií</text>
+<rect x="440.00" y="548.00" width="160" height="64" rx="6" fill="#faf8f2"/>
+<rect x="440.00" y="548.00" width="160" height="64" rx="6" fill="rgba(185,122,18,0.10)" stroke="#b97a12" stroke-width="1"/>
+<text x="520.00" y="578.00" fill="#b97a12" font-size="12" font-weight="600" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif" text-anchor="middle">Overenie</text>
+<text x="520.00" y="596.00" fill="#565b70" font-size="9" font-family="ui-monospace, 'SF Mono', Menlo, monospace" text-anchor="middle">gain na nových</text>
+<rect x="232.15" y="428.00" width="160" height="64" rx="6" fill="#faf8f2"/>
+<rect x="232.15" y="428.00" width="160" height="64" rx="6" fill="#faf8f2" stroke="#0a0b1a" stroke-width="1"/>
+<text x="312.15" y="458.00" fill="#0a0b1a" font-size="12" font-weight="600" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif" text-anchor="middle">Aktivácia</text>
+<text x="312.15" y="476.00" fill="#565b70" font-size="9" font-family="ui-monospace, 'SF Mono', Menlo, monospace" text-anchor="middle">človek potvrdí</text>
+<rect x="232.15" y="188.00" width="160" height="64" rx="6" fill="#faf8f2"/>
+<rect x="232.15" y="188.00" width="160" height="64" rx="6" fill="#faf8f2" stroke="#0a0b1a" stroke-width="1"/>
+<text x="312.15" y="218.00" fill="#0a0b1a" font-size="12" font-weight="600" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif" text-anchor="middle">Návrhy</text>
+<text x="312.15" y="236.00" fill="#565b70" font-size="9" font-family="ui-monospace, 'SF Mono', Menlo, monospace" text-anchor="middle">váš detektor</text>
+<rect x="420.0" y="288.0" width="200" height="104" rx="8" fill="#0a0b1a"/>
+<text x="520" y="334" fill="#faf8f2" font-size="13" font-weight="600" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif" text-anchor="middle">Banka + modely</text>
+<text x="520" y="354" fill="#faf8f2" opacity="0.75" font-size="9" font-family="ui-monospace, 'SF Mono', Menlo, monospace" text-anchor="middle">reviewed-pages · models/</text>
+<line x1="30" y1="692" x2="1010" y2="692" stroke="rgba(10,11,26,0.10)" stroke-width="0.8"/>
+<text x="30" y="708" fill="#565b70" font-size="8" font-family="ui-monospace, 'SF Mono', Menlo, monospace" letter-spacing="0.14em">LEGENDA</text>
+<text x="30" y="724" fill="#565b70" font-size="8" font-family="ui-monospace, 'SF Mono', Menlo, monospace">plná čiara: návrh · prerušovaná: zápis do banky · rámček: brána aktivácie</text>
+</svg>

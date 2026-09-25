@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600" role="img" aria-labelledby="ai-promotion-gate-title ai-promotion-gate-desc">
+<title id="ai-promotion-gate-title">Brána aktivácie modelu</title>
+<desc id="ai-promotion-gate-desc">Kandidát sa aktivuje len pri náraste recall aspoň o 0,05 a poklese precision najviac o 0,02 na odložených dokumentoch, inak ostáva starý model.</desc>
+<defs>
+<marker id="arr" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#565b70"/></marker>
+</defs>
+<rect width="600" height="640" fill="#faf8f2"/>
+<path d="M 240 64 V 88" fill="none" stroke="#565b70" stroke-width="1" marker-end="url(#arr)"/>
+<path d="M 240 152 V 160" fill="none" stroke="#565b70" stroke-width="1" marker-end="url(#arr)"/>
+<path d="M 335 220 H 355" fill="none" stroke="#565b70" stroke-width="1" marker-end="url(#arr)"/>
+<rect x="328.0" y="200" width="34" height="12" rx="2" fill="#faf8f2"/><text x="345" y="209" fill="#8d97ab" font-size="8" font-family="ui-monospace, 'SF Mono', Menlo, monospace" text-anchor="middle" letter-spacing="0.06em">ÁNO</text>
+<path d="M 240 280 V 368" fill="none" stroke="#565b70" stroke-width="1" marker-end="url(#arr)"/>
+<rect x="223.0" y="318" width="34" height="12" rx="2" fill="#faf8f2"/><text x="240" y="327" fill="#8d97ab" font-size="8" font-family="ui-monospace, 'SF Mono', Menlo, monospace" text-anchor="middle" letter-spacing="0.06em">NIE</text>
+<path d="M 450 280 V 328" fill="none" stroke="#565b70" stroke-width="1" marker-end="url(#arr)"/>
+<rect x="433.0" y="298" width="34" height="12" rx="2" fill="#faf8f2"/><text x="450" y="307" fill="#8d97ab" font-size="8" font-family="ui-monospace, 'SF Mono', Menlo, monospace" text-anchor="middle" letter-spacing="0.06em">ÁNO</text>
+<path d="M 545 220 H 568 V 400 H 340" fill="none" stroke="#565b70" stroke-width="1" marker-end="url(#arr)"/>
+<rect x="551.0" y="304" width="34" height="12" rx="2" fill="#faf8f2"/><text x="568" y="313" fill="#8d97ab" font-size="8" font-family="ui-monospace, 'SF Mono', Menlo, monospace" text-anchor="middle" letter-spacing="0.06em">NIE</text>
+<path d="M 240 432 V 468" fill="none" stroke="#565b70" stroke-width="1" marker-end="url(#arr)"/>
+<path d="M 450 392 V 444 H 240 V 468" fill="none" stroke="#565b70" stroke-width="1" marker-end="url(#arr)"/>
+<rect x="160" y="16" width="160" height="48" rx="20" fill="#faf8f2" stroke="#0a0b1a"/>
+<text x="240" y="45" fill="#0a0b1a" font-size="12" font-weight="600" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif" text-anchor="middle">Nový kandidát</text>
+<rect x="140" y="88" width="200" height="64" rx="6" fill="#faf8f2" stroke="#0a0b1a"/>
+<text x="240" y="114" fill="#0a0b1a" font-size="12" font-weight="600" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif" text-anchor="middle">Skóre validation + test</text>
+<text x="240" y="132" fill="#565b70" font-size="9" font-family="ui-monospace, 'SF Mono', Menlo, monospace" text-anchor="middle">IoU 0,4 · nové dokumenty</text>
+<polygon points="240,160 335,220 240,280 145,220" fill="#faf8f2" stroke="#0a0b1a"/>
+<text x="240" y="224" fill="#0a0b1a" font-size="12" font-weight="600" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif" text-anchor="middle">Recall +0,05?</text>
+<polygon points="450,160 545,220 450,280 355,220" fill="#faf8f2" stroke="#0a0b1a"/>
+<text x="450" y="216" fill="#0a0b1a" font-size="12" font-weight="600" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif" text-anchor="middle">Precision</text>
+<text x="450" y="234" fill="#565b70" font-size="9" font-family="ui-monospace, 'SF Mono', Menlo, monospace" text-anchor="middle">pokles max 0,02</text>
+<rect x="140" y="368" width="200" height="64" rx="6" fill="#faf8f2" stroke="#0a0b1a"/>
+<text x="240" y="394" fill="#0a0b1a" font-size="12" font-weight="600" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif" text-anchor="middle">Ponechať</text>
+<text x="240" y="412" fill="#565b70" font-size="9" font-family="ui-monospace, 'SF Mono', Menlo, monospace" text-anchor="middle">starý model ostáva</text>
+<rect x="350" y="328" width="200" height="64" rx="6" fill="rgba(185,122,18,0.10)" stroke="#b97a12"/>
+<text x="450" y="354" fill="#0a0b1a" font-size="12" font-weight="600" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif" text-anchor="middle">Aktivovať</text>
+<text x="450" y="372" fill="#565b70" font-size="9" font-family="ui-monospace, 'SF Mono', Menlo, monospace" text-anchor="middle">človek potvrdí</text>
+<rect x="160" y="468" width="160" height="48" rx="20" fill="#faf8f2" stroke="#0a0b1a"/>
+<text x="240" y="497" fill="#0a0b1a" font-size="12" font-weight="600" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif" text-anchor="middle">Hotovo</text>
+<line x1="30" y1="552" x2="570" y2="552" stroke="rgba(10,11,26,0.12)" stroke-width="0.8"/>
+<text x="30" y="568" fill="#565b70" font-size="8" font-family="ui-monospace, 'SF Mono', Menlo, monospace" letter-spacing="0.14em">LEGENDA</text>
+<text x="30" y="584" fill="#565b70" font-size="8" font-family="ui-monospace, 'SF Mono', Menlo, monospace">kosoštvorec: brána · zvýraznené: aktivácia po splnení oboch</text>
+</svg>

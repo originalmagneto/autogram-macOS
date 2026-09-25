@@ -271,6 +271,27 @@ swift run vision-eval ~/Chevron7Eval [--builtin-only] [--no-fm] [--bank <dir>] [
 <p>Výstup obsahuje presnosť, úplnosť a F1 pre každý druh prvku, priemerný čas na stranu a počet volaní on-device modelu. Bez <code>--bank</code> sa použije prázdny dočasný dataset, nie ten používateľský, aby boli čísla porovnateľné medzi commitmi.</p>
 </details>
 
+### Trénovanie vlastného detektora
+
+<p align="center">
+  <img src="docs/diagrams/ai-training-loop.svg" alt="Cyklus trénovania: kontrola ukladá strany, ponuka meria bránu, tréning beží na Macu, overenie porovnáva gain, aktiváciu potvrdí človek a návrhy sa vracajú do kontroly" width="100%">
+</p>
+
+Príklady z vašej kontroly vedia premenovať návrhy, ale nové rámce nenavrhnú. Keď skontrolujete dosť strán, aplikácia ponúkne natrénovanie vlastného detektora: ten sa učí, **kde** prvky na vašich dokumentoch bývajú, a slúži ako ďalší zdroj návrhov. Každý jeho návrh prechádza rovnakým filtrom, klasifikátorom aj vašou kontrolou ako ostatné.
+
+**Návod:**
+
+1. Po konverzii sa na Done obrazovke objaví tichá ponuka (alebo ju otvorte kedykoľvek z Nastavení → Učenie → **Otvoriť trénovanie…**).
+2. Skontrolujte správu: koľko strán a dokumentov máte, ktoré druhy sa natrénujú a ktorým chýbajú príklady (aspoň 15 na druh).
+3. Pozrite odhad času (prvý raz približne 8 až 15 minút) a **spustite trénovanie**. Beží raz naraz na pozadí, zrušením sa nič nestratí.
+4. Výsledok porovná nový a starý detektor na dokumentoch, ktoré model nevidel. Nový sa aktivuje, len keď nájde aspoň o 5 % prvkov viac a nechybí pritom. Aktiváciu potvrdíte tlačidlom **Používať nový detektor**.
+
+<p align="center">
+  <img src="docs/diagrams/ai-promotion-gate.svg" alt="Brána aktivácie: kandidát sa aktivuje len pri náraste recall aspoň o 0,05 a poklese precision najviac o 0,02, inak ostáva starý model" width="100%">
+</p>
+
+Predchádzajúci model ostáva na jedno vrátenie v Nastaveniach. Modely žijú vedľa banky príkladov (`~/Library/Application Support/Chevron7/VisionBank/models/`); vymazanie banky zmaže aj modely. Nič nikdy neopúšťa tento Mac.
+
 ## Zaručená konverzia
 
 ### Bezpečnostné prvky
