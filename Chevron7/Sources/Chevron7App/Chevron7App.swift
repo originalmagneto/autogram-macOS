@@ -119,6 +119,10 @@ struct Chevron7App: App {
         }
         .defaultSize(width: 940, height: 720)
         .windowResizability(.contentMinSize)
+        Window("Trénovanie detektora", id: DetectorTrainingWindow.id) {
+            DetectorTrainingView(settingsStore: model.settingsStore)
+        }
+        .defaultSize(width: 680, height: 600)
     }
 }
 
