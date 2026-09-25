@@ -350,6 +350,7 @@ struct DetectorTrainingView: View {
     private func reportStep(flow: DetectorTrainingFlow) -> some View {
         @Bindable var flow = flow
         if let report = flow.report {
+            heroCard(report: report, trainedBefore: flow.trainedBefore)
             VStack(alignment: .leading, spacing: 6) {
                 Label("Iba na tomto Macu", systemImage: "lock.shield")
                     .font(.headline)
@@ -357,6 +358,7 @@ struct DetectorTrainingView: View {
                     .foregroundStyle(.secondary)
             }
             .glassCard()
+            .frame(maxWidth: .infinity, alignment: .leading)
             VStack(alignment: .leading, spacing: 8) {
                 Label(flow.trainedBefore ? "Nové strany od posledného trénovania" : "Skontrolované strany",
                       systemImage: "doc.on.doc")
@@ -399,11 +401,58 @@ struct DetectorTrainingView: View {
                 }
                 .foregroundStyle(.secondary)
                 .glassCard()
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
         } else {
             ProgressView("Načítavam správu…")
                 .frame(maxWidth: .infinity, minHeight: 200)
         }
+    }
+
+    private func heroCard(report: DetectorTrainingReadiness, trainedBefore: Bool) -> some View {
+        let fraction = DetectorTrainingReadiness.overallFraction(
+            pages: report.reviewedPages, documents: report.documents,
+            newSince: report.newSinceLastTraining, trainedBefore: trainedBefore)
+        let percent = Int((fraction * 100).rounded())
+        return VStack(alignment: .leading, spacing: 8) {
+            Label("Pripravenosť na trénovanie", systemImage: "speedometer")
+                .font(.headline)
+            HStack(spacing: 16) {
+                Gauge(value: fraction, in: 0...1) {
+                    Text("Hotovo")
+                } currentValueLabel: {
+                    Text("\(percent) %")
+                        .font(.title2.monospacedDigit())
+                } minimumValueLabel: {
+                    Text("0 %")
+                } maximumValueLabel: {
+                    Text("100 %")
+                }
+                .frame(width: 110, height: 110)
+                Text(bindingLine(report: report, trainedBefore: trainedBefore))
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .glassCard()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Pripravenosť na trénovanie \(percent) percent. \(bindingLine(report: report, trainedBefore: trainedBefore))")
+    }
+
+    private func bindingLine(report: DetectorTrainingReadiness, trainedBefore: Bool) -> String {
+        if report.offerDue {
+            return "Brána splnená, môžete spustiť trénovanie."
+        }
+        if trainedBefore {
+            return "Počíta sa \(UXLabels.count(report.newSinceLastTraining, one: "nová strana", few: "nové strany", many: "nových strán")) z \(DetectorTrainingReadiness.retrainNewPages)."
+        }
+        let pagesFraction = Double(report.reviewedPages) / Double(DetectorTrainingReadiness.firstRunPages)
+        let docsFraction = Double(report.documents) / Double(DetectorTrainingReadiness.firstRunDocuments)
+        if pagesFraction <= docsFraction {
+            return "Najpomalšie rastú strany: \(report.reviewedPages) z \(DetectorTrainingReadiness.firstRunPages)."
+        }
+        return "Najpomalšie rastú dokumenty: \(report.documents) z \(DetectorTrainingReadiness.firstRunDocuments)."
     }
 
     private func trainingIcon(for kind: SecurityElement.Kind?) -> String {
