@@ -124,10 +124,14 @@ public struct LayeredDetectionProvider: SecurityElementsProviding {
         self.maxConcurrentPages = max(1, maxConcurrentPages)
     }
 
-    public static func makeDefault(bank: ExampleBank, useFoundationModel: Bool) -> LayeredDetectionProvider {
+    public static func makeDefault(bank: ExampleBank, useFoundationModel: Bool,
+                                   learnedSource: LearnedCandidateSource? = nil) -> LayeredDetectionProvider {
         let knn = FeaturePrintClassifier(bank: bank)
         let fm: (any ElementClassifying)? = useFoundationModel ? FoundationModelClassifier.makeIfAvailable() : nil
-        return LayeredDetectionProvider(classifier: TwoStageClassifier(primary: knn, secondary: fm))
+        var extra: [any CandidateSourcing] = [ContourCandidateSource(), SaliencyCandidateSource()]
+        if let learnedSource { extra.append(learnedSource) }
+        return LayeredDetectionProvider(extraSources: extra,
+                                        classifier: TwoStageClassifier(primary: knn, secondary: fm))
     }
 
     /// Versioned audit identifier listing active stages, stored in SecurityReviewStamp.
@@ -136,6 +140,9 @@ public struct LayeredDetectionProvider: SecurityElementsProviding {
         stages = CandidateSource.allCases.map(\.rawValue).filter { stages.contains($0) }
         var parts = ["LayeredDetectionProvider/\(Self.version)", stages.joined(separator: "+"), "kNN"]
         if classifier.secondary != nil { parts.append("fm") }
+        for learned in extraSources.compactMap({ $0 as? LearnedCandidateSource }) {
+            parts.append("learned(\(learned.modelID))")
+        }
         return parts.joined(separator: " ")
     }
 

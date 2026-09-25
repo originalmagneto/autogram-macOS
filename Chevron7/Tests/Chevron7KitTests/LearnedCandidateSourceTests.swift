@@ -10,6 +10,20 @@ final class LearnedCandidateSourceTests: XCTestCase {
         XCTAssertEqual(candidate.sourceLabel, "learned")
     }
 
+    func testIdentifierNamesActiveModel() {
+        let bank = ExampleBank(directory: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString))
+        let learned = LearnedCandidateSource(modelID: "deadbeef", predict: { _ in [] })
+        let provider = LayeredDetectionProvider.makeDefault(bank: bank, useFoundationModel: false, learnedSource: learned)
+        XCTAssertTrue(provider.identifier.contains("learned(deadbeef)"),
+                      "SecurityReviewStamp must name the active model, got: \(provider.identifier)")
+    }
+
+    func testIdentifierWithoutLearnedSourceUnchanged() {
+        let bank = ExampleBank(directory: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString))
+        let provider = LayeredDetectionProvider.makeDefault(bank: bank, useFoundationModel: false)
+        XCTAssertFalse(provider.identifier.contains("learned"))
+    }
+
     func testSourceIsLearned() {
         let source = LearnedCandidateSource(modelID: "abc", predict: { _ in [] })
         XCTAssertEqual(source.source, .learned)
