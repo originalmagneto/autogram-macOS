@@ -39,4 +39,65 @@ final class DetectorTrainerTests: XCTestCase {
             dataset: source, trainImages: ["missing.png"],
             trainAnnotations: [annotation(image: "missing.png")], to: staged))
     }
+    func testSecondStartWhileRunningThrowsBusy() async throws {
+        actor Gate {
+            private var waiters: [CheckedContinuation<Void, Never>] = []
+            func open() {
+                for waiter in waiters { waiter.resume() }
+                waiters = []
+            }
+            func wait() async {
+                await withCheckedContinuation { waiters.append($0) }
+            }
+        }
+        let job = DetectorTrainingJob()
+        let gate = Gate()
+        let first = Task<Int, Error> {
+            try await job.run {
+                await gate.wait()
+                return 1
+            }
+        }
+        while await !job.isRunning { await Task.yield() }
+        do {
+            _ = try await job.run { return 2 }
+            XCTFail("second start must throw")
+        } catch {
+            XCTAssertEqual(error as? DetectorTrainingError, .busy)
+        }
+        await gate.open()
+        let value = try await first.value
+        XCTAssertEqual(value, 1)
+    }
+
+    func testCancellationAbortsRun() async {
+        let job = DetectorTrainingJob()
+        let task = Task<Int, Error> {
+            try await job.run {
+                try await Task.sleep(nanoseconds: 5_000_000_000)
+                return 1
+            }
+        }
+        task.cancel()
+        do {
+            _ = try await task.value
+            XCTFail("cancelled run must throw")
+        } catch {
+            XCTAssertTrue(error is CancellationError)
+        }
+    }
+
+    func testThermalGateRefusesSeriousAndCritical() {
+        XCTAssertFalse(DetectorTrainer.refuseStart(thermalState: .nominal))
+        XCTAssertFalse(DetectorTrainer.refuseStart(thermalState: .fair))
+        XCTAssertTrue(DetectorTrainer.refuseStart(thermalState: .serious))
+        XCTAssertTrue(DetectorTrainer.refuseStart(thermalState: .critical))
+    }
+
+    func testThermalCancelsOnlyOnCritical() {
+        XCTAssertFalse(DetectorTrainer.cancelRun(thermalState: .nominal))
+        XCTAssertFalse(DetectorTrainer.cancelRun(thermalState: .fair))
+        XCTAssertFalse(DetectorTrainer.cancelRun(thermalState: .serious))
+        XCTAssertTrue(DetectorTrainer.cancelRun(thermalState: .critical))
+    }
 }
