@@ -7,19 +7,26 @@ import ImageIO
 import PDFKit
 import UniformTypeIdentifiers
 
-/// Turns a review decision into a bank entry: renders the page once,
-/// crops the element, embeds it, and persists everything.
+/// Turns a review decision into a bank entry: crops the element, embeds it, and
+/// persists everything. The stored page and crop images use `pageRenderWidth`
+/// (training export); the feature vector uses `featureRenderWidth`, the width the
+/// detector renders at, because a crop from a 1200 px render lies as far from the
+/// same crop at 760 px as two different elements do.
 public struct ExampleBankRecorder: Sendable {
     public let bank: ExampleBank
     public let featurePrints: any FeaturePrintProviding
     public let pageRenderWidth: Int
+    public let featureRenderWidth: Int
     public let detectorVersion: String
 
     public init(bank: ExampleBank, featurePrints: any FeaturePrintProviding = VisionFeaturePrintProvider(),
-                pageRenderWidth: Int = 1200, detectorVersion: String) {
+                pageRenderWidth: Int = 1200,
+                featureRenderWidth: Int = LayeredDetectionProvider.defaultRenderTargetWidth,
+                detectorVersion: String) {
         self.bank = bank
         self.featurePrints = featurePrints
         self.pageRenderWidth = pageRenderWidth
+        self.featureRenderWidth = featureRenderWidth
         self.detectorVersion = detectorVersion
     }
 
@@ -46,7 +53,13 @@ public struct ExampleBankRecorder: Sendable {
         }
         let image = rendered.cgImage
         guard let crop = PageCrop.crop(image, to: element.boundingBox) else { throw RecorderError.cropFailed }
-        let vector = try await featurePrints.featureVector(for: crop)
+        guard let detectorRender = BuiltInVisionProvider.render(page: page, targetWidth: featureRenderWidth) else {
+            throw RecorderError.renderFailed
+        }
+        guard let detectorCrop = PageCrop.crop(detectorRender.cgImage, to: element.boundingBox) else {
+            throw RecorderError.cropFailed
+        }
+        let vector = try await featurePrints.featureVector(for: detectorCrop)
         let entry = BankEntry(id: element.id, label: canonicalLabel,
                               documentSHA256: documentHash,
                               pageIndex: element.pageIndex, box: element.boundingBox,

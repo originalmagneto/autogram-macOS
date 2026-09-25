@@ -41,6 +41,24 @@ final class TwoStageClassifierTests: XCTestCase {
         XCTAssertEqual(result!.confidence, 0.7, accuracy: 1e-9)
     }
 
+    func testExactMatchNegativeIsDecisiveDespiteLowSupport() {
+        var exact = knn(nil, conf: 1, margin: 1, support: 1)
+        exact.isExactMatch = true
+        XCTAssertTrue(TwoStageClassifier.isConfident(exact, minimumSupport: 3, minimumMargin: 0.25))
+        let result = TwoStageClassifier.decide(primary: exact, secondary: fm(.initial, conf: 0.9),
+                                               hint: .initial, hintConfidence: 0.7, minimumSupport: 3, minimumMargin: 0.25)
+        XCTAssertNil(result)
+    }
+
+    func testExactMatchPositiveIsDecisiveDespiteLowSupport() {
+        var exact = knn(.waxSeal, conf: 1, margin: 1, support: 1)
+        exact.isExactMatch = true
+        let result = TwoStageClassifier.decide(primary: exact, secondary: fm(.initial, conf: 0.9),
+                                               hint: nil, hintConfidence: nil, minimumSupport: 3, minimumMargin: 0.25)
+        XCTAssertEqual(result?.kind, .waxSeal)
+        XCTAssertEqual(result?.decidedBy, .featurePrintKNN)
+    }
+
     func testFoundationModelNegativeDiscardsCandidate() {
         let result = TwoStageClassifier.decide(primary: knn(nil, conf: 0, margin: 0, support: 0),
                                                secondary: fm(nil, conf: 0.9),

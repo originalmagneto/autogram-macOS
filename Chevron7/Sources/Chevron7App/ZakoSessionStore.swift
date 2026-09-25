@@ -19,6 +19,9 @@ final class ZakoSessionStore {
     var bankRecorderFactory: (ExampleBank, String) -> ExampleBankRecorder = { bank, version in
         ExampleBankRecorder(bank: bank, detectorVersion: version)
     }
+    var detectionPipelineFactory: (AppSettings, ExampleBank) -> DetectionPipeline = { settings, bank in
+        ZakoSessionStore.buildPipeline(settings: settings, bank: bank)
+    }
     private(set) var detectorIdentifier: String = LayeredDetectionProvider(
         classifier: TwoStageClassifier(primary: NoOpClassifier(), secondary: nil)).identifier
     private var bankWork: Task<Void, Never>?
@@ -407,10 +410,13 @@ final class ZakoSessionStore {
         }
         self.sourceURL = url
         step = .analysis
-        await runAnalysis()
+        await runAnalysis(recallingReviewedPages: true)
     }
 
-    func runAnalysis() async {
+    /// Detects security elements on the loaded document. Opening a document
+    /// recalls its complete page reviews from the example bank in place of fresh
+    /// detection on those pages; "Znova analyzovať AI" asks the detector again.
+    func runAnalysis(recallingReviewedPages: Bool = false) async {
         guard let document else { return }
         let analysisRecordID = currentRecordID
         attestation.noSecurityElementsConfirmed = false
@@ -432,7 +438,7 @@ final class ZakoSessionStore {
             }
             return nil
         }()
-        var pipeline = Self.buildPipeline(settings: selectedSettings, bank: exampleBank)
+        var pipeline = detectionPipelineFactory(selectedSettings, exampleBank)
         if let layered = pipeline.builtin as? LayeredDetectionProvider {
             detectorIdentifier = layered.identifier
             // `buildPipeline` is static and cannot capture the store, so the
@@ -456,8 +462,13 @@ final class ZakoSessionStore {
         if let bankLoadError = await exampleBank.loadError, !bankWarningShown {
             showBankWarningOnce(bankLoadError)
         }
-        let detected = detectionOutcome.elements
-
+        var detected = detectionOutcome.elements
+        if recallingReviewedPages, selectedSettings.learnFromReviews, let documentData,
+           let reviewedPages = try? await exampleBank.reviewedPages() {
+            detected = ReviewedPageRecall.apply(
+                to: detected, documentSHA256: AttestationClauseGenerator.sha256Hex(of: documentData),
+                reviewedPages: reviewedPages)
+        }
 
         let manualElements = securityElements.filter { !$0.detectedByAI }
         var merged = enrich(detected)
@@ -474,7 +485,12 @@ final class ZakoSessionStore {
             securityElements: merged,
             suggestedTitle: baseAnalysis.suggestedTitle,
             analyzedAt: Date())
+        // A new analysis replaces the suggestions; it is not a reviewer's edit, so
+        // it must neither erase review decisions from the bank nor invalidate
+        // stored page reviews (see `securityElementsChanged`).
+        resettingSecurityReview = true
         securityElements = merged
+        resettingSecurityReview = false
         reconcileBlankPagesWithConfirmedElements()
         reviewedNonEmptyPages = []
         reviewUpdatedAt = nil

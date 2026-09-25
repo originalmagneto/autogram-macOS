@@ -4,7 +4,8 @@
 import Foundation
 import CoreGraphics
 
-/// kNN first; Foundation Model when kNN is unsure; built-in hint as last resort.
+/// kNN first (an exact match with an earlier review always decides); Foundation
+/// Model when kNN is unsure; built-in hint as last resort.
 public struct TwoStageClassifier: Sendable {
     public let primary: any ElementClassifying
     public let secondary: (any ElementClassifying)?
@@ -48,7 +49,7 @@ public struct TwoStageClassifier: Sendable {
     }
 
     static func isConfident(_ j: ElementJudgement, minimumSupport: Int, minimumMargin: Double) -> Bool {
-        j.supportCount >= minimumSupport && j.margin >= minimumMargin
+        j.isExactMatch || (j.supportCount >= minimumSupport && j.margin >= minimumMargin)
     }
 
     public static func decide(primary: ElementJudgement, secondary: ElementJudgement?,
