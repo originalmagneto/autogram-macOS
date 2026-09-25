@@ -1,6 +1,6 @@
 # Learned security-element detector (step C)
 
-Status: proposed, not started. Prepared 2026-09-25 after the review-learning fixes (`f6717b3f`, `c78f31bd`). Owner decisions of 2026-09-25 are folded in (see the end).
+Status: phase 0 done 2026-09-25 (verdict GO, owner approved 2026-09-25); phases 1-5 planned. Thresholds below are the approved starting points. Findings: `../reviews/2026-09-25-learned-detector-phase0.md`. Prepared 2026-09-25 after the review-learning fixes (`f6717b3f`, `c78f31bd`). Owner decisions of 2026-09-25 are folded in (see the end).
 
 ## Problem
 
@@ -18,7 +18,7 @@ Non-goals: shipping a pretrained model with the app, cloud training, replacing t
 
 - `import CreateML` builds against the Xcode 27 SDK. `MLObjectDetector.train(trainingData: .directoryWithImagesAndJsonAnnotation(at:), annotationType: .boundingBox(units: .pixel, origin: .topLeft, anchor: .center), parameters: .init(algorithm: .transferLearning(.objectPrint(revision: 1))))` typechecks and returns an `MLJob`, so training can run inside the app with progress and cancellation. The exporter's `annotations.json` already uses pixel units, a top-left origin and centre anchors.
 - The app is not sandboxed, so training data and models can live next to the bank in `~/Library/Application Support/Chevron7/VisionBank/models/`.
-- Not verified yet: training time and memory on real page counts, and whether Create ML accepts pages with empty annotation lists (reviewed pages without elements). Phase 0 answers both.
+- Answered: 50-iteration training on 34 pages takes 563 s at 0.8 GB peak RSS on the M1 Max Mac Studio; cost is fixed per page (about 16 s), the iteration budget changes nothing measurable. Create ML accepts pages with empty annotation lists with no error. Extrapolated first training (40 pages): about 10 to 11 minutes on that machine, less on newer Apple silicon.
 
 ## Data reality
 
@@ -33,8 +33,8 @@ On 2026-09-25 the reviewer's bank held 77 crop decisions from two sample documen
    - first training: at least 40 complete reviewed pages from at least 8 distinct documents;
    - later trainings: at least 20 new or changed complete page reviews since the last run;
    - the reviewer has not answered "Neskôr" in the last 7 days.
-   A label is trained only with at least 15 boxes; below that it is left out of the model rather than trained on noise, and the report names it. All numbers are starting points, to be tuned in phase 0.
-2. **`DetectorTrainingEstimate`** predicts the duration before the reviewer commits: the first time from the phase 0 throughput measured on Apple silicon (seconds per page and iteration), afterwards from this Mac's own last run, stored with the model. It is shown as a range ("približne 6 až 10 minút") and recalibrated after every run.
+   A label is trained only with at least 15 boxes; below that it is left out of the model rather than trained on noise, and the report names it. Thresholds approved by the owner 2026-09-25 as starting points (document diversity and the 15-box minimum are not validated by the synthetic spike and are tuned after the first real trainings).
+2. **`DetectorTrainingEstimate`** predicts the duration before the reviewer commits: the first time from the phase 0 throughput (about 16 s/page on the M1 Max Mac Studio, recomputed from the reviewer's page count because cost scales with pages, not iterations), afterwards from this Mac's own last run, stored with the model. It is shown as a range ("približne 8 až 15 minút") and recalibrated after every run.
 3. **`DetectorTrainer`** exports a fresh dataset with `CreateMLExporter`, builds the train set from the `train` partition only, runs `MLObjectDetector.train` with transfer learning, writes `models/candidate-<UUID>/Detector.mlmodel`, compiles it (`MLModel.compileModel(at:)`) and hands it to the evaluator. The export folder is deleted after the run. Cancellable through the `MLJob`.
 4. **`DetectorPromotion`** scores the candidate against the currently active configuration on the `validation` and `test` partitions with `DetectionEvaluator.score` (IoU 0.4, the `vision-eval` default). The candidate is promoted only if mean recall across trained labels rises by at least 0.05 while precision does not drop by more than 0.02. Otherwise it is discarded and the reason is logged. The previous model is kept for one-click rollback.
 5. **`LearnedCandidateSource: CandidateSourcing`** (new `CandidateSource.learned`) loads the active compiled model once per detection run and runs it through Vision (`VNCoreMLRequest`, recognized-object observations) on the already rendered page image. Each observation becomes a `DetectionCandidate` with `kindHint` from its top label and `hintConfidence` from its confidence. The boxes go through `CandidateMerger`, `CandidateQualityFilter` and `TwoStageClassifier` like any other candidate, so bank decisions (including exact-match rejections) still apply. `prioritized` should rank `.learned` candidates first for the Foundation Model budget.
@@ -102,5 +102,5 @@ page review saved (reviewed-pages.json)
 
 ## Still open
 
-- The thresholds (40 pages, 8 documents, 15 boxes per kind, 20 new pages for retraining) until phase 0 measures real training.
 - Final Slovak wording of the education copy.
+- Tuning of the approved starting thresholds (40 pages, 8 documents, 15 boxes per kind, 20 new pages for retraining) after the first real trainings.
