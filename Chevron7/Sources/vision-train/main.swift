@@ -28,6 +28,9 @@ func peakRSSBytes() -> Int {
     return Int(ru.ru_maxrss)
 }
 
+// Unbuffered so progress survives a crash and pipes show live output.
+setbuf(stdout, nil)
+
 var args = Array(CommandLine.arguments.dropFirst())
 guard let folderPath = args.first, !folderPath.hasPrefix("--") else {
     fail("usage: vision-train <dataset-folder> [--iterations N] [--iou 0.4] [--out <dir>]")
@@ -97,15 +100,17 @@ do {
 } catch {
     fail("training failed to start (empty pages in train: \(trainEmpty)): \(error)")
 }
-var trained: MLObjectDetector?
-var trainError: Error?
+// Written by the Combine callback on a background executor, read after the
+// semaphore fires, so the semaphore is the only synchronisation needed.
+nonisolated(unsafe) var trainedBox: MLObjectDetector?
+nonisolated(unsafe) var trainErrorBox: Error?
 let done = DispatchSemaphore(value: 0)
 let cancellable = job.result.sink(
-    receiveCompletion: { completion in
-        if case .failure(let error) = completion { trainError = error }
+    receiveCompletion: { @Sendable completion in
+        if case .failure(let error) = completion { trainErrorBox = error }
         done.signal()
     },
-    receiveValue: { model in trained = model; done.signal() })
+    receiveValue: { @Sendable model in trainedBox = model; done.signal() })
 var lastProgressLine = ""
 while done.wait(timeout: .now() + 10) == .timedOut {
     let doneCount = job.progress.completedUnitCount
@@ -115,8 +120,8 @@ while done.wait(timeout: .now() + 10) == .timedOut {
 }
 cancellable.cancel()
 let trainSeconds = Date().timeIntervalSince(trainStart)
-if let trainError { fail("training failed: \(trainError)") }
-guard let detector = trained else { fail("training finished without a model and without an error") }
+if let trainErrorBox { fail("training failed: \(trainErrorBox)") }
+guard let detector = trainedBox else { fail("training finished without a model and without an error") }
 let peakAfterTrain = peakRSSBytes()
 print(String(format: "trained in %.0f s (%.1f s/page, %.1f s/page/iteration)  peak RSS %.1f GB",
              trainSeconds, trainSeconds / Double(max(trainImages.count, 1)),
