@@ -18,6 +18,8 @@ struct AnalysisCanvasView: View {
     @State private var showRejectedList = false
     /// Viewer preference: rejected findings stay on the canvas as faint dashed outlines.
     @AppStorage(ElementOverlay.showRejectedKey) private var showRejectedOnCanvas = true
+    @AppStorage("zako.learningExplainerShown") private var learningExplainerShown = false
+    @State private var showLearningExplainer = false
 
     struct Interaction {
         enum Kind {
@@ -793,6 +795,20 @@ struct AnalysisCanvasView: View {
             .tint(isReviewed ? .green : .accentColor)
             .disabled(isEmptyPage || store.securityElements.contains { $0.pageIndex == pageIndex && $0.reviewState == .pending })
             .help(isReviewed ? "Kliknutím zrušíte označenie" : "Každá neprázdna strana musí byť skontrolovaná")
+            .popover(isPresented: $showLearningExplainer) {
+                learningExplainer
+            }
+            .onChange(of: showLearningExplainer) { _, shown in
+                if !shown { learningExplainerShown = true }
+            }
+            if store.settingsStore.settings.learnFromReviews {
+                Text("Každá skontrolovaná strana učí Chevron7 rozpoznávať vaše dokumenty.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .task {
+                        if !learningExplainerShown { showLearningExplainer = true }
+                    }
+            }
 
             if !store.unconfirmedNonEmptyPages.isEmpty && !store.isAnalyzing {
                 unconfirmedWarning
@@ -806,6 +822,18 @@ struct AnalysisCanvasView: View {
             }
 
         }
+    }
+
+    /// First-use explainer: the three layers of learning, shown once.
+    private var learningExplainer: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Ako sa Chevron7 učí").font(.headline)
+            Text("Rovnaký výrez si zapamätá hneď.")
+            Text("Rovnaký dokument si nabudúce prinesie vašu kontrolu.")
+            Text("Dosť skontrolovaných strán natrénuje detektor aj pre nové dokumenty, iba na tomto Macu.")
+        }
+        .padding()
+        .frame(width: 300)
     }
 
     @ViewBuilder
