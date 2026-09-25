@@ -4,7 +4,7 @@
 import Foundation
 
 public enum CandidateSource: String, Codable, Sendable, Hashable, CaseIterable {
-    case builtIn, contour, saliency
+    case builtIn, contour, saliency, learned
 }
 
 /// A region that may contain a security element. Produced by candidate
