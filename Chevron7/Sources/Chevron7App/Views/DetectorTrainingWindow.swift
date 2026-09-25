@@ -357,8 +357,8 @@ struct DetectorTrainingView: View {
                 Text("Detektor sa učí z vašich skontrolovaných strán. Nič nikam neposiela a nové návrhy bude stále potvrdzovať človek.")
                     .foregroundStyle(.secondary)
             }
-            .glassCard()
             .frame(maxWidth: .infinity, alignment: .leading)
+            .glassCard()
             VStack(alignment: .leading, spacing: 8) {
                 Label(flow.trainedBefore ? "Nové strany od posledného trénovania" : "Skontrolované strany",
                       systemImage: "doc.on.doc")
@@ -400,8 +400,8 @@ struct DetectorTrainingView: View {
                     Image(systemName: "info.circle")
                 }
                 .foregroundStyle(.secondary)
-                .glassCard()
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .glassCard()
             }
         } else {
             ProgressView("Načítavam správu…")
@@ -423,10 +423,6 @@ struct DetectorTrainingView: View {
                 } currentValueLabel: {
                     Text("\(percent) %")
                         .font(.title2.monospacedDigit())
-                } minimumValueLabel: {
-                    Text("0 %")
-                } maximumValueLabel: {
-                    Text("100 %")
                 }
                 .frame(width: 110, height: 110)
                 Text(bindingLine(report: report, trainedBefore: trainedBefore))
@@ -434,8 +430,8 @@ struct DetectorTrainingView: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .glassCard()
         .frame(maxWidth: .infinity, alignment: .leading)
+        .glassCard()
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Pripravenosť na trénovanie \(percent) percent. \(bindingLine(report: report, trainedBefore: trainedBefore))")
     }
