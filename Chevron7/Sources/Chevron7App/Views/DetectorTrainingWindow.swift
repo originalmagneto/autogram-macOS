@@ -253,7 +253,7 @@ struct DetectorTrainingView: View {
     @State private var flow: DetectorTrainingFlow?
 
     private static let steps: [(title: String, symbol: String)] = [
-        ("Prehľad", "chart.bar.doc"),
+        ("Prehľad", "chart.bar"),
         ("Odhad", "clock"),
         ("Trénovanie", "cpu"),
         ("Výsledok", "checkmark.seal"),
@@ -320,6 +320,11 @@ struct DetectorTrainingView: View {
             if flow.report?.offerDue == true {
                 Button("Pokračovať") { flow.step = .estimate }
                     .buttonStyle(.borderedProminent)
+            } else {
+                Button("Pokračovať") {}
+                    .buttonStyle(.borderedProminent)
+                    .disabled(true)
+                    .help("Dostupné po splnení brány: 40 strán z 8 dokumentov.")
             }
         case .estimate:
             Button("Spustiť trénovanie") { flow.startTraining() }
@@ -354,7 +359,7 @@ struct DetectorTrainingView: View {
             .glassCard()
             VStack(alignment: .leading, spacing: 8) {
                 Label(flow.trainedBefore ? "Nové strany od posledného trénovania" : "Skontrolované strany",
-                      systemImage: "doc.stack")
+                      systemImage: "doc.on.doc")
                     .font(.headline)
                 if flow.trainedBefore {
                     ProgressView(value: Double(report.newSinceLastTraining),
@@ -401,11 +406,20 @@ struct DetectorTrainingView: View {
         }
     }
 
+    private func trainingIcon(for kind: SecurityElement.Kind?) -> String {
+        switch kind {
+        case .officialStamp: return "rosette"
+        case .initial: return "scribble"
+        case .waxSeal: return "seal"
+        default: return kind?.sfSymbol ?? "questionmark.circle"
+        }
+    }
+
     private func kindRow(label trainingLabel: String, count: Int, needed: Int) -> some View {
         let kind = VisionTrainSplit.kind(forTrainingLabel: trainingLabel)
         let ready = count >= needed
         return HStack(spacing: 10) {
-            Image(systemName: kind?.sfSymbol ?? "questionmark.circle")
+            Image(systemName: trainingIcon(for: kind))
                 .foregroundStyle(ready ? Color.green : Color.secondary)
                 .frame(width: 20)
             VStack(alignment: .leading, spacing: 4) {
