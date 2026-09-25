@@ -27,8 +27,8 @@ final class DetectorTrainingFlow {
     var resultPromotable = false
     var errorText: String?
     var showBatteryConfirm = false
+    var trainedBefore = false
     var finishedWhileAway = false
-
     private let job = DetectorTrainingJob()
     private var runTask: Task<Void, Never>?
     private var pendingCandidate: TrainedCandidate?
@@ -56,6 +56,7 @@ final class DetectorTrainingFlow {
                 offersEnabled: settings.detectorTrainingOffersEnabled,
                 snoozedUntil: state.snoozedUntil)
             let eligible = report?.reviewedPages ?? 0
+            trainedBefore = state.lastRunAt != nil
             estimateText = DetectorTrainingEstimate.slovak(
                 pages: eligible, secondsPerPage: state.secondsPerPage)
         } catch {
@@ -251,6 +252,13 @@ struct DetectorTrainingView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var flow: DetectorTrainingFlow?
 
+    private static let steps: [(title: String, symbol: String)] = [
+        ("Prehľad", "chart.bar.doc"),
+        ("Odhad", "clock"),
+        ("Trénovanie", "cpu"),
+        ("Výsledok", "checkmark.seal"),
+    ]
+
     var body: some View {
         Group {
             if let flow {
@@ -259,7 +267,6 @@ struct DetectorTrainingView: View {
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .padding(20)
         .frame(minWidth: 640, minHeight: 520)
         .onAppear { flow = DetectorTrainingFlow(settingsStore: settingsStore) }
         .task { await flow?.loadReport() }
@@ -269,18 +276,68 @@ struct DetectorTrainingView: View {
     @ViewBuilder
     private func content(flow: DetectorTrainingFlow) -> some View {
         @Bindable var flow = flow
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Trénovanie vlastného detektora").font(.title2)
-            if let message = flow.errorText {
-                Text(message).foregroundStyle(.red)
+        VStack(spacing: 0) {
+            FlowStepBar(steps: Self.steps, currentStepIndex: stepIndex(flow.step))
+                .padding(.top, 8)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    if let message = flow.errorText {
+                        Label(message, systemImage: "xmark.circle.fill")
+                            .foregroundStyle(.red)
+                            .padding(12)
+                            .background(.red.opacity(0.08), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    }
+                    switch flow.step {
+                    case .report: reportStep(flow: flow)
+                    case .estimate: estimateStep(flow: flow)
+                    case .progress: progressStep(flow: flow)
+                    case .result: resultStep(flow: flow)
+                    }
+                }
+                .padding(20)
             }
-            switch flow.step {
-            case .report: reportStep(flow: flow)
-            case .estimate: estimateStep(flow: flow)
-            case .progress: progressStep(flow: flow)
-            case .result: resultStep(flow: flow)
+            StickyActionBar {
+                actions(flow: flow)
             }
-            Spacer()
+        }
+    }
+
+    private func stepIndex(_ step: DetectorTrainingFlow.Step) -> Int {
+        switch step {
+        case .report: return 0
+        case .estimate: return 1
+        case .progress: return 2
+        case .result: return 3
+        }
+    }
+
+    @ViewBuilder
+    private func actions(flow: DetectorTrainingFlow) -> some View {
+        @Bindable var flow = flow
+        Spacer()
+        switch flow.step {
+        case .report:
+            if flow.report?.offerDue == true {
+                Button("Pokračovať") { flow.step = .estimate }
+                    .buttonStyle(.borderedProminent)
+            }
+        case .estimate:
+            Button("Spustiť trénovanie") { flow.startTraining() }
+                .buttonStyle(.borderedProminent)
+                .alert("Mac beží v úspornom režime", isPresented: $flow.showBatteryConfirm) {
+                    Button("Spustiť aj tak") { flow.beginRun() }
+                    Button("Zrušiť", role: .cancel) {}
+                } message: {
+                    Text("Trénovanie na batériu bude pomalšie. Odporúčame pripojiť napájanie.")
+                }
+        case .progress:
+            Button("Zrušiť") { flow.cancelRun() }
+        case .result:
+            if flow.resultPromotable {
+                Button("Ponechať pôvodný") { flow.keepOldDetector() }
+                Button("Používať nový detektor") { flow.confirmUseNewDetector() }
+                    .buttonStyle(.borderedProminent)
+            }
         }
     }
 
@@ -288,63 +345,147 @@ struct DetectorTrainingView: View {
     private func reportStep(flow: DetectorTrainingFlow) -> some View {
         @Bindable var flow = flow
         if let report = flow.report {
-            Text("Detektor sa učí z vašich skontrolovaných strán, iba na tomto Macu. Nič nikam neposiela a nové návrhy bude stále potvrdzovať človek.")
-            Text("Skontrolované strany: \(report.reviewedPages), dokumenty: \(report.documents).")
-                .font(.headline)
-            ForEach(report.trainedLabels.sorted(), id: \.self) { label in
-                Text("\(label): \(report.boxesPerLabel[label] ?? 0) príkladov, trénuje sa.")
-            }
-            ForEach(report.leftOutLabels.keys.sorted(), id: \.self) { label in
-                Text("\(label): \(report.leftOutLabels[label] ?? 0) príkladov, potrebných 15. Bez nich sa tento druh nenaučí.")
+            VStack(alignment: .leading, spacing: 6) {
+                Label("Iba na tomto Macu", systemImage: "lock.shield")
+                    .font(.headline)
+                Text("Detektor sa učí z vašich skontrolovaných strán. Nič nikam neposiela a nové návrhy bude stále potvrdzovať človek.")
                     .foregroundStyle(.secondary)
             }
-            if report.offerDue {
-                Button("Pokračovať") { flow.step = .estimate }
-                    .buttonStyle(.borderedProminent)
-            } else {
-                Text("Na prvé trénovanie treba \(DetectorTrainingReadiness.firstRunPages) skontrolovaných strán z \(DetectorTrainingReadiness.firstRunDocuments) dokumentov. Každá skontrolovaná strana vás k nemu priblíži.")
-                    .foregroundStyle(.secondary)
+            .glassCard()
+            VStack(alignment: .leading, spacing: 8) {
+                Label(flow.trainedBefore ? "Nové strany od posledného trénovania" : "Skontrolované strany",
+                      systemImage: "doc.stack")
+                    .font(.headline)
+                if flow.trainedBefore {
+                    ProgressView(value: Double(report.newSinceLastTraining),
+                                 total: Double(DetectorTrainingReadiness.retrainNewPages))
+                    Text("\(report.newSinceLastTraining) z \(UXLabels.count(DetectorTrainingReadiness.retrainNewPages, one: "novej", few: "nových", many: "nových"))")
+                        .font(.callout.monospacedDigit())
+                } else {
+                    ProgressView(value: Double(report.reviewedPages),
+                                 total: Double(DetectorTrainingReadiness.firstRunPages))
+                    Text("\(report.reviewedPages) z \(UXLabels.count(DetectorTrainingReadiness.firstRunPages, one: "strany", few: "strany", many: "strán"))")
+                        .font(.callout.monospacedDigit())
+                    ProgressView(value: Double(report.documents),
+                                 total: Double(DetectorTrainingReadiness.firstRunDocuments))
+                    Text("\(report.documents) z \(UXLabels.count(DetectorTrainingReadiness.firstRunDocuments, one: "dokumentu", few: "dokumentov", many: "dokumentov"))")
+                        .font(.callout.monospacedDigit())
+                }
+            }
+            .glassCard()
+            VStack(alignment: .leading, spacing: 10) {
+                Label("Druhy prvkov", systemImage: "square.grid.2x2")
+                    .font(.headline)
+                ForEach(report.trainedLabels.sorted(), id: \.self) { label in
+                    kindRow(label: label, count: report.boxesPerLabel[label] ?? 0,
+                            needed: DetectorTrainingReadiness.boxesPerLabelMinimum)
+                }
+                ForEach(report.leftOutLabels.keys.sorted(), id: \.self) { label in
+                    kindRow(label: label, count: report.leftOutLabels[label] ?? 0,
+                            needed: DetectorTrainingReadiness.boxesPerLabelMinimum)
+                }
+            }
+            .glassCard()
+            if !report.offerDue {
+                Label {
+                    Text("Na prvé trénovanie treba \(UXLabels.count(DetectorTrainingReadiness.firstRunPages, one: "stranu", few: "strany", many: "strán")) z \(UXLabels.count(DetectorTrainingReadiness.firstRunDocuments, one: "dokumentov", few: "dokumentov", many: "dokumentov")). Každá skontrolovaná strana vás k nemu priblíži.")
+                } icon: {
+                    Image(systemName: "info.circle")
+                }
+                .foregroundStyle(.secondary)
+                .glassCard()
             }
         } else {
             ProgressView("Načítavam správu…")
+                .frame(maxWidth: .infinity, minHeight: 200)
         }
+    }
+
+    private func kindRow(label trainingLabel: String, count: Int, needed: Int) -> some View {
+        let kind = VisionTrainSplit.kind(forTrainingLabel: trainingLabel)
+        let ready = count >= needed
+        return HStack(spacing: 10) {
+            Image(systemName: kind?.sfSymbol ?? "questionmark.circle")
+                .foregroundStyle(ready ? Color.green : Color.secondary)
+                .frame(width: 20)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(kind?.label ?? trainingLabel)
+                    .font(.callout)
+                ProgressView(value: min(1, Double(count) / Double(max(needed, 1))))
+                    .tint(ready ? .green : .accentColor)
+                if !ready {
+                    Text("Ešte \(UXLabels.count(needed - count, one: "príklad", few: "príklady", many: "príkladov")) do \(needed). Bez nich sa tento druh nenaučí.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            Spacer()
+            Text("\(count)/\(needed)")
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(.secondary)
+            if ready {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(kind?.label ?? trainingLabel), \(count) z \(needed)")
     }
 
     @ViewBuilder
     private func estimateStep(flow: DetectorTrainingFlow) -> some View {
         @Bindable var flow = flow
-        Text("Odhad: \(flow.estimateText). Prvý odhad je hrubý, po prvom behu sa prepočíta z vášho Macu.")
-        Text("Nechajte Mac na napájaní. Chevron7 môže ostať otvorený, konverzie môžu pokračovať. Zatvorenie aplikácie beh zruší a nič sa nestratí. Mac môže byť medzitým pomalší.")
-            .foregroundStyle(.secondary)
-        Button("Spustiť trénovanie") { flow.startTraining() }
-            .buttonStyle(.borderedProminent)
-            .alert("Mac beží v úspornom režime", isPresented: $flow.showBatteryConfirm) {
-                Button("Spustiť aj tak") { flow.beginRun() }
-                Button("Zrušiť", role: .cancel) {}
-            } message: {
-                Text("Trénovanie na batériu bude pomalšie. Odporúčame pripojiť napájanie.")
-            }
+        VStack(alignment: .leading, spacing: 6) {
+            Label("Odhad času", systemImage: "clock")
+                .font(.headline)
+            Text(flow.estimateText)
+                .font(.title3)
+            Text("Prvý odhad je hrubý, po prvom behu sa prepočíta z vášho Macu.")
+                .foregroundStyle(.secondary)
+        }
+        .glassCard()
+        VStack(alignment: .leading, spacing: 8) {
+            Label("Nechajte Mac na napájaní.", systemImage: "powerplug")
+            Label("Chevron7 môže ostať otvorený, konverzie môžu pokračovať.", systemImage: "macwindow")
+            Label("Zatvorenie aplikácie beh zruší a nič sa nestratí.", systemImage: "xmark.circle")
+            Label("Mac môže byť medzitým pomalší.", systemImage: "speedometer")
+        }
+        .glassCard()
     }
 
     @ViewBuilder
     private func progressStep(flow: DetectorTrainingFlow) -> some View {
         @Bindable var flow = flow
-        Text(flow.phaseText).font(.headline)
-        ProgressView(value: flow.progressFraction)
-        Button("Zrušiť") { flow.cancelRun() }
+        VStack(spacing: 12) {
+            Image(systemName: "cpu")
+                .font(.system(size: 44))
+                .foregroundStyle(.secondary)
+            Text(flow.phaseText)
+                .font(.headline)
+            ProgressView(value: flow.progressFraction)
+            Text("\(Int((flow.progressFraction * 100).rounded())) %")
+                .font(.callout.monospacedDigit())
+                .foregroundStyle(.secondary)
+        }
+        .glassCard()
+        .frame(maxWidth: .infinity)
     }
 
     @ViewBuilder
     private func resultStep(flow: DetectorTrainingFlow) -> some View {
         @Bindable var flow = flow
-        Text(flow.resultText)
-        if flow.resultPromotable {
-            Button("Používať nový detektor") { flow.confirmUseNewDetector() }
-                .buttonStyle(.borderedProminent)
-            Button("Ponechať pôvodný") { flow.keepOldDetector() }
+        VStack(spacing: 12) {
+            Image(systemName: flow.resultPromotable ? "checkmark.seal.fill" : "info.circle.fill")
+                .font(.system(size: 44))
+                .foregroundStyle(flow.resultPromotable ? .green : .secondary)
+            Text(flow.resultText)
+                .multilineTextAlignment(.center)
         }
+        .glassCard()
+        .frame(maxWidth: .infinity)
     }
 }
+
 
 /// Quiet offer on ZaKo's Done screen after a conversion. Never interrupts:
 /// it appears only when the readiness report says an offer is due.

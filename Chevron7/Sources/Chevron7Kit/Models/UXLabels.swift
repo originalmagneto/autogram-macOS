@@ -5,6 +5,15 @@ import Foundation
 
 /// Shared, testable wording for VoiceOver and other accessibility surfaces.
 public enum UXLabels {
+    /// Slovak cardinal plural: 1 one, 2-4 few, 0 and 5+ many.
+    public static func count(_ n: Int, one: String, few: String, many: String) -> String {
+        switch n {
+        case 1: return "1 \(one)"
+        case 2, 3, 4: return "\(n) \(few)"
+        default: return "\(n) \(many)"
+        }
+    }
+
     public static func confidenceLabel(for confidence: Double) -> String {
         let percentage = Int((min(max(confidence, 0), 1) * 100).rounded())
         return "Istota \(percentage) %"
