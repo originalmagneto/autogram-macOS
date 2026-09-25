@@ -8,6 +8,7 @@ import Chevron7Kit
 /// can read. The stored string stays untouched: it is evidence.
 enum DetectionSourceLabel {
     private static let replacements: [(needle: String, slovak: String)] = [
+        ("learned", "váš detektor"),
         ("builtInHint", "iba odhad heuristiky"),
         ("builtIn", "heuristika"),
         ("contour", "kontúry"),

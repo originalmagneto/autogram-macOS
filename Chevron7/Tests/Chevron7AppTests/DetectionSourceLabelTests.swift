@@ -27,6 +27,11 @@ final class DetectionSourceLabelTests: XCTestCase {
         XCTAssertEqual(DetectionSourceLabel.slovak("reviewedPage"), "vaša skoršia kontrola tejto strany")
     }
 
+    func testLearnedDetectorIsNamed() {
+        XCTAssertEqual(DetectionSourceLabel.slovak("learned+contour; kNN(n=7)"),
+                       "váš detektor+kontúry; porovnanie s 7 príkladmi")
+    }
+
     func testExactMatchWithAnEarlierDecisionIsNamed() {
         XCTAssertEqual(DetectionSourceLabel.slovak("contour; kNN(exact)"),
                        "kontúry; rovnaké ako vaše skoršie rozhodnutie")
