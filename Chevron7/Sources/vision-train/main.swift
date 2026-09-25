@@ -33,7 +33,7 @@ setbuf(stdout, nil)
 
 var args = Array(CommandLine.arguments.dropFirst())
 guard let folderPath = args.first, !folderPath.hasPrefix("--") else {
-    fail("usage: vision-train <dataset-folder> [--iterations N] [--iou 0.4] [--out <dir>]")
+    fail("usage: vision-train <dataset-folder> [--iterations N] [--iou 0.4] [--out <dir>] [--model <Detector.mlmodel>]")
 }
 args.removeFirst()
 var maxIterations = 20
@@ -43,6 +43,10 @@ if let i = args.firstIndex(of: "--iterations"), i + 1 < args.count, let v = Int(
 if let i = args.firstIndex(of: "--iou"), i + 1 < args.count, let v = Double(args[i + 1]) { iou = v }
 if let i = args.firstIndex(of: "--out"), i + 1 < args.count {
     outDir = URL(fileURLWithPath: args[i + 1], isDirectory: true)
+}
+var modelArg: URL?
+if let i = args.firstIndex(of: "--model"), i + 1 < args.count {
+    modelArg = URL(fileURLWithPath: args[i + 1])
 }
 
 let folder = URL(fileURLWithPath: folderPath, isDirectory: true)
@@ -69,6 +73,7 @@ print("dataset: \(folder.path)")
 print("train: \(trainImages.count) pages (\(trainEmpty) empty)  validation: \(validationImages.count)  test: \(testImages.count)")
 print("labels in train: \(Set(trainAnnotations.flatMap { $0.annotations.map(\.label) }).sorted().joined(separator: ", "))")
 
+@MainActor func trainModel() -> URL {
 // Build the train-only folder CreateML expects: images plus annotations.json.
 let scratch = FileManager.default.temporaryDirectory.appendingPathComponent("vision-train-\(UUID().uuidString)", isDirectory: true)
 let trainDir = scratch.appendingPathComponent("train", isDirectory: true)
@@ -136,6 +141,16 @@ do {
 } catch {
     fail("cannot write model: \(error)")
 }
+return modelURL
+}
+
+let modelURL: URL
+if let existing = modelArg {
+    modelURL = existing
+    print("scoring existing model without training: \(modelURL.path)")
+} else {
+    modelURL = trainModel()
+}
 let compiledURL: URL
 do {
     compiledURL = try MLModel.compileModel(at: modelURL)
@@ -189,7 +204,7 @@ func report(partition: String, imageNames: [String]) throws {
                                             imageSizes: sizes, pageOrder: imageNames, iouThreshold: iou)
     print("\(partition): \(imageNames.count) pages, \(predicted.count) predicted boxes (iou \(iou))")
     for (label, m) in perLabel.sorted(by: { $0.key < $1.key }) {
-        print(String(format: "  %-22s TP %4d FP %4d FN %4d  P %.2f R %.2f F1 %.2f",
+        print(String(format: "  %-22@ TP %4d FP %4d FN %4d  P %.2f R %.2f F1 %.2f",
                      label, m.truePositives, m.falsePositives, m.falseNegatives,
                      m.precision, m.recall, m.f1))
     }
