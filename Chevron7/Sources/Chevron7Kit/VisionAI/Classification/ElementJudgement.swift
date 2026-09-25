@@ -22,10 +22,13 @@ public struct ElementJudgement: Sendable, Equatable {
     /// timeout or a model error). A judgement that is not unsure is decisive
     /// even when `kind` is nil and `confidence` is 0.
     public var isUnsure: Bool
+    /// True when the bank holds an earlier review of this very crop (kNN only).
+    /// That decision is final, however few examples back it.
+    public var isExactMatch: Bool
 
     public init(kind: SecurityElement.Kind?, confidence: Double, margin: Double = 0,
                 descriptionSK: String = "", decidedBy: ClassifierIdentity, supportCount: Int = 0,
-                isUnsure: Bool = false) {
+                isUnsure: Bool = false, isExactMatch: Bool = false) {
         self.kind = kind
         self.confidence = confidence
         self.margin = margin
@@ -33,6 +36,7 @@ public struct ElementJudgement: Sendable, Equatable {
         self.decidedBy = decidedBy
         self.supportCount = supportCount
         self.isUnsure = isUnsure
+        self.isExactMatch = isExactMatch
     }
 
     public static let unsure = ElementJudgement(kind: nil, confidence: 0, decidedBy: .featurePrintKNN,

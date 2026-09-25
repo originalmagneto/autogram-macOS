@@ -51,13 +51,26 @@ public struct FeaturePrintClassifier: ElementClassifying {
                          k: k)
     }
 
-    /// Distance-weighted vote over the k nearest examples.
+    /// Feature print distance at or below which a bank example counts as the very
+    /// same crop. The detector and the recorder render a page identically, so a
+    /// candidate the reviewer already decided lands at 0; distinct crops of one
+    /// element, even slightly shifted boxes, sit above 0.1.
+    public static let exactMatchDistance = 0.05
+
+    /// Distance-weighted vote over the k nearest examples. An earlier review of the
+    /// same crop decides on its own unless reviews of that crop disagree.
     public static func vote(query: FeatureVector, examples: [(FeatureVector, BankLabel)], k: Int) -> ElementJudgement {
         guard !examples.isEmpty else { return .unsure }
-        let nearest = examples
+        let byDistance = examples
             .map { (label: $0.1, distance: query.distance(to: $0.0)) }
             .sorted { $0.distance < $1.distance }
-            .prefix(k)
+        let exact = byDistance.prefix { $0.distance <= exactMatchDistance }
+        if let label = exact.first?.label, exact.allSatisfy({ $0.label == label }) {
+            let kind: SecurityElement.Kind? = { if case .kind(let k) = label { return k } else { return nil } }()
+            return ElementJudgement(kind: kind, confidence: 1, margin: 1, descriptionSK: "",
+                                    decidedBy: .featurePrintKNN, supportCount: exact.count, isExactMatch: true)
+        }
+        let nearest = byDistance.prefix(k)
         var weights: [BankLabel: Double] = [:]
         var counts: [BankLabel: Int] = [:]
         for item in nearest {

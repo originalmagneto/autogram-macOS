@@ -93,6 +93,9 @@ final class CallCountingClassifier: ElementClassifying, @unchecked Sendable {
 /// final kind for each merged candidate.
 public struct LayeredDetectionProvider: SecurityElementsProviding {
     public static let version = 2
+    /// Page width in pixels the detector renders at. `ExampleBankRecorder` embeds
+    /// review crops at the same width, so a reviewed candidate matches itself.
+    public static let defaultRenderTargetWidth = 760
 
     public let builtIn: BuiltInCandidateSource
     public let extraSources: [any CandidateSourcing]
@@ -111,7 +114,7 @@ public struct LayeredDetectionProvider: SecurityElementsProviding {
     public init(builtIn: BuiltInCandidateSource = BuiltInCandidateSource(),
                 extraSources: [any CandidateSourcing] = [ContourCandidateSource(), SaliencyCandidateSource()],
                 classifier: TwoStageClassifier,
-                renderTargetWidth: Int = 760,
+                renderTargetWidth: Int = LayeredDetectionProvider.defaultRenderTargetWidth,
                 maxConcurrentPages: Int = max(1, ProcessInfo.processInfo.activeProcessorCount / 2)) {
         self.builtIn = builtIn
         self.extraSources = extraSources
