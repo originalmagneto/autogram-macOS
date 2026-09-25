@@ -35,3 +35,35 @@ The manifest prevents identical document identities from crossing partitions. Co
 ## Original page review
 
 A confirmed element makes its original page nonempty for review and record numbering, even if low-ink analysis classified the scan as blank. Returning or rejecting the last confirmed finding restores that automatic classification. Physical observations still exclude both referenced pages from training.
+
+## Learned detector (step C)
+
+Once enough complete reviews exist (40 pages from 8 documents first, 20 new
+reviews later, 15 boxes per label; see the phase 0 findings in
+`docs/superpowers/reviews/2026-09-25-learned-detector-phase0.md`), the
+reviewer may start training from the dedicated workflow window. Training runs
+once at a time at utility priority, never in `--web-signing` accessory mode,
+refuses to start on serious thermal pressure and cancels on critical pressure.
+Cost is fixed per page (about 16 s on the M1 Max Mac Studio); the iteration
+budget (50) changes nothing measurable.
+
+`DetectorTrainer` exports a fresh dataset, stages the `train` split
+(`VisionTrainSplit`), trains with transfer learning (`objectPrint`), and
+writes `models/candidate-<UUID>/Detector.mlmodel` plus its compiled form.
+`DetectorPromotion` scores the candidate and the active model on the
+`validation` and `test` partitions (`LearnedModelScorer`, `DetectionEvaluator`
+at IoU 0.4) and promotes only on a mean recall gain of at least 0.05 with a
+precision drop of at most 0.02 across trained labels. `ModelRegistry` keeps
+`active/` and `previous/` under `<bank>/models/` with metadata (SHA-256 id,
+date, measured gain, seconds per page); rollback swaps them back. Deleting
+the bank deletes the models.
+
+`LearnedCandidateSource` (source `learned`) runs the active compiled model
+over the rendered page and proposes hinted candidates. They flow through
+`CandidateMerger`, `CandidateQualityFilter` and `TwoStageClassifier` like any
+other candidate, so bank rejections still apply, and every box still needs
+human confirmation. `LayeredDetectionProvider.identifier` appends
+`learned(<model id>)`, so `SecurityReviewStamp` records which model proposed
+the boxes. Readiness, estimate and offer state live in
+`models/training-state.json` (`TrainingState`); the offers switch is
+`AppSettings.detectorTrainingOffersEnabled`.
