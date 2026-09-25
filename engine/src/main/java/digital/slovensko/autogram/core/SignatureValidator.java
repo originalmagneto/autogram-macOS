@@ -65,6 +65,11 @@ public class SignatureValidator {
     }
 
     public synchronized Reports validate(SignedDocumentValidator docValidator) {
+        // Trusted lists load lazily (a visible signature or an explicit validation warms
+        // them); without them structural and cryptographic checks still run, only the
+        // EU qualification stays undecided instead of throwing on a null verifier.
+        if (verifier == null)
+            verifier = new CommonCertificateVerifier();
         docValidator.setCertificateVerifier(verifier);
 
         // TODO: do not print stack trace inside DSS

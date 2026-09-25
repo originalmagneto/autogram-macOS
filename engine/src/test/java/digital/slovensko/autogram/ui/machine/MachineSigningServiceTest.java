@@ -724,6 +724,52 @@ class MachineSigningServiceTest {
         }
     }
 
+    /// Financna sprava forms carry no target namespace and a TXT (text-output) stylesheet,
+    /// like the DPH form. The XDC build must handle that shape with referenced schemas.
+    @Test
+    void signingJobBuildsAnXmlDataContainerFromFsShapedEForm() throws Exception {
+        var xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+                + "<dokument><hlavicka><dic>1084791499</dic></hlavicka></dokument>";
+        var xsd = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+                + "<xsd:schema xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\" elementFormDefault=\"qualified\">"
+                + "<xsd:element name=\"dokument\"><xsd:complexType><xsd:sequence>"
+                + "<xsd:element name=\"hlavicka\"><xsd:complexType><xsd:sequence>"
+                + "<xsd:element name=\"dic\" type=\"xsd:string\"/>"
+                + "</xsd:sequence></xsd:complexType></xsd:element>"
+                + "</xsd:sequence></xsd:complexType></xsd:element></xsd:schema>";
+        var xslt = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+                + "<xsl:stylesheet version=\"1.0\" xmlns:xsl=\"http://www.w3.org/1999/XSL/Transform\">"
+                + "<xsl:output method=\"text\" omit-xml-declaration=\"yes\" encoding=\"utf-8\"/>"
+                + "<xsl:template match=\"/\">DIC:<xsl:value-of select=\"/dokument/hlavicka/dic\"/>"
+                + "</xsl:template></xsl:stylesheet>";
+        var source = temporaryDirectory.resolve("Object1279.xml");
+        Files.writeString(source, xml);
+        var responder = new MachineFileResponder(new MemoryRetainedFile(), () -> { });
+        var settings = new MachineSettings(true);
+        settings.setSignatureLevel(SignatureLevel.XAdES_BASELINE_B);
+        settings.setEform(new EFormRequest(
+                "http://data.gov.sk/def/container/xmldatacontainer+xml/1.1",
+                base64(xsd),
+                base64(xslt),
+                "https://ekr.financnasprava.sk/xdc/DPHv25/1.0",
+                "https://ekr.financnasprava.sk/Formulare/XSD/dph2025.xsd",
+                "https://pfseform.financnasprava.sk/Formulare/eFormVzor/DP/form.616.sb.xslt",
+                null, "TXT", null,
+                false, false, null, "ENVELOPING"));
+
+        var job = MachineSigningService.DefaultSigningSession.signingJob(Files.readAllBytes(source), source.toString(),
+                responder, settings);
+
+        assertEquals(SignatureLevel.XAdES_BASELINE_B, job.getParameters().getLevel());
+        assertEquals(ASiCContainerType.ASiC_E, job.getParameters().getContainer());
+        try (var stream = job.getDocument().openStream()) {
+            var content = new String(stream.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+            assertTrue(content.contains("XMLDataContainer"), "expected an XML Data Container, got: " + content);
+            assertTrue(content.contains("UsedXSDReference"), "expected the schema to be referenced");
+            assertTrue(content.contains("<dic>1084791499</dic>"), "expected the form payload to survive");
+        }
+    }
+
     /// ZaKo hands the PDF/A and the clause XDC as two documents. They must become two data
     /// objects of one ASiC-E, never a container nested inside another.
     @Test
@@ -965,6 +1011,32 @@ class MachineSigningServiceTest {
 
         assertFalse(tokenOpened.get());
         assertEquals("SIGNING_UNAVAILABLE", xmlWriter.payloadCode(2));
+    }
+
+    /// A state-portal eForm travels as plain XML: with eForm attributes it must reach the
+    /// session factory, where the XDC build happens. Without them it stays refused (above).
+    @Test
+    void preparationAcceptsAnXmlEFormWithAttributes() throws Exception {
+        var writer = new RecordingWriter();
+        var xmlSource = Files.writeString(temporaryDirectory.resolve("Object1279.xml"), probeForm()).toRealPath();
+        var sessionRequested = new AtomicBoolean();
+        var service = new MachineSigningService(writer.writer(), request -> {
+            sessionRequested.set(true);
+            throw new IllegalStateException("no token in this test");
+        }, content -> true);
+
+        service.sign("request-1", new SignRequest("fake", "123", "1234".toCharArray(), "XAdES_BASELINE_B",
+                new QualifiedTimestampRequest(false, List.of()),
+                List.of(new MachineFile("one", xmlSource.toString(), target("Object1279.asice").toString())),
+                new EFormRequest(
+                        "http://data.gov.sk/def/container/xmldatacontainer+xml/1.1",
+                        base64(probeSchema()),
+                        base64(probeTransformation()),
+                        PROBE_NS,
+                        null, null, "sk", "HTML", "probe",
+                        true, false, null, null)));
+
+        assertTrue(sessionRequested.get(), "an eForm XML source must reach the session factory");
     }
 
     /// The whole path for a record: preparation, a real Baseline B signature, the output check

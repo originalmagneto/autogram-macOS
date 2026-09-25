@@ -164,7 +164,9 @@
         transformationMediaDestinationTypeDescription:
           emptyToNull(object.xslMediaDestinationTypeDescription),
         transformationTargetEnvironment: emptyToNull(object.xslTargetEnvironment),
-        embedUsedSchemas: object.xdcIncludeRefs === true,
+        // Upstream autogram-extension sends embedUsedSchemas = !includeRefs;
+        // FS passes xdcIncludeRefs=true and expects schemas referenced, not embedded.
+        embedUsedSchemas: object.xdcIncludeRefs !== true,
         autoLoadEform: false,
         fsFormID: null,
         packaging: "ENVELOPING"

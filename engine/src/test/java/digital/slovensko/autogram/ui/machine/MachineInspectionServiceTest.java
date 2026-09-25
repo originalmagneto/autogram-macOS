@@ -250,6 +250,18 @@ class MachineInspectionServiceTest {
         assertFalse(payload.getAsJsonArray("signatures").isEmpty());
     }
 
+    /// The pre-sign signature census runs on a helper that may never have warmed the trusted
+    /// lists: it must report no signatures instead of throwing on a null verifier.
+    @Test
+    void trustedInspectionOfAnUnsignedPdfNeedsNoTrustedLists() throws Exception {
+        var unsigned = Files.readAllBytes(Path.of(MachineInspectionServiceTest.class
+                .getResource("/digital/slovensko/autogram/sample.pdf").getFile()));
+
+        var payload = MachineInspectionService.forTrustedValidation().inspect(unsigned);
+
+        assertTrue(payload.getAsJsonArray("signatures").isEmpty());
+    }
+
     @Test
     void rejectsBatchEntryWithoutTargetBeforeTrustInitialization() throws Exception {
         var trustInitialized = new AtomicBoolean();

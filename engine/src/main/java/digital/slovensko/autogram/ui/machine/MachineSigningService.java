@@ -100,7 +100,9 @@ public final class MachineSigningService {
         var requestPin = request != null ? request.pin() : null;
         try {
             var validatedRequest = MachineRequestValidator.validateSign(request);
-            preparedFiles = prepare(requestId, validatedRequest.files());
+            // A state-portal eForm travels as plain XML; without its attributes such a
+            // source stays refused below, so ordinary file signing never changes shape.
+            preparedFiles = prepare(requestId, validatedRequest.files(), validatedRequest.request().eform() != null);
             if (preparedFiles.stream().anyMatch(PreparedFile::hasVisibleAppearance)) {
                 trustInitializer.run();
             }
@@ -151,12 +153,12 @@ public final class MachineSigningService {
         }
     }
 
-    private List<PreparedFile> prepare(String requestId, List<ValidatedMachineFile> files) {
+    private List<PreparedFile> prepare(String requestId, List<ValidatedMachineFile> files, boolean eformXmlAllowed) {
         var prepared = new ArrayList<PreparedFile>();
         try {
             for (var file : files) {
                 progress(requestId, file.file(), "preparing");
-                prepared.add(PreparedFile.prepare(file, fileSystem));
+                prepared.add(PreparedFile.prepare(file, fileSystem, eformXmlAllowed));
             }
             return List.copyOf(prepared);
         } catch (Throwable exception) {
@@ -297,7 +299,8 @@ public final class MachineSigningService {
             this.attachments = attachments;
         }
 
-        private static PreparedFile prepare(ValidatedMachineFile validated, MachineSigningFileSystem fileSystem)
+        private static PreparedFile prepare(ValidatedMachineFile validated, MachineSigningFileSystem fileSystem,
+                boolean eformXmlAllowed)
                 throws IOException {
             var file = validated.file();
             MachineSigningFileSystem.RetainedFile source = null;
@@ -305,7 +308,7 @@ public final class MachineSigningService {
             try {
                 source = fileSystem.openSource(validated.source());
                 var sourceContent = source.readAll();
-                if (!isSupportedSource(file.source(), sourceContent)) {
+                if (!isSupportedSource(file.source(), sourceContent, eformXmlAllowed)) {
                     throw new IOException("Source is not a supported document");
                 }
                 var attachments = new ArrayList<AttachmentContent>();
@@ -451,8 +454,29 @@ public final class MachineSigningService {
         }
     }
 
-    private static boolean isSupportedSource(String source, byte[] content) {
-        return hasPdfHeader(content) || isAsic(source, content) || isRecordXdc(source, content);
+    private static boolean isSupportedSource(String source, byte[] content, boolean eformXmlAllowed) {
+        return hasPdfHeader(content) || isAsic(source, content) || isRecordXdc(source, content)
+                || (eformXmlAllowed && isXmlForm(source, content));
+    }
+
+    /// A state-portal eForm: plain XML the engine wraps into an XMLDataContainer from the
+    /// request's schema and transformation when it signs. Only with eForm attributes, so a
+    /// mislabeled or broken file still fails here rather than deep in the XDC build.
+    private static boolean isXmlForm(String source, byte[] content) {
+        if (!source.toLowerCase(java.util.Locale.ROOT).endsWith(".xml")) {
+            return false;
+        }
+        try {
+            var factory = javax.xml.parsers.DocumentBuilderFactory.newInstance();
+            factory.setNamespaceAware(true);
+            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+            factory.setXIncludeAware(false);
+            factory.setExpandEntityReferences(false);
+            factory.newDocumentBuilder().parse(new java.io.ByteArrayInputStream(content));
+            return true;
+        } catch (Exception exception) {
+            return false;
+        }
     }
 
     private static MimeType detectMimeType(String filename, byte[] content) {
