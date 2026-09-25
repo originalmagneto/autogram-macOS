@@ -30,6 +30,10 @@ let package = Package(
             dependencies: ["Chevron7Kit"]
         ),
         .executableTarget(
+            name: "vision-train",
+            dependencies: ["Chevron7Kit"]
+        ),
+        .executableTarget(
             name: "vision-eval",
             dependencies: ["Chevron7Kit"]
         ),
