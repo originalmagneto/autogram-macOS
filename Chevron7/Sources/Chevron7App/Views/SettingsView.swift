@@ -1292,7 +1292,7 @@ struct LearningDatasetCard: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Učenie a lokálny dataset").font(.headline)
 
-            Toggle("Klasifikovať neisté nálezy on-device modelom (Apple Intelligence)",
+            Toggle("Klasifikovať neisté nálezy modelom na tomto Macu (Apple Intelligence)",
                    isOn: $settingsStore.settings.useFoundationModelClassifier)
                 .disabled(!modelAvailable)
             Text(modelAvailable
