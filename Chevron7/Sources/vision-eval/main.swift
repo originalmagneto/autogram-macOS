@@ -6,7 +6,7 @@ import AppKit
 import PDFKit
 import Chevron7Kit
 
-// Usage: vision-eval <dataset-folder> [--builtin-only] [--no-fm] [--bank <dir>] [--iou 0.4] [--json]
+// Usage: vision-eval <dataset-folder> [--builtin-only] [--no-fm] [--bank <dir>] [--iou 0.4] [--json] [--model <Detector.mlmodel>]
 var args = Array(CommandLine.arguments.dropFirst())
 guard let folderPath = args.first else {
     FileHandle.standardError.write("usage: vision-eval <dataset-folder> [--builtin-only] [--no-fm] [--bank <dir>] [--iou 0.4] [--json]\n".data(using: .utf8)!)
@@ -57,9 +57,24 @@ if json {
     print(bankLine)
 }
 
-let provider: any SecurityElementsProviding = builtinOnly
-    ? BuiltInVisionProvider()
-    : LayeredDetectionProvider.makeDefault(bank: bank, useFoundationModel: useFM)
+let provider: any SecurityElementsProviding
+if builtinOnly {
+    provider = BuiltInVisionProvider()
+} else {
+    var learnedSource: LearnedCandidateSource?
+    if let i = args.firstIndex(of: "--model"), i + 1 < args.count {
+        let modelURL = URL(fileURLWithPath: args[i + 1])
+        guard modelURL.pathExtension == "mlmodel" else {
+            fatalError("pass Detector.mlmodel, not the compiled bundle (the audit id is the SHA-256 of the .mlmodel)")
+        }
+        let vnModel = try LearnedModelLoader.load(at: modelURL)
+        let modelID = AttestationClauseGenerator.sha256Hex(of: try Data(contentsOf: modelURL))
+        learnedSource = LearnedCandidateSource(modelID: modelID,
+                                              predict: LearnedCandidateSource.coreMLPredictor(model: vnModel))
+    }
+    provider = LayeredDetectionProvider.makeDefault(bank: bank, useFoundationModel: useFM,
+                                                    learnedSource: learnedSource)
+}
 let analyses = PDFAnalysisEngine().analyze(document: document).pageAnalyses
 
 let documentBox = UncheckedSendableBox(value: document)
