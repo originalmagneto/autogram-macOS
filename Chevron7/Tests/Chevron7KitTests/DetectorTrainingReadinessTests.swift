@@ -15,6 +15,18 @@ final class DetectorTrainingReadinessTests: XCTestCase {
                          reviewedAt: reviewedAt, detectorVersion: "t")
     }
 
+    func testOverallFractionTakesBindingGate() {
+        XCTAssertEqual(DetectorTrainingReadiness.overallFraction(pages: 1, documents: 1, newSince: 0, trainedBefore: false),
+                       0.025, accuracy: 1e-9)
+        XCTAssertEqual(DetectorTrainingReadiness.overallFraction(pages: 40, documents: 8, newSince: 0, trainedBefore: false), 1)
+        XCTAssertEqual(DetectorTrainingReadiness.overallFraction(pages: 40, documents: 2, newSince: 0, trainedBefore: false), 0.25)
+    }
+
+    func testOverallFractionRetraining() {
+        XCTAssertEqual(DetectorTrainingReadiness.overallFraction(pages: 60, documents: 12, newSince: 10, trainedBefore: true), 0.5)
+        XCTAssertEqual(DetectorTrainingReadiness.overallFraction(pages: 60, documents: 12, newSince: 99, trainedBefore: true), 1)
+    }
+
     private func kind(for label: String) -> SecurityElement.Kind {
         switch label {
         case "officialStamp": return .officialStamp

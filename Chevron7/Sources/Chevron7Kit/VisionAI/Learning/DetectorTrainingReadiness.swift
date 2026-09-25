@@ -20,6 +20,21 @@ public struct DetectorTrainingReadiness: Sendable, Equatable {
     public static let retrainNewPages = 20
     public static let boxesPerLabelMinimum = 15
 
+    /// Single hero number for the window: the binding gate as a 0...1 fraction.
+    /// First run is the slower of pages and documents; retraining counts new
+    /// pages only.
+    public static func overallFraction(pages: Int, documents: Int, newSince: Int,
+                                       trainedBefore: Bool) -> Double {
+        let raw: Double
+        if trainedBefore {
+            raw = Double(newSince) / Double(retrainNewPages)
+        } else {
+            raw = min(Double(pages) / Double(firstRunPages),
+                      Double(documents) / Double(firstRunDocuments))
+        }
+        return min(1, max(0, raw))
+    }
+
     public static func report(pages: [ReviewedBankPage], lastRunAt: Date?,
                               learnOn: Bool, offersEnabled: Bool, snoozedUntil: Date?,
                               now: Date = Date()) -> DetectorTrainingReadiness {
