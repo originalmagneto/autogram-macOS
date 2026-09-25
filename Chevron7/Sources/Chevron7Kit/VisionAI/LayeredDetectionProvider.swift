@@ -98,7 +98,7 @@ public struct LayeredDetectionProvider: SecurityElementsProviding {
     public static let defaultRenderTargetWidth = 760
 
     public let builtIn: BuiltInCandidateSource
-    public let extraSources: [any CandidateSourcing]
+    public var extraSources: [any CandidateSourcing]
     public let classifier: TwoStageClassifier
     public let renderTargetWidth: Int
     public let maxConcurrentPages: Int
@@ -132,6 +132,15 @@ public struct LayeredDetectionProvider: SecurityElementsProviding {
         if let learnedSource { extra.append(learnedSource) }
         return LayeredDetectionProvider(extraSources: extra,
                                         classifier: TwoStageClassifier(primary: knn, secondary: fm))
+    }
+
+    /// A copy with the learned source appended (or itself when nil), for call
+    /// sites that cannot rebuild the provider.
+    public func withLearnedSource(_ source: LearnedCandidateSource?) -> LayeredDetectionProvider {
+        guard let source else { return self }
+        var copy = self
+        copy.extraSources.append(source)
+        return copy
     }
 
     /// Versioned audit identifier listing active stages, stored in SecurityReviewStamp.

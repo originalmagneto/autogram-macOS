@@ -24,6 +24,21 @@ final class LearnedCandidateSourceTests: XCTestCase {
         XCTAssertFalse(provider.identifier.contains("learned"))
     }
 
+    func testWithLearnedSourceAppendsAndNamesModel() {
+        let bank = ExampleBank(directory: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString))
+        let base = LayeredDetectionProvider.makeDefault(bank: bank, useFoundationModel: false)
+        let learned = LearnedCandidateSource(modelID: "abc123", predict: { _ in [] })
+        let wired = base.withLearnedSource(learned)
+        XCTAssertTrue(wired.identifier.contains("learned(abc123)"))
+        XCTAssertTrue(wired.extraSources.contains { $0.source == .learned })
+    }
+
+    func testWithNilLearnedSourceUnchanged() {
+        let bank = ExampleBank(directory: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString))
+        let base = LayeredDetectionProvider.makeDefault(bank: bank, useFoundationModel: false)
+        XCTAssertEqual(base.withLearnedSource(nil).identifier, base.identifier)
+    }
+
     func testSourceIsLearned() {
         let source = LearnedCandidateSource(modelID: "abc", predict: { _ in [] })
         XCTAssertEqual(source.source, .learned)

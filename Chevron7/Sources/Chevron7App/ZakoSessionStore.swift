@@ -19,6 +19,7 @@ final class ZakoSessionStore {
     var bankRecorderFactory: (ExampleBank, String) -> ExampleBankRecorder = { bank, version in
         ExampleBankRecorder(bank: bank, detectorVersion: version)
     }
+    private var learnedSourceCache: (id: String, source: LearnedCandidateSource)?
     var detectionPipelineFactory: (AppSettings, ExampleBank) -> DetectionPipeline = { settings, bank in
         ZakoSessionStore.buildPipeline(settings: settings, bank: bank)
     }
@@ -325,6 +326,25 @@ final class ZakoSessionStore {
         }
     }
 
+    /// The registry's active model, loaded once per model id. A missing or
+    /// unloadable model means detection runs without the learned source:
+    /// detection must never break because of an optional stage.
+    private func loadActiveLearnedSource() async -> LearnedCandidateSource? {
+        let bankDir = await exampleBank.directory
+        let registry = ModelRegistry(root: ModelRegistry.modelsDirectory(in: bankDir))
+        guard let id = try? registry.activeModelID() else { return nil }
+        if let cached = learnedSourceCache, cached.id == id { return cached.source }
+        guard let model = try? LearnedModelLoader.load(at: registry.activeCompiledURL()) else { return nil }
+        let source = LearnedCandidateSource(modelID: id,
+                                            predict: LearnedCandidateSource.coreMLPredictor(model: model))
+        learnedSourceCache = (id, source)
+        return source
+    }
+
+    /// Drops the cached source so the next analysis picks up a newly
+    /// promoted or rolled-back model.
+    func forgetLearnedSourceCache() { learnedSourceCache = nil }
+
     static func buildPipeline(settings: AppSettings, bank: ExampleBank) -> DetectionPipeline {
         let llmProvider: (any SecurityElementsProviding)?
         switch settings.aiMode {
@@ -439,7 +459,8 @@ final class ZakoSessionStore {
             return nil
         }()
         var pipeline = detectionPipelineFactory(selectedSettings, exampleBank)
-        if let layered = pipeline.builtin as? LayeredDetectionProvider {
+        if var layered = pipeline.builtin as? LayeredDetectionProvider {
+            layered = layered.withLearnedSource(await loadActiveLearnedSource())
             detectorIdentifier = layered.identifier
             // `buildPipeline` is static and cannot capture the store, so the
             // per-page progress hook is attached here on a copy.

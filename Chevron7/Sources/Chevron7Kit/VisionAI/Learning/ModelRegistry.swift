@@ -13,6 +13,7 @@ public enum ModelRegistryError: Error, Equatable {
 /// bank directory deletes the models with it; nothing extra tracks them.
 public struct ModelMetadata: Codable, Equatable, Sendable {
     public var id: String
+
     public var trainedAt: Date
     public var recallGain: Double
     public var precisionDelta: Double
@@ -23,6 +24,10 @@ public struct ModelMetadata: Codable, Equatable, Sendable {
 
 public struct ModelRegistry: Sendable {
     public var root: URL
+    public static func modelsDirectory(in bankDirectory: URL) -> URL {
+        bankDirectory.appendingPathComponent("models", isDirectory: true)
+    }
+
     public init(root: URL) { self.root = root }
 
     public var activeDir: URL { root.appendingPathComponent("active", isDirectory: true) }

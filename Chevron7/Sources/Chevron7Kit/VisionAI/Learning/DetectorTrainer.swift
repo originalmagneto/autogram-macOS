@@ -147,7 +147,7 @@ extension DetectorTrainer {
         guard let detector = box.model else { throw DetectorTrainingError.emptyTrainPartition }
         let secondsPerPage = Date().timeIntervalSince(startedAt) / Double(trainImages.count)
         let bankDir = await bank.directory
-        let candidateDir = bankDir.appendingPathComponent("models", isDirectory: true)
+        let candidateDir = ModelRegistry.modelsDirectory(in: bankDir)
             .appendingPathComponent("candidate-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: candidateDir, withIntermediateDirectories: true)
         let modelURL = candidateDir.appendingPathComponent("Detector.mlmodel")
