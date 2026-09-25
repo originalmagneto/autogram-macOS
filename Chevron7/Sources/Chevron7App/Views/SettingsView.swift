@@ -1279,10 +1279,14 @@ struct LearningDatasetCard: View {
     @Bindable var settingsStore: AppSettingsStore
     let bank: ExampleBank
     var waitForLearningWrites: @MainActor () async -> Void = {}
+    @Environment(\.openWindow) private var openWindow
     @State private var counts: [BankLabel: Int] = [:]
     @State private var exportMessage: String?
     @State private var showDeleteConfirmation = false
     @State private var modelAvailable = false
+    @State private var readinessText: String?
+    @State private var activeModelText: String?
+    @State private var hasPreviousModel = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -1309,6 +1313,25 @@ struct LearningDatasetCard: View {
                 Button("Vymazať lokálny dataset…", role: .destructive) { showDeleteConfirmation = true }
                 Spacer()
             }
+            .controlSize(.small)
+
+            Divider()
+            Text("Vlastný detektor").font(.headline)
+            if let readinessText {
+                Text(readinessText).font(.caption.monospacedDigit())
+            }
+            if let activeModelText {
+                Text(activeModelText).font(.caption2).foregroundStyle(.secondary)
+            }
+            HStack {
+                Button("Otvoriť trénovanie…") { openWindow(id: DetectorTrainingWindow.id) }
+                if hasPreviousModel {
+                    Button("Vrátiť predchádzajúci detektor") { rollbackModel() }
+                }
+                Spacer()
+            }
+            .controlSize(.small)
+            Toggle("Pripomínať trénovanie detektora", isOn: $settingsStore.settings.detectorTrainingOffersEnabled)
             .controlSize(.small)
             if let exportMessage {
                 Text(exportMessage).font(.caption2).foregroundStyle(.secondary)
@@ -1337,6 +1360,49 @@ struct LearningDatasetCard: View {
         modelAvailable = SystemLanguageModel.default.isAvailable
         let entries = await bank.entries()
         counts = Dictionary(grouping: entries, by: \.label).mapValues(\.count)
+        await refreshTrainingStatus()
+    }
+
+    private func refreshTrainingStatus() async {
+        let bankDir = await bank.directory
+        let root = ModelRegistry.modelsDirectory(in: bankDir)
+        let pages = (try? await bank.reviewedPages()) ?? []
+        let state = (try? TrainingState.load(from: root)) ?? TrainingState()
+        let settings = settingsStore.settings
+        let report = DetectorTrainingReadiness.report(
+            pages: pages, lastRunAt: state.lastRunAt,
+            learnOn: settings.learnFromReviews,
+            offersEnabled: settings.detectorTrainingOffersEnabled,
+            snoozedUntil: state.snoozedUntil)
+        if state.lastRunAt == nil {
+            readinessText = "Skontrolované strany: \(report.reviewedPages) z \(DetectorTrainingReadiness.firstRunPages) pre prvé trénovanie"
+        } else {
+            readinessText = "Nové strany od posledného trénovania: \(report.newSinceLastTraining) z \(DetectorTrainingReadiness.retrainNewPages)"
+        }
+        let registry = ModelRegistry(root: root)
+        if let meta = try? JSONDecoder().decode(
+            ModelMetadata.self,
+            from: Data(contentsOf: root.appendingPathComponent("active/metadata.json"))) {
+            let date = meta.trainedAt.formatted(date: .numeric, time: .omitted)
+            activeModelText = "Aktívny vlastný detektor z \(date): recall +\(Int((meta.recallGain * 100).rounded())) %."
+        } else {
+            activeModelText = nil
+        }
+        hasPreviousModel = FileManager.default.fileExists(
+            atPath: registry.previousModelURL().path)
+    }
+
+    private func rollbackModel() {
+        Task {
+            do {
+                let bankDir = await bank.directory
+                try ModelRegistry(root: ModelRegistry.modelsDirectory(in: bankDir)).rollback()
+                exportMessage = "Vrátený predchádzajúci detektor."
+            } catch {
+                exportMessage = "Vrátenie zlyhalo: \(error.localizedDescription)"
+            }
+            await refreshCounts()
+        }
     }
 
     private func exportDataset() {
