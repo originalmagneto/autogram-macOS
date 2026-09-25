@@ -34,6 +34,12 @@ final class DetectorTrainingFlow {
     private var runTask: Task<Void, Never>?
     private var pendingCandidate: TrainedCandidate?
     private var pendingGain: (recall: Double, precision: Double)?
+    /// Seams for tests: production stages, compiles and scores a real model;
+    /// tests inject a fixture candidate and canned metrics instead.
+    var stageImport: @Sendable (URL, URL) throws -> TrainedCandidate = {
+        try ModelTransfer().stageImportCandidate(from: $0, modelsRoot: $1)
+    }
+    var scoreOverride: ((URL) async throws -> ([String: LabelMetrics], [String: LabelMetrics], Set<String>))?
 
     init(settingsStore: AppSettingsStore) {
         self.settingsStore = settingsStore
@@ -108,7 +114,7 @@ final class DetectorTrainingFlow {
                         }
                     })
             }
-            await present(candidate: candidate, saveTrainingState: true)
+            try await present(candidate: candidate, saveTrainingState: true)
         } catch is CancellationError {
             resultText = "Trénovanie ste zrušili. Nič sa nestratilo, dáta ostávajú."
             resultPromotable = false
@@ -135,10 +141,18 @@ final class DetectorTrainingFlow {
     private func doImport(from zipURL: URL) async {
         do {
             let root = await modelsRoot
-            let candidate = try await job.run {
-                try ModelTransfer().stageImportCandidate(from: zipURL, modelsRoot: root)
+            try Task.checkCancellation()
+            let stage = stageImport
+            let candidate = try await job.run { try stage(zipURL, root) }
+            do {
+                // Staging itself (unzip, compile) cannot be interrupted, so the
+                // cancellation is honoured here, before anything is scored.
+                try Task.checkCancellation()
+                try await present(candidate: candidate, saveTrainingState: false)
+            } catch is CancellationError {
+                discard(candidate: candidate)
+                throw CancellationError()
             }
-            await present(candidate: candidate, saveTrainingState: false)
         } catch is CancellationError {
             resultText = "Overenie ste zrušili. Dovezený súbor ostal nedotknutý."
             resultPromotable = false
@@ -156,7 +170,7 @@ final class DetectorTrainingFlow {
     /// The mandatory gate, shared by fresh training and imports: the candidate
     /// is scored on local held-out documents and promoted only through
     /// `DetectorPromotion`. Direct activation does not exist.
-    private func present(candidate: TrainedCandidate, saveTrainingState: Bool) async {
+    private func present(candidate: TrainedCandidate, saveTrainingState: Bool) async throws {
         phaseText = "Overenie na dokumentoch, ktoré model nevidel…"
         do {
             let labels = Set(report?.trainedLabels ?? [])
@@ -167,7 +181,13 @@ final class DetectorTrainingFlow {
                 step = .result
                 return
             }
-            let (candidateMetrics, activeMetrics, _) = try await score(modelURL: candidate.compiledURL)
+            let scored: ([String: LabelMetrics], [String: LabelMetrics], Set<String>)
+            if let scoreOverride {
+                scored = try await scoreOverride(candidate.compiledURL)
+            } else {
+                scored = try await score(modelURL: candidate.compiledURL)
+            }
+            let (candidateMetrics, activeMetrics, _) = scored
             let decision = DetectorPromotion.decide(candidate: candidateMetrics,
                                                     active: activeMetrics,
                                                     trainedLabels: labels)
@@ -190,6 +210,9 @@ final class DetectorTrainingFlow {
                     snoozedUntil: state.snoozedUntil), in: await modelsRoot)
             }
             step = .result
+        } catch is CancellationError {
+            discard(candidate: candidate)
+            throw CancellationError()
         } catch {
             discard(candidate: candidate)
             errorText = "Overenie zlyhalo: \(error.localizedDescription)"
@@ -244,6 +267,7 @@ final class DetectorTrainingFlow {
 
     private func score(modelURL: URL) async throws
         -> ([String: LabelMetrics], [String: LabelMetrics], Set<String>) {
+        try Task.checkCancellation()
         let exportRoot = FileManager.default.temporaryDirectory
             .appendingPathComponent("detector-score-\(UUID().uuidString)", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: exportRoot) }
@@ -257,6 +281,7 @@ final class DetectorTrainingFlow {
         let predictor = LearnedCandidateSource.coreMLPredictor(model: vnModel)
         var candidateMetrics: [String: LabelMetrics] = [:]
         for partition in ["validation", "test"] {
+            try Task.checkCancellation()
             let names = VisionTrainSplit.images(in: partition, splits: splits)
             let score = try await LearnedModelScorer.score(predict: predictor, imageNames: names,
                                                            folder: folder, truth: truth)
@@ -274,6 +299,7 @@ final class DetectorTrainingFlow {
            let activeModel = try? LearnedModelLoader.load(at: registry.activeCompiledURL()) {
             let activePredictor = LearnedCandidateSource.coreMLPredictor(model: activeModel)
             for partition in ["validation", "test"] {
+                try Task.checkCancellation()
                 let names = VisionTrainSplit.images(in: partition, splits: splits)
                 let score = try await LearnedModelScorer.score(predict: activePredictor, imageNames: names,
                                                                folder: folder, truth: truth)

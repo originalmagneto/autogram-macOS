@@ -27,6 +27,7 @@ public enum LearnedModelScorer {
         var predicted: [SecurityElement] = []
         var sizes: [String: CGSize] = [:]
         for (index, name) in imageNames.enumerated() {
+            try Task.checkCancellation()
             guard let imageSource = CGImageSourceCreateWithURL(folder.appendingPathComponent(name) as CFURL, nil),
                   let image = CGImageSourceCreateImageAtIndex(imageSource, 0, nil) else {
                 throw LearnedModelScorerError.unreadableImage(name)
