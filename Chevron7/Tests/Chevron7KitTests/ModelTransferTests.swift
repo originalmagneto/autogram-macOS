@@ -74,4 +74,28 @@ final class ModelTransferTests: XCTestCase {
             }
         }
     }
+
+    func testStageImportCandidateRejectsTamperedBundleAndPreservesActive() throws {
+        let root = scratchRoot()
+        _ = try fixtureActiveDir(in: root, modelContent: "model-v1")
+        let activeModel = root.appendingPathComponent("active/Detector.mlmodel")
+        let before = try Data(contentsOf: activeModel)
+        // A bundle with valid metadata but foreign model bytes.
+        let evilRoot = scratchRoot()
+        _ = try fixtureActiveDir(in: evilRoot, modelContent: "model-v1")
+        try Data("evil".utf8).write(
+            to: evilRoot.appendingPathComponent("active/Detector.mlmodel"))
+        let zip = root.appendingPathComponent("evil.zip")
+        try ModelTransfer().exportActiveModel(modelsRoot: evilRoot, to: zip)
+        XCTAssertThrowsError(
+            try ModelTransfer().stageImportCandidate(from: zip, modelsRoot: root)) { error in
+            guard case .invalidBundle = error as? ModelTransferError else {
+                return XCTFail("tampered bundle must be invalidBundle, got \(error)")
+            }
+        }
+        XCTAssertEqual(try Data(contentsOf: activeModel), before)
+        let residue = try FileManager.default.contentsOfDirectory(atPath: root.path)
+            .filter { $0.hasPrefix("candidate-") }
+        XCTAssertTrue(residue.isEmpty)
+    }
 }
