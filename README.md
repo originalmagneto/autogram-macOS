@@ -290,7 +290,9 @@ Príklady z vašej kontroly vedia premenovať návrhy, ale nové rámce nenavrhn
   <img src="docs/diagrams/ai-promotion-gate.svg" alt="Brána aktivácie: kandidát sa aktivuje len pri náraste recall aspoň o 0,05 a poklese precision najviac o 0,02, inak ostáva starý model" width="100%">
 </p>
 
-Predchádzajúci model ostáva na jedno vrátenie v Nastaveniach. Modely žijú vedľa banky príkladov (`~/Library/Application Support/Chevron7/VisionBank/models/`); vymazanie banky zmaže aj modely. Nič nikdy neopúšťa tento Mac.
+Predchádzajúci model ostáva na jedno vrátenie v Nastaveniach. Modely žijú vedľa banky príkladov (`~/Library/Application Support/Chevron7/VisionBank/models/`); vymazanie banky zmaže aj modely. Skeny nikdy neopúšťajú tento Mac; samotný model odnesie iba váš vlastný export.
+
+Prenos na iný Mac: Nastavenia → Učenie → **Exportovať detektor…** uloží zip so samotným modelom, bez skenov. Na druhom Macu ho prinesie okno trénovania → **Importovať detektor zo súboru…**, ale aktivuje sa, len keď prejde rovnakým overením na tamojších stranách. Cudzí model môže škodiť, preto priama aktivácia neexistuje.
 
 ## Zaručená konverzia
 
@@ -535,7 +537,16 @@ xattr -d com.apple.quarantine "/Applications/Chevron7.app"
 </details>
 
 <details open>
-<summary><strong>v0.14.1 · aktuálne vydanie: stav záznamu v EZZK sa overuje v každom režime</strong></summary>
+<summary><strong>v0.15.0 · aktuálne vydanie: vlastný detektor bezpečnostných prvkov a jeho prenos medzi Macmi</strong></summary>
+<ul>
+<li>Keď skontrolujete dosť strán (40 z 8 dokumentov, 15 príkladov na druh), aplikácia ponúkne natrénovanie vlastného detektora priamo na Macu; nový sa aktivuje, len keď na nepoznaných dokumentoch nájde aspoň o 5 % prvkov viac, a predchádzajúci ostáva na jedno vrátenie.</li>
+<li><strong>Exportovať detektor…</strong> v Nastaveniach uloží zip so samotným modelom, bez skenov; <strong>Importovať detektor zo súboru…</strong> v okne trénovania ho aktivuje, len keď prejde rovnakým overením na tamojších stranách. Poškodený balíček aplikácia odmietne a rozbehnuté overenie ide zrušiť.</li>
+<li>V nálezoch vidíte rámce vášho detektora a pečiatka kontroly zaznamená, ktorý model ich navrhol. Podrobnosti v poznámkach k vydaniu.</li>
+</ul>
+</details>
+
+<details>
+<summary><strong>v0.14.1 · predchádzajúce vydanie: stav záznamu v EZZK sa overuje v každom režime</strong></summary>
 <ul>
 <li>Záznam prijatý na spracovanie v EZZK sa overí v režime, v ktorom vznikol, aj keď je práve zapnutý iný režim; produkčný záznam sa tak zmení na <strong>Spracovaný v EZZK</strong> aj počas práce v Deme.</li>
 <li><strong>Overiť v EZZK</strong> v Registri a na záverečnej obrazovke ZaKo funguje aj pre záznam z iného režimu. Odoslanie záznamu ostáva len v jeho vlastnom režime.</li>

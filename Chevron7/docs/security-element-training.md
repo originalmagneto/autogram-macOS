@@ -67,3 +67,7 @@ human confirmation. `LayeredDetectionProvider.identifier` appends
 the boxes. Readiness, estimate and offer state live in
 `models/training-state.json` (`TrainingState`); the offers switch is
 `AppSettings.detectorTrainingOffersEnabled`.
+
+## Moving a model to another Mac
+
+Export zips only `active/Detector.mlmodel` with `metadata.json` (via `/usr/bin/ditto`). Scans and bank entries never enter the bundle. Import unzips the bundle, refuses anything without both files or with a model SHA-256 different from `metadata.id`, and stages the model as one more candidate (`models/candidate-<UUID>/`, compiled for scoring). The same promotion gate (`DetectorPromotion`) decides on local held-out documents; direct activation of an imported model does not exist. A foreign model can harm local documents, so the app warns before importing.

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: EUPL-1.2
 
 import SwiftUI
+import UniformTypeIdentifiers
 import UserNotifications
 import Chevron7Kit
 
@@ -33,6 +34,12 @@ final class DetectorTrainingFlow {
     private var runTask: Task<Void, Never>?
     private var pendingCandidate: TrainedCandidate?
     private var pendingGain: (recall: Double, precision: Double)?
+    /// Seams for tests: production stages, compiles and scores a real model;
+    /// tests inject a fixture candidate and canned metrics instead.
+    var stageImport: @Sendable (URL, URL) throws -> TrainedCandidate = {
+        try ModelTransfer().stageImportCandidate(from: $0, modelsRoot: $1)
+    }
+    var scoreOverride: ((URL) async throws -> ([String: LabelMetrics], [String: LabelMetrics], Set<String>))?
 
     init(settingsStore: AppSettingsStore) {
         self.settingsStore = settingsStore
@@ -84,10 +91,17 @@ final class DetectorTrainingFlow {
         runTask = Task(priority: .utility) { await self.run() }
     }
 
+    func importModel(from zipURL: URL) {
+        step = .progress
+        progressFraction = 0
+        phaseText = "Kontrola dovezeného detektora…"
+        errorText = nil
+        runTask = Task(priority: .utility) { await self.doImport(from: zipURL) }
+    }
+
     func cancelRun() {
         runTask?.cancel()
     }
-
     private func run() async {
         do {
             let candidate = try await job.run {
@@ -100,29 +114,7 @@ final class DetectorTrainingFlow {
                         }
                     })
             }
-            phaseText = "Overenie na dokumentoch, ktoré model nevidel…"
-            let (candidateMetrics, activeMetrics, labels) = try await score(candidate: candidate)
-            let decision = DetectorPromotion.decide(candidate: candidateMetrics,
-                                                    active: activeMetrics,
-                                                    trainedLabels: labels)
-            switch decision {
-            case .promote(let gain, let delta):
-                pendingCandidate = candidate
-                pendingGain = (gain, delta)
-                resultText = Self.resultLine(newMetrics: candidateMetrics, oldMetrics: activeMetrics,
-                                             labels: labels)
-                resultPromotable = true
-            case .keep(let reason):
-                try? FileManager.default.removeItem(
-                    at: candidate.modelURL.deletingLastPathComponent())
-                resultText = "Pôvodný detektor zostáva. Dôvod: \(reason)"
-                resultPromotable = false
-            }
-            let state = try TrainingState.load(from: await modelsRoot)
-            try TrainingState.save(TrainingState(
-                lastRunAt: Date(), secondsPerPage: candidate.secondsPerPage,
-                snoozedUntil: state.snoozedUntil), in: await modelsRoot)
-            step = .result
+            try await present(candidate: candidate, saveTrainingState: true)
         } catch is CancellationError {
             resultText = "Trénovanie ste zrušili. Nič sa nestratilo, dáta ostávajú."
             resultPromotable = false
@@ -144,6 +136,92 @@ final class DetectorTrainingFlow {
             step = .report
         }
         finishedWhileAway = true
+    }
+
+    private func doImport(from zipURL: URL) async {
+        do {
+            let root = await modelsRoot
+            try Task.checkCancellation()
+            let stage = stageImport
+            let candidate = try await job.run { try stage(zipURL, root) }
+            do {
+                // Staging itself (unzip, compile) cannot be interrupted, so the
+                // cancellation is honoured here, before anything is scored.
+                try Task.checkCancellation()
+                try await present(candidate: candidate, saveTrainingState: false)
+            } catch is CancellationError {
+                discard(candidate: candidate)
+                throw CancellationError()
+            }
+        } catch is CancellationError {
+            resultText = "Overenie ste zrušili. Dovezený súbor ostal nedotknutý."
+            resultPromotable = false
+            step = .result
+        } catch is DetectorTrainingError {
+            errorText = "Už beží trénovanie alebo overenie. Počkajte na koniec."
+            step = .report
+        } catch {
+            errorText = (error as? LocalizedError)?.errorDescription ?? "Overenie zlyhalo: \(error.localizedDescription)"
+            step = .report
+        }
+        finishedWhileAway = true
+    }
+
+    /// The mandatory gate, shared by fresh training and imports: the candidate
+    /// is scored on local held-out documents and promoted only through
+    /// `DetectorPromotion`. Direct activation does not exist.
+    private func present(candidate: TrainedCandidate, saveTrainingState: Bool) async throws {
+        phaseText = "Overenie na dokumentoch, ktoré model nevidel…"
+        do {
+            let labels = Set(report?.trainedLabels ?? [])
+            guard !labels.isEmpty else {
+                discard(candidate: candidate)
+                resultText = "Overenie nie je možné: na vašich stranách je málo príkladov na druh. Nič sa nezmenilo, pôvodný detektor zostáva."
+                resultPromotable = false
+                step = .result
+                return
+            }
+            let scored: ([String: LabelMetrics], [String: LabelMetrics], Set<String>)
+            if let scoreOverride {
+                scored = try await scoreOverride(candidate.compiledURL)
+            } else {
+                scored = try await score(modelURL: candidate.compiledURL)
+            }
+            let (candidateMetrics, activeMetrics, _) = scored
+            let decision = DetectorPromotion.decide(candidate: candidateMetrics,
+                                                    active: activeMetrics,
+                                                    trainedLabels: labels)
+            switch decision {
+            case .promote(let gain, let delta):
+                pendingCandidate = candidate
+                pendingGain = (gain, delta)
+                resultText = Self.resultLine(newMetrics: candidateMetrics, oldMetrics: activeMetrics,
+                                             labels: labels)
+                resultPromotable = true
+            case .keep(let reason):
+                discard(candidate: candidate)
+                resultText = "Pôvodný detektor zostáva. Dôvod: \(reason)"
+                resultPromotable = false
+            }
+            if saveTrainingState {
+                let state = try TrainingState.load(from: await modelsRoot)
+                try TrainingState.save(TrainingState(
+                    lastRunAt: Date(), secondsPerPage: candidate.secondsPerPage,
+                    snoozedUntil: state.snoozedUntil), in: await modelsRoot)
+            }
+            step = .result
+        } catch is CancellationError {
+            discard(candidate: candidate)
+            throw CancellationError()
+        } catch {
+            discard(candidate: candidate)
+            errorText = "Overenie zlyhalo: \(error.localizedDescription)"
+            step = .report
+        }
+    }
+
+    private func discard(candidate: TrainedCandidate) {
+        try? FileManager.default.removeItem(at: candidate.modelURL.deletingLastPathComponent())
     }
 
     func confirmUseNewDetector() {
@@ -187,8 +265,9 @@ final class DetectorTrainingFlow {
         }
     }
 
-    private func score(candidate: TrainedCandidate) async throws
+    private func score(modelURL: URL) async throws
         -> ([String: LabelMetrics], [String: LabelMetrics], Set<String>) {
+        try Task.checkCancellation()
         let exportRoot = FileManager.default.temporaryDirectory
             .appendingPathComponent("detector-score-\(UUID().uuidString)", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: exportRoot) }
@@ -198,10 +277,11 @@ final class DetectorTrainingFlow {
                                              from: Data(contentsOf: datasetURL))
         let splits = try JSONDecoder().decode([CreateMLDocumentSplit].self,
                                               from: Data(contentsOf: folder.appendingPathComponent("splits.json")))
-        let vnModel = try LearnedModelLoader.load(at: candidate.compiledURL)
+        let vnModel = try LearnedModelLoader.load(at: modelURL)
         let predictor = LearnedCandidateSource.coreMLPredictor(model: vnModel)
         var candidateMetrics: [String: LabelMetrics] = [:]
         for partition in ["validation", "test"] {
+            try Task.checkCancellation()
             let names = VisionTrainSplit.images(in: partition, splits: splits)
             let score = try await LearnedModelScorer.score(predict: predictor, imageNames: names,
                                                            folder: folder, truth: truth)
@@ -219,6 +299,7 @@ final class DetectorTrainingFlow {
            let activeModel = try? LearnedModelLoader.load(at: registry.activeCompiledURL()) {
             let activePredictor = LearnedCandidateSource.coreMLPredictor(model: activeModel)
             for partition in ["validation", "test"] {
+                try Task.checkCancellation()
                 let names = VisionTrainSplit.images(in: partition, splits: splits)
                 let score = try await LearnedModelScorer.score(predict: activePredictor, imageNames: names,
                                                                folder: folder, truth: truth)
@@ -393,6 +474,15 @@ struct DetectorTrainingView: View {
                 }
             }
             .glassCard()
+            VStack(alignment: .leading, spacing: 8) {
+                Label("Detektor z iného Macu", systemImage: "square.and.arrow.down")
+                    .font(.headline)
+                Text("Dovezený detektor pochádza z cudzieho Macu a vašim dokumentom môže škodiť. Overím ho preto na vašich skontrolovaných stranách a aktivujem ho, len keď prejde rovnakou bránou ako vlastné trénovanie. Prenáša sa iba model, nikdy vaše skeny.")
+                    .foregroundStyle(.secondary)
+                Button("Importovať detektor zo súboru…") { pickImportFile(flow: flow) }
+                    .controlSize(.small)
+            }
+            .glassCard()
             if !report.offerDue {
                 Label {
                     Text("Na prvé trénovanie treba \(UXLabels.count(DetectorTrainingReadiness.firstRunPages, one: "stranu", few: "strany", many: "strán")) z \(UXLabels.count(DetectorTrainingReadiness.firstRunDocuments, one: "dokumentov", few: "dokumentov", many: "dokumentov")). Každá skontrolovaná strana vás k nemu priblíži.")
@@ -407,6 +497,16 @@ struct DetectorTrainingView: View {
             ProgressView("Načítavam správu…")
                 .frame(maxWidth: .infinity, minHeight: 200)
         }
+    }
+
+    private func pickImportFile(flow: DetectorTrainingFlow) {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.zip]
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.prompt = "Importovať"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        flow.importModel(from: url)
     }
 
     private func heroCard(report: DetectorTrainingReadiness, trainedBefore: Bool) -> some View {
