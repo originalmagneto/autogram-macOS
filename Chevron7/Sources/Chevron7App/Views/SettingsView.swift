@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: EUPL-1.2
 
 import SwiftUI
+import UniformTypeIdentifiers
 import Chevron7Kit
 import AppKit
 import FoundationModels
@@ -1287,6 +1288,7 @@ struct LearningDatasetCard: View {
     @State private var readinessText: String?
     @State private var activeModelText: String?
     @State private var hasPreviousModel = false
+    @State private var hasActiveModel = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -1328,12 +1330,17 @@ struct LearningDatasetCard: View {
             }
             HStack {
                 Button("Otvoriť trénovanie…") { openWindow(id: DetectorTrainingWindow.id) }
+                if hasActiveModel {
+                    Button("Exportovať detektor…") { exportModel() }
+                }
                 if hasPreviousModel {
                     Button("Vrátiť predchádzajúci detektor") { rollbackModel() }
                 }
                 Spacer()
             }
             .controlSize(.small)
+            Text("Prenos detektora nesie iba model, nikdy vaše skeny ani príklady. Dovezený detektor sa aktivuje, len keď prejde overením na vašich stranách.")
+                .font(.caption2).foregroundStyle(.secondary)
             Toggle("Pripomínať trénovanie detektora", isOn: $settingsStore.settings.detectorTrainingOffersEnabled)
             .controlSize(.small)
             if let exportMessage {
@@ -1388,8 +1395,10 @@ struct LearningDatasetCard: View {
             from: Data(contentsOf: root.appendingPathComponent("active/metadata.json"))) {
             let date = meta.trainedAt.formatted(date: .numeric, time: .omitted)
             activeModelText = "Aktívny vlastný detektor z \(date): recall +\(Int((meta.recallGain * 100).rounded())) %."
+            hasActiveModel = true
         } else {
             activeModelText = nil
+            hasActiveModel = false
         }
         hasPreviousModel = FileManager.default.fileExists(
             atPath: registry.previousModelURL().path)
@@ -1405,6 +1414,24 @@ struct LearningDatasetCard: View {
                 exportMessage = "Vrátenie zlyhalo: \(error.localizedDescription)"
             }
             await refreshCounts()
+        }
+    }
+
+    private func exportModel() {
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.zip]
+        panel.nameFieldStringValue = "Detector.zip"
+        panel.prompt = "Exportovať"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        Task {
+            do {
+                let bankDir = await bank.directory
+                try ModelTransfer().exportActiveModel(
+                    modelsRoot: ModelRegistry.modelsDirectory(in: bankDir), to: url)
+                exportMessage = "Detektor exportovaný: \(url.lastPathComponent). Obsahuje iba model, nikdy vaše skeny."
+            } catch {
+                exportMessage = "Export zlyhal: \((error as? LocalizedError)?.errorDescription ?? error.localizedDescription)"
+            }
         }
     }
 

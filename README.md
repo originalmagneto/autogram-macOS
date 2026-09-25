@@ -290,7 +290,9 @@ Príklady z vašej kontroly vedia premenovať návrhy, ale nové rámce nenavrhn
   <img src="docs/diagrams/ai-promotion-gate.svg" alt="Brána aktivácie: kandidát sa aktivuje len pri náraste recall aspoň o 0,05 a poklese precision najviac o 0,02, inak ostáva starý model" width="100%">
 </p>
 
-Predchádzajúci model ostáva na jedno vrátenie v Nastaveniach. Modely žijú vedľa banky príkladov (`~/Library/Application Support/Chevron7/VisionBank/models/`); vymazanie banky zmaže aj modely. Nič nikdy neopúšťa tento Mac.
+Predchádzajúci model ostáva na jedno vrátenie v Nastaveniach. Modely žijú vedľa banky príkladov (`~/Library/Application Support/Chevron7/VisionBank/models/`); vymazanie banky zmaže aj modely. Skeny nikdy neopúšťajú tento Mac; samotný model odnesie iba váš vlastný export.
+
+Prenos na iný Mac: Nastavenia → Učenie → **Exportovať detektor…** uloží zip so samotným modelom, bez skenov. Na druhom Macu ho prinesie okno trénovania → **Importovať detektor zo súboru…**, ale aktivuje sa, len keď prejde rovnakým overením na tamojších stranách. Cudzí model môže škodiť, preto priama aktivácia neexistuje.
 
 ## Zaručená konverzia
 
