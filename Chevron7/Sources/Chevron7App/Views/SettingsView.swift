@@ -1317,6 +1317,9 @@ struct LearningDatasetCard: View {
 
             Divider()
             Text("Vlastný detektor").font(.headline)
+            Text("Ako sa Chevron7 učí: rovnaký výrez si zapamätá hneď, rovnaký dokument si prinesie vašu kontrolu a dosť skontrolovaných strán natrénuje detektor aj pre nové dokumenty, iba na tomto Macu.")
+                .font(.caption2).foregroundStyle(.secondary)
+
             if let readinessText {
                 Text(readinessText).font(.caption.monospacedDigit())
             }

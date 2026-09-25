@@ -407,3 +407,34 @@ struct DetectorTrainingOfferBanner: View {
         }
     }
 }
+
+/// Quiet line on the Done screen after a conversion with a newly reviewed
+/// page: the reviewer sees the review feeding the training goal.
+struct DetectorTrainingProgressLine: View {
+    let store: ZakoSessionStore
+    @State private var line: String?
+
+    var body: some View {
+        Group {
+            if let line {
+                Text(line).font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .task { await refresh() }
+    }
+
+    private func refresh() async {
+        guard store.settingsStore.settings.learnFromReviews,
+              !store.reviewedNonEmptyPages.isEmpty else { return }
+        let bank = store.exampleBank
+        guard let pages = try? await bank.reviewedPages() else { return }
+        let root = ModelRegistry.modelsDirectory(in: await bank.directory)
+        let state = (try? TrainingState.load(from: root)) ?? TrainingState()
+        if let lastRun = state.lastRunAt {
+            let fresh = pages.filter { $0.reviewedAt > lastRun }.count
+            line = "Strana pribudla do učenia (\(fresh) nových z \(DetectorTrainingReadiness.retrainNewPages))."
+        } else {
+            line = "Strana pribudla do učenia (\(pages.count) z \(DetectorTrainingReadiness.firstRunPages))."
+        }
+    }
+}
