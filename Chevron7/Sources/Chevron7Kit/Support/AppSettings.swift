@@ -122,6 +122,9 @@ public struct AppSettings: Codable, Sendable {
     public var useFoundationModelClassifier: Bool
     /// Record confirmed and rejected elements into the local example bank.
     public var learnFromReviews: Bool
+    /// Offer detector training once enough pages are reviewed. The workflow
+    /// stays reachable from Settings when offers are off.
+    public var detectorTrainingOffersEnabled: Bool
     /// Show "Podpísať mobilom" and allow signing through Autogram v mobile.
     public var mobileSigningEnabled: Bool
     /// AVM server base URL. Only the public host works with the App Store app; kept configurable for testing.
@@ -155,7 +158,7 @@ public struct AppSettings: Codable, Sendable {
         case pdfaMode, profiles, activeProfileID
         case ezzkICO, ezzkUsername, ezzkNotificationEmail, ezzkEdeskAddress, ezzkMode, ezzkPersonName
         case retainRecentDocuments
-        case useFoundationModelClassifier, learnFromReviews
+        case useFoundationModelClassifier, learnFromReviews, detectorTrainingOffersEnabled
         case mobileSigningEnabled, avmBaseURL
         case webSigningSavesLocally, webSigningOutputPath, webSigningRetentionDays
         case batchASiCPackaging
@@ -183,6 +186,7 @@ public struct AppSettings: Codable, Sendable {
                 retainRecentDocuments: Bool = false,
                 useFoundationModelClassifier: Bool = true,
                 learnFromReviews: Bool = true,
+                detectorTrainingOffersEnabled: Bool = true,
                 mobileSigningEnabled: Bool = true,
                 avmBaseURL: String = AVMClient.publicBaseURL.absoluteString,
                 webSigningSavesLocally: Bool = true,
@@ -211,6 +215,7 @@ public struct AppSettings: Codable, Sendable {
         self.retainRecentDocuments = retainRecentDocuments
         self.useFoundationModelClassifier = useFoundationModelClassifier
         self.learnFromReviews = learnFromReviews
+        self.detectorTrainingOffersEnabled = detectorTrainingOffersEnabled
         self.mobileSigningEnabled = mobileSigningEnabled
         self.avmBaseURL = avmBaseURL
         self.webSigningSavesLocally = webSigningSavesLocally
@@ -262,6 +267,7 @@ public struct AppSettings: Codable, Sendable {
         self.retainRecentDocuments = try container.decodeIfPresent(Bool.self, forKey: .retainRecentDocuments) ?? false
         self.useFoundationModelClassifier = try container.decodeIfPresent(Bool.self, forKey: .useFoundationModelClassifier) ?? true
         self.learnFromReviews = try container.decodeIfPresent(Bool.self, forKey: .learnFromReviews) ?? true
+        self.detectorTrainingOffersEnabled = try container.decodeIfPresent(Bool.self, forKey: .detectorTrainingOffersEnabled) ?? true
         self.mobileSigningEnabled = try container.decodeIfPresent(Bool.self, forKey: .mobileSigningEnabled) ?? true
         self.avmBaseURL = try container.decodeIfPresent(String.self, forKey: .avmBaseURL) ?? AVMClient.publicBaseURL.absoluteString
         self.webSigningSavesLocally = try container.decodeIfPresent(Bool.self, forKey: .webSigningSavesLocally) ?? true
@@ -295,6 +301,7 @@ public struct AppSettings: Codable, Sendable {
         try container.encode(retainRecentDocuments, forKey: .retainRecentDocuments)
         try container.encode(useFoundationModelClassifier, forKey: .useFoundationModelClassifier)
         try container.encode(learnFromReviews, forKey: .learnFromReviews)
+        try container.encode(detectorTrainingOffersEnabled, forKey: .detectorTrainingOffersEnabled)
         try container.encode(mobileSigningEnabled, forKey: .mobileSigningEnabled)
         try container.encode(avmBaseURL, forKey: .avmBaseURL)
         try container.encode(webSigningSavesLocally, forKey: .webSigningSavesLocally)
